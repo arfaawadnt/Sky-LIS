@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.2.1** · released 2026-10-10 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.2.2** · released 2026-10-10 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -210,6 +210,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.2.2 — 2026-10-10
 
 - **Sign-in**: a return URL of the other portal is ignored, so a platform administrator never lands on a client page.
 - **Development**: `seed-reasons` seeds the cancellation, refund, discount and rejection reasons (also part of
