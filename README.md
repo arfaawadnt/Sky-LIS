@@ -234,7 +234,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **UAT dry run, laboratory personas** (cashier, accounts, samples, technician, unit head; 19 critical scripts, results
+  under `docs/uat/results/`): the cash desk re-reads the device's treasury access per user and session instead of once per
+  browser session, the refund reasons reload per user, and the result-printing refusal text covers printing. The Cashier
+  role gains `catalogue.view` (refund reasons are a catalogue list). UAT scripts corrected to v0.3.
 
 ### v0.3.3 — 2026-10-10
 

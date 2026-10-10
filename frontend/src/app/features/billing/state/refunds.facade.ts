@@ -2,10 +2,11 @@ import { Injectable, computed, inject, resource, signal } from '@angular/core';
 
 import type { RefundCreated, RefundRegisterFilter, VisitAccountView } from '../../../core/api/billing.contracts';
 import type { PageRequest } from '../../../core/api/paging';
+import { AuthStore } from '../../../core/auth/auth.store';
 import { mutation } from '../../../core/state/mutation';
 import { BillingApi, type DownloadedFile } from '../data/billing.api';
 import type { MovementInput } from '../ui/movement-form.component';
-import { CashDeskFacade } from './cash-desk.facade';
+import { CashDeskFacade, reloadWhenSettled } from './cash-desk.facade';
 import type { VisitLookup } from './payments.facade';
 
 export const DEFAULT_REFUND_FILTER: RefundRegisterFilter = { accession: null, fromUtc: null, toUtc: null, treasuryId: null, method: null, page: 1, pageSize: 50 };
@@ -15,6 +16,7 @@ export const DEFAULT_REFUND_FILTER: RefundRegisterFilter = { accession: null, fr
 export class RefundsFacade {
   private readonly api = inject(BillingApi);
   private readonly desk = inject(CashDeskFacade);
+  private readonly auth = inject(AuthStore);
 
   readonly lookup = signal<VisitLookup | null>(null);
 
@@ -25,9 +27,16 @@ export class RefundsFacade {
 
   readonly current = computed<VisitAccountView | null>(() => (this.account.hasValue() ? this.account.value() : null));
 
+  /** Keyed by the signed-in user: another cashier on the same browser never inherits a list (or a refusal) read for someone else. */
   readonly reasons = resource({
+    params: () => ({ userId: this.auth.currentUser()?.id ?? '' }),
     loader: ({ abortSignal }) => this.api.refundReasons(abortSignal),
   });
+
+  /** Called when the Refunds page opens: a reason list that settled on an earlier visit (UAT D-08) is read again. */
+  refreshReasons(): void {
+    reloadWhenSettled(this.reasons);
+  }
 
   readonly refund = mutation(
     (input: MovementInput & { readonly visitId: string; readonly reasonId: string }): Promise<RefundCreated> =>

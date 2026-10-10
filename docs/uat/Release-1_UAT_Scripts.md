@@ -1,6 +1,6 @@
 # Sky LIS — Release 1 User Acceptance Test Scripts (LIS-UAT-001)
 
-Version 0.2 · 2026-10-10 · Status: draft for review by the business owner (corrected after the automated dry run of UAT-ADM and UAT-REG, `docs/uat/results/2026-10-10_dry-run_admin-reception.md`) · Build plan phase P6 ("User acceptance & training")
+Version 0.3 · 2026-10-10 · Status: draft for review by the business owner (corrected after the automated dry runs of UAT-ADM / UAT-REG, `docs/uat/results/2026-10-10_dry-run_admin-reception.md`, and of UAT-CSH / UAT-FIN / UAT-SMP / UAT-RES / UAT-VER, `docs/uat/results/2026-10-10_dry-run_laboratory.md`) · Build plan phase P6 ("User acceptance & training")
 
 Sources: business SRS LIS-SRS-001 (`docs/srs`, page ids CP-nn / SA-nn, workflows WF-nn, rules BR-nn), the module intakes
 (`docs/intake`, acceptance scenario ids and refusal codes), the Release-1 scope record (`docs/build/MODULES.md` §6, wave 4),
@@ -96,7 +96,7 @@ UAT-OPS, UAT-MDR, remaining UAT-SUP. Scripts inside a persona run in their numbe
 | Laboratory administrator | `lab.admin` (seeded) | Laboratory Administrator (seeded: everything) | branch MAIN; `lab.admin.manager` available as a second administrator for the SoD steps |
 | Shift manager (approver) | `lab.admin.manager` (seeded) | same role | approves treasury access, never requests it in the scripts |
 | Reception clerk | `uat.reception` | **Reception**: dashboard.view · registration.view/create/edit/cancel/export · patients.view/create/edit · pricing.view · catalogue.view · billing.view/create · treasury.view/create/cancel · results.view · samples.view (the Samples dialog of CP-10) · special: discount cap **10 %**, CanPay, CanCancel · result rights: see on CHEM and HEMA, every branch | branch MAIN; treasury MAIN-CASH approved for the clerk on the clerk's workstation (UAT-CSH-01 run as the clerk, approved by the manager) |
-| Cashier | `uat.cashier` | **Cashier**: dashboard.view · registration.view · billing.view/create/approve/cancel/export · treasury.view/create/cancel · pricing.view · special: CanPay, CanRefund, CanCancel, CanPrintInvoice · no result rights | branch MAIN; own browser profile |
+| Cashier | `uat.cashier` | **Cashier**: dashboard.view · registration.view · billing.view/create/approve/cancel/export · treasury.view/create/cancel · pricing.view · catalogue.view (the refund reason list of CP-24 is read from the catalogue) · special: CanPay, CanRefund, CanCancel, CanPrintInvoice · no result rights | branch MAIN; own browser profile |
 | Phlebotomist / technician (sample side) | `uat.reception` and `uat.tech` | as Reception / Technician | visits registered by UAT-REG-03 |
 | Laboratory technician | `uat.tech` | **Technician**: dashboard.view · results.view/create/approve/export · catalogue.view · result rights: see, review, edit, print on **CHEM and HEMA**, every branch (no verify) · no special rights | branch MAIN |
 | Technician, chemistry only | `uat.tech.chem` | **Technician (chemistry)**: as Technician but result rights on **CHEM only** | used by UAT-RES-08 |
@@ -262,14 +262,14 @@ Sign in as `uat.accounts`.
 Refs: CP-32 · WF-01 step 4, WF-10 · BR-06 · PRC S-P1-ok, S-P1-web, S-P1-dup, S-P3-default, S-P5-dup.
 Finance › Payers & contracts (`/pricing/payers`).
 1. Open the page: the default **Cash** payer with its **Default** tier exists (provisioned on first open).
-2. `New payer`: name "AXA Insurance" / Arabic, search key ` axa `, type Insurance, portal enabled, web username `axa.portal`. Save. `Add tier` "Gold" / Arabic, then "Silver".
+2. `New payer`: name "AXA Insurance" / Arabic, search key ` axa `, type Insurance, portal enabled, web username `axa.portal`. Save. `Add tier` "Gold" / Arabic, then "Silver". (When AXA / Gold already exist from an earlier session, add the missing tier only.)
 3. `Add tier` "Gold" again on AXA.
 4. `New payer` with search key `axa`.
 5. `New payer` with the portal enabled and no web username.
 6. On the Cash payer: `Deactivate`; on its Default tier: `Deactivate tier`.
 7. `Deactivate` AXA, confirm; then `Reactivate`.
 8. Arabic check.
-Expected: (1) Cash / Default present. (2) AXA Active, search key **AXA**, two tiers. (3) refused `PRC-103`. (4) refused `PRC-100`. (5) refused — the form insists on the username (`PRC-003`). (6) refused `PRC-020` and `PRC-021`. (7) Inactive ("its tiers quote nothing"), then Active.
+Expected: (1) Cash / Default present. (2) AXA Active, search key **AXA**, two tiers. (3) refused `PRC-103` "The payer already has a tier with this name." (4) refused `PRC-100` "Another payer uses this search key." (5) refused by the request validator (`VALIDATION-400`) with the field message "'Web Username' must not be empty." — the domain code `PRC-003` guards the same rule. (6) the payer is refused `PRC-020` "The default cash payer cannot be deactivated or change type."; the Default tier offers no `Deactivate tier` action (`PRC-021` on a forced request). (7) the confirm dialog reads "its tiers quote nothing"; Inactive (listed under the status filter All), then Active after `Reactivate`.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-FIN-02 — Base price lists: edit and activate · critical
@@ -283,7 +283,7 @@ Finance › Base price lists (`/pricing/base-price-lists`).
 6. Reception › Price query (as `uat.reception`, after UAT-ADM-03): quote K.
 7. Back on PL27: `Deactivate`.
 8. Arabic check.
-Expected: (1) as stated. (2) "List saved."; eight lines. (3) both refused `PRC-006`. (4) PL27 created **inactive** ("New lists start inactive"). (5) Active. (6) K is quoted **130** (the active list with the highest year prices cash patients, Pricing Q2), GLU is "Not priced under this contract" (not on PL27). (7) Inactive; K is quoted 120 again.
+Expected: (1) as stated (`Open price grid`). (2) "Prices saved: 4 added, 0 changed."; eight lines ("8 active of 8"). (3) both refused by the page: "Correct the highlighted prices first." (nothing is sent; `PRC-006` on a forced request). (4) "List saved."; PL27 is created **inactive** ("New lists start inactive") and its price grid opens at once. (5) Active. (6) K is quoted **130** (the active list with the highest year prices cash patients, Pricing Q2), GLU is "Not priced under this contract" (not on PL27). When the Accounts persona runs this step, the code is picked from the picker (see FIN-04). (7) Inactive; `Clear` the quote and add K again: 120.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-FIN-03 — Copy a list and Apply · standard
@@ -302,7 +302,7 @@ Reception › Price query (`/registration/price-query`) — Accounts holds `regi
 2. Payer AXA, tier Gold, same services.
 3. Add HCG with patient gender Male.
 4. Arabic check.
-Expected: (1) K 120 / patient share 120 / payer 0, GLU 90, HCG 250, preparation "Fasting hours?" shown on GLU, expected result dates by turnaround; the quote prints with "This quote is for information only". (2) every line "Not priced under this contract" (no contract pricing in Release 1). (3) the line is refused as restricted to the other gender (`REG-015`) or shown as not orderable.
+Expected: (1) K 120 / patient share 120 / payer 0, GLU 90, HCG 250, preparation "Fasting hours?" shown on GLU, expected result dates by turnaround; the quote prints with "This quote is for information only". Typing a code and Enter opens the picker for Accounts (the server-side service-entry resolution needs `registration.create`, REG intake §6; the picker's catalogue lookup needs `catalogue.view` only): pick the service there. (2) every line "Not priced under this contract" (no contract pricing in Release 1). (3) the line is refused as restricted to the other gender (`REG-015`) or shown as not orderable.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-FIN-05 — Payments register and receipts · standard
@@ -334,7 +334,7 @@ Finance › Treasury access (`/treasury/access`).
 2. Request MAIN-CASH again from the same browser.
 3. Tick `My requests only`.
 4. Arabic check.
-Expected: (1) "Access requested."; a row `TRQ-2026-nnnnn` **Pending**, requested by the cashier, device label, treasury, branch. (2) refused `TRS-012` "A pending or approved request already exists for this treasury on this device." (3) only the cashier's rows. The manager approves in UAT-ADM-07.
+Expected: (1) "Access requested."; a row `TRQ-2026-nnnnn` **Pending**, requested by the cashier, device label, treasury (`CODE · name`; the branch is the treasury's), decider column empty. (2) refused `TRS-012` "A pending or approved request already exists for this treasury on this device." (3) only the cashier's rows. The manager approves in UAT-ADM-07.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-CSH-02 — Payment refused before approval · critical
@@ -352,7 +352,7 @@ After approval. Visit: the one UAT-REG-09 saved without payment (patient share 2
 2. `Pay`: amount defaults to 210, method Cash, treasury MAIN-CASH, device shown. `Pay`.
 3. `Reprint` the receipt.
 4. Arabic check.
-Expected: (2) "Payment recorded — receipt RCT-2026-nnnnn."; the receipt prints (auto-print); account paid 210, remaining 0, status **Paid**; the payment row shows treasury, cashier, device. (3) a reprint copy. Search registrations shows the visit Settled.
+Expected: (2) "Payment recorded — receipt RCT-2026-nnnnn."; the receipt prints (auto-print); account paid 210, remaining 0, status **Paid**; the payment row shows receipt, time, amount, method, reference, cashier and status; treasury and device are stamped on the payment (Register tab column Treasury; `treasuryCode` / `deviceId` in the account). (3) a reprint copy. Search registrations shows the visit Settled.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-CSH-04 — Partial payments, card reference · critical
@@ -362,7 +362,7 @@ Visit: UAT-REG-08 (150 due, 100 paid at registration, 50 remaining).
 2. Same with reference `SLIP-1`.
 3. `Pay` the remaining 30 by POS with reference `POS-7`.
 4. Arabic check.
-Expected: (1) refused — "Enter the transaction reference." (`BIL-003`). (2) receipt; remaining 30, status Partial. (3) receipt; remaining 0, Paid; three receipts listed on the account (RCT at registration + two).
+Expected: (1) refused by the page: the Reference field reads "This field is required." under the hint "required except for cash" (`BIL-003` on a forced request). (2) receipt; remaining 30, status Partial ("Partly paid"). (3) receipt; remaining 0, Paid; three receipts listed on the account (RCT at registration + two).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-CSH-05 — Payment above the remaining balance · critical
@@ -372,7 +372,7 @@ Visit: any visit with remaining 50 (register one as the clerk with GLU only, pay
 2. `Pay` 0; then `-5`; then `10.005`.
 3. `Pay` 50.
 4. Arabic check.
-Expected: (1) refused `BIL-010` "The amount paid exceeds the remaining balance of the visit."; nothing recorded. (2) refused `BIL-001` / `BIL-002`. (3) recorded; "Nothing is due on this visit." afterwards.
+Expected: (1) refused by the page: "The value must be at most 50." (nothing is sent; `BIL-010` "The amount paid exceeds the remaining balance of the visit." on a forced request). (2) refused by the page: "The value must be at least 0.01." for 0 and −5, "The value has the wrong format." for 10.005 (`BIL-001` / `BIL-002` on a forced request). (3) recorded; "Nothing is due on this visit." afterwards.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-CSH-06 — Void a payment · standard
@@ -387,13 +387,13 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 #### UAT-CSH-07 — Refund a negative balance · critical
 Refs: CP-23 ("Refund the balance"), CP-24 · WF-09 step 4 · BR-14, BR-15 · BIL S-T3-ok, S-T3-over, S-T3-reason.
 Run after UAT-REG-11 cancelled a paid service (balance −150, status **Refund due**).
-1. Payments › `Collect` › that accession: `Refund the balance`.
-2. In the refund dialog: amount 200, reason "Service cancelled", cash. `Refund`.
+1. Payments › `Collect` › that accession: `Refund the balance` (a link that opens Finance › Refunds, `/billing/refunds?visitId=…`, with the visit's account).
+2. In the refund form: amount 200, reason "Service cancelled", cash. `Refund`.
 3. Amount 150, no reason. `Refund`.
 4. Amount 150, reason "Service cancelled". `Refund`. Print the refund receipt.
 5. `Refund the balance` again.
 6. Arabic check.
-Expected: (1) the dialog shows Refundable 150. (2) refused `BIL-011` "The amount exceeds the refundable balance." (3) refused `BIL-004` "Choose the reason of the refund." (4) "Refund RFD-2026-nnnnn recorded; print the receipt for the patient's signature."; the refund receipt shows amount, method, reason and "I received the amount above." signature box; remaining 0. (5) "Nothing is refundable on this visit."
+Expected: (1) the form shows "Refundable: 150.00 EGP" and the reason list of kind Refund (the Cashier role needs `catalogue.view` for it, §4; without it the form reads "The refund reasons could not be loaded."). (2) refused by the page: "The value must be at most 150." (`BIL-011` "The amount exceeds the refundable balance." on a forced request). (3) refused by the page: the Reason field reads "This field is required." (`BIL-004` on a forced request). (4) "Refund RFD-2026-nnnnn recorded; print the receipt for the patient's signature."; the refund receipt shows amount, method, reason and "I received the amount above." signature box; remaining 0; the refunds register lists the refund with reason, cashier and treasury. (5) the Refunds form reads "Nothing is refundable on this visit."; the Payments account offers no `Refund the balance` link any more.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-CSH-08 — Treasury of another branch · standard
@@ -412,7 +412,7 @@ Refs: CP-29 · BR-27 · TRS S-T4-ok · BIL S-T1-station.
 2. Cashier: `Pay` any balance on MAIN-CASH.
 3. Cashier: request MAIN-CASH again; manager approves.
 4. Arabic check.
-Expected: (1) row **Revoked** with reason. (2) refused `BIL-020`; the treasury disappears from the list. (3) a new TRQ, approved; payments work again.
+Expected: (1) row **Revoked** with the decider and time (the reason is kept on the request; the list does not show it yet — open point D-05 of the first dry run). (2) the treasury disappears from the Payments page ("No treasury is approved for you on this device."); `BIL-020` on a forced request. (3) a new TRQ, approved; payments work again.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-CSH-10 — Cancel own request · standard
@@ -623,7 +623,7 @@ Laboratory › Worklist (`/results/worklist`).
 4. `Print worklist`; `Export CSV`.
 5. Click `Results` on a row.
 6. Arabic check.
-Expected: (1) one row per ordered test: patient no., accession, sample, patient, age/sex, test, test status, sample status Received, collected, expected result (collection + duration on test days), delay, consumed %; rows coloured by the share of turnaround consumed (legend: ≥ warn %, ≥ late %), verified/printed rows uncoloured. (2) filters narrow the list. (3) the counters match the list. (4) the bench list prints with the count; the CSV downloads. (5) Results by accession opens on that visit.
+Expected: (1) one row per ordered test (no status box ticked = every status; tick `Ordered` to narrow): patient no., accession, sample, patient, age/sex, test, test status, sample status Received, collected, expected result (collection + duration on test days), delay, consumed %; rows coloured by the share of turnaround consumed (legend: ≥ warn %, ≥ late %), verified/printed rows uncoloured. (2) filters narrow the list. (3) the counters match the list. (4) the bench list prints with the count; the CSV downloads. (5) Results by accession opens on that visit.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-RES-02 — Enter numeric results, flags, panic · critical
@@ -635,7 +635,7 @@ Laboratory › Results by accession (`/results/by-accession`), visit of UAT-REG-
 4. On a visit of CREA (UAT-REG-14): CREA = `0.04` with a reportable low of 0.1 configured by the administrator (set it on CREA first). Save.
 5. Enter `abc` in NA of another visit. Save.
 6. Arabic check.
-Expected: (1) filters collapse; the case header shows patient data; **one tab per report unit** (CHEM with its Serum sample id, HEMA with its EDTA sample id) with the unit status. (2) K stored **6.8** (1 decimal), flag **HH / PANIC** (above 6.5), pink/red row; GLU normal (70–110); both **Complete**; "2 results saved."; the result log of K shows a Value row with user and time. (3) HGB 6.5 flagged panic low (< 7.0), Complete. (4) the value reads "< 0.1". (5) refused `RES-003` "The value must be a number."
+Expected: (1) the visits list collapses (`Hide visits`), the query fields stay; the case header shows patient data; **one tab per report unit** (CHEM with its Serum sample id, HEMA with its EDTA sample id) with the unit status. (2) K stored **6.8** (1 decimal), flag **HH / PANIC** (above 6.5), pink/red row; GLU normal (70–110); both **Complete**; "2 results saved."; the result log of K shows a Value row ("— → 6.8", Manual) with user and time. (3) HGB 6.5 flagged **LL / PANIC** (< 7.0), Complete — use a visit whose HEMA line is live (REG-11 cancels the HGB of UAT-REG-03's visit; UAT-SMP-01's visit works). (4) the result log and the report read "< 0.10" (the test's decimals); the editable cell keeps the typed 0.04. (5) refused `RES-003` "The value must be a number." on the row ("1 results were refused; see the codes on the rows.").
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-RES-03 — List, formula and reference-range resolution · standard
@@ -650,13 +650,13 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 #### UAT-RES-04 — Comment, note and review · critical
 Refs: CP-19, CP-47 · WF-06 steps 4–5 · RES R-T3-ok, R-T3-state, T10, T11.
 Visit of UAT-REG-03.
-1. On K: `Report comment (prints)` › insert from the library with `%haem` → HAEM. Save.
+1. On K: `Report comment (prints)` › in the dialog's Comment library panel search `haem` and click **HAEM** (its text is appended to the comment). Save.
 2. On K: `Internal note (never prints)` "recollect next time". Save.
 3. `Review` the CHEM unit.
 4. On a visit with no value entered: `Review`.
 5. `Verify`.
 6. Arabic check.
-Expected: (1) "The report comment was saved."; the comment appears under the test in the preview (UAT-VER-06). (2) "The internal note was saved."; absent from the preview. (3) K and GLU **Reviewed** ("2 results reviewed."), reviewer logged in the status log. (4) "No complete result to review." (`RES-012`). (5) the technician has no verify right: the button is disabled or the request is refused `RES-052` "You have no right to verify results of this clinical group in this branch."
+Expected: (1) "The report comment was saved."; the comment appears under the test in the preview (UAT-VER-06). (2) "The internal note was saved."; absent from the preview. (3) K and GLU **Reviewed** ("2 results reviewed."), reviewer logged in the status log. (4) "No complete result to review." (`RES-012`). (5) the technician has no verify right: the `Verify` button is absent (`RES-052` "You have no right to verify results of this clinical group in this branch." on a forced request).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-RES-05 — Verified value is frozen · standard
@@ -706,7 +706,7 @@ Visit of UAT-REG-03 after UAT-RES-04 (K, GLU Reviewed).
 1. Tab CHEM › `Verify`.
 2. Open the status log of K.
 3. Arabic check.
-Expected: (1) K and GLU **Verified**; the grid shows the verifier's name and time; the unit status Verified; the worklist row loses its colour. (2) the log lists Ordered → Complete (technician) → Reviewed → Verified (unit head, time). The sign-off is the electronic signature printed on the report.
+Expected: (1) "2 results verified (electronic signature)."; K and GLU **Verified** (row action `Amend` appears); the unit status Verified; the verifier's name and time are in the status log (`History and previous results`); the worklist row loses its colour. (2) the log lists Ordered → Complete (technician) → Reviewed → Verified (unit head, time). The sign-off is the electronic signature printed on the report.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-VER-02 — Missing values: verify, preview and print refused · critical
@@ -717,7 +717,7 @@ Visit of UAT-SMP-01 after UAT-RES-08 entered **one** CHEM value (K) and left NA 
 3. `Print report`.
 4. Enter NA and GLU, Save, `Verify`, then `Preview` and `Print report`.
 5. Arabic check.
-Expected: (1) only results **with a value** are signed (K Verified); the unit stays below Verified (lowest status, BR-04) with the badge "values missing"; forcing a verify on NA answers `RES-014` "A result without a value cannot be verified." (2) refused `RES-022` "A value is missing: the report cannot be previewed without the 'preview without verify' right." (3) refused `RES-021` "Only verified results print (BR-09)." (4) the unit is Verified; the preview shows the report; print marks it **Printed ×1**.
+Expected: (1) only results **with a value** are signed (K Verified); the unit stays below Verified (lowest status, BR-04) with the badge "values missing"; forcing a verify on NA answers `RES-014` "A result without a value cannot be verified." (2) refused `RES-022` "A value is missing: the report cannot be previewed without the 'preview without verify' right." (3) refused `RES-014` "A result without a value cannot be verified or printed." — the results are checked in grid order and each one's value before its state, so with K verified the empty NA decides; a unit whose first unverified result holds a value is refused `RES-021` "Only verified results print (BR-09)." instead. (4) the unit is Verified; the preview shows the report; print marks it **Printed** (status Printed and "Printed (copy 1)" in the status log after the visit is queried again).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-VER-03 — Delta check acknowledgement · critical
@@ -727,7 +727,7 @@ Refs: CP-19 · BR-11 · RES R-T2-delta, T7 · CREA delta 20 % (UAT-ADM-08).
 3. `Verify`.
 4. In the delta dialog read the message and click `Acknowledge and verify`.
 5. Arabic check.
-Expected: (1) Verified. (2) the row carries the **delta** flag; the tooltip shows "Previous 1.00" and the date. (3) the "Delta check" dialog opens: "These results differ from the patient's previous verified result beyond the test's delta limit (BR-11)…"; a forced verify without acknowledgement answers `RES-015`. (4) the log records "Delta acknowledged" then Verified; the value is unchanged (BR-11: warns, never blocks the value).
+Expected: (1) Verified. (2) the row carries the **delta** badge ("Δ 30%", `Acknowledge`); its tooltip reads "Previous 1, change 30%". (3) the "Delta check" dialog opens: "These results differ from the patient's previous verified result beyond the test's delta limit (BR-11)…"; a forced verify without acknowledgement answers `RES-015`. (4) the log records "Delta acknowledged" then Verified; the value is unchanged (BR-11: warns, never blocks the value).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-VER-04 — Undo verification and review · standard
@@ -745,7 +745,7 @@ Refs: CP-19 · BR-09, BR-15 · RES R-T6-ok, R-T6-right (RES-055).
 2. `Verify` again, `Print report`.
 3. Sign in as `uat.tech` (no "modify verified result" right) and try Amend on a verified result.
 4. Arabic check.
-Expected: (1) "The result was amended and returned to Complete; it needs a new verification."; the log keeps the previous value 6.8, the previous signature and the reason. (2) Verified again; the report prints with the amendment count and Printed ×2. (3) refused `RES-055` "Amending a verified result needs the special right 'modify verified result'."
+Expected: (1) "The result was amended and returned to Complete; it needs a new verification."; the log keeps the previous value 6.8, the previous signature and the reason. (2) Verified again; the report prints with the amendment count and "Printed (copy 2)" in the status log. (3) the `Amend` action is absent for the technician (`RES-055` "Amending a verified result needs the special right 'modify verified result'." on a forced request).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-VER-06 — Report preview and print · critical
@@ -755,7 +755,7 @@ Visit of UAT-REG-03 (CHEM verified in UAT-VER-01; HEMA cancelled in UAT-REG-11 o
 2. `Print report`.
 3. Reception (`uat.reception`): Search registrations › `Documents` › results report.
 4. Arabic check (the report language follows the tenant parameter `resultLanguage` default; note what prints).
-Expected: (1) the report: template header, patient and visit header, per report unit the tests with value, unit, reference range, flag (K 6.8 **HH**), the report comment under K, no internal note, the verifier's name and time as signature, QR code; hidden helper tests (none in this data) never print. (2) "The report of ACC-… was marked printed and sent to the printer."; Printed ×1; the log shows a Status row Printed. (3) the clerk can print the verified report; an unverified unit is refused `RES-021`.
+Expected: (1) the report: template header, patient and visit header, per report unit the tests with value, unit, reference range, flag (K 6.8 **HH**), the report comment under K, no internal note, the verifier's name and time as signature, QR code; hidden helper tests (none in this data) never print. (2) "The report of ACC-… was marked printed and sent to the printer."; status Printed and "Printed (copy 1)" in the status log. (3) `Results report` opens Results by accession on the visit; the clerk can `Preview` the verified report; printing needs `results.export` and the print result right, which the Reception role of §4 does not hold (open point 9) — a unit with missing values is refused at preview (`RES-022`).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-VER-07 — Panic value notification · standard · *gateway*
@@ -1076,6 +1076,11 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 3 | Review before verify (OQ-05) is off by default and cannot be changed by the laboratory in Release 1 (CP-57 is Release 2). | RES-04, VER-01 |
 | 4 | Accession format `ACC-yyyy-nnnnn`, patient `PAT-yyyy-nnnnn`, sample `SMP-…` (OQ-07) until configurable formats arrive. | REG-03 |
 | 5 | The notification gateway of the test lane decides whether the *gateway* scripts can run. | REG-02, OPS-07, VER-07 |
+| 6 | The refund reason list (CP-24) is read from the catalogue, so the Cashier role needs `catalogue.view` (now in §4); alternatively Billing exposes its own reason list. | CSH-07 |
+| 7 | Service-entry resolution (code + Enter) needs `registration.create` (REG intake §6): on the Price query page a `registration.view`-only role (Accounts) falls back to the picker without a message. Confirm, or relax the policy to `registration.view`. | FIN-02, FIN-04 |
+| 8 | The treasury-access list shows the decider and time but not the decision reason / revocation reason (D-05 of the first dry run). | CSH-09, ADM-07 |
+| 9 | Printing a verified report from Search registrations › Documents needs `results.export` and the print result right; the Reception role of §4 holds `results.view` only (preview works). Decide whether reception prints reports. | VER-06, REG-10 |
+| 10 | The Countries master gives Egypt a mobile length of 10: an Egyptian number typed with the trunk 0 (11 digits, as the seeded patients) is refused under "Egypt (10)" and accepted under "Any". Confirm the convention. | REG-03, SMP-01 |
 
 ## 10. Revision history
 
@@ -1083,3 +1088,4 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | --- | --- | --- | --- |
 | 0.1 | 2026-10-10 | Claude Code (documentation agent), for review by Mohamed Hashem | First set of Release-1 UAT scripts: 78 scripts (45 critical) across ten personas, results sheet, acceptance criteria, coverage. |
 | 0.2 | 2026-10-10 | Claude Code (UAT dry-run agent) | Corrections from the automated dry run of UAT-ADM-01/02/03/06/07/08 and UAT-REG-01/03/04/05/07/08/09/10/11 (`results/2026-10-10_dry-run_admin-reception.md`): §3 says what the screen shows for a code and which rules the page enforces before any call; §4 Reception role gains `samples.view`; expected texts aligned with the built screens (validator and page refusals, lockout after five failures, `Create and use`, dry-run line messages, treasury branch picker, decision time on treasury rows, role editor flow). Ids unchanged. |
+| 0.3 | 2026-10-10 | Claude Code (UAT dry-run agent) | Corrections from the automated dry run of UAT-CSH-01/02/03/04/05/07/09, UAT-FIN-01/02, UAT-SMP-01, UAT-RES-01/02/04/08 and UAT-VER-01/02/03/05/06 (`results/2026-10-10_dry-run_laboratory.md`): §4 Cashier role gains `catalogue.view`; expected texts aligned with the built screens (page validators on the Payments / Refunds / price-grid forms, the Refunds page reached by `Refund the balance`, validator message for the web username, no deactivate action on the Default tier, picker fallback of the service entry for Accounts, status boxes of the worklist, comment-library panel, absent Verify / Amend actions, RES-014 on printing a unit with missing values, delta tooltip text, status log as the carrier of signatures and print copies, preview-only for the clerk); open points 6–10. Ids unchanged. |

@@ -277,7 +277,7 @@
   "error.RES-011": "The result is verified or printed: use Amend to change it.",
   "error.RES-012": "Only complete results can be reviewed.",
   "error.RES-013": "The result cannot be verified in its current status.",
-  "error.RES-014": "A result without a value cannot be verified.",
+  "error.RES-014": "A result without a value cannot be verified or printed.",
   "error.RES-015": "Acknowledge the delta check before verifying (BR-11).",
   "error.RES-016": "This laboratory reviews results before verifying them.",
   "error.RES-017": "Nothing to undo: the result is not reviewed or verified.",

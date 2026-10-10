@@ -94,6 +94,10 @@ export class RefundsPage {
 
   constructor() {
     void this.i18n.load('billing');
+    // UAT D-08: the cash desk is shared by the module's pages for the life of the route; re-read the approved treasuries
+    // (and the refund reasons) each time a page opens so an approval or a role change since the last read shows at once.
+    this.desk.refresh();
+    this.facade.refreshReasons();
 
     effect(() => {
       const visitId = this.visitId();
