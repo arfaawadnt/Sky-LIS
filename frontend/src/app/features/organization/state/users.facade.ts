@@ -39,6 +39,12 @@ export class UsersFacade {
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
   }
+
+  /** Re-reads the users and the role filter when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.list.reload();
+    this.roles.reload();
+  }
 }
 
 /**
@@ -97,6 +103,15 @@ export class UserEditorFacade {
   readonly resetPassword = mutation((request: ResetUserPasswordRequest) => this.api.resetUserPassword(this.requireId(), request), { then: () => this.detail.reload() });
 
   readonly setActive = mutation((active: boolean) => this.api.setUserActive(this.requireId(), active), { then: () => this.detail.reload() });
+
+  /** Re-reads the user and its lookups when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.detail.reload();
+    this.roles.reload();
+    this.branches.reload();
+    this.catalogue.reload();
+    this.passwordMinLength.reload();
+  }
 
   private requireId(): string {
     const id = this.userId();

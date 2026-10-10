@@ -164,6 +164,7 @@ export class ServiceEditorPage {
   constructor() {
     void this.i18n.load('catalogue-a');
     this.facade.load(this.serviceId);
+    this.options.refresh();   // the options outlive the page: re-read on open (UAT D-14)
     if (!this.isNew) {
       this.form.controls.code.disable();
       this.form.controls.type.disable();

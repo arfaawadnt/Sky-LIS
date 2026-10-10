@@ -178,6 +178,29 @@ public sealed class MembershipDirectory(AppDbContext context, ITenantContextAcce
                 .ToList();
         }
     }
+
+    public async Task<bool> HasInactiveClientMembershipAsync(Guid platformUserId, Guid? tenantId, CancellationToken cancellationToken)
+    {
+        using (tenant.Elevate())
+        {
+            var tenantIds = await context.TenantMemberships.AsNoTracking()
+                .Where(m => m.PlatformUserId == platformUserId && m.IsActive && (tenantId == null || m.TenantId == tenantId))
+                .Select(m => m.TenantId)
+                .Distinct()
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            foreach (var candidate in tenantIds.Where(id => !TenantIds.IsPlatform(id)))
+            {
+                if (!await tenantStatus.IsActiveAsync(candidate, cancellationToken).ConfigureAwait(false))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
 }
 
 /// <summary>

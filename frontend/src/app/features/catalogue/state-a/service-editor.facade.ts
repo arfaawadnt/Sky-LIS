@@ -57,8 +57,11 @@ export class ServiceEditorFacade {
     then: () => this.detail.reload(),
   });
 
+  /** Opens a record; the detail is re-read even for the id already loaded, because the facade outlives the page (UAT D-14). */
   load(id: string | null): void {
     this.id.set(id);
+    this.detail.reload();
+    this.candidates.reload();
   }
 
   search(kind: ServiceMemberKind, search: string): void {

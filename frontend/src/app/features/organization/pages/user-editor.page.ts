@@ -208,6 +208,7 @@ export class UserEditorPage {
 
   constructor() {
     void this.i18n.load('organization');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14)
     effect(() => {
       const id = this.userId();
       untracked(() => this.facade.userId.set(id ?? null));

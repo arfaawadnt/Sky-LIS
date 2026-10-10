@@ -62,4 +62,9 @@ export class ParametersFacade {
   changes(): readonly SettingValueItem[] {
     return [...this.edits()].map(([key, value]) => ({ key, value }));
   }
+
+  /** Re-reads the parameters when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.settings.reload();
+  }
 }

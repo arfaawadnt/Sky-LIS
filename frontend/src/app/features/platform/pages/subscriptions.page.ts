@@ -139,6 +139,7 @@ export class SubscriptionsPage {
 
   constructor() {
     void this.i18n.load('platform');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14)
     const fromQuery = this.route.snapshot.queryParamMap.get('client');
     if (fromQuery) {
       this.facade.selectClient(fromQuery);

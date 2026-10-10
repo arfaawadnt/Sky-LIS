@@ -227,6 +227,7 @@ export class TestEditorPage {
   constructor() {
     void this.i18n.load('catalogue-a');
     this.facade.load(this.testId);
+    this.options.refresh();   // the options outlive the page: re-read on open (UAT D-14)
     if (!this.isNew) {
       this.general.controls.code.disable();
     }

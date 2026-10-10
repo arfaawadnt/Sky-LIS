@@ -51,6 +51,12 @@ export class PcrKitsFacade {
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
   }
+
+  /** Re-reads the kits and the analyser models when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.kits.reload();
+    this.models.reload();
+  }
 }
 
 /** SA-20 notification templates: list, save, activate, and the placeholder help served by the API. */
@@ -90,6 +96,12 @@ export class TemplatesFacade {
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
   }
+
+  /** Re-reads the templates and the placeholders when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.templates.reload();
+    this.placeholders.reload();
+  }
 }
 
 /** SA-19 platform parameters: the settings of the platform tenant, which are the defaults of every laboratory. */
@@ -104,4 +116,8 @@ export class ParametersFacade {
   readonly items = computed<readonly TenantSettingItem[]>(() => (this.settings.hasValue() ? this.settings.value().settings : []));
 
   readonly save = mutation((changes: readonly SettingValueItem[]) => this.api.saveSettings({ settings: changes }), { then: () => this.settings.reload() });
+  /** Re-reads the parameters when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.settings.reload();
+  }
 }

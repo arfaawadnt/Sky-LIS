@@ -42,4 +42,11 @@ public sealed record MembershipSummary(Guid TenantId, Guid MembershipId, string 
 public interface IMembershipDirectory
 {
     Task<IReadOnlyList<MembershipSummary>> ListActiveForUserAsync(Guid platformUserId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether the user holds an active membership in a client laboratory that is not usable (deactivated, or trial
+    /// ended: INV-PLT-003). Sign-in names that refusal <c>CLI-020</c> instead of the generic "no membership"; when
+    /// <paramref name="tenantId"/> is given only that laboratory is considered (the tenant chosen on the sign-in page).
+    /// </summary>
+    Task<bool> HasInactiveClientMembershipAsync(Guid platformUserId, Guid? tenantId, CancellationToken cancellationToken);
 }

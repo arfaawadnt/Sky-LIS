@@ -89,6 +89,7 @@ export class PcrKitsPage {
 
   constructor() {
     void this.i18n.load('platform');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14)
   }
 
   protected onActive(event: Event): void {

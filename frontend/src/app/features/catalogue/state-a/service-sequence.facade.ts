@@ -25,4 +25,9 @@ export class ServiceSequenceFacade {
   setType(type: ServiceType | null): void {
     this.filter.update((current) => ({ ...current, type }));
   }
+
+  /** Re-reads the sequence rows when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.rows.reload();
+  }
 }

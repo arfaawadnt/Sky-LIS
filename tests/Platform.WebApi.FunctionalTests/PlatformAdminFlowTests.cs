@@ -65,7 +65,12 @@ public sealed class PlatformAdminFlowTests(ApiFactory factory) : IClassFixture<A
         Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsJsonAsync($"{Clients}/{provisioned.Id}/deactivate", new DeactivateClientRequest("unpaid"))).StatusCode);
         Assert.Equal("Inactive", (await admin.GetFromJsonAsync<ClientDetail>($"{Clients}/{provisioned.Id}"))!.Status);
 
+        // INV-PLT-003: the laboratory's administrator is refused by name (CLI-020), not with the generic "no membership" (UAT dry run D-13).
+        var blocked = await new AuthClient(factory.CreateClient()).SignInAsync(provisioned.AdministratorUsername, "a long enough password");
+        Assert.Equal((HttpStatusCode.Unauthorized, "CLI-020"), (blocked.StatusCode, await AuthClient.CodeOf(blocked)));
+
         Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsync($"{Clients}/{provisioned.Id}/activate", null)).StatusCode);
+        await new AuthClient(factory.CreateClient()).SignInExpectingSuccessAsync(provisioned.AdministratorUsername, "a long enough password");
         var twice = await admin.PostAsync($"{Clients}/{provisioned.Id}/activate", null);
         Assert.Equal(HttpStatusCode.Conflict, twice.StatusCode);
         Assert.Equal("CLI-010", await AuthClient.CodeOf(twice));

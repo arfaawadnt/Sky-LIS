@@ -8,6 +8,7 @@ using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Persistence.Audit;
 using Platform.Infrastructure.Persistence.Settings;
 using Platform.IntegrationTests.Support;
+using Platform.SharedKernel.MultiTenancy;
 
 namespace Platform.IntegrationTests;
 
@@ -94,6 +95,49 @@ public sealed class TenantSettingsTests(DatabaseFixture fixture)
         var modified = await auditScope.ServiceProvider.GetRequiredService<AppDbContext>().Set<FieldChange>()
             .SingleAsync(change => change.EntityType == nameof(TenantSetting) && change.Action == FieldChangeAction.Modified);
         Assert.Equal(("ar", "en"), Field(modified, "Value"));
+    }
+
+    [DatabaseFact]
+    public async Task A_key_the_tenant_never_set_reads_the_platform_value_before_the_descriptor_default()
+    {
+        // Intake LIS-INT-FND-001 §6 / SA-19 (UAT dry run D-16): the platform parameters are the defaults of every laboratory.
+        var laboratory = Guid.CreateVersion7();
+        var actor = Guid.CreateVersion7();
+
+        using (var platform = fixture.AppScope(TenantIds.Platform, actor))
+        {
+            await platform.ServiceProvider.GetRequiredService<ITenantSettingsStore>().UpsertAsync(SettingKeys.PasswordMinLength.Key, "10", actor, Now, CancellationToken.None);
+            await platform.ServiceProvider.GetRequiredService<ITenantSettingsStore>().UpsertAsync(SettingKeys.LabelCopies.Key, "oops", actor, Now, CancellationToken.None);   // an invalid platform row is skipped
+            await platform.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        }
+
+        try
+        {
+            using (var inherited = fixture.AppScope(laboratory, actor))
+            {
+                var settings = inherited.ServiceProvider.GetRequiredService<ITenantSettings>();
+                Assert.Equal(10, await settings.GetAsync(SettingKeys.PasswordMinLength, CancellationToken.None));   // platform value
+                Assert.Equal(1, await settings.GetAsync(SettingKeys.LabelCopies, CancellationToken.None));          // descriptor default
+                Assert.Equal("10", (await settings.GetAllAsync(CancellationToken.None))[SettingKeys.PasswordMinLength.Key]);
+                Assert.Empty(await inherited.ServiceProvider.GetRequiredService<ITenantSettingsStore>().ListAsync(CancellationToken.None));   // nothing stored for the laboratory
+            }
+
+            using (var writer = fixture.AppScope(laboratory, actor))
+            {
+                await writer.ServiceProvider.GetRequiredService<ITenantSettingsStore>().UpsertAsync(SettingKeys.PasswordMinLength.Key, "12", actor, Now, CancellationToken.None);
+                await writer.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+            }
+
+            using var own = fixture.AppScope(laboratory, actor);
+            Assert.Equal(12, await own.ServiceProvider.GetRequiredService<ITenantSettings>().GetAsync(SettingKeys.PasswordMinLength, CancellationToken.None));   // the tenant's own value wins
+        }
+        finally
+        {
+            using var cleanup = fixture.AppScope(TenantIds.Platform, actor);
+            var context = cleanup.ServiceProvider.GetRequiredService<AppDbContext>();
+            context.Set<TenantSetting>().RemoveRange(await context.Set<TenantSetting>().ToListAsync());
+            await cleanup.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        }
     }
 
     private static (string? Before, string? After) Field(FieldChange change, string field)

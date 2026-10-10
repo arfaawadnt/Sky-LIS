@@ -29,39 +29,47 @@ export const routes: Routes = [
       {
         path: '',
         pathMatch: 'full',
-        canActivate: [tenantGuard],
+        canActivate: [tenantGuard],   // every client feature below is guarded the same way: a platform session is sent to /admin (UAT D-17)
         loadChildren: () => import('./features/home/home.routes').then((m) => m.HOME_ROUTES),
       },
       {
         path: 'treasury',
+        canActivate: [tenantGuard],
         loadChildren: () => import('./features/treasury/treasury.routes').then((m) => m.TREASURY_ROUTES),
       },
       {
         path: 'catalogue',
+        canActivate: [tenantGuard],
         loadChildren: () => import('./features/catalogue/catalogue.routes').then((m) => m.CATALOGUE_ROUTES),
       },
       {
         path: 'organization',
+        canActivate: [tenantGuard],
         loadChildren: () => import('./features/organization/organization.routes').then((m) => m.ORGANIZATION_ROUTES),
       },
       {
         path: 'pricing',
+        canActivate: [tenantGuard],
         loadChildren: () => import('./features/pricing/pricing.routes').then((m) => m.PRICING_ROUTES),
       },
       {
         path: 'patients',
+        canActivate: [tenantGuard],
         loadChildren: () => import('./features/patients/patients.routes').then((m) => m.PATIENTS_ROUTES),
       },
       {
         path: 'registration',
+        canActivate: [tenantGuard],
         loadChildren: () => import('./features/registration/registration.routes').then((m) => m.REGISTRATION_ROUTES),
       },
       {
         path: 'samples',
+        canActivate: [tenantGuard],
         loadChildren: () => import('./features/samples/samples.routes').then((m) => m.SAMPLES_ROUTES),
       },
       {
         path: 'billing',
+        canActivate: [tenantGuard],
         loadChildren: () => import('./features/billing/billing.routes').then((m) => m.BILLING_ROUTES),
       },
       {
@@ -70,10 +78,12 @@ export const routes: Routes = [
       },
       {
         path: 'integration',
+        canActivate: [tenantGuard],
         loadChildren: () => import('./features/integration/integration.routes').then((m) => m.INTEGRATION_ROUTES),
       },
       {
         path: 'results',
+        canActivate: [tenantGuard],
         loadChildren: () => import('./features/results/results.routes').then((m) => m.RESULTS_ROUTES),
       },
       {

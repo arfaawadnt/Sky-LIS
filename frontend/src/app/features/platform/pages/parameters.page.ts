@@ -90,6 +90,7 @@ export class ParametersPage {
 
   constructor() {
     void this.i18n.load('platform');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14)
     effect(() => {
       const items = this.facade.items();
       untracked(() => this.form.set(items.length === 0 ? null : this.buildForm(items)));

@@ -72,6 +72,14 @@ export class WalletsFacade {
     return this.api.all((page) => this.api.listWalletTransactions(clientId, kind, page));
   }
 
+  /** Re-reads the plans, the client list and the selected wallet when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.plans.reload();
+    this.clientOptions.reload();
+    this.wallet.reload();
+    this.transactions.reload();
+  }
+
   private reloadWallet(): void {
     this.wallet.reload();
     this.transactions.reload();

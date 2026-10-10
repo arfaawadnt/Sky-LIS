@@ -1,6 +1,6 @@
 # Sky LIS — Release 1 User Acceptance Test Scripts (LIS-UAT-001)
 
-Version 0.3 · 2026-10-10 · Status: draft for review by the business owner (corrected after the automated dry runs of UAT-ADM / UAT-REG, `docs/uat/results/2026-10-10_dry-run_admin-reception.md`, and of UAT-CSH / UAT-FIN / UAT-SMP / UAT-RES / UAT-VER, `docs/uat/results/2026-10-10_dry-run_laboratory.md`) · Build plan phase P6 ("User acceptance & training")
+Version 0.4 · 2026-10-10 · Status: draft for review by the business owner (corrected after the automated dry runs of UAT-ADM / UAT-REG, `docs/uat/results/2026-10-10_dry-run_admin-reception.md`, of UAT-CSH / UAT-FIN / UAT-SMP / UAT-RES / UAT-VER, `docs/uat/results/2026-10-10_dry-run_laboratory.md`, and of UAT-OPS / UAT-MDR / UAT-SUP, `docs/uat/results/2026-10-10_dry-run_super-admin.md`) · Build plan phase P6 ("User acceptance & training")
 
 Sources: business SRS LIS-SRS-001 (`docs/srs`, page ids CP-nn / SA-nn, workflows WF-nn, rules BR-nn), the module intakes
 (`docs/intake`, acceptance scenario ids and refusal codes), the Release-1 scope record (`docs/build/MODULES.md` §6, wave 4),
@@ -102,7 +102,7 @@ UAT-OPS, UAT-MDR, remaining UAT-SUP. Scripts inside a persona run in their numbe
 | Technician, chemistry only | `uat.tech.chem` | **Technician (chemistry)**: as Technician but result rights on **CHEM only** | used by UAT-RES-08 |
 | Unit head / pathologist | `uat.head` | **Unit head**: results.view/create/edit/approve/cancel/export/manage · catalogue.view · result rights: see, review, verify, edit, print on CHEM and HEMA, every branch · special: CanModifyVerifiedResult (not "preview without verify") | branch MAIN |
 | Accounts | `uat.accounts` | **Accounts**: pricing.view/create/edit/manage/export · billing.view/export · registration.view · catalogue.view · special: CanPrintInvoice (no CanPay, no CanRefund) | branch MAIN |
-| Operations Admin (NT) | `uat.ops` | **Operations Admin** (platform role): platform.view · tenancy.view/create/edit/manage · wallet.view/create/edit/manage · notifications.view | Super Admin portal |
+| Operations Admin (NT) | `uat.ops` | **Operations Admin** (platform role): platform.view · tenancy.view/create/edit/manage · wallet.view/create/manage (the catalogue has no `wallet.edit`) · notifications.view | Super Admin portal |
 | Master Data Reviewer (NT) | `uat.mdr` | **Master Data Reviewer**: platform.view · catalogue.view/create/edit/manage/export | Super Admin portal |
 | Super Admin (NT) | `platform.admin` (seeded) | Platform Administrator (seeded: every permission) | Super Admin portal |
 
@@ -775,7 +775,7 @@ Refs: SA-01, SA-02, SA-03 · WF-12.
 2. Home (`/admin`): brand and welcome.
 3. Dashboard (`/admin/dashboard`): change the period; `Refresh`.
 4. Arabic check.
-Expected: (1) `AUTH-002`, then the portal. (3) clients active/inactive, clients in trial, admin users, served patients, tests and registrations per period, wallets at zero, subscription vs manual, plan distribution, registrations by client, recent clients; the UAT laboratory's registrations appear.
+Expected: (1) `AUTH-002` "The username or password is incorrect.", then the Super Admin home (brand, welcome, pointer to the dashboard). (3) clients active/inactive, clients in trial, admin users, served patients, tests and registrations per period, wallets at or below zero, subscription vs manual, plan distribution, registrations by client, recent clients; the UAT laboratory's registrations appear (a laboratory seeded by DevTools, without a client record, shows as its tenant id).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-OPS-02 — Add a client manually · critical
@@ -786,7 +786,7 @@ SA › Administration › Clients (`/admin/clients`).
 3. Sign in to the client portal as `labb.admin` (laboratory UAT Lab B): Setup › Tests, Clinical groups, Reasons (as far as Release 1 exposes them), Finance › Payers.
 4. Back in SA: the client row.
 5. Arabic check.
-Expected: (1) "The client was created. Portal …/uatlabb, administrator labb.admin; the address was sent by SMS." — status **Active**, source **Manual**, wallet 0, one branch, one user. (2) refused `CLI-100` "This portal address is already taken." (3) the laboratory holds an **independent copy** of the global master data (clinical groups, sample types, units, tests, services, preparations, comments, reasons, microbiology — everything active in the platform tenant), its own branch and the Laboratory Administrator role; no record of the UAT laboratory is visible (tenant isolation). (4) branches 1, users 1, created today.
+Expected: (1) "The client was created. Portal https://uatlabb.skylis.app, administrator labb.admin; the address was sent by SMS." — status **Active**, source **Manual**, wallet 0, one branch, one user. (2) refused `CLI-100` "This portal address is already taken." (inline in the form). (3) the laboratory holds an **independent copy** of the global master data (clinical groups, sample types, units, tests, services, preparations, comments, reasons, microbiology — everything active in the platform tenant; on a database whose global catalogue is still empty the copy is empty and UAT-MDR-01 proves it), its own branch and the Laboratory Administrator role; no record of the UAT laboratory is visible (tenant isolation). (4) branches 1, users 1, created today.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-OPS-03 — Deactivate and activate a client · critical
@@ -797,7 +797,7 @@ Refs: SA-04 · WF-12 step 1 · PLT S-P3 (CLI-021, CLI-011, CLI-010, CLI-020).
 4. `Activate client`; sign in as `labb.admin`.
 5. `Activate client` again.
 6. Arabic check.
-Expected: (1) refused `CLI-021`. (2) status **Inactive**; sign-in refused `CLI-020` "This laboratory's subscription is inactive. Contact National Technology."; the open session is revoked. (3) `CLI-011`. (4) Active; sign-in works. (5) `CLI-010`.
+Expected: (1) refused by the page: "A reason is required." stays in the dialog, nothing is sent (`CLI-021` applies to a forced request). (2) "The client is inactive; its users are blocked.", status **Inactive**; sign-in refused `CLI-020` "This laboratory's subscription is inactive. Contact National Technology."; the open session is revoked. (3) the row of an inactive client offers `Activate client` only (`CLI-011` applies to a forced request). (4) "The client is active.", Active; sign-in works. (5) the row offers `Deactivate client` only (`CLI-010` applies to a forced request).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-OPS-04 — Reset the administrator password · standard
@@ -816,7 +816,7 @@ SA › Administration › Subscriptions & wallets (`/admin/subscriptions`).
 3. Amount 500, reference `INV-1`. Confirm.
 4. Amount 0.
 5. Arabic check.
-Expected: (1) plan listed with its client count. (2) refused `WAL-002` "A payment reference is required." (3) balance 500; a transaction Top-up with balance after, reference and user; the dashboard's "wallets at zero" drops by one. (4) refused `WAL-001`.
+Expected: (1) plan listed with its client count (0); `Deactivate plan` → Inactive, `Activate plan` → Active. (2) refused by the page: Reference "This field is required.", nothing is sent (`WAL-002` applies to a forced request). (3) "The wallet was topped up."; balance 500; a transaction Top-up with balance after, reference and user; the dashboard's "wallets at or below zero" drops by one. (4) refused by the page: "The value must be at least 0.01." (`WAL-001` applies to a forced request).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-OPS-06 — Countries and governorates · standard
@@ -847,7 +847,7 @@ Sign in as `uat.mdr`.
 #### UAT-MDR-01 — Global catalogue A and its copy to new clients · critical
 Refs: SA-12 · WF-12 step 2 · BR-25 · CAT S-CLONE, Q16 · OQ-03.
 SA › Master data › Tests / Services / Clinical groups / Sample types / Units / Service sequence (`/admin/catalogue/*`).
-1. Tests › `Add test` `TSH` (CHEM, Numeric, SER, mIU/L, band 0.4–4.0). Services › `Add service` TSH. Service sequence: give it a sequence.
+1. Tests › `Add test` `TSH` (CHEM, Numeric, SER, mIU/L, band 0.4–4.0 with an age band, e.g. 0–120 years: "Age to" is required). Services › `Add service` TSH (Test, member TSH). Service sequence: give it a sequence. When the platform catalogue is still empty, add the clinical group CHEM, the sample type SER and the unit mIU/L first (same editors).
 2. As `uat.ops`: create client "UAT Lab C" (as UAT-OPS-02). Sign in as its administrator: Setup › Tests.
 3. Sign in as `labb.admin` (UAT Lab B, created before step 1): Setup › Tests.
 4. Arabic check.
@@ -886,7 +886,7 @@ SA › Administration › Roles (`/admin/organization/roles`).
 2. `Add role` "Empty" with no permission; activate.
 3. Open a user's privileges tab (after UAT-SUP-02) and try to add an override.
 4. Arabic check.
-Expected: (1) two roles Active. (2) `ORG-005`. (3) no overrides in the platform tenant: "Platform staff inherit their role only." (`ORG-032`).
+Expected: (1) "Role created." twice; both roles listed Active with their permission count (the platform role editor has the General and Screen rights tabs only: no special or result rights). (2) refused by the page: "Grant at least one permission before creating the role." (`ORG-005` applies to a forced request). (3) the platform user editor has no Privileges tab: platform staff inherit their role only (`ORG-032` applies to a forced request).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-SUP-02 — Admin users · critical
@@ -897,7 +897,7 @@ SA › Administration › Admin users (`/admin/organization/users`).
 3. `Lock` `uat.mdr`; sign in as `uat.mdr`; `Unlock`.
 4. `Add user` `uat.sup2` with the role Platform Administrator; sign in as `uat.sup2` and open `platform.admin`: `Lock`, `Reset password`.
 5. Arabic check.
-Expected: (1) listed Active, "Inherits the role". (2) `ORG-023`. (3) `AUTH-003`, then sign-in works. (4) both refused — the main administrator is protected (`TEN-012`).
+Expected: (1) "User created." twice; both listed Active with their role (the list carries the role column; the employee code is derived from the username). (2) refused by the page: Username "The value has the wrong format." (`ORG-023` applies to a forced request). (3) `AUTH-003` "The account is locked. Try again later.", then sign-in works. (4) `Lock` and `Reset password` are disabled on the main administrator's Security tab ("The main administrator cannot be locked, deactivated or demoted…"); `TEN-012` applies to a forced request.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-SUP-03 — Sessions · standard
@@ -917,7 +917,7 @@ SA › Administration › Audit log (`/admin/audit`).
 3. `Export CSV`; as `uat.mdr` (no `audit.export`) try the export.
 4. Try to edit or delete an entry (there is no control; note it).
 5. Arabic check.
-Expected: (1) one row per action with time, user, action, entity and details; nothing from the laboratories' own trails (tenant trails are separate, ACC Q9). (2) "chain verified" (the SHA-256 chain over the stored rows is intact). (3) a CSV with a header row; `uat.mdr` is refused `AUTHZ-001` (button absent). (4) immutable.
+Expected: (1) one row per action with time, user, action, entity and details (deactivation / activation of the client, the top-up, the roles and users); nothing from the laboratories' own trails (tenant trails are separate, ACC Q9). The client **creation** is recorded in the new laboratory's own trail, not in the platform trail (open point 11). (2) "The audit chain is intact: n entries checked." (the SHA-256 chain over the stored rows). (3) a CSV with a header row; `uat.mdr` holds neither `audit.view` nor `audit.export`: the Audit log is absent from its menu and the export button needs `audit.export` (`AUTHZ-001` applies to a forced request). (4) immutable.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-SUP-05 — Platform parameters · critical
@@ -928,7 +928,7 @@ SA › Platform › Platform parameters (`/admin/parameters`).
 3. Create a client (UAT-OPS-07 or SA-04): its trial end.
 4. Enter `-1` for the delay warning percent; then `Use the default` on the password length. Save.
 5. Arabic check.
-Expected: (1) "2 parameter(s) saved."; the rows are marked Changed with "Default: …". (2) refused `ORG-020` — a laboratory that never changed the parameter reads the platform value. (3) trial of 7 days. (4) refused `SET-002` (value outside the descriptor's range); the password length returns to 8.
+Expected: (1) "2 parameter(s) saved."; the rows are marked Changed with "Default: …" and `Use the default`. (2) refused — a laboratory that never changed the parameter reads the platform value: the user editor's hint reads "At least 10 characters." and the page refuses the 9-character password; `ORG-020` applies to a forced request. (3) trial of 7 days — only a client created by the wizard carries a trial (a manual client starts Active without one), so this step runs with UAT-OPS-07 (*gateway*). (4) `-1` is refused by the page (the field is marked invalid, nothing is sent; `SET-002` applies to a forced request); `Use the default` + `Save` → "1 parameter(s) saved.", the password length reads 8 without the Changed mark.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-SUP-06 — Notification templates · standard
@@ -957,7 +957,7 @@ Refs: cross-cutting "Tenancy & branches" · PLT S-PLT-403 · wave-4 fix (return 
 3. As `labb.admin` (UAT Lab B): Search registrations by the accession of UAT-REG-03; Patients by Mona's number; Treasury access list.
 4. As `uat.ops`: Clients › UAT Lab B › "Open wallet"; try any client-portal page URL (`/registration/new`).
 5. Arabic check.
-Expected: (1) refused — the client portal has no admin routes; a forced API call answers `PLT-403`. (2) the platform administrator lands on the **Super Admin** home, never on the client dashboard (each portal returns only to its own routes). (3) nothing found: no visit, patient or request of the UAT laboratory is visible from Lab B. (4) the wallet opens; client pages are not available in the Super Admin portal.
+Expected: (1) the URL redirects to the client dashboard — the client portal has no admin routes; a forced API call answers `PLT-403`. (2) the platform administrator lands on the **Super Admin** home, never on the client dashboard (each portal returns only to its own routes). (3) nothing found: no visit, patient or request of the UAT laboratory is visible from Lab B. (4) the wallet opens (Subscriptions & wallets with the client selected); a client-page URL redirects to the Super Admin home — client pages are not available in the Super Admin portal (the server scopes every call to the platform tenant regardless).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 ---
@@ -1081,6 +1081,9 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 8 | The treasury-access list shows the decider and time but not the decision reason / revocation reason (D-05 of the first dry run). | CSH-09, ADM-07 |
 | 9 | Printing a verified report from Search registrations › Documents needs `results.export` and the print result right; the Reception role of §4 holds `results.view` only (preview works). Decide whether reception prints reports. | VER-06, REG-10 |
 | 10 | The Countries master gives Egypt a mobile length of 10: an Egyptian number typed with the trunk 0 (11 digits, as the seeded patients) is refused under "Egypt (10)" and accepted under "Any". Confirm the convention. | REG-03, SMP-01 |
+| 11 | The creation of a client (tenant, wallet, branch, administrator, master-data copy) is audited in the **new laboratory's** trail, where its administrator sees "Created Tenant · Platform Administrator"; the platform trail starts with the first later change (deactivation, top-up). The security-event ledger records `TENANT_PROVISIONED`. Decide whether the platform trail must carry the provisioning (D-15 of the Super Admin dry run). | SUP-04, OPS-02 |
+| 12 | Closed after the run: every client feature route carries `tenantGuard` (D-17 fixed in `app.routes.ts`); SUP-08 step 4 to be re-tested. |
+| 13 | Route-provided facades outlive their pages (Angular keeps the route injector): a list page opened again showed the previous visit's data — even another sign-in's — until `Refresh` (D-14, fixed for the platform, organization and catalogue features by re-reading on open; D-08 was the billing case). The laboratory features (registration, patients, results, pricing, treasury, …) follow the same pattern and need the same treatment. | MDR-01, all list pages |
 
 ## 10. Revision history
 
@@ -1089,3 +1092,4 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 0.1 | 2026-10-10 | Claude Code (documentation agent), for review by Mohamed Hashem | First set of Release-1 UAT scripts: 78 scripts (45 critical) across ten personas, results sheet, acceptance criteria, coverage. |
 | 0.2 | 2026-10-10 | Claude Code (UAT dry-run agent) | Corrections from the automated dry run of UAT-ADM-01/02/03/06/07/08 and UAT-REG-01/03/04/05/07/08/09/10/11 (`results/2026-10-10_dry-run_admin-reception.md`): §3 says what the screen shows for a code and which rules the page enforces before any call; §4 Reception role gains `samples.view`; expected texts aligned with the built screens (validator and page refusals, lockout after five failures, `Create and use`, dry-run line messages, treasury branch picker, decision time on treasury rows, role editor flow). Ids unchanged. |
 | 0.3 | 2026-10-10 | Claude Code (UAT dry-run agent) | Corrections from the automated dry run of UAT-CSH-01/02/03/04/05/07/09, UAT-FIN-01/02, UAT-SMP-01, UAT-RES-01/02/04/08 and UAT-VER-01/02/03/05/06 (`results/2026-10-10_dry-run_laboratory.md`): §4 Cashier role gains `catalogue.view`; expected texts aligned with the built screens (page validators on the Payments / Refunds / price-grid forms, the Refunds page reached by `Refund the balance`, validator message for the web username, no deactivate action on the Default tier, picker fallback of the service entry for Accounts, status boxes of the worklist, comment-library panel, absent Verify / Amend actions, RES-014 on printing a unit with missing values, delta tooltip text, status log as the carrier of signatures and print copies, preview-only for the clerk); open points 6–10. Ids unchanged. |
+| 0.4 | 2026-10-10 | Claude Code (UAT dry-run agent) | Corrections from the automated dry run of UAT-OPS-01/02/03/05, UAT-MDR-01 and UAT-SUP-01/02/04/05/08 (`results/2026-10-10_dry-run_super-admin.md`): §4 Operations Admin keys (`wallet.view/create/manage`); expected texts aligned with the built screens (page refusals for the deactivation reason, top-up reference and amount, empty role, username format, parameter range; rows offering only the opposite life-cycle action; disabled Lock / Reset on the main administrator; no Privileges tab in the platform user editor; the global catalogue preconditions and the age band of MDR-01; trial only for wizard clients; the audit chain message; client creation audited in the laboratory's trail); open points 11–13. Ids unchanged. |

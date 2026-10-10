@@ -55,6 +55,14 @@ export class ClientsFacade {
 
   readonly resetPassword = mutation((input: { id: string; newPassword: string }) => this.api.resetClientAdminPassword(input.id, input.newPassword));
 
+  /** Re-reads the clients and the lookups when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.clients.reload();
+    this.plans.reload();
+    this.countries.reload();
+    this.governorates.reload();
+  }
+
   setSearch(search: string): void {
     this.filter.update((current) => ({ ...current, search: search === '' ? null : search, page: 1 }));
   }

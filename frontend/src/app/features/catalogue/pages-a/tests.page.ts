@@ -90,6 +90,8 @@ export class TestsPage {
 
   constructor() {
     void this.i18n.load('catalogue-a');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14)
+    this.options.refresh();
   }
 
   protected typeLabel(type: LabTestType): string {

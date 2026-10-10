@@ -70,6 +70,11 @@ export abstract class CatalogueBListFacade<TItem, TCreate, TUpdate> {
 
   readonly exportCsv = mutation(() => this.endpoint.exportCsv(toQuery(this.filter(), false)));
 
+  /** Re-reads the list when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.list.reload();
+  }
+
   setSearch(search: string): void {
     this.filter.update((current) => ({ ...current, search, page: 1 }));
   }

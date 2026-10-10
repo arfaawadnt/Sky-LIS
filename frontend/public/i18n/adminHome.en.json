@@ -3,7 +3,7 @@
   "subtitle": "Clients, subscriptions and the health of the platform at a glance.",
   "welcomeTitle": "Welcome",
   "welcome": "Signed in as",
-  "placeholder": "The platform dashboard (SA-03) fills these tiles once the platform administration module is in place.",
+  "placeholder": "The figures of the platform are on the dashboard (Overview › Dashboard): clients, activity and wallets per period.",
   "kpi.clients": "Clients",
   "kpi.activeSubscriptions": "Active subscriptions",
   "kpi.openTickets": "Open tickets",

@@ -1,4 +1,4 @@
-import { Directive, computed, inject, signal } from '@angular/core';
+import { Directive, type OnInit, computed, inject, signal } from '@angular/core';
 import type { FormGroup } from '@angular/forms';
 
 import { CATALOGUE_B_PERMISSIONS } from '../../../core/api/catalogue-b.contracts';
@@ -28,7 +28,7 @@ export const CATALOGUE_B_I18N = 'catalogue-b';
  * page supplies its form, how a row fills it and how the form becomes a request.
  */
 @Directive()
-export abstract class CatalogueBEditorPage<TItem extends CatalogueBRow, TCreate, TUpdate> {
+export abstract class CatalogueBEditorPage<TItem extends CatalogueBRow, TCreate, TUpdate> implements OnInit {
   protected readonly i18n = inject(I18nService);
   protected readonly confirm = inject(ConfirmService);
   protected readonly toast = inject(ToastService);
@@ -48,6 +48,11 @@ export abstract class CatalogueBEditorPage<TItem extends CatalogueBRow, TCreate,
 
   constructor() {
     void this.i18n.load(CATALOGUE_B_I18N);
+  }
+
+  /** The facade outlives the page (route provider): re-read the list on open (UAT D-14). Runs once the subclass fields exist. */
+  ngOnInit(): void {
+    this.facade.refresh();
   }
 
   /** `text('add')` → `<prefix>.add`, else `catalogue-b.common.add`. */

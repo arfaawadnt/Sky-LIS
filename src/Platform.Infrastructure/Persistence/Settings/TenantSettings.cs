@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Platform.Application.Abstractions.Security;
 using Platform.Application.Abstractions.Settings;
 using Platform.Application.Settings;
 using Platform.Domain.Settings;
@@ -83,31 +84,74 @@ internal sealed class TenantSettingsStore(AppDbContext context) : ITenantSetting
 }
 
 /// <summary>
-/// Runtime reads (MODULES.md §1): the tenant's rows are loaded once per scope on the first read and parsed through
-/// their descriptors; a key the tenant never set, or set to something the catalogue no longer accepts, reads as the default.
+/// Runtime reads (MODULES.md §1): the tenant's rows are loaded once per scope and tenant on the first read and parsed
+/// through their descriptors. A key the tenant never set (or set to something the catalogue no longer accepts) reads
+/// as the <b>platform value</b> — the row the platform parameters page (SA-19) stores for the platform tenant — and
+/// only then as the descriptor's default (intake LIS-INT-FND-001 §6; UAT dry run D-16: a laboratory that never
+/// changed the password length kept accepting 8 characters after the platform raised it to 10).
 /// </summary>
-internal sealed class TenantSettings(AppDbContext context) : ITenantSettings
+/// <remarks>
+/// The platform rows are read under <c>ForTenant(TenantIds.Platform)</c>, without elevation: the next connection
+/// open stamps the platform tenant and its own RLS policy admits the rows. Inside an open transaction the stamp of
+/// the caller's tenant stays and the platform read yields nothing, which falls back to the descriptor default — the
+/// behaviour every read had before.
+/// </remarks>
+internal sealed class TenantSettings(AppDbContext context, ITenantContextAccessor tenant, ICurrentTenantSetter tenantScope) : ITenantSettings
 {
-    private Dictionary<string, string>? _stored;
+    private readonly Dictionary<Guid, Dictionary<string, string>> _loaded = [];
 
     public async ValueTask<T> GetAsync<T>(SettingDescriptor<T> descriptor, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        var stored = await LoadAsync(cancellationToken).ConfigureAwait(false);
-        return descriptor.Parse(stored.GetValueOrDefault(descriptor.Key));
+        var (own, platform) = await LoadAsync(cancellationToken).ConfigureAwait(false);
+        return descriptor.Parse(Resolve(descriptor, own, platform));
     }
 
     public async ValueTask<IReadOnlyDictionary<string, string>> GetAllAsync(CancellationToken cancellationToken)
     {
-        var stored = await LoadAsync(cancellationToken).ConfigureAwait(false);
+        var (own, platform) = await LoadAsync(cancellationToken).ConfigureAwait(false);
         return SettingKeys.All.ToDictionary(
             descriptor => descriptor.Key,
-            descriptor => stored.TryGetValue(descriptor.Key, out var value) && descriptor.IsValid(value) ? value.Trim() : descriptor.DefaultValue,
+            descriptor => Resolve(descriptor, own, platform) ?? descriptor.DefaultValue,
             StringComparer.Ordinal);
     }
 
-    private async ValueTask<Dictionary<string, string>> LoadAsync(CancellationToken cancellationToken) =>
-        _stored ??= await context.Set<TenantSetting>().AsNoTracking()
-            .ToDictionaryAsync(setting => setting.Key, setting => setting.Value, StringComparer.Ordinal, cancellationToken)
-            .ConfigureAwait(false);
+    /// <summary>The tenant's valid value, else the platform's valid value, else <c>null</c> (the descriptor decides the default).</summary>
+    private static string? Resolve(SettingDescriptor descriptor, Dictionary<string, string> own, Dictionary<string, string> platform) =>
+        own.TryGetValue(descriptor.Key, out var value) && descriptor.IsValid(value) ? value.Trim()
+        : platform.TryGetValue(descriptor.Key, out var inherited) && descriptor.IsValid(inherited) ? inherited.Trim()
+        : null;
+
+    private async ValueTask<(Dictionary<string, string> Own, Dictionary<string, string> Platform)> LoadAsync(CancellationToken cancellationToken)
+    {
+        var current = tenant.CurrentTenantId ?? Guid.Empty;
+        var own = await RowsAsync(current, cancellationToken).ConfigureAwait(false);
+        if (TenantIds.IsPlatform(current))
+        {
+            return (own, own);
+        }
+
+        if (!_loaded.TryGetValue(TenantIds.Platform, out var platform))
+        {
+            using (tenantScope.ForTenant(TenantIds.Platform))
+            {
+                platform = await RowsAsync(TenantIds.Platform, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        return (own, platform);
+    }
+
+    private async ValueTask<Dictionary<string, string>> RowsAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (!_loaded.TryGetValue(tenantId, out var rows))
+        {
+            rows = await context.Set<TenantSetting>().AsNoTracking()
+                .ToDictionaryAsync(setting => setting.Key, setting => setting.Value, StringComparer.Ordinal, cancellationToken)
+                .ConfigureAwait(false);
+            _loaded[tenantId] = rows;
+        }
+
+        return rows;
+    }
 }

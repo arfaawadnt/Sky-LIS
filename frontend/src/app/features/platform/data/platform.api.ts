@@ -129,7 +129,7 @@ export class PlatformApi {
   }
 
   deleteCountry(id: string): Promise<void> {
-    return firstValueFrom(this.http.delete<void>(`${PLATFORM_API.countries}/${encodeURIComponent(id)}`), { defaultValue: undefined });
+    return firstValueFrom(this.http.delete<void>(`${PLATFORM_API.countries}/${encodeURIComponent(id)}`), { defaultValue: undefined }).then(() => undefined);   // 204: the body is null, and a mutation's null means failure
   }
 
   listGovernorates(filter: ReferenceListFilter & { readonly countryId: string | null }, signal?: AbortSignal): Promise<Paged<GovernorateListItem>> {
@@ -264,7 +264,8 @@ export class PlatformApi {
   }
 
   private send(method: 'post' | 'put', url: string, body: unknown): Promise<void> {
-    return firstValueFrom(method === 'put' ? this.http.put<void>(url, body) : this.http.post<void>(url, body), { defaultValue: undefined });
+    // A 204 answer has a null body and `firstValueFrom` resolves it as null, which `mutation()` reports as failure; success is undefined.
+    return firstValueFrom(method === 'put' ? this.http.put<void>(url, body) : this.http.post<void>(url, body), { defaultValue: undefined }).then(() => undefined);
   }
 }
 

@@ -234,7 +234,12 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **UAT dry run, Super Admin personas** (operations admin, master data reviewer, super admin; 10 critical scripts, results
+  under `docs/uat/results/`): a user of a deactivated laboratory is refused with `CLI-020`; a laboratory that never set a
+  parameter inherits the platform value (password minimum length); platform, organization and catalogue list pages re-read
+  on every visit instead of showing the previous session's data; 204 answers of the platform API no longer toast a
+  refusal; a platform session can no longer open client pages (every client feature route carries the tenant guard);
+  stale admin-home text removed. UAT scripts corrected to v0.4.
 
 ### v0.3.4 — 2026-10-10
 

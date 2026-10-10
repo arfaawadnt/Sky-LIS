@@ -48,8 +48,11 @@ export class TestEditorFacade {
     then: () => this.detail.reload(),
   });
 
+  /** Opens a record; the detail is re-read even for the id already loaded, because the facade outlives the page (UAT D-14). */
   load(id: string | null): void {
     this.id.set(id);
+    this.detail.reload();
+    this.references.reload();
   }
 
   searchReferences(search: string): void {

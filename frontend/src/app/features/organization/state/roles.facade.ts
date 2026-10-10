@@ -30,6 +30,11 @@ export class RolesFacade {
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
   }
+
+  /** Re-reads the roles when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.list.reload();
+  }
 }
 
 /**
@@ -68,6 +73,14 @@ export class RoleEditorFacade {
   readonly saveResultRights = mutation((rights: readonly ResultRight[]) => this.api.setRoleResultRights(this.requireId(), rights), { then: () => this.detail.reload() });
 
   readonly setActive = mutation((active: boolean) => this.api.setRoleActive(this.requireId(), active), { then: () => this.detail.reload() });
+
+  /** Re-reads the role and its lookups when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.detail.reload();
+    this.catalogue.reload();
+    this.clinicalGroups.reload();
+    this.branches.reload();
+  }
 
   private requireId(): string {
     const id = this.roleId();

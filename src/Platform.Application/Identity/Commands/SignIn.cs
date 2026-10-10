@@ -8,6 +8,7 @@ using Platform.Application.Abstractions.Tokens;
 using Platform.Contracts.Common;
 using Platform.Contracts.Identity;
 using Platform.Domain.Identity;
+using Platform.Domain.PlatformAdmin;
 using Platform.SharedKernel.Abstractions;
 using Platform.SharedKernel.Primitives;
 
@@ -112,6 +113,14 @@ public sealed class SignInCommandHandler(
                 await unitOfWork.SaveChangesAsync(cancellationToken);
                 return new SignInResult(AuthResponse.StepSelectTenant, null, null, SessionKind.Browser, null,
                     active.Select(m => new TenantChoice(m.TenantId, m.TenantId.ToString())).ToList());
+            }
+
+            // SA-04 / INV-PLT-003: a user whose laboratory was deactivated (or whose trial ended) is told so (CLI-020),
+            // not "no membership" — the membership exists; the laboratory is what blocks the sign-in.
+            if (await memberships.HasInactiveClientMembershipAsync(user.Id, command.Tenant, cancellationToken))
+            {
+                await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInFailed, SecurityEvent.Warning, ActorUserId: user.Id, Detail: "client_inactive"), cancellationToken);
+                throw new DomainException(PlatformAdminCodes.ClientInactive, "This laboratory's subscription is inactive. Contact National Technology.", DomainFault.Unauthenticated);
             }
 
             await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInFailed, SecurityEvent.Warning, ActorUserId: user.Id, Detail: "no_membership"), cancellationToken);
