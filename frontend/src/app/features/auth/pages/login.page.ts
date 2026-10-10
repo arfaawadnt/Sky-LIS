@@ -104,7 +104,9 @@ export class LoginPage {
 
     const requested = this.returnUrl();
     const home = this.portal.homePath();
-    const local = requested && requested.startsWith('/') && !requested.startsWith('//') ? requested : home;
+    // A return URL that points back at the sign-in routes (left by a 401 raced with the sign-out) would show the form again
+    // to a signed-in user; the home page is the only sensible target then.
+    const local = requested && requested.startsWith('/') && !requested.startsWith('//') && !isLoginRoute(requested) ? requested : home;
     // A return URL left by the other portal (a laboratory user signed out, a platform administrator signs in) would land the
     // session on pages it cannot use; each portal returns only to its own routes.
     const belongsToAdmin = local === '/admin' || local.startsWith('/admin/') || local.startsWith('/admin?');
@@ -116,4 +118,9 @@ export class LoginPage {
 
     await this.router.navigateByUrl(target);
   }
+}
+
+/** `/login`, `/login/recover`, `/login?…`: the routes of this feature, never a destination after signing in. */
+export function isLoginRoute(url: string): boolean {
+  return url === '/login' || url.startsWith('/login/') || url.startsWith('/login?');
 }

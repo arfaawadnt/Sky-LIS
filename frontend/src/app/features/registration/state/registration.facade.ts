@@ -174,8 +174,15 @@ export class RegistrationFacade {
     return { list, payer, patient, discount, due, paid, remaining: round2(due - paid) };
   });
 
-  /** The amount the payment panel records (the due amount unless typed), never negative. */
+  /** True once a treasury is approved for this user on this device in the session branch (BR-27); without one the visit is saved unpaid. */
+  readonly hasTreasury = computed(() => (this.treasuries.value() ?? []).length > 0);
+
+  /** The amount the payment panel records (the due amount unless typed), never negative; nothing when no treasury is approved (the page says so). */
   readonly paymentAmount = computed(() => {
+    if (!this.hasTreasury()) {
+      return 0;
+    }
+
     const typed = this.payment().amount;
     return round2(Math.max(0, typed === null ? this.totals().due : typed));
   });

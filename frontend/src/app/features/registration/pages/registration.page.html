@@ -184,7 +184,16 @@
               <tr class="pending">
                 <td class="mono">{{ line.code }}</td>
                 <td>{{ name(line.nameEn, line.nameAr) }}</td>
-                <td colspan="5" class="muted small">{{ facade.check.isLoading() ? i18n.t('registration.services.pricing') : i18n.t('registration.services.notPlanned') }}</td>
+                <!-- a service the dry run refused (REG-014/015/100…) is not planned: its issue is the reason, not "not priced yet" -->
+                @if (issuesOf(line.serviceId).length > 0) {
+                  <td colspan="5" class="small">
+                    @for (issue of issuesOf(line.serviceId); track $index) {
+                      <span class="hint bad">{{ issueText(issue) }}</span>
+                    }
+                  </td>
+                } @else {
+                  <td colspan="5" class="muted small">{{ facade.check.isLoading() ? i18n.t('registration.services.pricing') : i18n.t('registration.services.notPlanned') }}</td>
+                }
                 <td>
                   <button type="button" class="icon-btn" [attr.aria-label]="i18n.tf('registration.removeLine', { code: line.code })" (click)="facade.removeLine(line.serviceId)"><app-icon name="x" [size]="15" /></button>
                 </td>

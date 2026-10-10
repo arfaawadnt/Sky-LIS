@@ -87,6 +87,24 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     backend.verify();
   });
 
+  it('records no payment and asks for no treasury when none is approved on the device (BR-27, UAT-REG-09)', async () => {
+    await runEffects();
+    flushReferenceLists(backend, { treasuries: [] });
+    await runEffects();
+    facade.defaultTier();
+    facade.setPatient(patient);
+    await runEffects();
+    facade.addServices([{ serviceId: 's-cbc', code: 'CBC', nameEn: 'Complete blood count', nameAr: '' }]);
+    await runEffects();
+    backend.expectOne(REGISTRATION_API.check).flush(checkResult());
+    await runEffects();
+
+    expect(facade.hasTreasury()).toBe(false);
+    expect(facade.paymentAmount()).toBe(0);
+    expect(facade.blockers()).toEqual([]);
+    backend.verify();
+  });
+
   it('refuses a duplicate typed service and re-runs the dry run when a line is reserved (BR-05)', async () => {
     await startNewVisit();
     facade.addServices([{ serviceId: 's-cbc', code: 'CBC', nameEn: 'Complete blood count', nameAr: '' }]);

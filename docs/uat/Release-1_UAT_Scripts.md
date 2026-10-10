@@ -1,6 +1,6 @@
 # Sky LIS — Release 1 User Acceptance Test Scripts (LIS-UAT-001)
 
-Version 0.1 · 2026-10-10 · Status: draft for review by the business owner · Build plan phase P6 ("User acceptance & training")
+Version 0.2 · 2026-10-10 · Status: draft for review by the business owner (corrected after the automated dry run of UAT-ADM and UAT-REG, `docs/uat/results/2026-10-10_dry-run_admin-reception.md`) · Build plan phase P6 ("User acceptance & training")
 
 Sources: business SRS LIS-SRS-001 (`docs/srs`, page ids CP-nn / SA-nn, workflows WF-nn, rules BR-nn), the module intakes
 (`docs/intake`, acceptance scenario ids and refusal codes), the Release-1 scope record (`docs/build/MODULES.md` §6, wave 4),
@@ -74,8 +74,11 @@ UAT-OPS, UAT-MDR, remaining UAT-SUP. Scripts inside a persona run in their numbe
 
 - **Id** `UAT-<area>-nn`; **Priority** *critical* (the acceptance criterion counts it) or *standard*.
 - **Refs**: SRS pages, workflow, business rules, intake scenario ids (`REG S-V1-ok` = scenario S-V1-ok of
-  LIS-INT-REG-001 §16). Refusal codes are the ones the screen shows in its message (e.g. `BIL-010`); the API answers the
-  same code in the problem details.
+  LIS-INT-REG-001 §16). A refusal code (e.g. `BIL-010`) names the rule; the screen shows the **translated message** of
+  that code (quoted in the expected result), never the code itself. The code is visible in the API's problem details
+  (browser developer tools › Network) when a tester needs to confirm it. Some rules are enforced by the page before any
+  call is made (a required field, a format, a disabled button); the expected result says so ("refused by the page") and
+  the API code applies only to a forced request.
 - **Menu paths** use the English sidebar labels of `shell.en.json` (`Reception › Registration`); the Super Admin portal is
   prefixed `SA ›`. Routes are given once per page for the record.
 - **Negative tests** are inside the script that owns the rule; they are numbered steps whose expected result is a refusal.
@@ -92,7 +95,7 @@ UAT-OPS, UAT-MDR, remaining UAT-SUP. Scripts inside a persona run in their numbe
 | --- | --- | --- | --- |
 | Laboratory administrator | `lab.admin` (seeded) | Laboratory Administrator (seeded: everything) | branch MAIN; `lab.admin.manager` available as a second administrator for the SoD steps |
 | Shift manager (approver) | `lab.admin.manager` (seeded) | same role | approves treasury access, never requests it in the scripts |
-| Reception clerk | `uat.reception` | **Reception**: dashboard.view · registration.view/create/edit/cancel/export · patients.view/create/edit · pricing.view · catalogue.view · billing.view/create · treasury.view/create/cancel · results.view · special: discount cap **10 %**, CanPay, CanCancel · result rights: see on CHEM and HEMA, every branch | branch MAIN; treasury MAIN-CASH approved for the clerk on the clerk's workstation (UAT-CSH-01 run as the clerk, approved by the manager) |
+| Reception clerk | `uat.reception` | **Reception**: dashboard.view · registration.view/create/edit/cancel/export · patients.view/create/edit · pricing.view · catalogue.view · billing.view/create · treasury.view/create/cancel · results.view · samples.view (the Samples dialog of CP-10) · special: discount cap **10 %**, CanPay, CanCancel · result rights: see on CHEM and HEMA, every branch | branch MAIN; treasury MAIN-CASH approved for the clerk on the clerk's workstation (UAT-CSH-01 run as the clerk, approved by the manager) |
 | Cashier | `uat.cashier` | **Cashier**: dashboard.view · registration.view · billing.view/create/approve/cancel/export · treasury.view/create/cancel · pricing.view · special: CanPay, CanRefund, CanCancel, CanPrintInvoice · no result rights | branch MAIN; own browser profile |
 | Phlebotomist / technician (sample side) | `uat.reception` and `uat.tech` | as Reception / Technician | visits registered by UAT-REG-03 |
 | Laboratory technician | `uat.tech` | **Technician**: dashboard.view · results.view/create/approve/export · catalogue.view · result rights: see, review, edit, print on **CHEM and HEMA**, every branch (no verify) · no special rights | branch MAIN |
@@ -122,7 +125,7 @@ Sign in as `lab.admin` (laboratory selected on the sign-in page). Setup › Bran
 4. On NORTH choose `Deactivate`, confirm. Then on MAIN choose `Deactivate`.
 5. Reactivate NORTH.
 6. Arabic check.
-Expected: (1) the row shows code **NORTH** (upper-cased), status Active. (2) refused `ORG-100` "A branch with this code already exists." (3) refused `ORG-009` (three-letter currency). (4) NORTH becomes Inactive; the second deactivation is refused `ORG-110` — one branch always stays active. (5) NORTH Active again. The audit log of the laboratory is Release 2; the Super Admin cannot see tenant trails — no audit check here.
+Expected: (1) the row shows code **NORTH** (upper-cased), status Active. (2) refused `ORG-100` "A branch with this code already exists." (3) refused by the request validator (`VALIDATION-400`) with the field message "'Currency' must be 3 characters in length" — the domain code `ORG-009` guards the same rule. (4) NORTH becomes Inactive ("Branch deactivated."); the second deactivation is refused `ORG-110` — one branch always stays active. (5) NORTH Active again. The audit log of the laboratory is Release 2; the Super Admin cannot see tenant trails — no audit check here.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-ADM-02 — Roles and privileges · critical
@@ -138,7 +141,7 @@ Setup › Roles & privileges (`/organization/roles`).
 8. Change the Reception role: remove `registration.cancel`; sign in as `uat.reception` in another profile and open Search registrations.
 9. Restore `registration.cancel` to the role.
 10. Arabic check.
-Expected: (1–3) six roles Active with the rights saved; "Changes apply to every member of the role at their next action." (4) refused `ORG-005` "An active role needs at least one permission." (5) refused `ORG-006`. (6) refused `ORG-007`. (7) refused `ORG-011` "The role still has members". (8) the `Cancel services` row action is gone for the clerk without a new sign-in (BR-17); the API answers `AUTHZ-001` when the action is forced. (9) the action is back.
+Expected: (1–3) six roles Active with the rights saved; the screen-rights tab reads "Changes apply to every member of the role at their next action." (a new role is created from the screen-rights step with its first permissions; the special and result rights are saved on their tabs afterwards; saving the rights of a role with members asks "The change applies to all of them. Continue?"). (4) refused by the page: "Grant at least one permission before creating the role." (`ORG-005` on a forced request). (5) refused: the cap field reads "The discount cap must be between 0 and 100." and nothing is saved (`ORG-006`). (6) not reproducible through the grid (one row per clinical group); `ORG-007` applies to a forced request only. (7) the `Deactivate` button is disabled with "A role with members cannot be deactivated." (`ORG-011` on a forced request). (8) the `Cancel services` row action is gone for the clerk without a new sign-in (BR-17); the API answers `AUTHZ-001` when the action is forced. (9) the action is back.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-ADM-03 — Users · critical
@@ -152,7 +155,7 @@ Setup › Users (`/organization/users`).
 6. In a new browser profile sign in as `uat.reception` with `<pw>`.
 7. Change the password on the profile page (current + new + confirm), then open the dashboard.
 8. Arabic check.
-Expected: (1–2) seven users Active, column Role filled, `Inherits the role`. (3) refused `ORG-023` (4–30 characters). (4) refused `ORG-020`. (5) refused `ORG-021` "must not contain the username". (6) the user lands on Account › Profile with "Your administrator asked you to choose a new password before you continue."; other pages redirect back to it. (7) "Your password was changed."; the dashboard opens; the sidebar shows only Reception, Finance (Payments, Treasury access), Laboratory (Worklist, Results) and Account entries — nothing from Setup.
+Expected: (1–2) seven users Active, column Role filled, `Inherits the role`; the list marks `Must change password`. (3) refused by the page under the username ("The value has the wrong format." with the hint "4–30 lower-case letters, digits, \".\" or \"_\""; `ORG-023` on a forced request). (4) refused by the page: "At least 8 characters." (`ORG-020` on a forced request). (5) refused `ORG-021` "The password must not contain the username." (6) the user lands on Account › Profile with "Your administrator asked you to choose a new password before you continue."; other pages redirect back to it. (7) "Your password was changed."; the dashboard opens; the sidebar shows Reception, Laboratory (Worklist, Results by accession), Finance (Treasuries and Treasury access, Payers & contracts and Base price lists read-only, Payments), the read-only catalogue lists under Setup (`catalogue.view`) and Account — no Branches, Roles & privileges or Users.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-ADM-04 — Lock, reset, protected administrator · standard
@@ -185,7 +188,7 @@ Finance › Treasuries (`/treasury/treasuries`).
 4. `Deactivate` NORTH-CASH. Then Finance › Treasury access › `Request access from this device` on NORTH-CASH.
 5. Reactivate NORTH-CASH.
 6. Arabic check.
-Expected: (1) row **NORTH-CASH** Active. (2) refused `TRS-100`. (3) renamed. (4) Inactive; the request is refused `TRS-010` "The treasury is inactive." (an inactive treasury is not offered, or the API refuses it). (5) Active.
+Expected: (1) row **NORTH-CASH** Active with branch `NORTH · North Branch` (the branch is picked from the active branches). (2) refused `TRS-100` "A treasury with this code already exists." (3) renamed. (4) Inactive; the inactive treasury is not offered in the Treasury access picker (`TRS-010` on a forced request). (5) Active (the row action reads `Activate`).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-ADM-07 — Treasury access decisions · critical
@@ -198,7 +201,7 @@ Run after UAT-CSH-01 created the cashier's pending request (and, as `lab.admin`,
 5. `Reject` it again with the reason "wrong branch".
 6. On the administrator's approved request: `Revoke` with reason "test revoke"; then request again from the same browser.
 7. Arabic check.
-Expected: (1) the buttons are hidden on your own rows; forcing the call answers `SOD-TRS-001` "You cannot decide on your own request." (2) both requests **Approved** with approver name, time and comment. (3) refused `TRS-013` "Only a pending request can be decided." (4) refused — the dialog insists on a reason (`TRS-020`). (5) **Rejected** with the reason. (6) **Revoked** with reason; the new request is a new `TRQ` number, Pending; the revoked row stays as history.
+Expected: (1) your own pending row offers `Cancel request` only; forcing the call answers `SOD-TRS-001` "The requester cannot approve their own request." (2) both requests **Approved**; the row shows the approver and the decision time (the approve dialog takes no comment in Release 1). (3) refused `TRS-013` ("not allowed while the request is in state Approved"). (4) refused — the dialog insists: "A reason is required." (`TRS-020`). (5) **Rejected** (the reason is kept on the request; the list shows the decider and time). (6) **Revoked**; the new request is a new `TRQ` number, Pending; the revoked row stays as history.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-ADM-08 — Catalogue A: groups, sample types, units, tests, services · critical
@@ -217,7 +220,7 @@ Setup › Clinical groups / Sample types / Units of measurement / Tests / Servic
 11. Services › `Add service`: code `HCG`, short name, names, group CHEM, type Test, sample type SER, **gender Female**, duration 24 h, member test HCG. Save. Repeat `CREA` (member CREA; also member EGFR in a Profile service `RENAL` with members CREA + EGFR, sample SER) and `BLDGRP` (HEMA, EDTA).
 12. `Add service` of type Test with two member tests; then a Profile with no sample type.
 13. Arabic check (open the Tests list in Arabic: Arabic test names appear in the grid).
-Expected: (1) MICRO Active; the second is refused `CAT-001` (code format). (2) URN with two conditions; the duplicate condition is refused `CAT-011`. (3) IU/L listed. (4–5) tests saved; the ranges tab lists the bands. (6) refused `CAT-054` (overlapping bands for the same sex and condition). (7) refused `CAT-053` (panic inside normal). (8) saved; changing the default to `O` is refused `CAT-058` (BR-19). (9) the valid formula is saved normalised; the broken one is refused `CAT-063`. (10) refused `CAT-071`. (11) services Active with the next shortcut numbers. (12) refused `CAT-021` and `CAT-029`.
+Expected: (1) MICRO Active; the second is refused by the page ("Use upper-case letters, digits, '-', '_' or '.', starting with a letter or digit."; `CAT-001` on a forced request). (2) URN with two conditions (the `Conditions` row action); the duplicate condition is refused `CAT-011`. (3) IU/L listed. (4–5) tests saved; the ranges tab lists the bands. (6) refused `CAT-054` (overlapping bands for the same sex and condition). (7) refused `CAT-053` (panic inside normal). (8) saved; ticking `Default` on `O` ticks `Placeholder` with it (the editor's BR-19 affordance) — untick `Placeholder` on `O` and save: refused `CAT-058` "Only a placeholder can be the default". (9) the valid formula is saved normalised (`ROUND(175 * [CREA] ^ -1.154, 0)`); the broken one is refused `CAT-063`. (10) refused `CAT-071`. (11) services Active with the next sequence numbers. (12) refused `CAT-021`; the profile without a sample type is refused by the page ("This field is required."; `CAT-029` on a forced request).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-ADM-09 — Service sequence · standard
@@ -432,7 +435,7 @@ Refs: CP-03, CP-04, CP-05 · ACC S-D1 · ORG AS-S1.
 4. Click `Price query`, `New registration`, `Search registrations`, `Worklist`, `Payments`, `Results by accession` in turn.
 5. Leave the browser idle past the session timeout (default parameter) and act.
 6. Arabic check.
-Expected: (1) `AUTH-002` "The username or password is incorrect."; five quick failures → `RATE-429` / lockout message; the correct password opens the portal. (2) only assigned branches listed; the session shows the branch in the top bar. (3) the KPIs count the session branch and day (registrations, collected today, pending results, unverified backlog, delayed tests; samples tiles are Release 2 and absent). (4) each quick action opens its page. (5) the session is renewed silently (refresh cookie) while the refresh session lives; after the sign-out the page returns to sign-in.
+Expected: (1) `AUTH-002` "The username or password is incorrect."; after five failures the account is locked for 30 minutes and the next attempt — even with the right password — answers `AUTH-003` "The account is locked. Try again later." (an administrator unlocks it on Users › Security, UAT-ADM-04; the `RATE-429` limit is 20 attempts per 10 minutes and is independent); the correct password opens the portal. (2) only assigned branches listed; the session shows the branch in the top bar. (3) the KPIs count the session branch and day (registrations, collected today, pending results, unverified backlog, delayed tests; samples tiles are Release 2 and absent). (4) each quick action opens its page. (5) the session is renewed silently (refresh cookie) while the refresh session lives; after the sign-out the page returns to sign-in.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-02 — Password recovery with OTP · standard · *gateway*
@@ -457,7 +460,7 @@ Reception › Registration (`/registration/new`).
 7. In the success dialog open the labels and the job order, then `Open the visit`.
 8. Reception › Search registrations: find the accession.
 9. Arabic check.
-Expected: (1) a new file is created on save with number **PAT-2026-nnnnn**, mobile stored as 01001234567. (3) three lines with patient share 120 / 90 / 150, payer share 0, expected result dates; summary amount due **360**. (5) "Captured now and recorded by Billing right after the visit is saved." (6) "Registration saved": accession **ACC-2026-nnnnn**, "360 received — receipt RCT-2026-nnnnn"; the sample labels window lists **two tubes** — one Serum tube (CHEM: K + GLU, BR-02) and one EDTA tube (HEMA: HGB) — each with Code 128 barcode, unit code, accession, patient, services; the job order shows the visit header, balance due 0, the two tubes and their services; the receipt prints. (7) the edit page `Visit ACC-…` opens with the three lines Ordered, samples Received (auto-receive). (8) the row shows the services, patient share 360, remaining 0, status Open / Settled.
+Expected: (1) `Create and use` creates the file at once with number **PAT-2026-nnnnn** (before the visit is saved), mobile stored as 01001234567. (3) three lines with patient share 120 / 90 / 150, payer share 0, expected result dates; summary amount due **360**. (5) "Captured now and recorded by Billing right after the visit is saved." (6) "Registration saved": accession **ACC-2026-nnnnn**, "360 received — receipt RCT-2026-nnnnn"; the sample labels window lists **two tubes** — one Serum tube (CHEM: K + GLU, BR-02) and one EDTA tube (HEMA: HGB) — each with Code 128 barcode, unit code, accession, patient, services; the job order shows the visit header, balance due 0, the two tubes and their services; the receipt prints. (7) the edit page `Visit ACC-…` opens with the three lines Ordered, samples Received (auto-receive). (8) the row shows the services, patient share 360, remaining `Settled`, status Open.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-04 — Similar patient warning and existing file · critical
@@ -466,7 +469,7 @@ Refs: CP-06, CP-11 · WF-02 steps 1–2 · BR-01 · PAT S-SIM · tenant default 
 2. Pick the existing file; add NA; pay cash. Save.
 3. Type "محمد أحمد" for a new file with mobile 01112223333; save a visit with K. Then start another registration and type "محمد احمد" (no hamza).
 4. Arabic check.
-Expected: (1) the similar-files panel lists Mona's file (number, mobile) marked Exact; "Compare the name and the mobile before creating a new file." (2) the visit is created on the **same** patient number; Patients › the file shows two visits. (3) the Arabic file is found despite the spelling difference (normalised match).
+Expected: (1) the similar-files panel lists Mona's file (number, mobile) marked "Same name and mobile" with `Use this file`; "Compare the name and the mobile before creating a new file." (2) the visit is created on the **same** patient number; Patients › the file shows two visits. (3) the Arabic file is found despite the spelling difference (normalised match).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-05 — Duplicate and gender-restricted services · critical
@@ -475,7 +478,7 @@ Refs: CP-06 · WF-02 step 4 · REG S-V1-dup, S-V1-gender, S-V1-unpriced.
 2. Add `HCG` (female-only service from UAT-ADM-08).
 3. Change the payer to AXA / Gold and keep K.
 4. Arabic check.
-Expected: (1) `REG-100` "The service is already on this visit." (2) `REG-015` "The service is restricted to the other gender." (3) on save `REG-014` "The service is not priced under this contract." (no contract pricing in Release 1); switching back to Cash saves.
+Expected: (1) refused by the page: "Already on this visit: K." (`REG-100` on a forced request). (2) the HCG line reads "HCG: The service is restricted to the other gender." (`REG-015` from the dry run) and the save is blocked ("Some services were refused; remove them or change the contract."). (3) the K line reads "K: The service is not priced under this contract." (`REG-014`) as soon as the contract changes and the save is blocked (no contract pricing in Release 1); switching back to Cash saves.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-06 — Reserved service and release · standard
@@ -494,7 +497,7 @@ Refs: CP-06 · WF-02 step 5 · REG S-V1-discount · special right discount cap 1
 3. New registration: Percent 30 with the same reason. Save.
 4. As `lab.admin` (cap 100 %): the same 30 %.
 5. Arabic check.
-Expected: (1) refused — "Choose the discount reason." (`REG-017`). (2) discount 21, amount due **189**, "Your limit is 10 % of the patient share."; the payment defaults to 189; the receipt shows the discount. (3) refused `REG-060` "The discount exceeds your limit." (page: "The discount exceeds your limit of 10 %."). (4) saved (discount reduces the patient share only, Registration Q4).
+Expected: (1) refused by the page — "Choose the discount reason." (`REG-017` on a forced request). (2) discount 21, amount due **189**, "Your limit is 10 % of the patient share."; the payment defaults to 189; the receipt shows the discount. (3) refused `REG-060` "The discount exceeds your limit." (page: "The discount exceeds your limit of 10 %."). (4) saved (discount reduces the patient share only, Registration Q4).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-08 — Partial payment and payment validations on the page · critical
@@ -504,7 +507,7 @@ Refs: CP-06 · WF-02 step 6 · BR-26 · REG Q19 · BIL S-T1-ref, S-T1-over.
 3. Same with amount 95.
 4. Reference `SLIP-2`, amount 90. Save.
 5. Arabic check.
-Expected: (1) saved; "100 received — receipt …"; Search registrations shows remaining **50**, balance Partial (used by UAT-CSH-04). (2) "Enter the transaction reference." (3) "The amount paid cannot exceed the amount due." (4) saved with the card receipt.
+Expected: (1) saved; "100 received — receipt …"; Search registrations shows remaining **50**, balance Partial (used by UAT-CSH-04). (2) refused by the page: "Enter the transaction reference." (3) refused by the page: "The amount paid cannot exceed the amount due." (4) saved with the card receipt.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-09 — Registration without an approved treasury · critical
@@ -512,15 +515,15 @@ Refs: CP-06 · BR-27 · REG Q19 · registration dictionary `payment.noTreasury`.
 In a browser profile where the clerk has **no** approved treasury (a fresh profile):
 1. New registration (Mona Hassan): K + GLU. Look at the Payment card. Save.
 2. Arabic check.
-Expected: (1) the card reads "No treasury is approved for you on this device in this branch. The visit is saved without a payment; collect it on the Payments page."; the visit is saved (ACC number, labels, job order), no receipt; the success dialog offers `Collect on the Payments page`; Search registrations shows remaining 210, Unpaid (used by UAT-CSH-03).
+Expected: (1) the card reads "No treasury is approved for you on this device in this branch. The visit is saved without a payment; collect it on the Payments page."; the visit is saved (ACC number, labels, job order), no receipt; the success dialog offers `Collect on the Payments page`; Search registrations shows remaining 210.00, status Open (used by UAT-CSH-03).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-10 — Search registrations and row actions · critical
 Refs: CP-10 · WF-02 · documents (labels, job order, receipt, report).
 Reception › Search registrations (`/registration/visits`).
 1. Search by accession; by patient number; by name; by mobile; date range today; status filters.
-2. Row › `Samples`: the dialog lists the tubes with unit, type, status **Received**, sample number; `Label` prints one, `Print all labels`.
-3. Row › `Documents`: job order, receipts (Payments page), results report.
+2. Row › `Samples` (needs `samples.view`): the dialog lists the tubes with unit, type, status **Received**, collected and received times, sample number; `Label` prints one, `Print all labels`.
+3. Row › `Documents`: sample labels, print / open the job order, receipts (Payments page), results report.
 4. Row › `Payments`; row › `Results`; row › `Edit`.
 5. `Export CSV`.
 6. Arabic check.
@@ -536,7 +539,7 @@ Visits: (a) UAT-REG-03 (K, GLU, HGB paid 360; after UAT-VER-01 K and GLU are ver
 4. Visit (a): tick HGB with reason "Ordered by mistake". Confirm.
 5. As `uat.tech` (no `registration.cancel`), open Search registrations.
 6. Arabic check.
-Expected: (1) refused "A cancellation needs a reason." (`REG-021`). (2) K is **Cancelled** (kept on the row with reason, user, time; struck through), patient share 90, paid 210 → remaining **−120**, balance **Refund due**; the tube of K is cancelled; the result rows of K are Cancelled on Results by accession. (3) refused `REG-106` "The service has verified results and cannot be cancelled." (4) HGB cancelled; balance −150 Refund due (used by UAT-CSH-07 — adjust the expected refundable to the visit used). (5) the action is absent; forced → `REG-061` / `AUTHZ-001`.
+Expected: (1) the `Cancel the selected services` button stays disabled until a reason is chosen (`REG-021` on a forced request). (2) K is **Cancelled** (kept on the row as a struck-through chip; reason, user and time on the visit), patient share 90, paid 210 → remaining **−120** on the row and **Refund due** on the Payments page; the tube of K is cancelled; the result rows of K are Cancelled on Results by accession. (3) refused `REG-106` "The service has verified results and cannot be cancelled." (4) HGB cancelled; balance −150 Refund due (used by UAT-CSH-07 — adjust the expected refundable to the visit used). (5) the action is absent (a role without `registration.view` cannot even list the visits); a forced request answers `AUTHZ-001`.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-12 — Price query and continue to registration · standard
@@ -1079,3 +1082,4 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | Version | Date | Author | Change |
 | --- | --- | --- | --- |
 | 0.1 | 2026-10-10 | Claude Code (documentation agent), for review by Mohamed Hashem | First set of Release-1 UAT scripts: 78 scripts (45 critical) across ten personas, results sheet, acceptance criteria, coverage. |
+| 0.2 | 2026-10-10 | Claude Code (UAT dry-run agent) | Corrections from the automated dry run of UAT-ADM-01/02/03/06/07/08 and UAT-REG-01/03/04/05/07/08/09/10/11 (`results/2026-10-10_dry-run_admin-reception.md`): §3 says what the screen shows for a code and which rules the page enforces before any call; §4 Reception role gains `samples.view`; expected texts aligned with the built screens (validator and page refusals, lockout after five failures, `Create and use`, dry-run line messages, treasury branch picker, decision time on treasury rows, role editor flow). Ids unchanged. |

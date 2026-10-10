@@ -10,6 +10,13 @@ export function discountModeOf(cap: number | null): DiscountMode {
   return cap === null ? 'default' : cap === 0 ? 'none' : 'custom';
 }
 
+export const MAX_DISCOUNT_CAP_PERCENT = 100;
+
+/** The cap the server accepts (ORG-006): empty, or a whole percentage from 0 to 100. The page refuses anything else instead of clamping it. */
+export function isDiscountCapValid(cap: number | null): boolean {
+  return cap === null || (Number.isInteger(cap) && cap >= 0 && cap <= MAX_DISCOUNT_CAP_PERCENT);
+}
+
 /**
  * The special rights of a role, or a user's override of them (SRS CP-37; LDM manual §12.3 "Special Rights"): the
  * discount cap (tenant default, none, or a custom percentage up to 100) and the eight action flags. Emits a complete
@@ -28,11 +35,14 @@ export function discountModeOf(cap: number | null): DiscountMode {
         </select>
         @if (mode() === 'custom') {
           <label class="cap">
-            <input class="inp" type="number" min="1" max="100" step="1" [value]="value().discountCapPercent" (change)="onCap($event)" [attr.aria-label]="i18n.t('organization.special.discountCap')" />
+            <input class="inp" type="number" min="1" [max]="maxCap" step="1" [value]="value().discountCapPercent" (change)="onCap($event)" [attr.aria-label]="i18n.t('organization.special.discountCap')" />
             <span>%</span>
           </label>
         }
       </div>
+      @if (!capValid()) {
+        <p class="problem small" role="alert">{{ i18n.t('organization.error.ORG-006') }}</p>
+      }
       <p class="muted small">{{ i18n.t('organization.special.discountHint') }}</p>
     </fieldset>
 
@@ -61,6 +71,7 @@ export function discountModeOf(cap: number | null): DiscountMode {
     .discount-row select { width: auto; min-width: 220px; }
     .cap { display: inline-flex; align-items: center; gap: var(--sp-1); }
     .cap input { width: 90px; }
+    .problem { color: var(--danger, #b42318); margin: var(--sp-2) 0 0; }
     ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--sp-3); }
     .check { align-items: flex-start; }
     .check > span { display: grid; gap: 2px; }
@@ -75,7 +86,9 @@ export class SpecialRightsFormComponent {
   readonly valueChange = output<SpecialRights>();
 
   protected readonly flags = SPECIAL_RIGHT_FLAGS;
+  protected readonly maxCap = MAX_DISCOUNT_CAP_PERCENT;
   protected readonly mode = computed(() => discountModeOf(this.value().discountCapPercent));
+  protected readonly capValid = computed(() => isDiscountCapValid(this.value().discountCapPercent));
 
   protected onMode(event: Event): void {
     const mode = (event.target as HTMLSelectElement).value as DiscountMode;
@@ -86,7 +99,8 @@ export class SpecialRightsFormComponent {
 
   protected onCap(event: Event): void {
     const raw = Number((event.target as HTMLInputElement).value);
-    const cap = Number.isFinite(raw) ? Math.min(100, Math.max(1, Math.round(raw))) : 1;
+    // The typed value travels as is (rounded to a whole percent): an out-of-range cap is shown as refused, never silently clamped (ORG-006).
+    const cap = Number.isFinite(raw) ? Math.round(raw) : 1;
     this.valueChange.emit({ ...this.value(), discountCapPercent: cap });
   }
 

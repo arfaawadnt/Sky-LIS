@@ -234,7 +234,11 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **UAT dry run** (laboratory administrator and reception, 15 critical scripts, results under `docs/uat/results/`): seven
+  frontend defects fixed: refusal messages of the branches page, discount cap above 100 % no longer clamped, treasury form
+  picks a branch by name, registration without an approved treasury saves unpaid instead of blocking, treasury-access rows
+  show the decision time, dry-run refusals of a service line are shown, a sign-out racing a 401 no longer loops back to
+  the sign-in page. UAT scripts corrected to v0.2.
 
 ### v0.3.1 — 2026-10-10
 

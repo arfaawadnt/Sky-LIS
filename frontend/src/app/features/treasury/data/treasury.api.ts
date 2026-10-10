@@ -14,6 +14,7 @@ import {
   type TreasuryListFilter,
   type TreasuryListItem,
 } from '../../../core/api/treasury.contracts';
+import { type BranchListItem, ORGANIZATION_API } from '../../../core/api/organization.contracts';
 import { toHttpParams } from '../../../shared/forms/paging';
 
 /** Typed calls of the module; URLs are built with `HttpParams`, never by string concatenation (pitfall P-60). */
@@ -30,6 +31,13 @@ export class TreasuryApi {
   listTreasuriesPage(filter: TreasuryListFilter, signal?: AbortSignal): Promise<Paged<TreasuryListItem>> {
     const params = toHttpParams({ isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize });
     return firstValueFrom(this.http.get<Paged<TreasuryListItem>>(TREASURY_API.treasuries, { params }), { defaultValue: emptyPage<TreasuryListItem>() }).then(abortable(signal));
+  }
+
+  /** The active branches of the laboratory, for the branch picker of the treasury form (CP-28: a treasury belongs to one branch). */
+  async activeBranches(signal?: AbortSignal): Promise<readonly BranchListItem[]> {
+    const params = toHttpParams({ search: '', isActive: true, page: 1, pageSize: 200 });
+    const page = await firstValueFrom(this.http.get<Paged<BranchListItem>>(ORGANIZATION_API.branches, { params }), { defaultValue: emptyPage<BranchListItem>() }).then(abortable(signal));
+    return page.items;
   }
 
   createTreasury(request: CreateTreasuryRequest): Promise<CreatedResource> {

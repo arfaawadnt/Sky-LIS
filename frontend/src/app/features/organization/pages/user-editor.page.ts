@@ -36,7 +36,7 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { DEFAULT_PASSWORD_MIN_LENGTH, UserEditorFacade } from '../state/users.facade';
 import { PrivilegeMatrixComponent, sortKeys } from '../ui/privilege-matrix.component';
 import { type ResetPasswordInput, ResetPasswordDialogComponent } from '../ui/reset-password-dialog.component';
-import { SpecialRightsFormComponent } from '../ui/special-rights-form.component';
+import { isDiscountCapValid, SpecialRightsFormComponent } from '../ui/special-rights-form.component';
 import { USER_STATUS_TONES } from '../ui/user-status';
 
 export type UserTab = 'profile' | 'access' | 'privileges' | 'security';
@@ -379,6 +379,11 @@ export class UserEditorPage {
 
   protected async saveOverrides(): Promise<void> {
     if (this.isNew() || !this.canManage()) {
+      return;
+    }
+
+    if (!this.useRoleSpecialRights() && !isDiscountCapValid(this.specialOverride().discountCapPercent)) {
+      this.toast.error(this.i18n.t('organization.error.ORG-006'));
       return;
     }
 

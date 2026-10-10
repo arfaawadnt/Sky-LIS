@@ -6,6 +6,7 @@ import { TREASURY_ACCESS_STATUSES, TREASURY_PERMISSIONS, type TreasuryAccessRequ
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
+import { formatDateTime } from '../../../shared/patient/patient-demographics';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
@@ -65,8 +66,17 @@ export class TreasuryAccessPage {
     { key: 'requestedByName', header: 'treasury.requestedBy' },
     { key: 'device', header: 'treasury.device', value: (row) => row.deviceLabel ?? row.deviceId, secondary: true },
     { key: 'status', header: 'treasury.status', width: '120px' },
-    { key: 'decidedByName', header: 'treasury.decidedBy', secondary: true },
+    // the decision: who and when (UAT-ADM-07 expects the approver name and time on the row); the reason stays in the audit trail until the list carries it
+    { key: 'decidedByName', header: 'treasury.decidedBy', secondary: true, value: (row) => this.decision(row) },
   ];
+
+  private decision(row: TreasuryAccessRequestListItem): string {
+    if (row.decidedByName === null) {
+      return '';
+    }
+
+    return row.decidedAtUtc === null ? row.decidedByName : `${row.decidedByName} · ${formatDateTime(row.decidedAtUtc, this.i18n.lang())}`;
+  }
 
   protected readonly rows = computed<readonly TreasuryAccessRequestListItem[]>(() => (this.facade.requests.hasValue() ? this.facade.requests.value().items : []));
 

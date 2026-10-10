@@ -25,7 +25,7 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { RoleEditorFacade } from '../state/roles.facade';
 import { PrivilegeMatrixComponent, sortKeys } from '../ui/privilege-matrix.component';
 import { type BranchOption, ResultRightsGridComponent } from '../ui/result-rights-grid.component';
-import { SpecialRightsFormComponent } from '../ui/special-rights-form.component';
+import { isDiscountCapValid, SpecialRightsFormComponent } from '../ui/special-rights-form.component';
 
 export type RoleTab = 'general' | 'permissions' | 'special' | 'results';
 
@@ -245,6 +245,11 @@ export class RoleEditorPage {
 
   protected async saveSpecial(): Promise<void> {
     if (this.isNew() || !this.specialDirty()) {
+      return;
+    }
+
+    if (!isDiscountCapValid(this.special().discountCapPercent)) {
+      this.toast.error(this.i18n.t('organization.error.ORG-006'));
       return;
     }
 
