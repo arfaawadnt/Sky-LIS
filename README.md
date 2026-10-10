@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.3.2** · released 2026-10-10 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.3.3** · released 2026-10-10 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.3.3 — 2026-10-10
 
 - **Installed on WIN-9S2KO4FA64L** (production lane, self-signed certificate): service `NTLIS` from package 0.3.2, IIS
   site `lis-ui` at `https://WIN-9S2KO4FA64L`, the private PostgreSQL instance registered as the service `LIS_POSTGRES`;
