@@ -26,7 +26,8 @@ export interface SelectOption {
 
 export type SelectOptionsSource = readonly SelectOption[] | (() => Promise<readonly SelectOption[]>);
 
-export type FieldKind = 'text' | 'textarea' | 'number' | 'select' | 'boolean' | 'localizedText' | 'date' | 'code';
+/** `multiSelect` holds a `string[]` of option values (an empty array when nothing is chosen; `required` demands at least one). */
+export type FieldKind = 'text' | 'textarea' | 'number' | 'select' | 'multiSelect' | 'boolean' | 'localizedText' | 'date' | 'code';
 
 export interface FieldSchema {
   /** The form control name; for `localizedText` the DTO carries `<name>En` / `<name>Ar`. */
@@ -41,7 +42,7 @@ export interface FieldSchema {
   readonly min?: number;
   readonly max?: number;
   readonly step?: number;
-  /** `select` only: static options or an async provider (resolved once when the page opens). */
+  /** `select` and `multiSelect`: static options or an async provider (resolved once when the page opens). */
   readonly options?: SelectOptionsSource;
   /** Cannot change once created (a code); disabled in the edit drawer. */
   readonly immutable?: boolean;

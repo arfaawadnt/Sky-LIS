@@ -1,15 +1,15 @@
-// Copied from features/patients (MODULES/brief: features never import each other) and bound to the registration dictionary
-// (registration.patient.*); replace with the shared picker when the integrator moves it to shared/.
+// Shared patient picker (Patients CP-11 and Registration CP-06 use the same file lookup and creation form). It reads the
+// `patients` dictionary and the Patients contracts; it never imports a feature.
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, resource, signal, viewChild } from '@angular/core';
 
-import { type CreatedPatient, PATIENTS_PERMISSIONS, type PatientListItem, type PatientSummary, type RegisterPatientRequest, type SimilarPatient } from '../../../core/api/patients.contracts';
-import { I18nService } from '../../../core/i18n/i18n.service';
-import { mutation } from '../../../core/state/mutation';
-import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
-import { CanDirective } from '../../../shared/ui/can.directive';
-import { EmptyStateComponent } from '../../../shared/ui/empty-state/empty-state.component';
-import { IconComponent } from '../../../shared/ui/icon/icon.component';
-import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.component';
+import { type CreatedPatient, PATIENTS_PERMISSIONS, type PatientListItem, type PatientSummary, type RegisterPatientRequest, type SimilarPatient } from '../../core/api/patients.contracts';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { mutation } from '../../core/state/mutation';
+import { BadgeComponent } from '../ui/badge/badge.component';
+import { CanDirective } from '../ui/can.directive';
+import { EmptyStateComponent } from '../ui/empty-state/empty-state.component';
+import { IconComponent } from '../ui/icon/icon.component';
+import { SearchBoxComponent } from '../ui/search-box/search-box.component';
 import { PatientLookupApi } from './patient-lookup.api';
 import { ageBetween, ageParts, birthDateFromAge, toSummary, todayIso } from './patient-demographics';
 import { PatientFormComponent, type TypedIdentity } from './patient-form.component';
@@ -27,7 +27,7 @@ const MIN_QUERY_LENGTH = 2;
  * Usage: `<app-patient-picker [selected]="visit.patient()" (picked)="visit.setPatient($event)" (cleared)="visit.clearPatient()" />`
  */
 @Component({
-  selector: 'app-reg-patient-picker',
+  selector: 'app-patient-picker',
   imports: [SearchBoxComponent, PatientFormComponent, BadgeComponent, CanDirective, EmptyStateComponent, IconComponent],
   templateUrl: './patient-picker.component.html',
   styleUrl: './patient-picker.component.css',
@@ -88,7 +88,7 @@ export class PatientPickerComponent {
   protected readonly register = mutation((request: RegisterPatientRequest) => this.api.register(request));
 
   constructor() {
-    void this.i18n.load('registration');
+    void this.i18n.load('patients');
   }
 
   protected onSearch(text: string): void {
@@ -136,7 +136,7 @@ export class PatientPickerComponent {
 
   protected ageText(item: { readonly age: { readonly years: number; readonly months: number; readonly days: number } }): string {
     return ageParts(item.age)
-      .map((part) => this.i18n.tf(`registration.patient.age.${part.unit}`, { value: part.value }))
+      .map((part) => this.i18n.tf(`patients.age.${part.unit}`, { value: part.value }))
       .join(' ');
   }
 }

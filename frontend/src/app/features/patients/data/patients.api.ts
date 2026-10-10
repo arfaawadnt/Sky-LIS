@@ -14,7 +14,7 @@ import {
   type UpdatePatientRequest,
 } from '../../../core/api/patients.contracts';
 import { toHttpParams } from '../../../shared/forms/paging';
-import { abortable, itemsOf } from './patient-lookup.api';
+import { abortable, itemsOf } from '../../../shared/patient/patient-lookup.api';
 
 /** A downloaded file: its bytes and the name the server suggested (or the fallback). */
 export interface DownloadedFile {

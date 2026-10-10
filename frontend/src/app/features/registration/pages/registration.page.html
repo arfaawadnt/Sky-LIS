@@ -31,7 +31,7 @@
           </div>
         }
       } @else {
-        <app-reg-patient-picker [selected]="facade.patient()" (picked)="onPatient($event)" (cleared)="facade.setPatient(null)" />
+        <app-patient-picker [selected]="facade.patient()" (picked)="onPatient($event)" (cleared)="facade.setPatient(null)" />
       }
     </app-section-card>
 

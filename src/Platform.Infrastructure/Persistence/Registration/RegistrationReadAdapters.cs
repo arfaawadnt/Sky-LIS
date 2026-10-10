@@ -242,13 +242,3 @@ internal sealed class RegistrationDirectory(AppDbContext context) : IRegistratio
         public string? NameAr { get; set; }
     }
 }
-
-/// <summary>
-/// Placeholder until the Results module (wave 3) ships the real adapter of <see cref="IResultStatusLookup"/>: nothing is
-/// verified yet, so no cancellation is refused for verified results (MODULES.md §5). Delete it with the real adapter.
-/// </summary>
-[FallbackAdapter]
-internal sealed class NoVerifiedResultsLookup : IResultStatusLookup
-{
-    public Task<bool> HasVerifiedResultsAsync(IReadOnlyCollection<Guid> lineIds, CancellationToken cancellationToken) => Task.FromResult(false);
-}

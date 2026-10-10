@@ -150,7 +150,7 @@ export class UnitsPage {
 }
 ```
 
-Field kinds: `text`, `textarea`, `number`, `select` (static `options` or async provider), `boolean`, `localizedText`,
+Field kinds: `text`, `textarea`, `number`, `select` (static `options` or async provider), `multiSelect` (same options, value `string[]`), `boolean`, `localizedText`,
 `date` (`yyyy-MM-dd` string), `code` (upper-case, `CODE_PATTERN`, immutable on edit unless `immutable: false`).
 `immutable: true` disables any field on edit. Empty `select`/`date` values go to the DTO as `null`.
 

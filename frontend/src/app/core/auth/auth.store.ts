@@ -11,6 +11,8 @@ import {
   type SignInRequest,
   type StartPasswordRecoveryRequest,
 } from '../api/auth.contracts';
+import { ACCOUNT_API } from '../api/account.contracts';
+import { I18nService } from '../i18n/i18n.service';
 
 export interface CurrentUser {
   readonly id: string;
@@ -29,6 +31,7 @@ export interface CurrentUser {
 @Injectable({ providedIn: 'root' })
 export class AuthStore {
   private readonly http = inject(HttpClient);
+  private readonly i18n = inject(I18nService);
 
   private readonly accessToken = signal<string | null>(null);
   private readonly expiresAtUtc = signal<Date | null>(null);
@@ -72,8 +75,31 @@ export class AuthStore {
   async hydrate(): Promise<void> {
     try {
       await this.refresh();
+      // CP-65: the interface opens in the language saved on the membership (the sign-in page applies it the same way).
+      const language = this.profileState()?.language;
+      if (language) {
+        this.i18n.setLanguage(language);
+      }
     } finally {
       this.hydrated.set(true);
+    }
+  }
+
+  /**
+   * CP-65: switches the interface and saves the language on the membership of the session, so the next sign-in and every
+   * other device open in it. The switch itself never waits for the server; a refused save leaves the profile as it was.
+   */
+  async updateLanguage(language: string): Promise<void> {
+    this.i18n.setLanguage(language);
+    const profile = this.profileState();
+    if (!profile) {
+      return;
+    }
+
+    await firstValueFrom(this.http.put<void>(ACCOUNT_API.preferences, { language }), { defaultValue: undefined });
+    const current = this.profileState();
+    if (current) {
+      this.profileState.set({ ...current, language });
     }
   }
 

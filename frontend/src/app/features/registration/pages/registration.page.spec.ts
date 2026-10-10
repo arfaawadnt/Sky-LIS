@@ -255,7 +255,7 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
     expect(host.querySelectorAll('tr.saved').length).toBe(2);
     expect(host.querySelectorAll('select option').length).toBeGreaterThan(0);
     expect(host.querySelector<HTMLSelectElement>('select')?.disabled).toBe(true);
-    expect(host.querySelector('app-reg-patient-picker')).toBeNull();
+    expect(host.querySelector('app-patient-picker')).toBeNull();
     expect(host.textContent).not.toContain('registration.payment.cardTitle');
     const releaseButton = host.querySelector<HTMLButtonElement>('tr.saved button.btn.sm');
     expect(releaseButton).not.toBeNull();

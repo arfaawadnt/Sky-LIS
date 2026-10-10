@@ -30,8 +30,8 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { openFile, saveFile } from '../data/save-file';
 import { PatientFileFacade } from '../state/patient-file.facade';
 import { MergeDialogComponent } from '../ui/merge-dialog.component';
-import { ageParts, fileSize, formatDateTime } from '../ui/patient-demographics';
-import { PatientFormComponent } from '../ui/patient-form.component';
+import { ageParts, fileSize, formatDateTime } from '../../../shared/patient/patient-demographics';
+import { PatientFormComponent } from '../../../shared/patient/patient-form.component';
 
 /**
  * One patient file (SRS CP-11): the demographics, the documents (attach, open, download, deactivate with a reason —

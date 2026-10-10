@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import type { PatientFormSettings, RegisterPatientRequest } from '../../../core/api/patients.contracts';
-import { PermissionsService } from '../../../core/permissions/permissions.service';
+import type { PatientFormSettings, RegisterPatientRequest } from '../../core/api/patients.contracts';
+import { PermissionsService } from '../../core/permissions/permissions.service';
 import { PatientFormComponent } from './patient-form.component';
 import { ageBetween, todayIso } from './patient-demographics';
 

@@ -3,8 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { PATIENTS_API, type PatientDetail, type PatientListItem, type PatientSummary } from '../../../core/api/patients.contracts';
-import { PermissionsService } from '../../../core/permissions/permissions.service';
+import { PATIENTS_API, type PatientDetail, type PatientListItem, type PatientSummary } from '../../core/api/patients.contracts';
+import { PermissionsService } from '../../core/permissions/permissions.service';
 import { PatientPickerComponent } from './patient-picker.component';
 
 @Component({

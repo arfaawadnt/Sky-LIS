@@ -78,6 +78,15 @@
                   <span>{{ fieldLabel(field) }}</span>
                 </label>
               }
+              @case ('multiSelect') {
+                <app-form-field [label]="fieldLabel(field)" [hint]="fieldHint(field)" [required]="field.required ?? false" [problem]="saveProblem()">
+                  <select multiple [formControlName]="field.name" [size]="optionsFor(field).length > 8 ? 8 : (optionsFor(field).length < 3 ? 3 : optionsFor(field).length)">
+                    @for (option of optionsFor(field); track option.value) {
+                      <option [ngValue]="option.value">{{ optionLabel(option) }}</option>
+                    }
+                  </select>
+                </app-form-field>
+              }
               @case ('select') {
                 <app-form-field [label]="fieldLabel(field)" [hint]="fieldHint(field)" [required]="field.required ?? false" [problem]="saveProblem()">
                   <select [formControlName]="field.name">

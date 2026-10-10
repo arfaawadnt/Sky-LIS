@@ -215,7 +215,9 @@ QMS source is never read or copied (section 1); everything here is written from 
   on CRED-002/003, `problemDetailsInterceptor` → typed `ProblemError`), `core/crypto` (`credential-envelope.ts`: WebCrypto-only
   compact JWE seal; `CredentialEnvelopeClient` fetches the challenge), `core/api` (hand-written auth contracts until the
   OpenAPI generator lands), `core/i18n` (lang/dir signals, per-feature JSON in `public/i18n`), `core/state/mutation.ts`,
-  `shell/nav.registry.ts`, `features/auth` (login page), `features/home`. Commands in `frontend/`: `npm run build`,
+  `shell/nav.registry.ts`, `features/auth` (login page), `features/home`; `shared/patient` (patient picker, form, demographics
+  and lookup API shared by Patients and Registration; reads the `patients` dictionary); `core/release.ts` (`RELEASE_SCOPE`,
+  `inReleaseScope`); `AuthStore.updateLanguage` saves the language switch (CP-65) and `hydrate` applies the saved one. Commands in `frontend/`: `npm run build`,
   `npm run lint` (ESLint + `scripts/check-boundaries.mjs`), `npm run test:ci`. Rules: no `any`/`$any()`, no web storage, no
   `subscribe()` in components, core/shared never import features, features never import each other.
 - Business modules (Task 5, 03 §3–§10, D-04/D-07): the first feature module is **Treasury access** (SRS CP-28/CP-29,

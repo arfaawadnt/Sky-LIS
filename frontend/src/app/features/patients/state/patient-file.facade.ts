@@ -2,7 +2,7 @@ import { Injectable, computed, inject, resource, signal } from '@angular/core';
 
 import type { MergePatientsRequest, PatientDocumentItem, PatientListItem, UpdatePatientRequest } from '../../../core/api/patients.contracts';
 import { mutation } from '../../../core/state/mutation';
-import { PatientLookupApi } from '../data/patient-lookup.api';
+import { PatientLookupApi } from '../../../shared/patient/patient-lookup.api';
 import { PatientsApi } from '../data/patients.api';
 
 const MERGE_SEARCH_LIMIT = 10;

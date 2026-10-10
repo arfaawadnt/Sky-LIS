@@ -342,6 +342,10 @@ export class MasterDataPageComponent<TItem, TDto> {
         const value = typeof initial === 'number' ? initial : typeof field.defaultValue === 'number' ? field.defaultValue : null;
         return new FormControl<number | null>({ value, disabled }, { validators });
       }
+      case 'multiSelect': {
+        const value = Array.isArray(initial) ? initial.filter((entry): entry is string => typeof entry === 'string') : Array.isArray(field.defaultValue) ? field.defaultValue.filter((entry): entry is string => typeof entry === 'string') : [];
+        return new FormControl<string[]>({ value, disabled }, { nonNullable: true, validators: field.required ? [Validators.required, Validators.minLength(1)] : [] });
+      }
       case 'select':
       case 'date': {
         const value = typeof initial === 'string' ? initial : typeof field.defaultValue === 'string' ? field.defaultValue : null;
@@ -408,7 +412,7 @@ export class MasterDataPageComponent<TItem, TDto> {
 
   private async loadOptions(fields: readonly FieldSchema[]): Promise<void> {
     for (const field of fields) {
-      if (field.kind !== 'select' || typeof field.options !== 'function') {
+      if ((field.kind !== 'select' && field.kind !== 'multiSelect') || typeof field.options !== 'function') {
         continue;
       }
 

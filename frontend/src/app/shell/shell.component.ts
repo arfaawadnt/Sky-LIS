@@ -81,6 +81,7 @@ export class ShellComponent {
     this.mobileOpen.set(false);
   }
 
+  /** The topbar saves the preference afterwards (CP-65). */
   protected toggleLanguage(): void {
     this.i18n.setLanguage(this.i18n.lang() === 'en' ? 'ar' : 'en');
   }

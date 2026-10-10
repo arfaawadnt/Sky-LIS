@@ -211,7 +211,12 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Shared patient picker**: the patient lookup and creation form used by Patients and Registration live once in
+  `frontend/src/app/shared/patient` (Registration's copy removed).
+- **Language**: the top-bar language switch saves the preference on the membership, and the app opens in the saved
+  language after sign-in or a page reload.
+- **UI kit**: master-data pages accept a `multiSelect` field (a string array of option values).
+- **Backend**: Registration's placeholder result-status adapter removed; the Results module's adapter is the only one.
 
 ### v0.2.0 — 2026-10-10
 

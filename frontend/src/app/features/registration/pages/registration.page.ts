@@ -28,9 +28,9 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { dateTime, money, pick } from '../data/registration-format';
-import { PatientLookupApi } from '../patient/patient-lookup.api';
-import { toSummary } from '../patient/patient-demographics';
-import { PatientPickerComponent } from '../patient/patient-picker.component';
+import { PatientLookupApi } from '../../../shared/patient/patient-lookup.api';
+import { toSummary } from '../../../shared/patient/patient-demographics';
+import { PatientPickerComponent } from '../../../shared/patient/patient-picker.component';
 import { RegistrationFacade, type SaveBlocker } from '../state/registration.facade';
 import { RegistrationPrinter } from '../state/registration-printer';
 import { type PickedService, ServiceEntryComponent } from '../ui/service-entry.component';

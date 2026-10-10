@@ -1,9 +1,6 @@
-import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input, model, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
 
-import { ACCOUNT_API, type UpdatePreferencesRequest } from '../core/api/account.contracts';
 import { AuthStore } from '../core/auth/auth.store';
 import { I18nService } from '../core/i18n/i18n.service';
 import { PortalService } from '../core/portal/portal.service';
@@ -28,7 +25,6 @@ export class ShellTopbarComponent {
   protected readonly auth = inject(AuthStore);
   protected readonly portal = inject(PortalService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-  private readonly http = inject(HttpClient);
 
   readonly portalLabel = input.required<string>();
   readonly mobileOpen = input(false);
@@ -65,15 +61,14 @@ export class ShellTopbarComponent {
     this.rememberLanguage();
   }
 
-  /** CP-65: the switch is also the user's preference, saved on the membership (fire and forget; the switch itself never waits). */
+  /** CP-65: the switch is also the user's preference, saved on the membership by the auth store (fire and forget; the switch itself never waits). */
   private rememberLanguage(): void {
     const language = this.i18n.lang();
     if (!this.auth.isAuthenticated() || (language !== 'en' && language !== 'ar')) {
       return;
     }
 
-    const body: UpdatePreferencesRequest = { language };
-    void firstValueFrom(this.http.put<void>(ACCOUNT_API.preferences, body)).catch(() => undefined);
+    void this.auth.updateLanguage(language).catch(() => undefined);
   }
 
   protected onSignOut(): void {

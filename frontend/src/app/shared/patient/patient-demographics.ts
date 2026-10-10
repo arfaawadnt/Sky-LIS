@@ -1,6 +1,4 @@
-// Copied from features/patients (MODULES/brief: features never import each other) and bound to the registration dictionary
-// (registration.patient.*); replace with the shared picker when the integrator moves it to shared/.
-import type { PatientAge, PatientDetail, PatientGender, PatientListItem, PatientSummary, PatientTitle, SimilarPatient } from '../../../core/api/patients.contracts';
+import type { PatientAge, PatientDetail, PatientGender, PatientListItem, PatientSummary, PatientTitle, SimilarPatient } from '../../core/api/patients.contracts';
 
 /**
  * Pure helpers of the patient form and picker, mirroring the server's rules so the screen agrees with the aggregate:

@@ -10,7 +10,7 @@ import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { DialogComponent } from '../../../shared/ui/dialog/dialog.component';
 import { FormFieldComponent } from '../../../shared/ui/form-field/form-field.component';
 import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.component';
-import { ageParts } from './patient-demographics';
+import { ageParts } from '../../../shared/patient/patient-demographics';
 
 /**
  * Merge a duplicate into this file (CP-11 "merge duplicates (right)", T3): search the duplicate, compare the two files

@@ -3,9 +3,9 @@ import { Injectable, computed, inject, resource, signal } from '@angular/core';
 import type { PageRequest } from '../../../core/api/paging';
 import type { PatientGender, PatientListFilter, PatientStatus, RegisterPatientRequest, SimilarPatient, UpdatePatientRequest } from '../../../core/api/patients.contracts';
 import { mutation } from '../../../core/state/mutation';
-import { PatientLookupApi } from '../data/patient-lookup.api';
+import { PatientLookupApi } from '../../../shared/patient/patient-lookup.api';
 import { PatientsApi } from '../data/patients.api';
-import type { TypedIdentity } from '../ui/patient-form.component';
+import type { TypedIdentity } from '../../../shared/patient/patient-form.component';
 
 /** Minimum typed identity before the similar lookup runs: two name characters or a whole mobile. */
 const MIN_NAME = 2;

@@ -21,6 +21,7 @@ interface ItemDto {
   readonly code: string;
   readonly nameEn: string;
   readonly nameAr: string;
+  readonly tags?: readonly string[];
 }
 
 /** An in-memory adapter that records every call (what a module's `*Api` does over HTTP). */
@@ -82,6 +83,7 @@ class HostComponent {
     fields: [
       { name: 'code', kind: 'code', required: true, maxLength: 8 },
       { name: 'name', kind: 'localizedText', required: true },
+      { name: 'tags', kind: 'multiSelect', options: [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }, { value: 'c', label: 'Gamma' }] },
     ],
     adapter: this.adapter,
   };
@@ -155,11 +157,38 @@ describe('MasterDataPageComponent (shared/ui)', () => {
     dialog?.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
     await flush(fixture);
 
-    expect(adapter.calls).toContain('create:{"code":"C3","nameEn":"Gamma","nameAr":"جاما"}');
+    expect(adapter.calls).toContain('create:{"code":"C3","nameEn":"Gamma","nameAr":"جاما","tags":[]}');
     expect(host.querySelector('[role="dialog"]')).toBeNull();
     expect(TestBed.inject(ToastService).toasts().length).toBe(1);
     expect(adapter.calls.filter((call) => call === 'list').length).toBe(listCalls + 1);
     expect(host.querySelectorAll('tbody tr[data-row]').length).toBe(3);
+  });
+
+  it('multiSelect: the chosen options reach the DTO as a string array', async () => {
+    const { fixture, host, adapter } = await render();
+    host.querySelector<HTMLButtonElement>('app-page-header .btn.primary')?.click();
+    await fixture.whenStable();
+    const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+    setValue(dialog?.querySelector<HTMLInputElement>('input.code') ?? null, 'c4');
+    setValue(dialog?.querySelector<HTMLInputElement>('input[lang="en"]') ?? null, 'Delta');
+    setValue(dialog?.querySelector<HTMLInputElement>('input[lang="ar"]') ?? null, 'دلتا');
+
+    const select = dialog?.querySelector<HTMLSelectElement>('select[multiple]') ?? null;
+    if (!select) {
+      throw new Error('multi-select missing');
+    }
+
+    expect(select.options.length).toBe(3);   // no "choose…" placeholder on a multi-select
+    for (const option of select.options) {
+      option.selected = option.text === 'Alpha' || option.text === 'Gamma';
+    }
+
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await fixture.whenStable();
+    dialog?.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
+    await flush(fixture);
+
+    expect(adapter.calls).toContain('create:{"code":"C4","nameEn":"Delta","nameAr":"دلتا","tags":["a","c"]}');
   });
 
   it('refuses to save an invalid form and shows the field errors', async () => {
@@ -192,7 +221,7 @@ describe('MasterDataPageComponent (shared/ui)', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true }));
     await flush(fixture);
 
-    expect(adapter.calls).toContain('update:b:{"code":"B2","nameEn":"Beta renamed","nameAr":"بيتا"}');
+    expect(adapter.calls).toContain('update:b:{"code":"B2","nameEn":"Beta renamed","nameAr":"بيتا","tags":[]}');
     expect(host.querySelector('[role="dialog"]')).toBeNull();
   });
 

@@ -1,5 +1,3 @@
-// Copied from features/patients (MODULES/brief: features never import each other) and bound to the registration dictionary
-// (registration.patient.*); replace with the shared picker when the integrator moves it to shared/.
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { type AbstractControl, FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors, type ValidatorFn, Validators } from '@angular/forms';
 
@@ -17,19 +15,19 @@ import {
   type PatientTitle,
   type RegisterPatientRequest,
   type SimilarPatient,
-} from '../../../core/api/patients.contracts';
-import { ProblemCodes, type ProblemDetails } from '../../../core/api/problem-details';
-import { I18nService } from '../../../core/i18n/i18n.service';
-import { PermissionsService } from '../../../core/permissions/permissions.service';
-import { markAllTouched } from '../../../shared/forms/mark-all-touched';
-import { problemMessage } from '../../../shared/forms/problem-text';
-import { SERVER_ERROR_KEY, clearServerErrors, problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
-import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
-import { requiredText } from '../../../shared/forms/validators';
-import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
-import { CanDirective } from '../../../shared/ui/can.directive';
-import { FormFieldComponent } from '../../../shared/ui/form-field/form-field.component';
-import { IconComponent } from '../../../shared/ui/icon/icon.component';
+} from '../../core/api/patients.contracts';
+import { ProblemCodes, type ProblemDetails } from '../../core/api/problem-details';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { PermissionsService } from '../../core/permissions/permissions.service';
+import { markAllTouched } from '../forms/mark-all-touched';
+import { problemMessage } from '../forms/problem-text';
+import { SERVER_ERROR_KEY, clearServerErrors, problemToFormErrors } from '../forms/problem-to-form-errors';
+import { SaveShortcutDirective } from '../forms/save-shortcut.directive';
+import { requiredText } from '../forms/validators';
+import { BadgeComponent } from '../ui/badge/badge.component';
+import { CanDirective } from '../ui/can.directive';
+import { FormFieldComponent } from '../ui/form-field/form-field.component';
+import { IconComponent } from '../ui/icon/icon.component';
 import { ageBetween, ageParts, birthDateFromAge, defaultGender, isValidAge, isValidMobile, normalizeMobile, parseIso, todayIso } from './patient-demographics';
 
 /** What the user is typing in a new file, for the similar-patient lookup (BR-01). */
@@ -58,12 +56,12 @@ const FIELD_OF_CODE: Readonly<Record<string, string>> = {
  * The patient create/edit form (CP-06 patient data, CP-11): title proposes the gender, date of birth ↔ age sync in both
  * directions (the last one typed is what is saved), mobile digits checked against the chosen country's length when the
  * platform publishes it (8–15 otherwise), mandatory mobile / national id from the tenant parameters, VIP only for
- * `registration.patient.viewConfidential`, and the similar-patient warning while a new file is typed. Presentational: inputs in,
+ * `patients.viewConfidential`, and the similar-patient warning while a new file is typed. Presentational: inputs in,
  * `save` / `typed` / `useExisting` out; the host puts the buttons where it wants and calls `submit()`. Moves to
  * `shared/` with the patient picker.
  */
 @Component({
-  selector: 'app-reg-patient-form',
+  selector: 'app-patient-form',
   imports: [ReactiveFormsModule, SaveShortcutDirective, FormFieldComponent, CanDirective, BadgeComponent, IconComponent],
   templateUrl: './patient-form.component.html',
   styleUrl: './patient-form.component.css',
@@ -109,7 +107,7 @@ export class PatientFormComponent {
       return null;
     }
 
-    return problemMessage(this.i18n, 'registration', problem);
+    return problemMessage(this.i18n, 'patients', problem);
   });
 
   protected readonly form = new FormGroup(
@@ -137,7 +135,7 @@ export class PatientFormComponent {
   );
 
   constructor() {
-    void this.i18n.load('registration');
+    void this.i18n.load('patients');
 
     effect(() => {
       const patient = this.patient();
@@ -170,7 +168,7 @@ export class PatientFormComponent {
         const field = FIELD_OF_CODE[problem.code];
         const control = field ? this.form.get(field) : null;
         if (control) {
-          control.setErrors({ ...(control.errors ?? {}), [SERVER_ERROR_KEY]: problemMessage(this.i18n, 'registration', problem) });
+          control.setErrors({ ...(control.errors ?? {}), [SERVER_ERROR_KEY]: problemMessage(this.i18n, 'patients', problem) });
           control.markAsTouched();
         }
       });
@@ -276,12 +274,12 @@ export class PatientFormComponent {
 
   protected ageText(age: PatientAge): string {
     return ageParts(age)
-      .map((part) => this.i18n.tf(`registration.patient.age.${part.unit}`, { value: part.value }))
+      .map((part) => this.i18n.tf(`patients.age.${part.unit}`, { value: part.value }))
       .join(' ');
   }
 
   protected matchLabel(candidate: SimilarPatient): string {
-    return this.i18n.t(`registration.patient.match.${candidate.match}`);
+    return this.i18n.t(`patients.match.${candidate.match}`);
   }
 
   /** The age the user typed, when complete enough (years given, the rest default to 0) and valid. */
@@ -333,7 +331,7 @@ export class PatientFormComponent {
     }
 
     if (parseIso(value) === null || value < EARLIEST_BIRTH || value > todayIso()) {
-      return { [SERVER_ERROR_KEY]: this.i18n.t('registration.patient.validation.dateOfBirth') };
+      return { [SERVER_ERROR_KEY]: this.i18n.t('patients.validation.dateOfBirth') };
     }
 
     return null;

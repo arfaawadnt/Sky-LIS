@@ -28,8 +28,8 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
 import { saveFile } from '../data/save-file';
 import { PatientsFacade } from '../state/patients.facade';
-import { ageParts } from '../ui/patient-demographics';
-import { PatientFormComponent, type TypedIdentity } from '../ui/patient-form.component';
+import { ageParts } from '../../../shared/patient/patient-demographics';
+import { PatientFormComponent, type TypedIdentity } from '../../../shared/patient/patient-form.component';
 
 /**
  * Patients register (SRS CP-11): search by number, name, mobile or national id; filters gender, status and (with the

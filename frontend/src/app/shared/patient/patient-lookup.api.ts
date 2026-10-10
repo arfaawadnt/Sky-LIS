@@ -1,10 +1,8 @@
-// Copied from features/patients (MODULES/brief: features never import each other) and bound to the registration dictionary
-// (registration.patient.*); replace with the shared picker when the integrator moves it to shared/.
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
-import { emptyPage, type Paged } from '../../../core/api/paging';
+import { emptyPage, type Paged } from '../../core/api/paging';
 import {
   type ConditionOption,
   type CountryOption,
@@ -16,7 +14,7 @@ import {
   type PatientListItem,
   type RegisterPatientRequest,
   type SimilarPatientsResponse,
-} from '../../../core/api/patients.contracts';
+} from '../../core/api/patients.contracts';
 
 const DEFAULT_SETTINGS: PatientFormSettings = { mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true };
 
