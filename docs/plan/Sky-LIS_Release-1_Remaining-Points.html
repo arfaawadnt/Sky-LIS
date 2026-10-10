@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sky LIS — Remaining Points after Release 1 — LIS-RP-001 v1.0</title>
+<meta name="description" content="Every open point after the Release-1 build, dry runs and installation of Sky LIS, with its module, purpose and enhancement phase.">
+<style>
+  :root{--bad:#C8102E;--bg:#F3F6FB;--blue-soft:#E8F1FE;--blue:#2A7DF5;--grad:linear-gradient(90deg,#2A7DF5,#6E3BE4);--ink:#14213A;--line-soft:#EAEFF6;--line:#DCE3EE;--muted:#6B7A90;--navy:#0B2A5B;--ok-soft:#E3F5EC;--ok:#13865A;--paper:#fff;--violet-soft:#EFE9FD;--violet:#6E3BE4;--warn-soft:#FFF3DF;--warn:#B26B00;--bad-soft:#FBE7EA}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+  .page{max-width:1180px;margin:0 auto;padding:32px 16px 64px}
+  header.doc{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:28px 32px;position:relative;overflow:hidden}
+  header.doc::before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:var(--grad)}
+  h1{margin:0 0 6px;font-size:28px;letter-spacing:-.01em;color:var(--navy)}
+  .sub{margin:0;color:var(--muted)}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 24px;margin-top:18px;font-size:13px}
+  .meta b{display:block;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:11px}
+  h2{font-size:20px;color:var(--navy);margin:40px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+  h3{font-size:16px;margin:24px 0 8px;color:var(--ink)}
+  p{margin:8px 0}
+  .lead{color:var(--muted)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card .n{font-size:30px;font-weight:700;color:var(--navy);line-height:1}
+  .card .l{color:var(--muted);font-size:13px;margin-top:6px}
+  .phase{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px 24px;margin:18px 0}
+  .phase-head{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:baseline;margin-bottom:6px}
+  .phase-head h2{margin:0;border:0;padding:0}
+  .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .pill.blue{background:var(--blue-soft);color:var(--blue)}
+  .pill.violet{background:var(--violet-soft);color:var(--violet)}
+  .pill.ok{background:var(--ok-soft);color:var(--ok)}
+  .pill.warn{background:var(--warn-soft);color:var(--warn)}
+  .pill.bad{background:var(--bad-soft);color:var(--bad)}
+  .pill.grey{background:var(--line-soft);color:var(--muted)}
+  table{width:100%;border-collapse:collapse;margin:12px 0 4px;font-size:14px;background:var(--paper)}
+  th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left}
+  th{background:var(--line-soft);font-weight:600;color:var(--navy);font-size:12.5px;text-transform:uppercase;letter-spacing:.03em}
+  td.id{font-family:Consolas,monospace;font-size:13px;white-space:nowrap;color:var(--navy)}
+  code{font-family:Consolas,monospace;font-size:13px;background:var(--line-soft);padding:1px 5px;border-radius:4px}
+  .owner{white-space:nowrap}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:13px;color:var(--muted);margin:10px 0 0}
+  footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+  @media (max-width:720px){table{display:block;overflow-x:auto}header.doc{padding:22px 18px}}
+  @media print{body{background:#fff;font-size:12px}.page{max-width:none;padding:0}.phase,header.doc,.card{break-inside:avoid;border-color:#bbb}h2{break-after:avoid}a{color:inherit;text-decoration:none}}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="doc">
+  <h1>Sky LIS — Remaining Points after Release 1</h1>
+  <p class="sub">Open items collected from the Release-1 build, the four workflow walk-throughs, the three UAT dry runs (44 critical scripts, 18 defects, 15 fixed) and the installation on WIN-9S2KO4FA64L, grouped into enhancement phases.</p>
+  <div class="meta">
+    <div><b>Document</b>LIS-RP-001 · v1.0</div>
+    <div><b>Date</b>2026-10-10</div>
+    <div><b>Software state</b>v0.3.6 (github.com/arfaawadnt/Sky-LIS), installed on WIN-9S2KO4FA64L</div>
+    <div><b>Sources</b>docs/uat/Release-1_UAT_Scripts.md §9, docs/uat/results/*, docs/deploy/Release-1_Deployment_Runbook.md §12, docs/build/MODULES.md §6, CLAUDE.md §5</div>
+    <div><b>Related</b>LIS-BP-001 Build plan (phase P6), LIS-SRS-001, LIS-RS-001, LIS-UAT-001, LIS-DEP-001</div>
+  </div>
+</header>
+
+<section>
+  <h2>1. Summary</h2>
+  <p class="lead">Everything inside the Release-1 scope (the pages of the v2.1 client and v3.1 admin prototype builds) is built, walked through, deployed and released. What remains falls into five phases: decisions that unblock the pilot, the pilot's own prerequisites, hardening of what exists, completion of the acceptance evidence, and the parked Release-2 modules.</p>
+  <div class="cards">
+    <div class="card"><div class="n">11</div><div class="l">business decisions to take (Phase A)</div></div>
+    <div class="card"><div class="n">5</div><div class="l">pilot prerequisites needing external resources (Phase B)</div></div>
+    <div class="card"><div class="n">9</div><div class="l">hardening and small enhancements (Phase C)</div></div>
+    <div class="card"><div class="n">7</div><div class="l">acceptance evidence still to produce (Phase D)</div></div>
+    <div class="card"><div class="n">9</div><div class="l">Release-2 modules, parked by decision (Phase E)</div></div>
+  </div>
+  <div class="legend">
+    <span class="pill bad">blocks the pilot</span>
+    <span class="pill warn">before the pilot</span>
+    <span class="pill blue">during hypercare</span>
+    <span class="pill grey">Release 2</span>
+  </div>
+</section>
+
+<div class="phase">
+  <div class="phase-head"><h2>Phase A — Decisions that unblock the pilot</h2><span class="pill bad">blocks the pilot</span><span class="pill grey">owner: business owner · National Technology</span></div>
+  <p class="lead">No code is needed to take these decisions; most of them cost a day or less of engineering once decided. They came out of the dry runs (UAT scripts §9) and the runbook's open questions.</p>
+  <table>
+    <thead><tr><th style="width:70px">Id</th><th>Point</th><th style="width:150px">Module</th><th>Purpose of the decision</th><th style="width:120px">Effort after decision</th></tr></thead>
+    <tbody>
+      <tr><td class="id">A-01</td><td>Public host name, trusted TLS certificate and client portal domain of the real installation. The current site uses the machine name and a self-signed certificate.</td><td>Deployment (PLT)</td><td>Lets browsers trust the site, lets the refresh cookie work outside localhost and gives each client its portal address (<code>https://&lt;client&gt;.&lt;domain&gt;</code>).</td><td>hours (re-run <code>install-ui-site.ps1</code>)</td></tr>
+      <tr><td class="id">A-02</td><td>Master-data update policy (OQ-03): Release 1 copies the global catalogue only when a client is created; later changes do not reach existing clients.</td><td>Catalogue (CAT) · Platform (PLT)</td><td>Decides whether a publish-to-tenants mechanism is required for the pilot or can wait for Release 2.</td><td>none, or 1–2 weeks for a publish policy</td></tr>
+      <tr><td class="id">A-03</td><td>Received gate (OQ-04): samples are auto-collected and auto-received on save, so results can be entered without a scan.</td><td>Samples (SMP) · Results (RES)</td><td>Confirms the pilot laboratory works without the sample pages (which are Release 2).</td><td>none</td></tr>
+      <tr><td class="id">A-04</td><td>Review before verify (OQ-05) is off and a laboratory cannot change it in Release 1 (the parameters page CP-57 is Release 2).</td><td>Results (RES) · Settings</td><td>Fixes the sign-off model of the pilot: verify directly, or review first.</td><td>days (expose the parameter)</td></tr>
+      <tr><td class="id">A-05</td><td>Number formats are fixed: <code>ACC-yyyy-nnnnn</code>, <code>PAT-yyyy-nnnnn</code>, <code>SMP-yyyy-nnnnn</code> (OQ-07).</td><td>Registration (REG) · Patients (PAT) · Samples (SMP)</td><td>Decides whether the pilot can live with the fixed formats or needs the configurable formats of LDM.</td><td>days per configurable format</td></tr>
+      <tr><td class="id">A-06</td><td>Refund reasons are read from the catalogue, so the Cashier role needs <code>catalogue.view</code>; alternatively Billing exposes its own reason list.</td><td>Billing (BIL) · Catalogue (CAT)</td><td>Keeps roles minimal, or keeps one list of reasons.</td><td>none, or 1 day</td></tr>
+      <tr><td class="id">A-07</td><td>Service entry by code needs <code>registration.create</code>; on the price query an Accounts user falls back to the picker without a message.</td><td>Registration (REG)</td><td>Decides whether price enquiry is a reception-only task or an accounts task too.</td><td>hours</td></tr>
+      <tr><td class="id">A-08</td><td>Whether reception may print verified reports (needs <code>results.export</code> and the print result right).</td><td>Results (RES) · Organization (ORG)</td><td>Defines the role matrix of the pilot (who prints).</td><td>none (role set-up)</td></tr>
+      <tr><td class="id">A-09</td><td>Egypt's mobile length of 10 in the countries master refuses numbers typed with the trunk 0 (11 digits).</td><td>Platform (PLT) · Patients (PAT)</td><td>Chooses the national convention so reception does not fight the validator.</td><td>hours</td></tr>
+      <tr><td class="id">A-10</td><td>Client creation is audited in the new laboratory's trail, not the platform trail (provisioning runs in the new tenant's scope).</td><td>Platform (PLT) · Audit</td><td>Decides where the platform's own audit evidence of onboarding must live.</td><td>1–2 days if the platform trail must carry it</td></tr>
+      <tr><td class="id">A-11</td><td>Treasury-access rows show the decider and time but not the decision or revocation reason.</td><td>Treasury (TRS)</td><td>Decides whether the reason is needed on the list (contract change) or the audit trail is enough.</td><td>1 day</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="phase">
+  <div class="phase-head"><h2>Phase B — Pilot prerequisites needing external resources</h2><span class="pill bad">blocks the pilot</span><span class="pill grey">owner: National Technology operations + engineering</span></div>
+  <p class="lead">Items the build plan's phase P6 ("Hardening, migration &amp; go-live") lists and that need something outside the repository: a provider, a host, source data or a test team.</p>
+  <table>
+    <thead><tr><th style="width:70px">Id</th><th>Point</th><th style="width:150px">Module</th><th>Purpose</th><th style="width:140px">Needs</th></tr></thead>
+    <tbody>
+      <tr><td class="id">B-01</td><td>SMS / e-mail gateway adapter. <code>INotificationSender</code> only writes to the log; recovery OTP, the subscription wizard OTP and panic-value notifications never reach a phone. Three UAT scripts (REG-02, OPS-07, VER-07) are blocked on it.</td><td>Foundation (FND) · Notifications</td><td>Password recovery, self-service subscription and critical-value alerts in production.</td><td>provider contract and credentials; ~1 week</td></tr>
+      <tr><td class="id">B-02</td><td>Data migration from LDM: patients, visits, results history, catalogue, prices, contracts, users; validation reports; dry runs.</td><td>All laboratory modules</td><td>The pilot laboratory starts with its history instead of an empty database.</td><td>LDM export or database access; 3–4 weeks</td></tr>
+      <tr><td class="id">B-03</td><td>Installation on the real host per the runbook (service, site, PostgreSQL on its standard port, scheduled backup task). The current installation is the development server with the private PostgreSQL instance.</td><td>Deployment (PLT)</td><td>A production host under operations control.</td><td>host, PostgreSQL 17, hosting bundle; 1 day</td></tr>
+      <tr><td class="id">B-04</td><td>Backup and recovery drill on the real host (done once on the private dev instance: dump verified, restored into <code>lis_drill</code>).</td><td>Deployment (PLT)</td><td>Proves recovery time and the restore procedure where it will matter.</td><td>B-03; half a day</td></tr>
+      <tr><td class="id">B-05</td><td>Load test at 1,500 samples per shift and a penetration test (NFR-004…007, NFR-013).</td><td>All</td><td>Performance and security evidence before go-live.</td><td>test tooling and a security tester; 1–2 weeks</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="phase">
+  <div class="phase-head"><h2>Phase C — Hardening and small enhancements of what exists</h2><span class="pill warn">before the pilot</span><span class="pill grey">owner: engineering</span></div>
+  <p class="lead">Defects and observations the dry runs recorded as minor (severity 3–4), plus platform items that were never in the Release-1 prototype scope but are expected of a production system.</p>
+  <table>
+    <thead><tr><th style="width:70px">Id</th><th>Point</th><th style="width:150px">Module</th><th>Purpose</th><th style="width:110px">Effort</th></tr></thead>
+    <tbody>
+      <tr><td class="id">C-01</td><td>Stale list pattern in the laboratory features: route-provided facades outlive their pages, so a list opened again can show the previous visit's data until Refresh (fixed for platform, organization and catalogue; still present in registration, results, billing, patients, treasury lists).</td><td>REG · RES · BIL · PAT · TRS</td><td>Every page shows current data on every visit; a second user on the same browser never sees the first user's rows.</td><td>2–3 days</td></tr>
+      <tr><td class="id">C-02</td><td>Minor UI observations from the dry runs: special-rights checkboxes without accessible names; a stale refusal banner after re-sign-in; the result grid not refreshed after printing; <code>Label</code> offered on a cancelled tube in the Samples dialog; the roles list needs Refresh after a create.</td><td>ORG · RES · REG · SMP</td><td>Polish and accessibility before users see the screens.</td><td>2 days</td></tr>
+      <tr><td class="id">C-03</td><td>Scheduled jobs and the retention purge. Retention periods are only assumed in the intakes (financial records 10 years, agent logs 2 years); most data is "never deleted" by rule.</td><td>Foundation (FND) · Ops</td><td>Keeps the outbox, OTP challenges, nonces and sessions from growing without bound; applies the agreed retention.</td><td>1 week after retention decisions</td></tr>
+      <tr><td class="id">C-04</td><td>OpenAPI document and generated TypeScript client. The frontend uses hand-written contracts and a hand-maintained credential-field map.</td><td>WebApi · Frontend core</td><td>Removes drift between API and client; required by the architecture pack (01 §6.2).</td><td>1 week</td></tr>
+      <tr><td class="id">C-05</td><td>MFA/TOTP and step-up re-authentication endpoints (security spec 02 §3), not in the Release-1 prototype.</td><td>Identity (FND)</td><td>Second factor for administrators and sensitive actions.</td><td>2 weeks</td></tr>
+      <tr><td class="id">C-06</td><td>Rolling file log for the service (today: Application event log and the security-event ledger only).</td><td>Deployment (PLT)</td><td>Operations diagnostics without the event viewer.</td><td>1 day</td></tr>
+      <tr><td class="id">C-07</td><td>Scheduled backup task registration on the host (script exists, task not created).</td><td>Deployment (PLT)</td><td>Unattended daily backups with retention.</td><td>hours</td></tr>
+      <tr><td class="id">C-08</td><td>Test lane (<code>NTLIS_TEST</code>, <code>lis-ui-test</code>, database <code>lis_test</code>) for UAT and upgrades, with its own certificate.</td><td>Deployment (PLT)</td><td>Acceptance and upgrade rehearsal without touching production.</td><td>half a day</td></tr>
+      <tr><td class="id">C-09</td><td>Housekeeping of the installed database: deactivate the dry-run user <code>uat.short</code> (nine-character password), restore the demo laboratory's auto-print parameters, decide whether the dry-run data stays.</td><td>Ops</td><td>A clean state before a manual acceptance session.</td><td>hours</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="phase">
+  <div class="phase-head"><h2>Phase D — Acceptance evidence still to produce</h2><span class="pill warn">before the pilot</span><span class="pill grey">owner: test lead · personas of LIS-UAT-001</span></div>
+  <p class="lead">The automated dry runs executed the 44 critical scripts and fixed what they found; the remaining evidence needs people, printers and a second browser.</p>
+  <table>
+    <thead><tr><th style="width:70px">Id</th><th>Point</th><th style="width:150px">Module</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="id">D-01</td><td>Run the 34 standard (non-critical) UAT scripts.</td><td>All</td><td>Full coverage of LIS-UAT-001.</td></tr>
+      <tr><td class="id">D-02</td><td>Manual verification of everything automation could not exercise: printing of labels, job orders, receipts, worklists and reports; CSV downloads.</td><td>REG · BIL · RES</td><td>Printed documents are a core deliverable of a laboratory system.</td></tr>
+      <tr><td class="id">D-03</td><td>Two-browser scenarios: live permission change (BR-17), "open session revoked" after client deactivation, the two-branch user, the idle timeout.</td><td>ORG · PLT · Account</td><td>Session and authorization behaviour across devices.</td></tr>
+      <tr><td class="id">D-04</td><td>Re-test SUP-08 step 4 (platform session on client routes) after the route-guard fix of v0.3.5.</td><td>Shell</td><td>Closes defect D-17.</td></tr>
+      <tr><td class="id">D-05</td><td>Gateway scripts REG-02, OPS-07, VER-07 once B-01 exists.</td><td>FND · PLT · RES</td><td>OTP and notification flows end to end.</td></tr>
+      <tr><td class="id">D-06</td><td>Arabic acceptance by native-speaking testers (the dry runs checked RTL and dictionary completeness, not wording).</td><td>All</td><td>Terminology the laboratory staff recognises.</td></tr>
+      <tr><td class="id">D-07</td><td>Training material per persona from the UAT scripts and the prototypes.</td><td>All</td><td>Build plan P6 "User acceptance &amp; training".</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="phase">
+  <div class="phase-head"><h2>Phase E — Release 2 modules, parked by decision</h2><span class="pill grey">Release 2</span><span class="pill grey">owner: product</span></div>
+  <p class="lead">Not part of the agreed Release-1 cut (prototype builds v2.1 / v3.1). Where a backend already exists it stays hidden under <code>RELEASE_SCOPE = 'R1'</code>; nothing of it is reachable from the menus.</p>
+  <table>
+    <thead><tr><th style="width:70px">Id</th><th>Module and pages</th><th style="width:170px">State in the code</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="id">E-01</td><td>Samples: collection &amp; receipt, samples by visit, rejections, tracking (CP-14…CP-17, WF-05)</td><td>backend and pages built, hidden</td><td>Barcode-driven sample lifecycle instead of auto-receive.</td></tr>
+      <tr><td class="id">E-02</td><td>Registration modes: home visit, batch and lab-to-lab, bookings, transfers register, cancellations register (CP-07…CP-09, CP-25, CP-26)</td><td>backend built, no pages</td><td>The remaining LDM registration workflows.</td></tr>
+      <tr><td class="id">E-03</td><td>Results by sample, work queue, quality control (CP-20…CP-22)</td><td>backend built, no pages</td><td>Bench-oriented entry and QC.</td></tr>
+      <tr><td class="id">E-04</td><td>Finance: refunds page as a menu item, batch payment, cash closing (CP-24, CP-27, CP-30), contract pricing page (CP-34)</td><td>backend and pages built, hidden</td><td>Daily closing and contract pricing (WF-09 rest).</td></tr>
+      <tr><td class="id">E-05</td><td>Claims (CP-31) and the sixteen financial reports (CP-35)</td><td>not built</td><td>Billing of credit payers and management reporting.</td></tr>
+      <tr><td class="id">E-06</td><td>Analyser integration: analysers, mappings, sample codes, site agents, PCR kits (CP-58…CP-62) and the Super Admin integration library (SA-15…SA-18)</td><td>backend and pages built, hidden; library hidden in admin</td><td>Instrument results without manual entry (WF-07).</td></tr>
+      <tr><td class="id">E-07</td><td>Auto-verification settings and medical rules (CP-63, CP-64)</td><td>not built (contract in MODULES.md §7)</td><td>Automatic release of normal results.</td></tr>
+      <tr><td class="id">E-08</td><td>Laboratory parameters page (CP-57) and the remaining catalogue editors on the client side (diagnoses, sending labs, shortcut sets, test rules, reasons, report templates, patient conditions, additional services)</td><td>backend and pages built, hidden</td><td>Per-laboratory configuration without the platform team.</td></tr>
+      <tr><td class="id">E-09</td><td>Web results portal, SMS/e-mail of reports, result attachments and voice notes (intake RES-001 out of scope)</td><td>not built</td><td>Patient-facing delivery of results.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<section>
+  <h2>2. Suggested order</h2>
+  <table>
+    <thead><tr><th style="width:120px">Step</th><th>Content</th><th style="width:170px">Exit</th></tr></thead>
+    <tbody>
+      <tr><td>1 · now</td><td>Phase A decisions A-01…A-11 in one review session with the business owner; Phase C housekeeping C-09.</td><td>decisions recorded in the intakes</td></tr>
+      <tr><td>2 · next 2 weeks</td><td>B-01 gateway, B-03 real host, C-06…C-08, C-01, C-02, and the decisions of A that cost hours (A-06…A-09, A-11).</td><td>test lane live, gateway live</td></tr>
+      <tr><td>3 · weeks 3–4</td><td>Phase D acceptance with the personas, D-05 gateway scripts, B-04 drill, B-05 load and penetration tests.</td><td>sign-off per persona (LIS-UAT-001 §7)</td></tr>
+      <tr><td>4 · weeks 3–6</td><td>B-02 data migration dry runs, C-03 retention, C-04 OpenAPI client.</td><td>migration validated</td></tr>
+      <tr><td>5 · pilot</td><td>Go-live of the first laboratory, two weeks of hypercare, C-05 MFA when the business asks for it, Release-2 backlog (Phase E) agreed.</td><td>pilot runs a full day without LDM</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>LIS-RP-001 v1.0 · 2026-10-10 · Sky LIS, National Technology · Generated from the repository state at v0.3.6. Points carry stable ids; update this document together with the UAT scripts and the runbook.</footer>
+</div>
+</body>
+</html>

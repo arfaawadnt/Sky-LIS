@@ -124,6 +124,10 @@ A PDF twin for hard-copy review is produced with headless Edge: `powershell -Fil
 `docs/plan/Sky-LIS_Build_Phases.html` (+ `.pdf`) is the phased build plan (foundation → existing pages enhanced → new
 pages → new modules → go-live). Generated from `docs/plan/src/plan.data.js` via `node docs/plan/src/build.js`.
 
+`docs/plan/Sky-LIS_Release-1_Remaining-Points.html` (+ `.pdf`, LIS-RP-001) lists every open point after Release 1 by phase
+(A decisions, B pilot prerequisites, C hardening, D acceptance evidence, E Release 2) with stable ids `A-nn`…`E-nn`; hand-written
+HTML (no build step), PDF via the same `pdf.ps1`. Update it with the UAT scripts and the runbook.
+
 ### Requirements specification
 
 `docs/requirements/LIS_Requirements_Specification.html` (LIS-RS-001) is the consolidated requirements document:

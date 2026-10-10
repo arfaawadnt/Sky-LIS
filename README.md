@@ -234,7 +234,9 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Remaining points after Release 1** `docs/plan/Sky-LIS_Release-1_Remaining-Points.html` (+ PDF, LIS-RP-001): every open
+  item with its module, purpose and enhancement phase (decisions, pilot prerequisites, hardening, acceptance evidence,
+  Release 2).
 
 ### v0.3.6 — 2026-10-10
 
