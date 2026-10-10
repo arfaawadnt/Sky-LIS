@@ -1,0 +1,68 @@
+<app-page-header [title]="i18n.t('platform.parameters.title')" [subtitle]="i18n.t('platform.parameters.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('platform.refresh') }}</button>
+  <button pageActions type="submit" form="platform-parameters-form" class="btn primary" *appCan="permissions.settingsManage" [disabled]="facade.save.pending() || form() === null">
+    {{ facade.save.pending() ? i18n.t('platform.saving') : i18n.t('platform.save') }}
+  </button>
+</app-page-header>
+
+<p class="info-strip small">{{ i18n.t('platform.parameters.scope') }}</p>
+
+@if (facade.settings.error()) {
+  <p class="problem" role="alert">{{ i18n.t('platform.loadError') }}</p>
+}
+@if (saveProblem(); as problem) {
+  <p class="problem" role="alert">{{ problemText(problem) }}</p>
+}
+
+@if (form(); as form) {
+  <form id="platform-parameters-form" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate class="stack">
+    @for (group of groups(); track group.id) {
+      <app-section-card [title]="i18n.t('platform.parameters.group.' + group.id)">
+        <div class="form-grid">
+          @for (item of group.items; track item.key) {
+            <div class="stack">
+              @switch (item.type) {
+                @case ('Bool') {
+                  <label class="check">
+                    <input type="checkbox" [formControlName]="item.key" />
+                    <span>{{ label(item) }}</span>
+                  </label>
+                  <span class="small muted">{{ hint(item) }}</span>
+                }
+                @case ('Int') {
+                  <app-form-field [label]="label(item)" [hint]="hint(item)">
+                    <input type="number" [formControlName]="item.key" [attr.min]="spec(item.key).min ?? null" [attr.max]="spec(item.key).max ?? null" step="1" />
+                  </app-form-field>
+                }
+                @default {
+                  <app-form-field [label]="label(item)" [hint]="hint(item)">
+                    @if (spec(item.key).options; as options) {
+                      <select [formControlName]="item.key">
+                        @for (option of options; track option) {
+                          <option [value]="option">{{ optionLabel(item.key, option) }}</option>
+                        }
+                      </select>
+                    } @else {
+                      <input type="text" [formControlName]="item.key" dir="ltr" maxlength="200" autocomplete="off" />
+                    }
+                  </app-form-field>
+                }
+              }
+              <div class="row-gap">
+                @if (isModified(form, item)) {
+                  <app-badge tone="info">{{ i18n.t('platform.parameters.modified') }}</app-badge>
+                  <button type="button" class="btn sm ghost" *appCan="permissions.settingsManage" (click)="resetToDefault(form, item)">{{ i18n.t('platform.parameters.useDefault') }}</button>
+                }
+                @if (item.updatedAtUtc) {
+                  <span class="small muted">{{ i18n.tf('platform.parameters.updatedAt', { at: updated(item) }) }}</span>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </app-section-card>
+    }
+  </form>
+} @else if (facade.settings.isLoading()) {
+  <p class="muted">{{ i18n.t('platform.loading') }}</p>
+}

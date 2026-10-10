@@ -1,0 +1,6 @@
+P:System.DateTime.Now;Time comes from IClock (Platform.SharedKernel.Abstractions); pitfall P-14
+P:System.DateTime.UtcNow;Time comes from IClock (Platform.SharedKernel.Abstractions); pitfall P-14
+P:System.DateTime.Today;Time comes from IClock (Platform.SharedKernel.Abstractions); pitfall P-14
+P:System.DateTimeOffset.Now;Time comes from IClock (Platform.SharedKernel.Abstractions); pitfall P-14
+P:System.DateTimeOffset.UtcNow;Time comes from IClock (Platform.SharedKernel.Abstractions); pitfall P-14
+M:System.Guid.NewGuid;Identifiers are UUID v7 minted by Entity (Guid.CreateVersion7); pitfall P-14

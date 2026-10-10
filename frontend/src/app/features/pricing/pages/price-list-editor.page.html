@@ -1,0 +1,155 @@
+<div class="editor" appSaveShortcut (appSaveShortcut)="save()">
+  <app-page-header [title]="title()" [subtitle]="i18n.t('pricing.editor.subtitle')" [breadcrumb]="crumbs()">
+    <button pageActions type="button" class="btn ghost" (click)="facade.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('pricing.refresh') }}</button>
+    <button pageActions type="button" class="btn" *appCan="permissions.export" (click)="exportCsv()" [disabled]="!facade.lines.hasValue()">
+      <app-icon name="arrow-down" [size]="15" />{{ i18n.t('pricing.exportCsv') }}
+    </button>
+    <button pageActions type="button" class="btn" *appCan="permissions.create" (click)="openCopy()" [disabled]="detail() === null">
+      <app-icon name="clipboard" [size]="15" />{{ i18n.t('pricing.lists.action.copy') }}
+    </button>
+    <button pageActions type="button" class="btn primary" *appCan="permissions.approve" (click)="apply()" [disabled]="detail() === null || !detail()?.isActive || facade.apply.pending()">
+      <app-icon name="zap" [size]="15" />{{ i18n.t('pricing.editor.apply') }}
+    </button>
+  </app-page-header>
+
+  <p class="info-strip">{{ i18n.t('pricing.editor.note') }}</p>
+
+  @if (facade.detail.error()) {
+    <p class="problem" role="alert">{{ i18n.t('pricing.editor.loadError') }}</p>
+  }
+  @for (problem of [facade.setActive.problem(), facade.apply.problem()]; track $index) {
+    @if (problem) {
+      <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
+    }
+  }
+
+  @if (detail(); as list) {
+    <app-section-card [title]="i18n.t('pricing.editor.summary')">
+      <button cardActions type="button" class="btn sm" [class.danger]="list.isActive" *appCan="permissions.manage" (click)="toggleActive()" [disabled]="facade.setActive.pending()">
+        <app-icon name="power" [size]="14" />{{ i18n.t(list.isActive ? 'pricing.lists.deactivate' : 'pricing.lists.activate') }}
+      </button>
+      <dl class="kv summary">
+        <dt>{{ i18n.t('pricing.lists.column.code') }}</dt>
+        <dd class="mono">{{ list.code }}</dd>
+        <dt>{{ i18n.t('pricing.lists.column.year') }}</dt>
+        <dd>{{ list.year }}</dd>
+        <dt>{{ i18n.t('pricing.editor.status') }}</dt>
+        <dd>
+          <app-badge [status]="list.isActive ? 'Active' : 'Inactive'" />
+          @if (list.isCashDefault) {
+            <app-badge tone="info">{{ i18n.t('pricing.editor.cashDefault') }}</app-badge>
+          }
+        </dd>
+        <dt>{{ i18n.t('pricing.lists.column.lines') }}</dt>
+        <dd>{{ i18n.tf('pricing.editor.lineCounts', { active: list.activeLineCount, total: list.lineCount }) }}</dd>
+        @if (list.copiedFromCode) {
+          <dt>{{ i18n.t('pricing.lists.column.copiedFrom') }}</dt>
+          <dd>
+            <a class="link mono" [routerLink]="['/pricing/base-price-lists', list.copiedFromListId]">{{ list.copiedFromCode }}</a>
+          </dd>
+        }
+        <dt>{{ i18n.t('pricing.editor.derived') }}</dt>
+        <dd>
+          @if (list.derivedContracts.length === 0) {
+            <span class="muted">{{ i18n.t('pricing.editor.noDerived') }}</span>
+          }
+          <span class="chips">
+            @for (contract of list.derivedContracts; track contract.contractPricingId) {
+              <a class="chip" [routerLink]="['/pricing/contract-pricing', contract.contractTierId]">
+                {{ tierLabel(contract.payerNameEn, contract.payerNameAr) }} / {{ tierLabel(contract.tierNameEn, contract.tierNameAr) }}
+              </a>
+            }
+          </span>
+        </dd>
+      </dl>
+      @if (!list.isActive) {
+        <p class="warn-strip">{{ i18n.t('pricing.editor.inactiveHint') }}</p>
+      }
+    </app-section-card>
+  }
+
+  <app-section-card [padded]="false" class="grid-card">
+    <app-toolbar>
+      <app-search-box toolbarFilters [placeholder]="i18n.t('pricing.editor.searchPlaceholder')" (searchChange)="onSearch($event)" />
+      <app-service-picker
+        toolbarFilters
+        *appCan="permissions.edit"
+        [search]="searchService"
+        [taken]="facade.takenIds()"
+        [label]="i18n.t('pricing.editor.addService')"
+        [placeholder]="i18n.t('pricing.editor.addServicePlaceholder')"
+        (picked)="onPicked($event)"
+      />
+      <ng-container toolbarActions>
+        @if (facade.dirtyRows().length > 0) {
+          <span class="dirty small" role="status">{{ i18n.tf('pricing.editor.unsaved', { count: facade.dirtyRows().length }) }}</span>
+          <button type="button" class="btn ghost" (click)="discard()">{{ i18n.t('pricing.editor.discard') }}</button>
+        }
+        <button type="button" class="btn primary" *appCan="permissions.edit" (click)="save()" [disabled]="facade.dirtyRows().length === 0 || facade.save.pending()">
+          <app-icon name="check" [size]="15" />{{ i18n.t(facade.save.pending() ? 'pricing.saving' : 'pricing.editor.save') }}
+        </button>
+      </ng-container>
+    </app-toolbar>
+
+    @if (facade.save.problem(); as problem) {
+      <p class="problem list-problem" role="alert">{{ problemText(problem.code) }}</p>
+    }
+    @if (facade.lines.error()) {
+      <p class="problem list-problem" role="alert">{{ i18n.t('pricing.editor.loadError') }}</p>
+    }
+
+    <app-data-table
+      [columns]="columns"
+      [rows]="pagedRows()"
+      [loading]="facade.lines.isLoading()"
+      [interactive]="false"
+      [compact]="true"
+      [emptyTitle]="i18n.t('pricing.editor.empty')"
+      [emptyMessage]="i18n.t('pricing.editor.emptyHint')"
+      [caption]="title()"
+      [rowClass]="rowClass"
+    >
+      <ng-template appCell="code" [appCellOf]="pagedRows()" let-row>
+        <span class="mono">{{ facade.names.code(row.serviceId) || '—' }}</span>
+      </ng-template>
+      <ng-template appCell="service" [appCellOf]="pagedRows()" let-row>
+        {{ facade.names.name(row.serviceId, i18n.lang()) || '—' }}
+      </ng-template>
+      <ng-template appCell="price" [appCellOf]="pagedRows()" let-row>
+        <input
+          type="number"
+          class="inp sm price"
+          min="0"
+          step="0.01"
+          max="99999999.99"
+          [value]="row.price"
+          [class.invalid]="row.invalid"
+          [attr.aria-invalid]="row.invalid"
+          [attr.aria-label]="i18n.tf('pricing.editor.priceOf', { service: facade.names.code(row.serviceId) || row.serviceId })"
+          [readOnly]="!canEdit()"
+          (input)="onPrice(row, $event)"
+        />
+      </ng-template>
+      <ng-template appCell="active" [appCellOf]="pagedRows()" let-row>
+        <input
+          type="checkbox"
+          [checked]="row.isActive"
+          [disabled]="!canEdit()"
+          [attr.aria-label]="i18n.tf('pricing.editor.activeOf', { service: facade.names.code(row.serviceId) || row.serviceId })"
+          (change)="onActive(row, $event)"
+        />
+      </ng-template>
+      <ng-template appCell="state" [appCellOf]="pagedRows()" let-row>
+        @if (row.isNew) {
+          <app-badge tone="info">{{ i18n.t('pricing.editor.new') }}</app-badge>
+        } @else if (row.dirty) {
+          <app-badge tone="warn">{{ i18n.t('pricing.editor.changed') }}</app-badge>
+        }
+      </ng-template>
+    </app-data-table>
+
+    <app-paginator [page]="page().page" [pageSize]="page().pageSize" [totalCount]="facade.visibleRows().length" (pageChange)="page.set($event)" />
+  </app-section-card>
+</div>
+
+<app-copy-list-dialog [(open)]="copyOpen" [source]="detail()" [pending]="facade.copy.pending()" [problem]="facade.copy.problem()" (confirmCopy)="runCopy($event)" />

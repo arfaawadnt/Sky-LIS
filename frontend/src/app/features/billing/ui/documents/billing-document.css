@@ -1,0 +1,89 @@
+/* Shared layout of the Billing documents (receipt, invoice, refund receipt, closing sheet); black on white for print. */
+:host {
+  display: block;
+}
+
+.facts th {
+  width: 34%;
+  font-weight: 600;
+}
+
+.mono {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+}
+
+.muted {
+  color: #555;
+}
+
+.amount {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin: 10px 0;
+  padding: 8px 10px;
+  border: 2px solid #111;
+  font-size: 14px;
+}
+
+.amount b {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.void-banner {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border: 2px dashed #111;
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+caption {
+  caption-side: top;
+  text-align: start;
+  font-weight: 600;
+  padding: 4px 0;
+}
+
+.totals td,
+.totals th {
+  font-weight: 700;
+}
+
+.code {
+  max-width: 60mm;
+  margin: 10px auto 0;
+}
+
+.note {
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+
+.signatures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 28px;
+  page-break-inside: avoid;
+}
+
+.signature {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.signature .line {
+  height: 36px;
+  border-bottom: 1px solid #111;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}

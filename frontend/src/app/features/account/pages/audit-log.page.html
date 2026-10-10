@@ -1,0 +1,130 @@
+<app-page-header [title]="i18n.t('account.audit.title')" [subtitle]="isPlatform() ? i18n.t('account.audit.subtitlePlatform') : i18n.t('account.audit.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="facade.entries.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('account.refresh') }}</button>
+  <button pageActions type="button" class="btn" (click)="verify()" [disabled]="facade.verify.pending()"><app-icon name="shield" [size]="15" />{{ facade.verify.pending() ? i18n.t('account.audit.verifying') : i18n.t('account.audit.verify') }}</button>
+  <button pageActions type="button" class="btn primary" *appCan="permissions.auditExport" (click)="exportCsv()" [disabled]="facade.export.pending()"><app-icon name="arrow-down" [size]="15" />{{ facade.export.pending() ? i18n.t('account.audit.exporting') : i18n.t('account.audit.export') }}</button>
+</app-page-header>
+
+@if (facade.verification(); as result) {
+  @if (result.ok) {
+    <p class="ok-strip" role="status"><app-icon name="check" [size]="16" />{{ i18n.tf('account.audit.chainOk', { count: count(result.checked) }) }}</p>
+  } @else {
+    <p class="problem" role="alert"><app-icon name="alert" [size]="16" />{{ i18n.tf('account.audit.chainBroken', { sequence: result.firstBrokenSequence ?? '?', count: count(result.checked) }) }}</p>
+  }
+}
+@if (facade.verify.problem(); as problem) {
+  <p class="problem" role="alert">{{ problemText(problem) }}</p>
+}
+@if (facade.export.problem(); as problem) {
+  <p class="problem" role="alert">{{ problemText(problem) }}</p>
+}
+
+<app-section-card class="filters" [title]="i18n.t('account.audit.filters')">
+  <form [formGroup]="form" (ngSubmit)="apply()" novalidate>
+    <div class="filter-grid">
+      <app-form-field [label]="i18n.t('account.audit.from')">
+        <input type="date" formControlName="fromDay" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('account.audit.to')">
+        <input type="date" formControlName="toDay" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('account.audit.user')">
+        <select formControlName="userId">
+          <option value="">{{ i18n.t('account.audit.allUsers') }}</option>
+          @for (actor of actors(); track actor.userId) {
+            <option [value]="actor.userId">{{ actor.displayName }} ({{ actor.username }}){{ actor.isActive ? '' : ' — ' + i18n.t('account.audit.inactive') }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('account.audit.entity')" [hint]="i18n.t('account.audit.entityHint')">
+        <input type="text" formControlName="entityType" list="audit-entity-types" maxlength="200" autocomplete="off" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('account.audit.entityId')">
+        <input type="text" formControlName="entityId" maxlength="200" autocomplete="off" dir="ltr" />
+      </app-form-field>
+    </div>
+    <datalist id="audit-entity-types">
+      @for (type of entityTypes(); track type) {
+        <option [value]="type"></option>
+      }
+    </datalist>
+    <div class="filter-actions">
+      <button type="button" class="btn" (click)="reset()">{{ i18n.t('account.audit.reset') }}</button>
+      <button type="submit" class="btn primary"><app-icon name="filter" [size]="15" />{{ i18n.t('account.audit.apply') }}</button>
+    </div>
+  </form>
+</app-section-card>
+
+<app-section-card [padded]="false">
+  @if (facade.entries.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('account.audit.loadError') }}</p>
+  }
+  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.entries.isLoading()" [emptyTitle]="i18n.t('account.audit.empty')" [caption]="i18n.t('account.audit.title')" (rowActivate)="open($event)">
+    <ng-template appCell="action" [appCellOf]="rows()" let-row>
+      <span class="action">
+        <app-badge [tone]="row.kind === 'Event' ? 'violet' : 'info'">{{ kindLabel(row.kind) }}</app-badge>
+        <span>{{ row.action }}</span>
+      </span>
+    </ng-template>
+  </app-data-table>
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="totalCount()" (pageChange)="onPage($event)" />
+</app-section-card>
+<p class="muted small note">{{ i18n.t('account.audit.exportNote') }}</p>
+
+<app-drawer [open]="facade.selected() !== null" (openChange)="onDrawer($event)" [title]="i18n.t('account.audit.entry')" size="lg">
+  @if (facade.selected(); as entry) {
+    <dl class="kv">
+      <dt>{{ i18n.t('account.audit.time') }}</dt>
+      <dd>{{ when(entry.atUtc) }}</dd>
+      <dt>{{ i18n.t('account.audit.user') }}</dt>
+      <dd>{{ entry.actorName ?? i18n.t('account.audit.system') }}</dd>
+      <dt>{{ i18n.t('account.audit.action') }}</dt>
+      <dd><app-badge [tone]="entry.kind === 'Event' ? 'violet' : 'info'">{{ kindLabel(entry.kind) }}</app-badge> {{ entry.action }}</dd>
+      <dt>{{ i18n.t('account.audit.entity') }}</dt>
+      <dd>{{ entry.entityType }}</dd>
+      <dt>{{ i18n.t('account.audit.entityId') }}</dt>
+      <dd class="mono" dir="ltr">{{ entry.entityId }}</dd>
+      @if (entry.sequence !== null) {
+        <dt>{{ i18n.t('account.audit.sequence') }}</dt>
+        <dd class="mono">{{ entry.sequence }}</dd>
+      }
+      @if (entry.reason) {
+        <dt>{{ i18n.t('account.audit.reason') }}</dt>
+        <dd>{{ entry.reason }}</dd>
+      }
+      @if (entry.correlationId) {
+        <dt>{{ i18n.t('account.audit.correlation') }}</dt>
+        <dd class="mono small" dir="ltr">{{ entry.correlationId }}</dd>
+      }
+    </dl>
+
+    @if (entry.changes && entry.changes.length > 0) {
+      <h3 class="sub">{{ i18n.t('account.audit.changes') }}</h3>
+      <div class="diff-wrap">
+        <table class="diff">
+          <caption class="visually-hidden">{{ i18n.t('account.audit.changes') }}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{{ i18n.t('account.audit.field') }}</th>
+              <th scope="col">{{ i18n.t('account.audit.before') }}</th>
+              <th scope="col">{{ i18n.t('account.audit.after') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (change of entry.changes; track change.field) {
+              <tr>
+                <th scope="row" class="mono">{{ change.field }}</th>
+                <td class="before">{{ change.before ?? '—' }}</td>
+                <td class="after">{{ change.after ?? '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else if (entry.payload) {
+      <h3 class="sub">{{ i18n.t('account.audit.payload') }}</h3>
+      <pre class="payload" dir="ltr">{{ pretty(entry.payload) }}</pre>
+    }
+
+    <button type="button" class="btn" (click)="showRecord(entry)"><app-icon name="layers" [size]="15" />{{ i18n.t('account.audit.recordHistory') }}</button>
+  }
+</app-drawer>

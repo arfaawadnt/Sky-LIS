@@ -1,0 +1,32 @@
+# Development PostgreSQL 17 for LIS on the reserved port 5433 (CLAUDE.md §2). Start from this folder:
+#   docker compose up -d
+# Secrets come from deploy/postgres/.env (git-ignored; copy .env.example). The init script creates the two roles,
+# the "lis" database and its schemas on the first start only; migrations are applied with "dotnet ef database update".
+name: lis
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: lis-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LIS_PG_SUPERUSER_PASSWORD:?set LIS_PG_SUPERUSER_PASSWORD in deploy/postgres/.env}
+      POSTGRES_DB: postgres
+      LIS_OWNER_PASSWORD: ${LIS_OWNER_PASSWORD:?set LIS_OWNER_PASSWORD in deploy/postgres/.env}
+      LIS_APP_PASSWORD: ${LIS_APP_PASSWORD:?set LIS_APP_PASSWORD in deploy/postgres/.env}
+    volumes:
+      - lis_pgdata:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+      - ./roles.sql:/lis/roles.sql:ro
+      - ./schema.sql:/lis/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  lis_pgdata:

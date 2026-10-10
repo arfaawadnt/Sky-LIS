@@ -1,0 +1,46 @@
+using Platform.Contracts.Common;
+
+namespace Platform.Contracts.PlatformAdmin;
+
+// The public subscription wizard (CP-02): anonymous, rate-limited, one hour from start to completion.
+// Step 1 start → code to the manager's mobile; step 2 verify; step 3 complete (credentials) → portal address.
+
+public sealed record StartSubscriptionRequest(
+    string LabNameEn,
+    string LabNameAr,
+    Guid CountryId,
+    Guid GovernorateId,
+    string Address,
+    string Mobile,
+    string? LicenceNo,
+    string ManagerName,
+    string ManagerMobile,
+    string? Email,
+    string? Language);
+
+/// <summary>The request to continue with; the code went to <paramref name="MaskedMobile"/> and lives <paramref name="CodeLifetimeSeconds"/>.</summary>
+public sealed record SubscriptionStarted(Guid SubscriptionId, DateTimeOffset ExpiresAtUtc, string MaskedMobile, int CodeLifetimeSeconds);
+
+public sealed record VerifySubscriptionRequest(Guid SubscriptionId, string Code);
+
+public sealed record ResendSubscriptionCodeRequest(Guid SubscriptionId);
+
+/// <summary>Step 3: the administrator's username and password (credential envelope, D-03). The confirmation is checked in the browser.</summary>
+public sealed record CompleteSubscriptionRequest
+{
+    public Guid SubscriptionId { get; init; }
+
+    public string Username { get; init; } = string.Empty;
+
+    [CredentialField]
+    public string Password { get; init; } = string.Empty;
+}
+
+public sealed record SubscriptionCompletedResponse(Guid TenantId, string PortalUrl, string Username);
+
+/// <summary><paramref name="Valid"/>: the username has an acceptable shape; <paramref name="Available"/>: no account uses it.</summary>
+public sealed record UsernameAvailability(string Username, bool Valid, bool Available);
+
+public sealed record PublicCountry(Guid Id, string NameEn, string NameAr, string IsoCode, string DialCode, int MobileLength, string? Flag, string CurrencyCode, string Language);
+
+public sealed record PublicGovernorate(Guid Id, Guid CountryId, string NameEn, string NameAr, string? District);

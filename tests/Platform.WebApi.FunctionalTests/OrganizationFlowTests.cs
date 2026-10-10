@@ -1,0 +1,267 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using Platform.Contracts.Common;
+using Platform.Contracts.Identity;
+using Platform.Contracts.Organization;
+using Platform.WebApi.FunctionalTests.Support;
+
+namespace Platform.WebApi.FunctionalTests;
+
+/// <summary>
+/// The Organization pages over the real API (intake LIS-INT-ORG-001 §16): branches (CP-36), roles with special and
+/// result rights (CP-37, BR-17), users with enveloped passwords, lock, reset and overrides (CP-38), and the branch
+/// selection of an unrestricted membership (CP-04). Every refusal arrives as its code.
+/// </summary>
+public sealed class OrganizationFlowTests(ApiFactory factory) : IClassFixture<ApiFactory>
+{
+    private const string Branches = "/api/v1/organization/branches";
+    private const string Roles = "/api/v1/organization/roles";
+    private const string Users = "/api/v1/organization/users";
+    private const string MyPrivileges = "/api/v1/organization/me/privileges";
+    private const string SelectBranch = "/api/v1/auth/select-branch";
+
+    private static readonly string[] AdministratorPermissions =
+    [
+        "organization.view", "organization.create", "organization.edit", "organization.manage",
+        "identity.view", "identity.create", "identity.edit", "identity.manage",
+        "registration.view", "registration.create", "patients.view", "results.view",
+    ];
+
+    [DatabaseFact]
+    public async Task Branches_are_created_updated_and_deactivated_but_the_last_active_one_stays()
+    {
+        var tenant = Guid.CreateVersion7();
+        var admin = await AdministratorAsync(tenant);
+        var (outsider, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["patients.view"]);
+        var outsiderClient = await SignedInClientAsync(outsider);
+
+        var created = await admin.PostAsJsonAsync(Branches, new CreateBranchRequest(" nasr ", "Nasr City", "مدينة نصر", null, null, "+20 2 2222 3333", "nasr@lab.example", "egp"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var nasr = (await created.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+
+        var duplicate = await admin.PostAsJsonAsync(Branches, new CreateBranchRequest("NASR", "Again", "مرة أخرى", null, null, null, null, "EGP"));
+        Assert.Equal(("ORG-100", HttpStatusCode.Conflict), (await AuthClient.CodeOf(duplicate), duplicate.StatusCode));
+
+        var shape = await admin.PostAsJsonAsync(Branches, new CreateBranchRequest("", "No code", "بدون رمز", null, null, null, null, "EGP"));
+        Assert.Equal(HttpStatusCode.BadRequest, shape.StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"{Branches}/{nasr}", new UpdateBranchRequest("Nasr City 1", "مدينة نصر 1", null, null, null, null, "USD"))).StatusCode);
+        var listed = await admin.GetFromJsonAsync<Paged<BranchListItem>>(Branches + "?search=nasr");
+        Assert.Equal(("NASR", "Nasr City 1", "USD"), (listed!.Items[0].Code, listed.Items[0].NameEn, listed.Items[0].Currency));
+
+        var last = await admin.PostAsync($"{Branches}/{nasr}/deactivate", null);
+        Assert.Equal(("ORG-110", HttpStatusCode.Conflict), (await AuthClient.CodeOf(last), last.StatusCode));
+
+        await admin.PostAsJsonAsync(Branches, new CreateBranchRequest("MAADI", "Maadi", "المعادي", null, null, null, null, "EGP"));
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsync($"{Branches}/{nasr}/deactivate", null)).StatusCode);
+        Assert.False((await admin.GetFromJsonAsync<BranchListItem>($"{Branches}/{nasr}"))!.IsActive);
+
+        var forbidden = await outsiderClient.GetAsync(Branches);
+        Assert.Equal((HttpStatusCode.Forbidden, ProblemCodes.Forbidden), (forbidden.StatusCode, await AuthClient.CodeOf(forbidden)));
+    }
+
+    [DatabaseFact]
+    public async Task A_role_carries_special_and_result_rights_and_a_change_reaches_its_members_at_once()
+    {
+        var tenant = Guid.CreateVersion7();
+        var admin = await AdministratorAsync(tenant);
+
+        var roleId = await CreateRoleAsync(admin, "Reception", ["registration.view"]);
+        var duplicate = await admin.PostAsJsonAsync(Roles, new CreateRoleRequest("RECEPTION", "مكرر", null, ["registration.view"]));
+        Assert.Equal(("ORG-101", HttpStatusCode.Conflict), (await AuthClient.CodeOf(duplicate), duplicate.StatusCode));
+
+        var platformKey = await admin.PostAsJsonAsync(Roles, new CreateRoleRequest("Sneaky", "متسلل", null, ["tenancy.manage"]));
+        Assert.Equal(HttpStatusCode.Forbidden, platformKey.StatusCode);
+        Assert.Contains(await AuthClient.CodeOf(platformKey), new[] { "ORG-033", "ORG-030" });
+
+        var badCap = await admin.PutAsJsonAsync($"{Roles}/{roleId}/special-rights", new SpecialRightsDto(101, true, false, false, false, false, false, false, false));
+        Assert.Equal(HttpStatusCode.BadRequest, badCap.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"{Roles}/{roleId}/special-rights", new SpecialRightsDto(10, true, true, false, false, false, false, true, false))).StatusCode);
+        var group = Guid.CreateVersion7();
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"{Roles}/{roleId}/result-rights", new SetRoleResultRightsRequest([new ResultRightDto(group, null, false, false, true, false, false)]))).StatusCode);
+
+        var (memberName, memberPassword) = await CreateUserAsync(admin, roleId);
+        var member = await SignedInClientAsync(memberName, memberPassword);
+        var privileges = await member.GetFromJsonAsync<MyPrivilegesResponse>(MyPrivileges);
+        Assert.Equal(["registration.view"], privileges!.Privileges.PermissionKeys);
+        Assert.Equal((10, true), (privileges.Privileges.SpecialRights.DiscountCapPercent, privileges.Privileges.SpecialRights.CanRefund));
+        Assert.True(Assert.Single(privileges.Privileges.ResultRights).CanSee);   // verify implies see
+
+        // BR-17: the role changes, the member's very next request carries the new permission.
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"{Roles}/{roleId}/permissions", new SetRolePermissionsRequest(["registration.view", "registration.create"]))).StatusCode);
+        var me = await member.GetFromJsonAsync<SessionResponse>(AuthClient.MePath);
+        Assert.Contains("registration.create", me!.Permissions);
+
+        var withMembers = await admin.PostAsync($"{Roles}/{roleId}/deactivate", null);
+        Assert.Equal(("ORG-011", HttpStatusCode.Conflict), (await AuthClient.CodeOf(withMembers), withMembers.StatusCode));
+
+        var detail = await admin.GetFromJsonAsync<RoleDetail>($"{Roles}/{roleId}");
+        Assert.Equal((1, 2), (detail!.MemberCount, detail.PermissionKeys.Count));
+    }
+
+    [DatabaseFact]
+    public async Task Users_are_created_with_an_enveloped_password_locked_unlocked_and_reset()
+    {
+        var tenant = Guid.CreateVersion7();
+        var admin = await AdministratorAsync(tenant);
+        var roleId = await CreateRoleAsync(admin, "Technician", ["results.view"]);
+
+        var plaintext = await admin.PostAsJsonAsync(Users, UserBody($"plain.{Suffix()}", "a plaintext password", roleId));
+        Assert.Equal(ProblemCodes.CredentialPlaintext, await AuthClient.CodeOf(plaintext));
+
+        var tooShort = await PostUserAsync(admin, $"short.{Suffix()}", "short", roleId);
+        Assert.Equal("ORG-020", await AuthClient.CodeOf(tooShort));
+
+        var (username, password) = await CreateUserAsync(admin, roleId);
+        var userId = (await admin.GetFromJsonAsync<Paged<UserListItem>>($"{Users}?search={username}"))!.Items.Single().UserId;
+        await SignedInClientAsync(username, password);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsync($"{Users}/{userId}/lock", null)).StatusCode);
+        var lockedOut = await new AuthClient(factory.CreateClient()).SignInAsync(username, password);
+        Assert.Equal(ProblemCodes.AccountLocked, await AuthClient.CodeOf(lockedOut));
+        Assert.Equal("Locked", (await admin.GetFromJsonAsync<UserDetail>($"{Users}/{userId}"))!.Status);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsync($"{Users}/{userId}/unlock", null)).StatusCode);
+        await SignedInClientAsync(username, password);
+
+        var temporary = "temporary pass " + Suffix();
+        var reset = await PostSealedAsync(admin, $"{Users}/{userId}/reset-password", "temporaryPassword", temporary, sealedValue => new { temporaryPassword = sealedValue, mustChangePassword = true });
+        Assert.Equal(HttpStatusCode.NoContent, reset.StatusCode);
+        Assert.Equal(ProblemCodes.InvalidCredentials, await AuthClient.CodeOf(await new AuthClient(factory.CreateClient()).SignInAsync(username, password)));
+        var afterReset = await SignedInClientAsync(username, temporary);
+        Assert.True((await afterReset.GetFromJsonAsync<MyPrivilegesResponse>(MyPrivileges))!.MustChangePassword);
+
+        var adminId = (await admin.GetFromJsonAsync<SessionResponse>(AuthClient.MePath))!.UserId;
+        var self = await admin.PostAsync($"{Users}/{adminId}/lock", null);
+        Assert.Equal(("SOD-ORG-001", HttpStatusCode.Forbidden), (await AuthClient.CodeOf(self), self.StatusCode));
+    }
+
+    [DatabaseFact]
+    public async Task Overrides_affect_one_user_restore_returns_to_the_role_and_nobody_grants_beyond_their_own_rights()
+    {
+        var tenant = Guid.CreateVersion7();
+        var admin = await AdministratorAsync(tenant);
+        var roleId = await CreateRoleAsync(admin, "Clerk", ["registration.view"]);
+        var (username, password) = await CreateUserAsync(admin, roleId);
+        var userId = (await admin.GetFromJsonAsync<Paged<UserListItem>>($"{Users}?search={username}"))!.Items.Single().UserId;
+        var member = await SignedInClientAsync(username, password);
+
+        var overridden = await admin.PutAsJsonAsync($"{Users}/{userId}/overrides", new SetUserOverridesRequest(["patients.view"], [], null));
+        Assert.Equal(HttpStatusCode.NoContent, overridden.StatusCode);
+        Assert.Contains("patients.view", (await member.GetFromJsonAsync<MyPrivilegesResponse>(MyPrivileges))!.Privileges.PermissionKeys);
+        var listed = (await admin.GetFromJsonAsync<Paged<UserListItem>>($"{Users}?search={username}"))!.Items.Single();
+        Assert.True(listed.IsModified);
+
+        var beyond = await admin.PutAsJsonAsync($"{Users}/{userId}/overrides", new SetUserOverridesRequest(["billing.approve"], [], null));
+        Assert.Equal(("ORG-030", HttpStatusCode.Forbidden), (await AuthClient.CodeOf(beyond), beyond.StatusCode));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsync($"{Users}/{userId}/restore", null)).StatusCode);
+        Assert.DoesNotContain("patients.view", (await member.GetFromJsonAsync<MyPrivilegesResponse>(MyPrivileges))!.Privileges.PermissionKeys);
+        Assert.False((await admin.GetFromJsonAsync<UserDetail>($"{Users}/{userId}"))!.IsModified);
+    }
+
+    [DatabaseFact]
+    public async Task An_unrestricted_member_selects_any_active_branch_and_a_single_active_branch_is_selected_at_sign_in()
+    {
+        var tenant = Guid.CreateVersion7();
+        var admin = await AdministratorAsync(tenant);
+        var main = await CreateBranchAsync(admin, "MAIN");
+        var (member, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["patients.view"]);   // no branch assigned = every active branch
+
+        var (single, _, _) = await new AuthClient(factory.CreateClient()).SignInExpectingSuccessAsync(member, ApiFactory.Password);
+        Assert.Equal(main, single.Profile!.BranchId);   // the only active branch needs no selection step
+
+        var second = await CreateBranchAsync(admin, "SECOND");
+        var client = await SignedInClientAsync(member);
+        var selectable = await client.GetFromJsonAsync<SelectableBranchesResponse>($"{Branches}/selectable");
+        Assert.Equal(new[] { main, second }.Order(), selectable!.Branches.Select(branch => branch.Id).Order());
+
+        var chosen = await client.PostAsJsonAsync(SelectBranch, new SelectBranchRequest(second));
+        Assert.Equal(HttpStatusCode.OK, chosen.StatusCode);
+        Assert.Equal(second, (await chosen.Content.ReadFromJsonAsync<AuthProfile>())!.BranchId);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsync($"{Branches}/{main}/deactivate", null)).StatusCode);
+        var inactive = await client.PostAsJsonAsync(SelectBranch, new SelectBranchRequest(main));
+        Assert.Equal((HttpStatusCode.Forbidden, ProblemCodes.BranchNotAssigned), (inactive.StatusCode, await AuthClient.CodeOf(inactive)));
+
+        var foreign = await client.PostAsJsonAsync(SelectBranch, new SelectBranchRequest(Guid.CreateVersion7()));
+        Assert.Equal(ProblemCodes.BranchNotAssigned, await AuthClient.CodeOf(foreign));
+    }
+
+    [DatabaseFact]
+    public async Task The_permission_catalogue_of_a_laboratory_offers_no_platform_module()
+    {
+        var admin = await AdministratorAsync(Guid.CreateVersion7());
+
+        var catalogue = await admin.GetFromJsonAsync<PermissionCatalogueResponse>("/api/v1/organization/permission-catalogue");
+
+        Assert.DoesNotContain(catalogue!.Modules, module => module.Key is "platform" or "tenancy");
+        Assert.Contains(catalogue.Modules, module => module.Key == "registration" && module.Actions.Contains("create"));
+        Assert.Contains("viewConfidential", catalogue.Actions);
+    }
+
+    /// <summary>The random tail of a version-7 UUID: its leading characters are the millisecond clock and repeat for about a minute.</summary>
+    private static string Suffix() => Guid.CreateVersion7().ToString("N")[^8..];
+
+    private async Task<HttpClient> AdministratorAsync(Guid tenant)
+    {
+        var (username, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: AdministratorPermissions, displayName: "Lab Administrator");
+        return await SignedInClientAsync(username);
+    }
+
+    private static async Task<Guid> CreateRoleAsync(HttpClient admin, string name, string[] keys)
+    {
+        var created = await admin.PostAsJsonAsync(Roles, new CreateRoleRequest(name, name + " ع", null, keys));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        return (await created.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+    }
+
+    private static async Task<Guid> CreateBranchAsync(HttpClient admin, string code)
+    {
+        var created = await admin.PostAsJsonAsync(Branches, new CreateBranchRequest(code, code + " branch", "فرع " + code, null, null, null, null, "EGP"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        return (await created.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+    }
+
+    private static object UserBody(string username, string password, Guid roleId) => new
+    {
+        username,
+        password,
+        mustChangePassword = false,
+        fullNameEn = "Staff " + username,
+        fullNameAr = "موظف",
+        email = $"{username}@lab.example",
+        roleId,
+    };
+
+    private Task<HttpResponseMessage> PostUserAsync(HttpClient admin, string username, string password, Guid roleId) =>
+        PostSealedAsync(admin, Users, "password", password, sealedValue => UserBody(username, sealedValue, roleId));
+
+    private async Task<(string Username, string Password)> CreateUserAsync(HttpClient admin, Guid roleId)
+    {
+        var username = $"staff.{Suffix()}";
+        var password = "a long staff password";
+        var created = await PostUserAsync(admin, username, password, roleId);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        return (username, password);
+    }
+
+    /// <summary>Seals one credential field exactly as the SPA's envelope interceptor does (D-03): the audience is the method and path.</summary>
+    private static async Task<HttpResponseMessage> PostSealedAsync(HttpClient client, string path, string field, string value, Func<string, object> body)
+    {
+        var challenge = await new AuthClient(client).ChallengeAsync();
+        return await client.PostAsJsonAsync(path, body(TestSealer.Seal(challenge, field, value, "POST " + path)));
+    }
+
+    private Task<HttpClient> SignedInClientAsync(string username) => SignedInClientAsync(username, ApiFactory.Password);
+
+    private async Task<HttpClient> SignedInClientAsync(string username, string password)
+    {
+        var client = factory.CreateClient();
+        var (body, _, _) = await new AuthClient(client).SignInExpectingSuccessAsync(username, password);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body.AccessToken);
+        client.DefaultRequestHeaders.Add("X-Requested-With", "Platform");
+        return client;
+    }
+}

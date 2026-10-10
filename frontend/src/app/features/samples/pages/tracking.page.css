@@ -1,0 +1,28 @@
+.lookup {
+  display: block;
+  margin-block-end: var(--sp-4);
+}
+
+.lookup-problem {
+  margin-block: var(--sp-3) 0;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--sp-4);
+  margin-block-end: var(--sp-4);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 2fr) minmax(0, 3fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

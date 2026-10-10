@@ -1,0 +1,226 @@
+<app-page-header [title]="i18n.t('integration.agents.title')" [subtitle]="i18n.t('integration.agents.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="facade.list.reload(); facade.intake.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('integration.refresh') }}</button>
+  <button pageActions type="button" class="btn primary" *appCan="permissions.manage" (click)="openCreate()"><app-icon name="plus" [size]="15" />{{ i18n.t('integration.agents.add') }}</button>
+</app-page-header>
+
+<app-tabs [tabs]="tabs()" [(active)]="tab" />
+
+@if (tab() === 'agents') {
+  <app-section-card [padded]="false" role="tabpanel">
+    <app-toolbar>
+      <app-search-box toolbarFilters [placeholder]="i18n.t('integration.agents.search')" (searchChange)="facade.setSearch($event)" />
+      <select toolbarFilters class="inp filter" (change)="onActiveFilter($event)" [attr.aria-label]="i18n.t('integration.field.active')">
+        <option value="">{{ i18n.t('integration.allStatuses') }}</option>
+        <option value="true">{{ i18n.t('integration.active') }}</option>
+        <option value="false">{{ i18n.t('integration.inactive') }}</option>
+      </select>
+    </app-toolbar>
+
+    @if (facade.list.error()) {
+      <p class="problem list-problem" role="alert">{{ i18n.t('integration.loadError') }}</p>
+    }
+    @for (problem of [facade.deactivate.problem()]; track $index) {
+      @if (problem) {
+        <p class="problem list-problem" role="alert">{{ problemText(problem.code) }}</p>
+      }
+    }
+
+    <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.list.isLoading()" [emptyTitle]="i18n.t('integration.agents.empty')" [caption]="i18n.t('integration.agents.title')" (rowActivate)="openDetail($event)">
+      <ng-template appCell="status" [appCellOf]="rows()" let-row>
+        <app-badge [tone]="tone(row.status)">{{ i18n.t('integration.agentStatus.' + row.status) }}</app-badge>
+      </ng-template>
+      <ng-template appCell="active" [appCellOf]="rows()" let-row>
+        <app-badge [tone]="tone(row.isActive ? 'Active' : 'Inactive')">{{ i18n.t(row.isActive ? 'integration.active' : 'integration.inactive') }}</app-badge>
+      </ng-template>
+      <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+        <button type="button" class="icon-btn" (click)="openDetail(row)" [attr.aria-label]="i18n.t('integration.agents.details')" [title]="i18n.t('integration.agents.details')"><app-icon name="eye" [size]="15" /></button>
+        <button type="button" class="icon-btn" (click)="openLogs(row)" [attr.aria-label]="i18n.t('integration.agents.logs')" [title]="i18n.t('integration.agents.logs')"><app-icon name="inbox" [size]="15" /></button>
+        @if (row.isActive) {
+          <ng-container *appCan="permissions.manage">
+            <button type="button" class="icon-btn" (click)="push(row)" [disabled]="facade.push.pending()" [attr.aria-label]="i18n.t('integration.agents.push')" [title]="i18n.t('integration.agents.push')"><app-icon name="zap" [size]="15" /></button>
+            <button type="button" class="icon-btn" (click)="rotate(row)" [disabled]="facade.rotate.pending()" [attr.aria-label]="i18n.t('integration.agents.rotate')" [title]="i18n.t('integration.agents.rotate')"><app-icon name="shield" [size]="15" /></button>
+          </ng-container>
+        }
+        <button type="button" class="icon-btn" *appCan="permissions.manage" (click)="toggleActive(row)" [attr.aria-label]="i18n.t(row.isActive ? 'integration.agents.deactivate' : 'integration.agents.reactivate')" [title]="i18n.t(row.isActive ? 'integration.agents.deactivate' : 'integration.agents.reactivate')"><app-icon name="power" [size]="15" /></button>
+      </ng-template>
+    </app-data-table>
+
+    <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="total()" (pageChange)="onPage($event)" />
+  </app-section-card>
+} @else {
+  <app-section-card [padded]="false" role="tabpanel">
+    <app-toolbar>
+      <app-search-box toolbarFilters [placeholder]="i18n.t('integration.intake.search')" (searchChange)="facade.setIntakeFilter({ search: $event })" />
+      <select toolbarFilters class="inp filter" (change)="onIntakeStatus($event)" [attr.aria-label]="i18n.t('integration.field.status')" data-testid="intake-status">
+        <option value="">{{ i18n.t('integration.allStatuses') }}</option>
+        @for (status of intakeStatuses; track status) {
+          <option [value]="status">{{ i18n.t('integration.intakeStatus.' + status) }}</option>
+        }
+      </select>
+      <select toolbarFilters class="inp filter" (change)="onIntakeAnalyser($event)" [attr.aria-label]="i18n.t('integration.field.analyser')">
+        <option value="">{{ i18n.t('integration.allAnalysers') }}</option>
+        @for (analyser of analysers(); track analyser.id) {
+          <option [value]="analyser.id">{{ analyser.code }}</option>
+        }
+      </select>
+      <label toolbarFilters class="range-field">
+        <span>{{ i18n.t('integration.from') }}</span>
+        <input class="inp" type="datetime-local" (change)="onIntakeFrom($event)" />
+      </label>
+      <label toolbarFilters class="range-field">
+        <span>{{ i18n.t('integration.to') }}</span>
+        <input class="inp" type="datetime-local" (change)="onIntakeTo($event)" />
+      </label>
+    </app-toolbar>
+
+    @if (facade.intake.error()) {
+      <p class="problem list-problem" role="alert">{{ i18n.t('integration.loadError') }}</p>
+    }
+
+    <app-data-table [columns]="intakeColumns" [rows]="intakeRows()" [loading]="facade.intake.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('integration.intake.empty')" [caption]="i18n.t('integration.intake.tab')">
+      <ng-template appCell="value" [appCellOf]="intakeRows()" let-row>
+        <span class="mono">{{ row.rawValue }}</span>
+        @if (row.convertedValue !== null && row.convertedValue !== row.rawValue) {
+          <span class="muted"> → </span><span class="mono">{{ row.convertedValue }}</span>
+        }
+        @if (row.source === 'Pcr') {
+          <app-badge tone="violet">PCR</app-badge>
+        }
+      </ng-template>
+      <ng-template appCell="status" [appCellOf]="intakeRows()" let-row>
+        <app-badge [tone]="tone(row.status)">{{ i18n.t('integration.intakeStatus.' + row.status) }}</app-badge>
+      </ng-template>
+    </app-data-table>
+
+    <app-paginator [page]="facade.intakeFilter().page" [pageSize]="facade.intakeFilter().pageSize" [totalCount]="intakeTotal()" (pageChange)="onIntakePage($event)" />
+  </app-section-card>
+}
+
+<app-dialog [(open)]="createOpen" size="md" [title]="i18n.t('integration.agents.add')">
+  <form [formGroup]="createForm" appSaveShortcut (appSaveShortcut)="create()" (ngSubmit)="create()" novalidate class="form-grid">
+    <app-form-field class="full" [label]="i18n.t('integration.field.name')"><input type="text" formControlName="name" maxlength="100" autocomplete="off" /></app-form-field>
+    <app-form-field class="full" [label]="i18n.t('integration.field.branch')">
+      <select formControlName="branchId">
+        <option value="">{{ i18n.t('integration.choose') }}</option>
+        @for (branch of branches(); track branch.id) {
+          <option [value]="branch.id">{{ branch.code }} · {{ branchName(branch) }}</option>
+        }
+      </select>
+    </app-form-field>
+    <app-form-field class="full" [label]="i18n.t('integration.agents.config')" [hint]="i18n.t('integration.agents.configHint')">
+      <textarea formControlName="configJson" rows="5" class="mono" spellcheck="false" placeholder='{ "logRetentionDays": 30 }'></textarea>
+    </app-form-field>
+    @if (createForm.controls.configJson.errors?.['json']) {
+      <p class="problem full" role="alert">{{ i18n.t('integration.agents.configInvalid') }}</p>
+    }
+    @if (facade.create.problem(); as problem) {
+      <p class="problem full" role="alert">{{ problemText(problem.code) }}</p>
+    }
+    <p class="muted small full">{{ i18n.t('integration.agents.createHint') }}</p>
+  </form>
+  <button dialogFooter type="button" class="btn ghost" (click)="createOpen.set(false)">{{ i18n.t('integration.cancel') }}</button>
+  <button dialogFooter type="button" class="btn primary" [disabled]="facade.create.pending()" (click)="create()">{{ i18n.t('integration.agents.create') }}</button>
+</app-dialog>
+
+<app-drawer [(open)]="detailOpen" size="lg" [title]="detail()?.name ?? i18n.t('integration.agents.details')">
+  @if (detail(); as agent) {
+    <dl class="kv">
+      <dt>{{ i18n.t('integration.field.status') }}</dt>
+      <dd><app-badge [tone]="tone(agent.status)">{{ i18n.t('integration.agentStatus.' + agent.status) }}</app-badge> {{ age(agent.lastHeartbeatAtUtc) }}</dd>
+      @if (agent.statusMessage) {
+        <dt>{{ i18n.t('integration.agents.message') }}</dt>
+        <dd>{{ agent.statusMessage }}</dd>
+      }
+      <dt>{{ i18n.t('integration.field.branch') }}</dt>
+      <dd>{{ branchName({ nameEn: agent.branchNameEn ?? '', nameAr: agent.branchNameAr ?? '' }) }}</dd>
+      <dt>{{ i18n.t('integration.agents.version') }}</dt>
+      <dd>{{ agent.version ?? '—' }}</dd>
+      <dt>{{ i18n.t('integration.secret.clientId') }}</dt>
+      <dd><span class="mono">{{ agent.clientId ?? '—' }}</span> @if (agent.credentialStatus) { <app-badge [tone]="tone(agent.credentialStatus)">{{ i18n.t('integration.credentialStatus.' + agent.credentialStatus) }}</app-badge> }</dd>
+      <dt>{{ i18n.t('integration.secret.expires') }}</dt>
+      <dd>{{ when(agent.credentialExpiresAtUtc) }}</dd>
+      <dt>{{ i18n.t('integration.agents.configVersion') }}</dt>
+      <dd>{{ agent.configVersion }}</dd>
+    </dl>
+
+    <h3 class="section">{{ i18n.t('integration.agents.connectedAnalysers') }}</h3>
+    @if (agent.analysers.length === 0) {
+      <p class="muted">{{ i18n.t('integration.agents.noAnalysers') }}</p>
+    } @else {
+      <ul class="analysers">
+        @for (analyser of agent.analysers; track analyser.id) {
+          <li>
+            <span class="mono">{{ analyser.code }}</span>
+            <span>{{ branchName(analyser) }}</span>
+            <app-badge [tone]="tone(analyser.linkStatus)">{{ i18n.t('integration.link.' + analyser.linkStatus) }}</app-badge>
+            <span class="muted small">{{ age(analyser.lastSeenAtUtc) }}</span>
+            @if (analyser.message) {
+              <span class="muted small">{{ analyser.message }}</span>
+            }
+          </li>
+        }
+      </ul>
+    }
+
+    <h3 class="section">{{ i18n.t('integration.agents.settings') }}</h3>
+    <form [formGroup]="editForm" appSaveShortcut (appSaveShortcut)="saveDetail()" (ngSubmit)="saveDetail()" novalidate class="form-grid">
+      <app-form-field class="full" [label]="i18n.t('integration.field.name')"><input type="text" formControlName="name" maxlength="100" /></app-form-field>
+      <app-form-field class="full" [label]="i18n.t('integration.agents.config')" [hint]="i18n.t('integration.agents.configHint')">
+        <textarea formControlName="configJson" rows="10" class="mono" spellcheck="false"></textarea>
+      </app-form-field>
+      @if (editForm.controls.configJson.errors?.['json']) {
+        <p class="problem full" role="alert">{{ i18n.t('integration.agents.configInvalid') }}</p>
+      }
+      @if (facade.update.problem(); as problem) {
+        <p class="problem full" role="alert">{{ problemText(problem.code) }}</p>
+      }
+    </form>
+  }
+  <button drawerFooter type="button" class="btn ghost" (click)="detailOpen.set(false)">{{ i18n.t('integration.close') }}</button>
+  @if (detail(); as agent) {
+    @if (agent.isActive) {
+      <button drawerFooter type="button" class="btn" *appCan="permissions.manage" (click)="push(agent)" [disabled]="facade.push.pending()"><app-icon name="zap" [size]="15" />{{ i18n.t('integration.agents.push') }}</button>
+    }
+    <button drawerFooter type="button" class="btn primary" *appCan="permissions.manage" (click)="saveDetail()" [disabled]="facade.update.pending()">{{ i18n.t('integration.save') }}</button>
+  }
+</app-drawer>
+
+<app-drawer [(open)]="logsOpen" size="xl" [title]="i18n.t('integration.agents.logs') + (detail() ? ' · ' + detail()?.name : '')">
+  <div class="log-filters">
+    <label class="range-field">
+      <span>{{ i18n.t('integration.from') }}</span>
+      <input class="inp" type="datetime-local" (change)="onLogFrom($event)" />
+    </label>
+    <label class="range-field">
+      <span>{{ i18n.t('integration.to') }}</span>
+      <input class="inp" type="datetime-local" (change)="onLogTo($event)" />
+    </label>
+    <label class="range-field">
+      <span>{{ i18n.t('integration.logs.minLevel') }}</span>
+      <select class="inp" (change)="onLogLevel($event)">
+        <option value="">{{ i18n.t('integration.logs.allLevels') }}</option>
+        @for (level of levels; track level) {
+          <option [value]="level">{{ i18n.t('integration.level.' + level) }}</option>
+        }
+      </select>
+    </label>
+    <app-search-box [placeholder]="i18n.t('integration.logs.search')" (searchChange)="facade.setLogFilter({ search: $event })" />
+    <button type="button" class="btn ghost" (click)="facade.logs.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('integration.refresh') }}</button>
+  </div>
+  <p class="muted small">{{ i18n.t('integration.logs.hint') }}</p>
+  @if (facade.logs.error()) {
+    <p class="problem" role="alert">{{ i18n.t('integration.loadError') }}</p>
+  }
+  <app-data-table [columns]="logColumns" [rows]="logRows()" [loading]="facade.logs.isLoading()" [interactive]="false" [compact]="true" [emptyTitle]="i18n.t('integration.logs.empty')" [caption]="i18n.t('integration.agents.logs')">
+    <ng-template appCell="level" [appCellOf]="logRows()" let-row>
+      <app-badge [tone]="levelTone(row.level)">{{ i18n.t('integration.level.' + row.level) }}</app-badge>
+    </ng-template>
+    <ng-template appCell="message" [appCellOf]="logRows()" let-row>
+      <span class="log-message" [class.error]="row.level === 'Error'">{{ row.message }}</span>
+    </ng-template>
+  </app-data-table>
+  <app-paginator [page]="facade.logFilter().page" [pageSize]="facade.logFilter().pageSize" [totalCount]="logTotal()" (pageChange)="onLogPage($event)" />
+  <button drawerFooter type="button" class="btn ghost" (click)="logsOpen.set(false)">{{ i18n.t('integration.close') }}</button>
+</app-drawer>
+
+<app-integration-secret-dialog [(open)]="secretOpen" [secret]="secret()" (dismissed)="secret.set(null)" />

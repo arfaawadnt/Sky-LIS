@@ -1,0 +1,129 @@
+/*
+ * Print kit base (MODULES.md §1 "Documents"): page sizes, no colour backgrounds, table rules. The PrintService
+ * writes a document into a hidden iframe whose <body> carries `print-root` and one of the `size-*` classes; the
+ * same rules apply when the application window itself is printed (shell chrome hidden).
+ */
+
+/* ---------- page boxes (the iframe document sets @page size through its own <style>) ---------- */
+.print-root {
+  margin: 0;
+  background: #fff;
+  color: #111;
+  font: 12px/1.45 'Segoe UI', Tahoma, 'Noto Sans Arabic', Arial, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.print-root.size-A4 {
+  width: 210mm;
+}
+
+.print-root.size-A5 {
+  width: 148mm;
+}
+
+.print-root.size-label-50x25 {
+  width: 50mm;
+  font-size: 7pt;
+  line-height: 1.2;
+}
+
+.print-root.size-label-38x25 {
+  width: 38mm;
+  font-size: 6pt;
+  line-height: 1.2;
+}
+
+.print-root .print-page {
+  padding: 10mm 12mm;
+  page-break-after: always;
+}
+
+.print-root .print-page:last-child {
+  page-break-after: auto;
+}
+
+.print-root.size-label-50x25 .print-page,
+.print-root.size-label-38x25 .print-page {
+  padding: 1.5mm 2mm;
+  overflow: hidden;
+}
+
+/* ---------- tables ---------- */
+.print-root table,
+.print-document table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: inherit;
+  margin: 6px 0;
+}
+
+.print-root th,
+.print-root td,
+.print-document th,
+.print-document td {
+  border: 1px solid #333;
+  padding: 3px 6px;
+  text-align: start;
+  vertical-align: top;
+}
+
+.print-root th,
+.print-document th {
+  background: #eee;
+  font-weight: 700;
+}
+
+.print-root tr,
+.print-document tr {
+  page-break-inside: avoid;
+}
+
+.print-root thead,
+.print-document thead {
+  display: table-header-group;
+}
+
+.print-root .num,
+.print-document .num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- barcodes and marks ---------- */
+.print-root svg.code128,
+.print-document svg.code128 {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.print-root .avoid-break,
+.print-document .avoid-break {
+  page-break-inside: avoid;
+}
+
+/* ---------- when the application itself is printed ---------- */
+@media print {
+  html,
+  body {
+    background: #fff;
+    color: #111;
+  }
+
+  body > app-root > app-toast-host,
+  body > app-root > app-dialog-host,
+  .app-print-frame {
+    display: none !important;
+  }
+
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

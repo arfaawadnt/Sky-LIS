@@ -1,0 +1,90 @@
+<app-page-header [title]="i18n.t('account.wallet.title')" [subtitle]="i18n.t('account.wallet.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="facade.refresh()"><app-icon name="refresh" [size]="15" />{{ i18n.t('account.refresh') }}</button>
+  <button pageActions type="button" class="btn primary" *appCan="permissions.walletCreate" (click)="openTopUp()"><app-icon name="plus" [size]="15" />{{ i18n.t('account.wallet.requestTopUp') }}</button>
+</app-page-header>
+
+@if (facade.wallet.error()) {
+  <p class="problem" role="alert">{{ i18n.t('account.wallet.loadError') }}</p>
+}
+
+@if (wallet(); as w) {
+  @if (w.balance <= 0) {
+    <p class="warn-strip" role="status">{{ i18n.t('account.wallet.atZero') }}</p>
+  }
+
+  <section class="kpis" [attr.aria-label]="i18n.t('account.wallet.summary')">
+    <app-stat-card [label]="i18n.t('account.wallet.balance')" [value]="money(w.balance, w.currencyCode)" [hint]="i18n.t('account.wallet.prepaid')" icon="vault" [tone]="w.balance <= 0 ? 'bad' : 'brand'" />
+    <app-stat-card [label]="i18n.t('account.wallet.nextCharge')" [value]="day(w.nextChargeAtUtc)" [hint]="money(w.monthlyFee, w.planCurrencyCode)" icon="coins" tone="info" />
+    <app-stat-card [label]="i18n.t('account.wallet.plan')" [value]="planName(w)" [hint]="w.planCode" icon="layers" tone="info" />
+    <app-stat-card [label]="i18n.t('account.wallet.smsUsed')" [value]="smsLabel()" [hint]="i18n.t('account.wallet.thisMonth')" icon="inbox" [tone]="w.smsUsedThisMonth >= w.smsQuota && w.smsQuota > 0 ? 'warn' : 'ok'" />
+  </section>
+
+  @if (w.pendingTopUpRequests.length > 0) {
+    <app-section-card [title]="i18n.t('account.wallet.pendingRequests')">
+      <ul class="requests">
+        @for (request of w.pendingTopUpRequests; track request.id) {
+          <li>
+            <b>{{ money(request.amount, w.currencyCode) }}</b>
+            <span class="muted small">{{ when(request.requestedAtUtc) }} · {{ request.requestedByName ?? '—' }}</span>
+            @if (request.note) {
+              <span class="small">{{ request.note }}</span>
+            }
+            <app-badge [status]="request.status">{{ i18n.t('account.wallet.requestStatus.' + request.status) }}</app-badge>
+          </li>
+        }
+      </ul>
+    </app-section-card>
+  }
+} @else if (facade.wallet.isLoading()) {
+  <p class="muted" aria-live="polite">{{ i18n.t('account.loading') }}</p>
+}
+
+<app-section-card class="movements" [padded]="false" [title]="i18n.t('account.wallet.transactions')">
+  <app-toolbar>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('account.wallet.kind') }}</span>
+      <select class="inp" (change)="onKind($event)">
+        <option value="">{{ i18n.t('account.wallet.allKinds') }}</option>
+        @for (kind of kinds; track kind) {
+          <option [value]="kind" [selected]="facade.filter().kind === kind">{{ kindLabel(kind) }}</option>
+        }
+      </select>
+    </label>
+  </app-toolbar>
+
+  @if (facade.transactions.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('account.wallet.transactionsError') }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.transactions.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('account.wallet.noTransactions')" [caption]="i18n.t('account.wallet.transactions')">
+    <ng-template appCell="kind" [appCellOf]="rows()" let-row>
+      <app-badge [tone]="row.kind === 'TopUp' ? 'ok' : row.kind === 'Usage' ? 'warn' : 'info'">{{ kindLabel(row.kind) }}</app-badge>
+    </ng-template>
+    <ng-template appCell="amount" [appCellOf]="rows()" let-row>
+      <span class="amount" [class.credit]="row.amount > 0" [class.debit]="row.amount < 0">{{ money(row.amount) }}</span>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="totalCount()" (pageChange)="onPage($event)" />
+</app-section-card>
+
+<app-dialog [(open)]="topUpOpen" [title]="i18n.t('account.wallet.requestTopUp')" size="sm">
+  <form id="top-up-form" [formGroup]="topUp" (ngSubmit)="submitTopUp()" appSaveShortcut (appSaveShortcut)="submitTopUp()" novalidate>
+    <p class="muted small">{{ i18n.t('account.wallet.topUpText') }}</p>
+    <app-form-field [label]="i18n.t('account.wallet.amount') + (currency() ? ' (' + currency() + ')' : '')">
+      <input type="number" formControlName="amount" min="1" step="0.01" inputmode="decimal" />
+    </app-form-field>
+    <app-form-field [label]="i18n.t('account.wallet.note')">
+      <textarea formControlName="note" rows="3" maxlength="500"></textarea>
+    </app-form-field>
+    @if (facade.requestTopUp.problem(); as problem) {
+      <p class="problem" role="alert">{{ problemText(problem) }}</p>
+    }
+  </form>
+  <ng-container dialogFooter>
+    <button type="button" class="btn" (click)="topUpOpen.set(false)">{{ i18n.t('account.cancel') }}</button>
+    <button type="submit" form="top-up-form" class="btn primary" [disabled]="facade.requestTopUp.pending()">
+      {{ facade.requestTopUp.pending() ? i18n.t('account.saving') : i18n.t('account.wallet.sendRequest') }}
+    </button>
+  </ng-container>
+</app-dialog>

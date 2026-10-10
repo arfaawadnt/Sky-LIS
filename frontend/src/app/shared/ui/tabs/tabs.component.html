@@ -1,0 +1,23 @@
+<div class="tabs" role="tablist">
+  @for (tab of tabs(); track tab.id; let i = $index) {
+    <button
+      type="button"
+      class="tab"
+      role="tab"
+      [id]="tabId(tab.id)"
+      [class.active]="tab.id === current()"
+      [attr.aria-selected]="tab.id === current()"
+      [attr.aria-disabled]="tab.disabled ? true : null"
+      [attr.aria-controls]="tabId(tab.id) + '-panel'"
+      [tabindex]="tab.id === current() ? 0 : -1"
+      [disabled]="tab.disabled ?? false"
+      (click)="select(tab)"
+      (keydown)="onKeydown($event, i)"
+    >
+      {{ tab.label }}
+      @if (tab.badge !== null && tab.badge !== undefined) {
+        <span class="count">{{ tab.badge }}</span>
+      }
+    </button>
+  }
+</div>

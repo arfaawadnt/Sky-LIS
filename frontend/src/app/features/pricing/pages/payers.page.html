@@ -1,0 +1,99 @@
+<app-master-data-page [config]="config">
+  <ng-template appCell="name" [appCellOf]="config" let-row>
+    <span class="payer-name">{{ i18n.lang() === 'ar' ? row.nameAr : row.nameEn }}</span>
+    @if (row.isDefault) {
+      <app-badge tone="info">{{ i18n.t('pricing.payers.default') }}</app-badge>
+    }
+  </ng-template>
+  <ng-template appCell="type" [appCellOf]="config" let-row>
+    <app-badge [tone]="row.type === 'Cash' ? 'ok' : row.type === 'Insurance' ? 'violet' : 'info'">{{ typeLabel(row.type) }}</app-badge>
+  </ng-template>
+  <ng-template appCell="tiers" [appCellOf]="config" let-row>
+    @if (row.tiers.length === 0) {
+      <span class="muted small">{{ i18n.t('pricing.payers.noTiersShort') }}</span>
+    }
+    <span class="tags">
+      @for (tier of row.tiers; track tier.id) {
+        <span class="tag" [class.off]="!tier.isActive">{{ tierName(tier) }}</span>
+      }
+    </span>
+  </ng-template>
+</app-master-data-page>
+
+<app-drawer [open]="tiersOpen()" (openChange)="onTiersOpenChange($event)" [title]="tiersTitle()" size="lg">
+  <p class="muted small intro">{{ i18n.t('pricing.tiers.help') }}</p>
+
+  @if (tierProblem(); as problem) {
+    <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
+  }
+
+  @if (facade.tiersPayer.isLoading() && facade.tiers().length === 0) {
+    <p class="muted">{{ i18n.t('pricing.loading') }}</p>
+  } @else if (facade.tiers().length === 0) {
+    <app-empty-state [title]="i18n.t('pricing.tiers.empty')" [message]="i18n.t('pricing.tiers.emptyHint')" icon="layers" />
+  } @else {
+    <table class="tiers">
+      <caption class="visually-hidden">{{ tiersTitle() }}</caption>
+      <thead>
+        <tr>
+          <th scope="col">{{ i18n.t('pricing.tiers.nameEn') }}</th>
+          <th scope="col">{{ i18n.t('pricing.tiers.nameAr') }}</th>
+          <th scope="col">{{ i18n.t('pricing.tiers.status') }}</th>
+          <th scope="col"><span class="visually-hidden">{{ i18n.t('pricing.actions') }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (tier of facade.tiers(); track tier.id) {
+          <tr [class.editing]="isEditing(tier)" [class.inactive]="!tier.isActive">
+            <td>
+              {{ tier.nameEn }}
+              @if (tier.isDefault) {
+                <app-badge tone="info">{{ i18n.t('pricing.payers.default') }}</app-badge>
+              }
+            </td>
+            <td dir="rtl" lang="ar">{{ tier.nameAr }}</td>
+            <td><app-badge [status]="tier.isActive ? 'Active' : 'Inactive'" /></td>
+            <td class="actions">
+              <button type="button" class="row-btn" *appCan="permissions.edit" (click)="editTier(tier)" [attr.aria-label]="i18n.t('pricing.tiers.rename')" [title]="i18n.t('pricing.tiers.rename')">
+                <app-icon name="edit" [size]="15" />
+              </button>
+              @if (!tier.isDefault) {
+                <button
+                  type="button"
+                  class="row-btn"
+                  [class.danger]="tier.isActive"
+                  *appCan="permissions.manage"
+                  (click)="toggleTier(tier)"
+                  [attr.aria-label]="i18n.t(tier.isActive ? 'pricing.tiers.deactivate' : 'pricing.tiers.activate')"
+                  [title]="i18n.t(tier.isActive ? 'pricing.tiers.deactivate' : 'pricing.tiers.activate')"
+                >
+                  <app-icon name="power" [size]="15" />
+                </button>
+              }
+              <button type="button" class="row-btn" (click)="openTierPricing(tier)" [attr.aria-label]="i18n.t('pricing.payers.action.contractPricing')" [title]="i18n.t('pricing.payers.action.contractPricing')">
+                <app-icon name="coins" [size]="15" />
+              </button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  <form class="tier-form" [formGroup]="tierForm" (ngSubmit)="saveTier()" appSaveShortcut (appSaveShortcut)="saveTier()" novalidate *appCan="editingTierId() === null ? permissions.create : permissions.edit">
+    <h3 class="form-title">{{ i18n.t(editingTierId() === null ? 'pricing.tiers.add' : 'pricing.tiers.rename') }}</h3>
+    <app-localized-text-input [group]="tierForm" [label]="i18n.t('pricing.tiers.name')" name="name" [maxLength]="200" />
+    <div class="form-actions">
+      @if (editingTierId() !== null) {
+        <button type="button" class="btn" (click)="cancelTierEdit()">{{ i18n.t('pricing.cancel') }}</button>
+      }
+      <button type="submit" class="btn primary" [disabled]="facade.addTier.pending() || facade.renameTier.pending()">
+        <app-icon [name]="editingTierId() === null ? 'plus' : 'check'" [size]="15" />{{ i18n.t(editingTierId() === null ? 'pricing.tiers.addButton' : 'pricing.save') }}
+      </button>
+    </div>
+  </form>
+
+  <ng-container drawerFooter>
+    <button type="button" class="btn" (click)="closeTiers()">{{ i18n.t('pricing.close') }}</button>
+  </ng-container>
+</app-drawer>

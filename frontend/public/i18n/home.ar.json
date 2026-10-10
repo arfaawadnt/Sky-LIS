@@ -1,0 +1,1 @@
+{ "title": "لوحة التحكم", "welcome": "مرحبًا،", "loadingSession": "جارٍ تحميل الجلسة…", "tenant": "المستأجر", "scope": "النطاق", "sessionExpires": "تنتهي الجلسة", "permissions": "الصلاحيات", "noPermissions": "لا شيء بعد (الأدوار تأتي مع حزمة الصلاحيات)", "sessionError": "تعذر تحميل الجلسة." }

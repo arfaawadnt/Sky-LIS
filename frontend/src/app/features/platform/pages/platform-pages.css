@@ -1,0 +1,124 @@
+/* Layout shared by the platform administration pages; the kit styles everything else. */
+
+:host {
+  display: block;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--sp-3);
+  margin-block-end: var(--sp-4);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--sp-4);
+  margin-block-end: var(--sp-4);
+}
+
+.inline-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.inline-filter select,
+.inline-filter input {
+  inline-size: auto;
+  min-inline-size: 140px;
+}
+
+.list-problem {
+  margin: var(--sp-3) var(--sp-4) 0;
+}
+
+.stack {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.row-gap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.section-title {
+  margin: var(--sp-4) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--ink-2);
+  text-transform: none;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.chip:hover,
+.chip:focus-visible {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.json {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  min-block-size: 120px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  margin-inline-start: var(--sp-1);
+}
+
+.amount-negative {
+  color: var(--bad);
+}
+
+.amount-positive {
+  color: var(--ok);
+}
+
+.preview {
+  padding: var(--sp-3);
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  white-space: pre-wrap;
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 720px) {
+  .inline-filter select,
+  .inline-filter input {
+    min-inline-size: 110px;
+  }
+}

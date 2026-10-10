@@ -1,0 +1,83 @@
+.payer-name {
+  margin-inline-end: var(--sp-2);
+  font-weight: 600;
+}
+
+.tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.tag {
+  display: inline-block;
+  padding: 1px var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.tag.off {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.intro {
+  margin: 0 0 var(--sp-3);
+}
+
+.tiers {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.tiers th,
+.tiers td {
+  padding: var(--sp-2);
+  border-block-end: 1px solid var(--line-soft);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.tiers th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tiers tr.inactive td {
+  color: var(--muted);
+}
+
+.tiers tr.editing td {
+  background: var(--blue-soft);
+}
+
+.tiers .actions {
+  white-space: nowrap;
+  text-align: end;
+}
+
+.tier-form {
+  display: grid;
+  gap: var(--sp-3);
+  margin-block-start: var(--sp-5);
+  padding: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.form-title {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}

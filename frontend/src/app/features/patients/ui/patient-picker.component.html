@@ -1,0 +1,75 @@
+@if (selected(); as patient) {
+  <div class="chosen">
+    <app-icon name="user" [size]="18" />
+    <div class="who">
+      <span class="mono number">{{ patient.number }}</span>
+      <span class="name">{{ patient.fullName }}@if (patient.nameAr) { · <span dir="rtl" lang="ar">{{ patient.nameAr }}</span>}</span>
+      <span class="small muted">
+        {{ i18n.t('patients.gender.' + patient.gender) }} · {{ ageText(patient) }}@if (patient.mobile) { · <span class="mono" dir="ltr">{{ patient.mobile }}</span>}
+      </span>
+    </div>
+    @if (patient.isVip) {
+      <app-badge tone="violet">{{ i18n.t('patients.vip') }}</app-badge>
+    }
+    <button type="button" class="btn sm" (click)="cleared.emit()">{{ i18n.t('patients.picker.change') }}</button>
+  </div>
+} @else if (mode() === 'search') {
+  <div class="search-row">
+    <app-search-box class="grow" [placeholder]="i18n.t('patients.picker.placeholder')" [label]="i18n.t('patients.picker.label')" (searchChange)="onSearch($event)" />
+    @if (allowCreate()) {
+      <button type="button" class="btn primary" *appCan="permissions.create" (click)="startCreate()"><app-icon name="plus" [size]="15" />{{ i18n.t('patients.new') }}</button>
+    }
+  </div>
+
+  @if (query().length >= 2) {
+    @if (results.error()) {
+      <p class="problem" role="alert">{{ i18n.t('patients.loadError') }}</p>
+    } @else if (results.isLoading() && rows().length === 0) {
+      <p class="muted small" role="status">{{ i18n.t('patients.loading') }}</p>
+    } @else if (rows().length === 0) {
+      <app-empty-state icon="search" [title]="i18n.t('patients.picker.noMatch')" [message]="i18n.t('patients.picker.noMatchHint')" />
+    } @else {
+      <ul class="results" [attr.aria-label]="i18n.t('patients.picker.results')">
+        @for (row of rows(); track row.id) {
+          <li>
+            <button type="button" class="result" (click)="choose(row)">
+              <span class="mono number">{{ row.number }}</span>
+              <span class="name">{{ row.fullName }}@if (row.nameAr) { · <span dir="rtl" lang="ar">{{ row.nameAr }}</span>}</span>
+              <span class="small muted">{{ i18n.t('patients.gender.' + row.gender) }} · {{ ageText(row) }}</span>
+              <span class="small mono muted" dir="ltr">{{ row.mobile ?? '' }}</span>
+              @if (row.isVip) {
+                <app-badge tone="violet">{{ i18n.t('patients.vip') }}</app-badge>
+              }
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  }
+} @else {
+  <div class="create">
+    <header class="create-head">
+      <strong>{{ i18n.t('patients.picker.newTitle') }}</strong>
+      <span class="small muted">{{ i18n.t('patients.picker.newHint') }}</span>
+    </header>
+    <app-patient-form
+      [settings]="settings.value() ?? null"
+      [countries]="countries.value() ?? []"
+      [governorates]="governorates.value() ?? []"
+      [conditions]="conditions.value() ?? []"
+      [similar]="candidates()"
+      [problem]="register.problem()"
+      [pending]="register.pending()"
+      [initialName]="initialName()"
+      (typed)="onTyped($event)"
+      (useExisting)="chooseSimilar($event)"
+      (save)="onSave($event)"
+    />
+    <div class="create-actions">
+      <button type="button" class="btn ghost" (click)="cancelCreate()">{{ i18n.t('patients.cancel') }}</button>
+      <button type="button" class="btn primary" [disabled]="register.pending()" (click)="saveNew()">
+        {{ register.pending() ? i18n.t('patients.saving') : i18n.t('patients.picker.saveNew') }}
+      </button>
+    </div>
+  </div>
+}

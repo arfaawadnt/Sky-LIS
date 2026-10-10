@@ -1,0 +1,23 @@
+<section class="card">
+  <h1>{{ i18n.t('home.title') }}</h1>
+  @if (auth.currentUser(); as user) {
+    <p>{{ i18n.t('home.welcome') }} <strong>{{ user.displayName }}</strong></p>
+  }
+
+  @if (session.isLoading()) {
+    <p class="muted">{{ i18n.t('home.loadingSession') }}</p>
+  } @else if (session.hasValue()) {
+    <dl class="session">
+      <dt>{{ i18n.t('home.tenant') }}</dt>
+      <dd>{{ session.value().tenantId ?? '—' }}</dd>
+      <dt>{{ i18n.t('home.scope') }}</dt>
+      <dd>{{ session.value().scope }}</dd>
+      <dt>{{ i18n.t('home.sessionExpires') }}</dt>
+      <dd>{{ session.value().expiresAtUtc }}</dd>
+      <dt>{{ i18n.t('home.permissions') }}</dt>
+      <dd>{{ session.value().permissions.length === 0 ? i18n.t('home.noPermissions') : session.value().permissions.join(', ') }}</dd>
+    </dl>
+  } @else if (session.error()) {
+    <p class="problem" role="alert">{{ i18n.t('home.sessionError') }}</p>
+  }
+</section>

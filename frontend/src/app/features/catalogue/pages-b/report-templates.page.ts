@@ -1,0 +1,119 @@
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+
+import {
+  CATALOGUE_B_PERMISSIONS,
+  REPORT_TEMPLATE_LANGUAGES,
+  REPORT_TEMPLATE_TYPES,
+  type ReportTemplateLanguage,
+  type ReportTemplateListItem,
+  type ReportTemplateRequest,
+  type ReportTemplateType,
+} from '../../../core/api/catalogue-b.contracts';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { type LocalizedText, localizedPick } from '../../../shared/forms/localized-text';
+import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
+import { CellTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
+import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
+import type { FormValue, MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
+import { CatalogueBApi } from '../data-b/catalogue-b.api';
+import { CatalogueBExportButtonComponent } from '../ui-b/catalogue-b-export-button.component';
+
+/**
+ * Report templates (SRS CP-54): print layouts by document type with language, QR and optional bilingual header and
+ * footer texts. Logo and signature are files of the Files module: the register shows whether one is attached and
+ * the editor keeps them (choosing the file waits for the Files upload API, intake A10).
+ */
+@Component({
+  selector: 'app-catalogue-b-report-templates-page',
+  imports: [MasterDataPageComponent, CellTemplateDirective, BadgeComponent, CatalogueBExportButtonComponent],
+  template: `
+    <app-master-data-page [config]="config">
+      <ng-template appCell="assets" [appCellOf]="config" let-row>
+        @if (row.logoFileId) {
+          <app-badge tone="info">{{ i18n.t('catalogue-b.reportTemplates.logo') }}</app-badge>
+        }
+        @if (row.signatureFileId) {
+          <app-badge tone="violet">{{ i18n.t('catalogue-b.reportTemplates.signature') }}</app-badge>
+        }
+        @if (row.showQr) {
+          <app-badge tone="neutral">QR</app-badge>
+        }
+      </ng-template>
+      <app-catalogue-b-export-button pageActions [export]="exportCsv" />
+    </app-master-data-page>
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class ReportTemplatesPage {
+  protected readonly i18n = inject(I18nService);
+  private readonly api = inject(CatalogueBApi);
+
+  protected readonly exportCsv = (): Promise<void> => this.api.reportTemplates.exportCsv({});
+
+  protected readonly config: MasterDataConfig<ReportTemplateListItem, ReportTemplateRequest> = {
+    i18nPrefix: 'catalogue-b.reportTemplates',
+    columns: [
+      { key: 'name', header: 'catalogue-b.reportTemplates.column.name', sortable: true, value: (item) => localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang()) },
+      { key: 'type', header: 'catalogue-b.reportTemplates.column.type', sortable: true, width: '150px', value: (item) => this.i18n.t(`catalogue-b.templateType.${item.type}`) },
+      { key: 'language', header: 'catalogue-b.reportTemplates.column.language', width: '120px', value: (item) => this.i18n.t(`catalogue-b.templateLanguage.${item.language}`) },
+      { key: 'assets', header: 'catalogue-b.reportTemplates.column.assets', secondary: true },
+    ],
+    fields: [
+      { name: 'name', kind: 'localizedText', required: true, maxLength: 200 },
+      {
+        name: 'type',
+        kind: 'select',
+        required: true,
+        options: () => Promise.resolve(REPORT_TEMPLATE_TYPES.map((type) => ({ value: type, label: this.i18n.t(`catalogue-b.templateType.${type}`) }))),
+      },
+      {
+        name: 'language',
+        kind: 'select',
+        required: true,
+        defaultValue: 'Both',
+        options: () => Promise.resolve(REPORT_TEMPLATE_LANGUAGES.map((language) => ({ value: language, label: this.i18n.t(`catalogue-b.templateLanguage.${language}`) }))),
+      },
+      { name: 'showQr', kind: 'boolean' },
+      { name: 'headerText', kind: 'localizedText', required: false, maxLength: 400, hint: 'catalogue-b.reportTemplates.hint.texts' },
+      { name: 'footerText', kind: 'localizedText', required: false, maxLength: 400 },
+    ],
+    adapter: {
+      list: (filter, page, signal) => this.api.reportTemplates.list({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      create: (dto) => this.api.reportTemplates.create(dto),
+      update: (id, dto) => this.api.reportTemplates.update(id, dto),
+      setActive: (id, active) => this.api.reportTemplates.setActive(id, active),
+    },
+    toDto: (value, item) => toRequest(value, item),
+    permissions: { create: CATALOGUE_B_PERMISSIONS.create, update: CATALOGUE_B_PERMISSIONS.edit, activate: CATALOGUE_B_PERMISSIONS.manage },
+    drawerSize: 'lg',
+  };
+
+  constructor() {
+    void this.i18n.load('catalogue-b');
+  }
+}
+
+function optional(value: unknown): string | null {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text === '' ? null : text;
+}
+
+/** Empty header/footer languages travel as null; logo and signature are kept from the record (no file picker yet). */
+export function toRequest(value: FormValue, item: ReportTemplateListItem | null): ReportTemplateRequest {
+  const name = value['name'] as LocalizedText;
+  const header = value['headerText'] as LocalizedText | undefined;
+  const footer = value['footerText'] as LocalizedText | undefined;
+  return {
+    nameEn: name.en.trim(),
+    nameAr: name.ar.trim(),
+    type: (value['type'] as ReportTemplateType | null) ?? 'Results',
+    logoFileId: item?.logoFileId ?? null,
+    signatureFileId: item?.signatureFileId ?? null,
+    showQr: value['showQr'] === true,
+    language: (value['language'] as ReportTemplateLanguage | null) ?? 'Both',
+    headerTextEn: optional(header?.en),
+    headerTextAr: optional(header?.ar),
+    footerTextEn: optional(footer?.en),
+    footerTextAr: optional(footer?.ar),
+  };
+}

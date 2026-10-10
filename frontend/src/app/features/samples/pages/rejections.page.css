@@ -1,0 +1,71 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 2fr) minmax(0, 3fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.policy,
+.page-problem {
+  margin-block: 0 var(--sp-4);
+}
+
+.replacement {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  margin-block-end: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--ok);
+  border-inline-start-width: 6px;
+  border-radius: var(--r);
+  background: var(--ok-soft);
+}
+
+.replacement > app-icon {
+  color: var(--ok);
+}
+
+.grow {
+  flex: 1;
+}
+
+.found {
+  margin-block-start: var(--sp-4);
+  padding-block-start: var(--sp-4);
+  border-block-start: 1px solid var(--line-soft);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-block-start: var(--sp-3);
+}
+
+.lookup-problem {
+  margin-block: var(--sp-3) 0;
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.filter input {
+  width: auto;
+}
+
+.list-problem {
+  margin: var(--sp-3) var(--sp-4) 0;
+}

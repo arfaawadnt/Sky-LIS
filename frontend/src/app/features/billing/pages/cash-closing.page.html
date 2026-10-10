@@ -1,0 +1,132 @@
+<app-page-header [title]="i18n.t('billing.closing.title')" [subtitle]="i18n.t('billing.closing.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('billing.refresh') }}</button>
+</app-page-header>
+
+<app-section-card *appCan="permissions.close" [title]="i18n.t('billing.closing.scopeTitle')">
+  <form [formGroup]="scopeForm" (ngSubmit)="preview()" novalidate>
+    <div class="form-grid">
+      <app-form-field [label]="i18n.t('billing.field.treasury')">
+        <select formControlName="treasuryId" (change)="onTreasuryChange()">
+          <option value="">{{ i18n.t('billing.pay.chooseTreasury') }}</option>
+          @for (treasury of facade.treasuryList(); track treasury.id) {
+            <option [value]="treasury.id">{{ treasury.code }} · {{ treasuryName(treasury) }}{{ treasury.isActive ? '' : ' (' + i18n.t('billing.closing.inactive') + ')' }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('billing.field.cashier')">
+        <select formControlName="cashierUserId">
+          <option value="">{{ i18n.t('billing.closing.allCashiers') }}</option>
+          @for (cashier of cashierList(); track cashier.userId) {
+            <option [value]="cashier.userId">{{ cashier.name }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('billing.closing.from')">
+        <input type="datetime-local" formControlName="from" (change)="loadCashiers()" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('billing.closing.to')" [hint]="i18n.t('billing.closing.toHint')">
+        <input type="datetime-local" formControlName="to" (change)="loadCashiers()" />
+      </app-form-field>
+    </div>
+    <div class="count-row">
+      <button type="submit" class="btn primary" [disabled]="facade.preview.isLoading()"><app-icon name="search" [size]="15" />{{ i18n.t('billing.closing.preview') }}</button>
+    </div>
+  </form>
+</app-section-card>
+
+@if (previewProblem(); as problem) {
+  <p class="problem" role="alert">{{ problemText(problem) }}</p>
+}
+
+@if (facade.currentPreview(); as preview) {
+  <app-section-card [title]="i18n.t('billing.closing.totals')" [subtitle]="preview.treasuryCode + ' · ' + (preview.cashierName ?? i18n.t('billing.closing.allCashiers'))">
+    <div class="stack">
+      @if (preview.overlapsClosedPeriod) {
+        <p class="warn-strip">{{ i18n.t('billing.closing.overlaps') }}</p>
+      }
+      <div class="totals-grid">
+        <app-stat-card [label]="i18n.t('billing.closing.totalPayments')" [value]="money(preview.totals.totalPayments)" tone="brand" [hint]="i18n.tf('billing.closing.count', { count: preview.totals.paymentCount })" />
+        <app-stat-card [label]="i18n.t('billing.closing.cashPayments')" [value]="money(preview.totals.cashPayments)" tone="ok" />
+        <app-stat-card [label]="i18n.t('billing.closing.nonCash')" [value]="money(nonCash())" tone="info" [hint]="i18n.t('billing.closing.nonCashHint')" />
+        <app-stat-card [label]="i18n.t('billing.closing.refunds')" [value]="money(preview.totals.totalRefunds)" tone="warn" [hint]="i18n.t('billing.method.Cash') + ' ' + money(preview.totals.cashRefunds)" />
+        <app-stat-card [label]="i18n.t('billing.closing.expectedCash')" [value]="money(preview.totals.expectedCash)" tone="brand" [hint]="preview.currency" />
+        <app-stat-card [label]="i18n.t('billing.closing.outstanding')" [value]="money(preview.totals.outstandingBalance)" tone="bad" [hint]="i18n.tf('billing.closing.visitCount', { count: preview.totals.visitCount })" />
+        <app-stat-card [label]="i18n.t('billing.closing.discounts')" [value]="money(preview.totals.discountTotal)" tone="info" />
+      </div>
+      <p class="muted small">{{ i18n.t('billing.closing.equation') }}</p>
+
+      <form *appCan="permissions.close" [formGroup]="countForm" (ngSubmit)="close(preview)" appSaveShortcut (appSaveShortcut)="close(preview)" novalidate>
+        <div class="count-row">
+          <app-form-field [label]="i18n.t('billing.closing.countedCash')">
+            <input type="number" inputmode="decimal" step="0.01" min="0" formControlName="countedCash" />
+          </app-form-field>
+          <p class="difference" [class.short]="(difference() ?? 0) < 0" [class.over]="(difference() ?? 0) > 0" aria-live="polite">
+            {{ i18n.t('billing.closing.difference') }}: {{ money(difference()) }}
+          </p>
+        </div>
+        <app-form-field [label]="i18n.t('billing.closing.note')" [hint]="i18n.t('billing.closing.noteHint')">
+          <textarea formControlName="note" rows="2" maxlength="1000"></textarea>
+        </app-form-field>
+        @if (noteMissing()) {
+          <p class="problem" role="alert">{{ i18n.t('billing.error.BIL-034') }}</p>
+        }
+        @if (facade.close.problem(); as problem) {
+          <p class="problem" role="alert">{{ problemText(problem) }}</p>
+        }
+        <button type="submit" class="btn primary" [disabled]="!canClose(preview)">
+          <app-icon name="check" [size]="15" />{{ facade.close.pending() ? i18n.t('billing.pay.working') : i18n.t('billing.closing.close') }}
+        </button>
+      </form>
+    </div>
+  </app-section-card>
+
+  <app-section-card [title]="i18n.t('billing.closing.movements')" [padded]="false">
+    @if (preview.movementsTruncated) {
+      <p class="info-strip list-problem">{{ i18n.t('billing.closing.truncated') }}</p>
+    }
+    <app-data-table [columns]="movementColumns" [rows]="preview.movements" [interactive]="false" [compact]="true" [emptyTitle]="i18n.t('billing.closing.noMovements')" [caption]="i18n.t('billing.closing.movements')">
+      <ng-template appCell="kind" [appCellOf]="preview.movements" let-row>{{ i18n.t('billing.closing.kind.' + row.kind) }}</ng-template>
+      <ng-template appCell="method" [appCellOf]="preview.movements" let-row>{{ methodLabel(row.method) }}</ng-template>
+      <ng-template appCell="status" [appCellOf]="preview.movements" let-row>
+        <app-badge [tone]="tone(row)">{{ i18n.t('billing.status.' + row.status) }}</app-badge>
+      </ng-template>
+    </app-data-table>
+  </app-section-card>
+}
+
+<app-section-card [title]="i18n.t('billing.closing.register')" [padded]="false">
+  <app-toolbar>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('billing.field.treasury') }}</span>
+      <select class="inp" (change)="onRegisterTreasury($event)">
+        <option value="">{{ i18n.t('billing.filter.all') }}</option>
+        @for (treasury of facade.treasuryList(); track treasury.id) {
+          <option [value]="treasury.id">{{ treasury.code }} · {{ treasuryName(treasury) }}</option>
+        }
+      </select>
+    </label>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('billing.filter.from') }}</span>
+      <input class="inp" type="date" (change)="onRegisterFrom($event)" />
+    </label>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('billing.filter.to') }}</span>
+      <input class="inp" type="date" (change)="onRegisterTo($event)" />
+    </label>
+    <button toolbarActions type="button" class="btn ghost" *appCan="permissions.export" (click)="exportCsv()" [disabled]="facade.exportCsv.pending()">
+      <app-icon name="arrow-down" [size]="15" />{{ i18n.t('billing.exportCsv') }}
+    </button>
+  </app-toolbar>
+
+  @if (facade.closings.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('billing.loadError') }}</p>
+  }
+
+  <app-data-table [columns]="closingColumns" [rows]="closings()" [loading]="facade.closings.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('billing.closing.empty')" [caption]="i18n.t('billing.closing.register')">
+    <ng-template appRowActions [appRowActionsOf]="closings()" let-row>
+      <button type="button" class="btn sm ghost" (click)="printSheet(row)"><app-icon name="printer" [size]="14" />{{ i18n.t('billing.closing.printSheet') }}</button>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="closingsTotal()" (pageChange)="onPage($event)" />
+</app-section-card>

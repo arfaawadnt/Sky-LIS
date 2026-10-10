@@ -1,0 +1,243 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.table-wrap {
+  overflow: auto;
+  max-width: 100%;
+}
+
+table.g {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-weight: 700;
+  text-align: start;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  z-index: 1;
+}
+
+td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: middle;
+  text-align: start;
+}
+
+.compact th,
+.compact td {
+  padding: 6px 9px;
+  font-size: var(--fs-sm);
+}
+
+.al-center {
+  text-align: center;
+}
+
+.al-end {
+  text-align: end;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.zebra tbody tr:nth-child(even):not(.state) td {
+  background: var(--surface-2);
+}
+
+tbody tr[tabindex] {
+  outline: none;
+}
+
+tbody tr[tabindex]:focus-visible td {
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
+:host-context([dir='rtl']) tbody tr[tabindex]:focus-visible td {
+  box-shadow: inset -3px 0 0 var(--blue);
+}
+
+.interactive tbody tr:not(.state) {
+  cursor: pointer;
+}
+
+.interactive tbody tr:not(.state):hover td,
+tbody tr:focus-visible td {
+  background: var(--row-hover);
+}
+
+tbody tr.sel td,
+.zebra tbody tr.sel td {
+  background: var(--blue-soft);
+}
+
+tbody tr.loading td {
+  opacity: 0.6;
+}
+
+/* rows flagged by `rowClass` (master data: deactivated records) */
+tbody tr.inactive td {
+  color: var(--muted);
+}
+
+th.sel,
+td.sel {
+  width: 36px;
+  text-align: center;
+}
+
+th.actions,
+td.actions {
+  text-align: end;
+  white-space: nowrap;
+  width: 1%;
+}
+
+.row-actions {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.sort-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.sort-btn:hover {
+  color: var(--navy);
+}
+
+tr.state td {
+  padding: 0;
+  background: transparent;
+}
+
+.loading {
+  padding: var(--sp-6) var(--sp-4);
+  text-align: center;
+  color: var(--muted);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--blue);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 959px) {
+  .secondary {
+    display: none;
+  }
+}
+
+/* cards under 720px */
+@media (max-width: 719px) {
+  thead {
+    display: none;
+  }
+
+  table.g,
+  tbody {
+    display: block;
+  }
+
+  tbody tr {
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    margin: var(--sp-2) var(--sp-3);
+    padding: var(--sp-2) 0;
+    background: var(--surface);
+  }
+
+  tbody tr.state {
+    border: 0;
+    margin: 0;
+  }
+
+  .zebra tbody tr:nth-child(even):not(.state) td {
+    background: transparent;
+  }
+
+  td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--sp-3);
+    border: 0;
+    padding: 4px 12px;
+    text-align: end;
+  }
+
+  td.secondary {
+    display: flex;
+  }
+
+  td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: start;
+    flex: none;
+  }
+
+  td.sel::before,
+  td.actions::before,
+  tr.state td::before {
+    content: none;
+  }
+
+  td.actions {
+    /* the table-mode width: 1% would shrink the card's action row to its narrowest child */
+    width: auto;
+    white-space: normal;
+    justify-content: flex-end;
+    padding-top: var(--sp-2);
+    border-top: 1px dashed var(--line-soft);
+    margin-top: var(--sp-1);
+  }
+}

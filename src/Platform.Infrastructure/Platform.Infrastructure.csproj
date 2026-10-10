@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 01 §2.1: references Application, Domain, SharedKernel, EF Core 9 and Npgsql. Never ASP.NET MVC types. Gate: LayerRulesTests, InfrastructureHardeningTests. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Description>EF Core 9 persistence (conventions, interceptors, repositories, outbox), security adapters, jobs. The only assembly that knows PostgreSQL.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Platform.SharedKernel\Platform.SharedKernel.csproj" />
+    <ProjectReference Include="..\Platform.Domain\Platform.Domain.csproj" />
+    <ProjectReference Include="..\Platform.Application\Platform.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" />
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Platform.ArchitectureTests" />
+    <InternalsVisibleTo Include="Platform.IntegrationTests" />
+    <InternalsVisibleTo Include="Platform.Application.UnitTests" />
+    <InternalsVisibleTo Include="Platform.WebApi.FunctionalTests" />
+  </ItemGroup>
+
+</Project>

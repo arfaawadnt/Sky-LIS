@@ -1,0 +1,294 @@
+<app-page-header [title]="title()" [subtitle]="user()?.username ?? i18n.t('organization.users.editorSubtitle')" [breadcrumb]="breadcrumb()">
+  <ng-container pageActions>
+    @if (user(); as current) {
+      <app-badge [tone]="statusTone(current.status)">{{ statusLabel(current.status) }}</app-badge>
+      @if (current.isPrimaryAdministrator) {
+        <app-badge tone="violet">{{ i18n.t('organization.users.primary') }}</app-badge>
+      }
+      @if (current.isModified) {
+        <app-badge tone="warn">{{ i18n.t('organization.users.modified') }}</app-badge>
+      }
+    }
+  </ng-container>
+</app-page-header>
+
+@if (facade.detail.error()) {
+  <p class="problem" role="alert">{{ i18n.t('organization.users.loadError') }}</p>
+}
+@if (isSelf()) {
+  <p class="info-strip">{{ i18n.t('organization.users.selfNotice') }}</p>
+}
+@if (user()?.belongsToOtherTenants) {
+  <p class="warn-strip">{{ i18n.t('organization.users.otherTenantsNotice') }}</p>
+}
+
+<div class="editor" appSaveShortcut (appSaveShortcut)="saveActive()">
+  <app-tabs [tabs]="tabs()" [active]="activeTab()" (activeChange)="onTab($event)" />
+
+  @if (problem(); as current) {
+    <p class="problem" role="alert">{{ problemText(current) }}</p>
+  }
+
+  @switch (activeTab()) {
+    @case ('profile') {
+      <app-section-card role="tabpanel" [title]="i18n.t('organization.users.tab.profile')">
+        <form class="form-grid" [formGroup]="form" (ngSubmit)="saveProfile()" novalidate>
+          @if (isNew()) {
+            <app-form-field [label]="i18n.t('organization.users.field.username')" [hint]="i18n.t('organization.users.hint.username')">
+              <input type="text" formControlName="username" autocomplete="off" maxlength="30" />
+            </app-form-field>
+            <app-form-field [label]="i18n.t('organization.users.field.employeeCode')" [hint]="i18n.t('organization.users.hint.employeeCode')">
+              <input type="text" formControlName="employeeCode" autocomplete="off" maxlength="32" />
+            </app-form-field>
+            <app-form-field [label]="i18n.t('organization.users.field.password')" [hint]="i18n.tf('organization.users.hint.password', { min: passwordMinLength() })">
+              <input type="password" formControlName="password" autocomplete="new-password" [attr.maxlength]="maxPasswordLength" />
+            </app-form-field>
+            <app-form-field [label]="i18n.t('organization.users.field.confirm')">
+              <input type="password" formControlName="confirm" autocomplete="new-password" [attr.maxlength]="maxPasswordLength" />
+            </app-form-field>
+            @if (passwordMismatch()) {
+              <p class="problem full" role="alert">{{ i18n.t('organization.reset.mismatch') }}</p>
+            }
+          } @else if (user(); as current) {
+            <dl class="kv full">
+              <dt>{{ i18n.t('organization.users.field.username') }}</dt>
+              <dd class="mono">{{ current.username }}</dd>
+              <dt>{{ i18n.t('organization.users.field.employeeCode') }}</dt>
+              <dd class="mono">{{ current.employeeCode }}</dd>
+            </dl>
+          }
+
+          <app-localized-text-input class="full" [group]="form.controls.name" [label]="i18n.t('organization.users.field.fullName')" [maxLength]="200" />
+
+          <app-form-field [label]="i18n.t('organization.users.field.email')">
+            <input type="email" formControlName="email" autocomplete="off" maxlength="254" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('organization.users.field.mobile')" [hint]="i18n.t('organization.users.hint.mobile')">
+            <input type="tel" formControlName="mobile" autocomplete="off" maxlength="30" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('organization.users.field.designation')">
+            <input type="text" formControlName="designation" maxlength="100" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('organization.users.field.shifts')" [hint]="i18n.t('organization.users.hint.shifts')">
+            <input type="text" formControlName="shifts" maxlength="440" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('organization.users.field.language')">
+            <select formControlName="language">
+              <option value="en">English</option>
+              <option value="ar">العربية</option>
+            </select>
+          </app-form-field>
+          <app-form-field [label]="i18n.t('organization.users.field.expiry')" [hint]="i18n.t('organization.users.hint.expiry')">
+            <input type="date" formControlName="expiry" />
+          </app-form-field>
+
+          @if (isNew()) {
+            <app-form-field [label]="i18n.t('organization.users.field.role')">
+              <select formControlName="roleId">
+                <option value="">{{ i18n.t('organization.users.noRole') }}</option>
+                @for (role of roles(); track role.id) {
+                  <option [value]="role.id">{{ localized(role.nameEn, role.nameAr) }}</option>
+                }
+              </select>
+            </app-form-field>
+            <fieldset class="full branches">
+              <legend>{{ i18n.t('organization.users.field.branches') }}</legend>
+              <label class="check">
+                <input type="checkbox" [checked]="allBranches()" (change)="onAllBranches($event)" />
+                <span>{{ i18n.t('organization.users.allBranchesOption') }}</span>
+              </label>
+              @if (!allBranches()) {
+                <ul class="branch-list">
+                  @for (branch of branches(); track branch.id) {
+                    <li>
+                      <label class="check">
+                        <input type="checkbox" [checked]="branchChoice().has(branch.id)" (change)="toggleBranch(branch.id, $event)" />
+                        <span><span class="mono">{{ branch.code }}</span> {{ localized(branch.nameEn, branch.nameAr) }}</span>
+                      </label>
+                    </li>
+                  }
+                </ul>
+              }
+            </fieldset>
+          }
+
+          <label class="check full">
+            <input type="checkbox" formControlName="mustChange" />
+            <span>{{ i18n.t('organization.users.field.mustChange') }}</span>
+          </label>
+
+          @if (canEditProfile()) {
+            <div class="actions full">
+              <button type="submit" class="btn primary" [disabled]="facade.create.pending() || facade.update.pending()">
+                {{ isNew() ? i18n.t('organization.users.create') : i18n.t('organization.save') }}
+              </button>
+            </div>
+          }
+        </form>
+      </app-section-card>
+    }
+
+    @case ('access') {
+      @if (user(); as current) {
+        <div class="two-col" role="tabpanel">
+          <app-section-card [title]="i18n.t('organization.users.field.role')" [subtitle]="i18n.t('organization.users.roleHint')">
+            <app-form-field [label]="i18n.t('organization.users.field.role')">
+              <select [value]="roleChoice()" [disabled]="!canManage() || current.isPrimaryAdministrator" (change)="onRoleChoice($event)">
+                <option value="">{{ i18n.t('organization.users.noRole') }}</option>
+                @for (role of roles(); track role.id) {
+                  <option [value]="role.id" [selected]="role.id === roleChoice()">{{ localized(role.nameEn, role.nameAr) }}</option>
+                }
+              </select>
+            </app-form-field>
+            @if (current.isPrimaryAdministrator) {
+              <p class="muted small">{{ i18n.t('organization.users.primaryRoleLocked') }}</p>
+            }
+            @if (canManage() && !current.isPrimaryAdministrator) {
+              <div class="actions">
+                <button type="button" class="btn primary" [disabled]="roleChoice() === '' || roleChoice() === current.roleId || facade.assignRole.pending()" (click)="saveRole()">
+                  {{ i18n.t('organization.users.assignRole') }}
+                </button>
+              </div>
+            }
+          </app-section-card>
+
+          <app-section-card [title]="i18n.t('organization.users.field.branches')" [subtitle]="i18n.t('organization.users.branchesHint')">
+            <label class="check">
+              <input type="checkbox" [checked]="allBranches()" [disabled]="isSelf()" (change)="onAllBranches($event)" />
+              <span>{{ i18n.t('organization.users.allBranchesOption') }}</span>
+            </label>
+            @if (!allBranches()) {
+              <ul class="branch-list">
+                @for (branch of branches(); track branch.id) {
+                  <li>
+                    <label class="check">
+                      <input type="checkbox" [checked]="branchChoice().has(branch.id)" [disabled]="isSelf()" (change)="toggleBranch(branch.id, $event)" />
+                      <span><span class="mono">{{ branch.code }}</span> {{ localized(branch.nameEn, branch.nameAr) }}</span>
+                    </label>
+                  </li>
+                }
+              </ul>
+            }
+            <div class="actions" *appCan="permissions.usersEdit">
+              <button type="button" class="btn primary" [disabled]="isSelf() || facade.assignBranches.pending()" (click)="saveBranches()">{{ i18n.t('organization.save') }}</button>
+            </div>
+          </app-section-card>
+        </div>
+      }
+    }
+
+    @case ('privileges') {
+      @if (user(); as current) {
+        <app-section-card role="tabpanel" [title]="i18n.t('organization.users.tab.privileges')" [subtitle]="i18n.t('organization.users.privilegesHint')">
+          <div class="status-row">
+            @if (current.isModified) {
+              <app-badge tone="warn">{{ i18n.t('organization.users.modified') }}</app-badge>
+              @if (canManage()) {
+                <button type="button" class="btn sm" [disabled]="facade.restore.pending()" (click)="restore()"><app-icon name="refresh" [size]="14" />{{ i18n.t('organization.users.restore') }}</button>
+              }
+            } @else {
+              <app-badge tone="ok">{{ i18n.t('organization.users.inherits') }}</app-badge>
+            }
+            @if (current.roleNameEn) {
+              <span class="muted small">{{ i18n.tf('organization.users.inheritsFrom', { role: localized(current.roleNameEn, current.roleNameAr ?? current.roleNameEn) }) }}</span>
+            }
+          </div>
+
+          @if (added().length > 0 || removed().length > 0) {
+            <div class="chips" [attr.aria-label]="i18n.t('organization.users.overrideSummary')">
+              @for (key of added(); track key) {
+                <span class="chip added">+ {{ key }}</span>
+              }
+              @for (key of removed(); track key) {
+                <span class="chip removed">− {{ key }}</span>
+              }
+            </div>
+          }
+
+          <app-privilege-matrix
+            [modules]="catalogue().modules"
+            [actions]="catalogue().actions"
+            [selected]="overrideKeys()"
+            [baseline]="baseline()"
+            [disabled]="!canManage()"
+            [caption]="i18n.t('organization.users.tab.privileges')"
+            (selectedChange)="setOverrideKeys($event)" />
+
+          <fieldset class="special-override">
+            <legend>{{ i18n.t('organization.roles.tab.special') }}</legend>
+            <label class="check">
+              <input type="checkbox" [checked]="useRoleSpecialRights()" [disabled]="!canManage()" (change)="onUseRoleSpecialRights($event)" />
+              <span>{{ i18n.t('organization.users.useRoleSpecialRights') }}</span>
+            </label>
+            @if (!useRoleSpecialRights()) {
+              <app-special-rights-form [value]="specialOverride()" [disabled]="!canManage()" (valueChange)="specialOverride.set($event)" />
+            }
+          </fieldset>
+
+          @if (canManage()) {
+            <div class="actions">
+              <button type="button" class="btn primary" [disabled]="facade.setOverrides.pending()" (click)="saveOverrides()">{{ i18n.t('organization.users.saveOverrides') }}</button>
+            </div>
+          }
+        </app-section-card>
+      }
+    }
+
+    @case ('security') {
+      @if (user(); as current) {
+        <app-section-card role="tabpanel" [title]="i18n.t('organization.users.tab.security')">
+          <dl class="kv">
+            <dt>{{ i18n.t('organization.users.column.status') }}</dt>
+            <dd><app-badge [tone]="statusTone(current.status)">{{ statusLabel(current.status) }}</app-badge></dd>
+            <dt>{{ i18n.t('organization.users.passwordChanged') }}</dt>
+            <dd>{{ formatInstant(current.passwordChangedAtUtc) }}</dd>
+            <dt>{{ i18n.t('organization.users.field.expiry') }}</dt>
+            <dd>{{ current.passwordExpiresAtUtc === null ? i18n.t('organization.users.noExpiry') : formatInstant(current.passwordExpiresAtUtc) }}</dd>
+            <dt>{{ i18n.t('organization.users.field.mustChange') }}</dt>
+            <dd>{{ current.mustChangePassword ? i18n.t('organization.yes') : i18n.t('organization.no') }}</dd>
+          </dl>
+
+          @if (canManage()) {
+            <div class="danger-zone">
+              <div class="row">
+                <p>{{ i18n.t('organization.users.resetHint') }}</p>
+                <button type="button" class="btn" [disabled]="current.isPrimaryAdministrator || current.belongsToOtherTenants" (click)="openReset()">
+                  <app-icon name="shield" [size]="15" />{{ i18n.t('organization.users.resetPassword') }}
+                </button>
+              </div>
+              <div class="row">
+                <p>{{ current.isLocked ? i18n.t('organization.users.unlockHint') : i18n.t('organization.users.lockHint') }}</p>
+                @if (current.isLocked) {
+                  <button type="button" class="btn" [disabled]="current.belongsToOtherTenants || facade.setLocked.pending()" (click)="setLocked(false)">{{ i18n.t('organization.users.unlock') }}</button>
+                } @else {
+                  <button type="button" class="btn danger" [disabled]="current.isPrimaryAdministrator || current.belongsToOtherTenants || facade.setLocked.pending()" (click)="setLocked(true)">
+                    {{ i18n.t('organization.users.lock') }}
+                  </button>
+                }
+              </div>
+              <div class="row">
+                <p>{{ current.isActive ? i18n.t('organization.users.deactivateHint') : i18n.t('organization.users.reactivateHint') }}</p>
+                @if (current.isActive) {
+                  <button type="button" class="btn danger" [disabled]="current.isPrimaryAdministrator || facade.setActive.pending()" (click)="setActive(false)">{{ i18n.t('organization.deactivate') }}</button>
+                } @else {
+                  <button type="button" class="btn" [disabled]="facade.setActive.pending()" (click)="setActive(true)">{{ i18n.t('organization.activate') }}</button>
+                }
+              </div>
+            </div>
+            @if (current.isPrimaryAdministrator) {
+              <p class="muted small">{{ i18n.t('organization.users.primaryProtected') }}</p>
+            }
+          }
+        </app-section-card>
+
+        <app-reset-password-dialog
+          [(open)]="resetOpen"
+          [username]="current.username"
+          [minLength]="passwordMinLength()"
+          [pending]="facade.resetPassword.pending()"
+          [problem]="resetProblem()"
+          (submitted)="resetPassword($event)" />
+      }
+    }
+  }
+</div>

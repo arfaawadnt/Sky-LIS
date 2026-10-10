@@ -1,0 +1,46 @@
+<app-page-header [title]="i18n.t('catalogue-a.sequence.title')" [subtitle]="i18n.t('catalogue-a.sequence.subtitle')">
+  <app-catalogue-export-button pageActions ngProjectAs="[pageActions]" *appCan="permissions.export" [exporter]="exportCsv" />
+  <button pageActions ngProjectAs="[pageActions]" type="button" class="btn primary" *appCan="permissions.edit" [disabled]="!canSave()" (click)="save()">
+    {{ facade.save.pending() ? i18n.t('catalogue-a.saving') : i18n.tf('catalogue-a.sequence.save', { count: changes().length }) }}
+  </button>
+</app-page-header>
+
+<div appSaveShortcut (appSaveShortcut)="save()">
+  <app-section-card [padded]="false">
+    <app-toolbar>
+      <app-search-box toolbarFilters [placeholder]="i18n.t('catalogue-a.sequence.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+      <label toolbarFilters class="filter">
+        <span class="visually-hidden">{{ i18n.t('catalogue-a.sequence.column.type') }}</span>
+        <select class="inp" (change)="onType($event)">
+          <option value="">{{ i18n.t('catalogue-a.allTypes') }}</option>
+          @for (type of types; track type) {
+            <option [value]="type" [selected]="facade.filter().type === type">{{ typeLabel(type) }}</option>
+          }
+        </select>
+      </label>
+      <button toolbarActions type="button" class="btn ghost" [disabled]="changes().length === 0" (click)="discard()"><app-icon name="x" [size]="15" />{{ i18n.t('catalogue-a.sequence.discard') }}</button>
+      <button toolbarActions type="button" class="btn ghost" (click)="facade.rows.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('catalogue-a.refresh') }}</button>
+    </app-toolbar>
+
+    @if (facade.save.problem()) {
+      <p class="problem list-problem" role="alert">{{ problemText() }}</p>
+    }
+    @if (duplicateIds().size > 0) {
+      <p class="warn-strip list-problem" role="status">{{ i18n.t('catalogue-a.sequence.duplicates') }}</p>
+    }
+    @if (invalidIds().size > 0) {
+      <p class="warn-strip list-problem" role="status">{{ i18n.t('catalogue-a.sequence.invalid') }}</p>
+    }
+    @if (facade.rows.error()) {
+      <p class="problem list-problem" role="alert">{{ i18n.t('catalogue-a.loadError') }}</p>
+    }
+
+    <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.rows.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('catalogue-a.sequence.empty')" [caption]="i18n.t('catalogue-a.sequence.title')">
+      <ng-template appCell="sequence" [appCellOf]="rows()" let-row>
+        <input class="inp sm mono seq" type="number" min="1" step="1" [value]="value(row)" (input)="onInput(row, $event)" [attr.aria-label]="i18n.t('catalogue-a.sequence.column.sequence') + ' ' + row.code" [class.invalid]="invalidIds().has(row.id) || duplicateIds().has(row.id)" [class.changed]="changed(row)" />
+      </ng-template>
+      <ng-template appCell="type" [appCellOf]="rows()" let-row><app-badge tone="info">{{ typeLabel(row.type) }}</app-badge></ng-template>
+      <ng-template appCell="status" [appCellOf]="rows()" let-row><app-badge [status]="row.isActive ? 'Active' : 'Inactive'" /></ng-template>
+    </app-data-table>
+  </app-section-card>
+</div>

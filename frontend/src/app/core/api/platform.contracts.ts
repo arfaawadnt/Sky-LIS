@@ -1,0 +1,516 @@
+/**
+ * Platform administration contracts mirrored from `Platform.Contracts.PlatformAdmin` (Super Admin portal SA-03…SA-20,
+ * the laboratory's wallet CP-66; bootstrap until the OpenAPI generator lands, 01 §6.2). JSON is camelCase; mobiles are
+ * E.164; amounts are numbers with two decimals.
+ */
+
+export type { Paged } from './paging';
+
+export interface CreatedResource {
+  readonly id: string;
+}
+
+// ── Clients (SA-04) ──────────────────────────────────────────────────────────────────────────────
+
+export type ClientStatus = 'Trial' | 'Active' | 'Inactive';
+export type ClientSource = 'Subscription' | 'Manual';
+
+export const CLIENT_STATUSES: readonly ClientStatus[] = ['Trial', 'Active', 'Inactive'];
+export const CLIENT_SOURCES: readonly ClientSource[] = ['Subscription', 'Manual'];
+
+export interface ClientListItem {
+  readonly id: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly portalSlug: string;
+  readonly portalUrl: string;
+  readonly countryId: string;
+  readonly countryNameEn: string;
+  readonly countryNameAr: string;
+  readonly governorateId: string;
+  readonly governorateNameEn: string;
+  readonly governorateNameAr: string;
+  readonly managerName: string;
+  readonly managerMobile: string;
+  readonly planId: string;
+  readonly planCode: string;
+  readonly planNameEn: string;
+  readonly planNameAr: string;
+  readonly walletBalance: number;
+  readonly walletCurrency: string;
+  readonly branches: number;
+  readonly users: number;
+  readonly createdAtUtc: string;
+  readonly source: ClientSource;
+  readonly status: ClientStatus;
+  readonly trialEndsAtUtc: string | null;
+}
+
+export interface ClientDetail {
+  readonly id: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly countryId: string;
+  readonly governorateId: string;
+  readonly address: string;
+  readonly mobile: string;
+  readonly licenceNo: string | null;
+  readonly managerName: string;
+  readonly managerMobile: string;
+  readonly email: string | null;
+  readonly planId: string;
+  readonly portalSlug: string;
+  readonly portalUrl: string;
+  readonly language: string;
+  readonly source: ClientSource;
+  readonly status: ClientStatus;
+  readonly createdAtUtc: string;
+  readonly trialEndsAtUtc: string | null;
+  readonly activatedAtUtc: string | null;
+  readonly deactivatedAtUtc: string | null;
+  readonly deactivationReason: string | null;
+  readonly administratorUserId: string | null;
+  readonly administratorUsername: string | null;
+  readonly walletBalance: number;
+  readonly walletCurrency: string;
+  readonly branches: number;
+  readonly users: number;
+}
+
+export interface ClientFilter {
+  readonly search: string | null;
+  readonly source: ClientSource | null;
+  readonly planId: string | null;
+  readonly status: ClientStatus | null;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/** The editable details of a client (SA-04 drawer). */
+export interface ClientDetailsRequest {
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly countryId: string;
+  readonly governorateId: string;
+  readonly address: string;
+  readonly mobile: string;
+  readonly licenceNo: string | null;
+  readonly managerName: string;
+  readonly managerMobile: string;
+  readonly email: string | null;
+  readonly planId: string;
+  readonly language: string | null;
+}
+
+/** SA-04 "Add": `adminPassword` is a `[CredentialField]`, sealed by the envelope interceptor. */
+export interface ProvisionClientRequest extends ClientDetailsRequest {
+  readonly portalSlug: string | null;
+  readonly adminUsername: string;
+  readonly adminPassword: string;
+}
+
+export type UpdateClientRequest = ClientDetailsRequest;
+
+export interface ProvisionedClient {
+  readonly id: string;
+  readonly portalUrl: string;
+  readonly administratorUsername: string;
+}
+
+/** SA-04 "Reset password": `newPassword` is a `[CredentialField]`. */
+export interface ResetClientAdminPasswordRequest {
+  readonly newPassword: string;
+}
+
+// ── Plans and wallets (SA-05, CP-66) ───────────────────────────────────────────────────────────
+
+export type WalletTransactionKind = 'TopUp' | 'Subscription' | 'Usage';
+export type TopUpRequestStatus = 'Pending' | 'Completed' | 'Declined';
+
+export const WALLET_TRANSACTION_KINDS: readonly WalletTransactionKind[] = ['TopUp', 'Subscription', 'Usage'];
+
+export interface PlanListItem {
+  readonly id: string;
+  readonly code: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly monthlyFee: number;
+  readonly currencyCode: string;
+  readonly maxBranches: number;
+  readonly maxUsers: number;
+  readonly smsQuota: number;
+  readonly maxAnalysers: number;
+  readonly isActive: boolean;
+  readonly clientCount: number;
+}
+
+export interface PlanRequest {
+  readonly code: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly monthlyFee: number;
+  readonly currencyCode: string;
+  readonly maxBranches: number;
+  readonly maxUsers: number;
+  readonly smsQuota: number;
+  readonly maxAnalysers: number;
+}
+
+export interface TopUpRequestItem {
+  readonly id: string;
+  readonly amount: number;
+  readonly note: string | null;
+  readonly status: TopUpRequestStatus;
+  readonly requestedAtUtc: string;
+  readonly requestedByUserId: string;
+  readonly requestedByName: string | null;
+  readonly decidedAtUtc: string | null;
+}
+
+export interface WalletDetail {
+  readonly walletId: string;
+  readonly tenantId: string;
+  readonly clientNameEn: string;
+  readonly clientNameAr: string;
+  readonly balance: number;
+  readonly currencyCode: string;
+  readonly nextChargeAtUtc: string;
+  readonly planId: string;
+  readonly planCode: string;
+  readonly planNameEn: string;
+  readonly planNameAr: string;
+  readonly monthlyFee: number;
+  readonly planCurrencyCode: string;
+  readonly smsQuota: number;
+  readonly smsUsedThisMonth: number;
+  readonly pendingTopUpRequests: readonly TopUpRequestItem[];
+}
+
+export interface WalletTransactionItem {
+  readonly id: string;
+  readonly kind: WalletTransactionKind;
+  readonly amount: number;
+  readonly balanceAfter: number;
+  readonly reference: string;
+  readonly note: string | null;
+  readonly atUtc: string;
+  readonly byUserId: string | null;
+  readonly byName: string | null;
+}
+
+export interface TopUpWalletRequest {
+  readonly amount: number;
+  readonly reference: string;
+  readonly note: string | null;
+  readonly topUpRequestId: string | null;
+}
+
+/** CP-66 "Request top-up" (client tenant, `wallet.create`). */
+export interface CreateTopUpRequest {
+  readonly amount: number;
+  readonly note: string | null;
+}
+
+// ── Countries, governorates, templates (SA-10, SA-11, SA-20) ───────────────────────────────────
+
+export interface CountryListItem {
+  readonly id: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly isoCode: string;
+  readonly dialCode: string;
+  readonly currency: string;
+  readonly currencyCode: string;
+  readonly language: string;
+  readonly timeZone: string;
+  readonly mobileLength: number;
+  readonly flag: string | null;
+  readonly remarks: string | null;
+  readonly isActive: boolean;
+  readonly governorateCount: number;
+}
+
+export interface CountryRequest {
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly isoCode: string;
+  readonly dialCode: string;
+  readonly currency: string;
+  readonly currencyCode: string;
+  readonly language: string;
+  readonly timeZone: string;
+  readonly mobileLength: number;
+  readonly flag: string | null;
+  readonly remarks: string | null;
+}
+
+export interface GovernorateListItem {
+  readonly id: string;
+  readonly countryId: string;
+  readonly countryNameEn: string;
+  readonly countryNameAr: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly district: string | null;
+  readonly remarks: string | null;
+  readonly isActive: boolean;
+}
+
+export interface GovernorateRequest {
+  readonly countryId: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly district: string | null;
+  readonly remarks: string | null;
+}
+
+export type TemplateChannel = 'Sms' | 'Email';
+
+export const TEMPLATE_CHANNELS: readonly TemplateChannel[] = ['Sms', 'Email'];
+
+export interface NotificationTemplateListItem {
+  readonly id: string;
+  readonly code: string;
+  readonly channel: TemplateChannel;
+  readonly subjectEn: string | null;
+  readonly subjectAr: string | null;
+  readonly textEn: string;
+  readonly textAr: string;
+  readonly isActive: boolean;
+}
+
+export interface NotificationTemplateRequest {
+  readonly code: string;
+  readonly channel: TemplateChannel;
+  readonly textEn: string;
+  readonly textAr: string;
+  readonly subjectEn: string | null;
+  readonly subjectAr: string | null;
+}
+
+export interface TemplatePlaceholders {
+  readonly placeholders: readonly string[];
+  readonly aliases: Readonly<Record<string, string>>;
+}
+
+// ── Integration library (SA-15…SA-18) ──────────────────────────────────────────────────────────
+
+export type AnalyserProtocol = 'Astm' | 'Hl7' | 'Proprietary';
+export type PhysicalLink = 'Serial' | 'Tcp' | 'File';
+export type CodeSystemName = 'Loinc' | 'Cpt' | 'Icd10' | 'Snomed';
+
+export const ANALYSER_PROTOCOLS: readonly AnalyserProtocol[] = ['Astm', 'Hl7', 'Proprietary'];
+export const PHYSICAL_LINKS: readonly PhysicalLink[] = ['Serial', 'Tcp', 'File'];
+export const CODE_SYSTEM_NAMES: readonly CodeSystemName[] = ['Loinc', 'Cpt', 'Icd10', 'Snomed'];
+
+export interface AnalyserModelListItem {
+  readonly id: string;
+  readonly vendor: string;
+  readonly model: string;
+  readonly discipline: string;
+  readonly protocol: AnalyserProtocol;
+  readonly physicalLink: PhysicalLink;
+  readonly modes: readonly string[];
+  readonly driverVersion: string | null;
+  readonly isActive: boolean;
+}
+
+export interface AnalyserModelRequest {
+  readonly vendor: string;
+  readonly model: string;
+  readonly discipline: string;
+  readonly protocol: AnalyserProtocol;
+  readonly physicalLink: PhysicalLink;
+  readonly modes: readonly string[];
+  readonly driverVersion: string | null;
+}
+
+export interface PcrKitListItem {
+  readonly id: string;
+  readonly name: string;
+  readonly analyserModelId: string | null;
+  readonly analyserModelName: string | null;
+  readonly layoutJson: string;
+  readonly thresholdsJson: string;
+  readonly verdictRulesJson: string;
+  readonly isActive: boolean;
+}
+
+export interface PcrKitRequest {
+  readonly name: string;
+  readonly analyserModelId: string | null;
+  readonly layoutJson: string;
+  readonly thresholdsJson: string;
+  readonly verdictRulesJson: string;
+}
+
+export interface CodeSystemListItem {
+  readonly id: string;
+  readonly name: CodeSystemName;
+  readonly version: string;
+  readonly use: string | null;
+  readonly itemCount: number;
+  readonly lastImportedAtUtc: string | null;
+  readonly isActive: boolean;
+}
+
+export interface CodeSystemRequest {
+  readonly name: CodeSystemName;
+  readonly version: string;
+  readonly use: string | null;
+}
+
+export interface CodeSystemItemView {
+  readonly code: string;
+  readonly display: string;
+}
+
+export interface CodeSystemImportResult {
+  readonly inserted: number;
+  readonly updated: number;
+  readonly unchanged: number;
+  readonly total: number;
+}
+
+export interface RuleTemplateListItem {
+  readonly id: string;
+  readonly name: string;
+  readonly clinicalGroupName: string | null;
+  readonly formula: string;
+  readonly description: string | null;
+  readonly isActive: boolean;
+}
+
+export interface RuleTemplateRequest {
+  readonly name: string;
+  readonly clinicalGroupName: string | null;
+  readonly formula: string;
+  readonly description: string | null;
+}
+
+/** Shared list query of the reference registers. */
+export interface ReferenceListFilter {
+  readonly search: string | null;
+  readonly isActive: boolean | null;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+// ── Dashboard and sessions (SA-03, SA-08) ──────────────────────────────────────────────────────
+
+export type DashboardPeriod = 'today' | 'week' | 'month' | 'year';
+
+export const DASHBOARD_PERIODS: readonly DashboardPeriod[] = ['today', 'week', 'month', 'year'];
+
+export interface ClientCounts {
+  readonly total: number;
+  readonly active: number;
+  readonly inactive: number;
+  readonly trial: number;
+  readonly bySubscription: number;
+  readonly byManual: number;
+}
+
+export interface ActivityTotals {
+  readonly servedPatients: number;
+  readonly tests: number;
+  readonly registrations: number;
+}
+
+export interface PlanShare {
+  readonly planId: string;
+  readonly code: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly clients: number;
+}
+
+export interface ClientActivity {
+  readonly tenantId: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly registrations: number;
+}
+
+export interface RecentClient {
+  readonly id: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly portalUrl: string;
+  readonly countryNameEn: string;
+  readonly countryNameAr: string;
+  readonly planCode: string;
+  readonly walletBalance: number;
+  readonly currencyCode: string;
+  readonly createdAtUtc: string;
+  readonly source: ClientSource;
+  readonly status: ClientStatus;
+}
+
+export interface PlatformDashboard {
+  readonly period: DashboardPeriod;
+  readonly fromUtc: string;
+  readonly toUtc: string;
+  readonly clients: ClientCounts;
+  readonly adminUsers: number;
+  readonly activity: ActivityTotals;
+  readonly walletsAtOrBelowZero: number;
+  readonly planDistribution: readonly PlanShare[];
+  readonly registrationsByClient: readonly ClientActivity[];
+  readonly recentClients: readonly RecentClient[];
+}
+
+export type AdminSessionStatus = 'Active' | 'Idle';
+
+export interface AdminSessionItem {
+  readonly sessionId: string;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly username: string;
+  readonly ipAddress: string | null;
+  readonly sinceUtc: string;
+  readonly lastSeenAtUtc: string;
+  readonly expiresAtUtc: string;
+  readonly status: AdminSessionStatus;
+  readonly isCurrent: boolean;
+}
+
+// ── Endpoints, permissions, refusal codes ──────────────────────────────────────────────────────
+
+export const PLATFORM_API = {
+  clients: '/api/v1/platform/clients',
+  plans: '/api/v1/platform/plans',
+  wallets: '/api/v1/platform/wallets',
+  countries: '/api/v1/platform/countries',
+  governorates: '/api/v1/platform/governorates',
+  templates: '/api/v1/platform/notification-templates',
+  analyserModels: '/api/v1/platform/library/analyser-models',
+  pcrKits: '/api/v1/platform/library/pcr-kits',
+  codeSystems: '/api/v1/platform/library/code-systems',
+  ruleTemplates: '/api/v1/platform/library/rule-templates',
+  sessions: '/api/v1/platform/sessions',
+  dashboard: '/api/v1/platform/dashboard',
+  /** The laboratory's own wallet (CP-66). */
+  myWallet: '/api/v1/wallet',
+} as const;
+
+/** Permission keys of the pages (the server also requires the platform tenant: PLT-403). */
+export const PLATFORM_PERMISSIONS = {
+  platformView: 'platform.view',
+  platformManage: 'platform.manage',
+  tenancyView: 'tenancy.view',
+  tenancyCreate: 'tenancy.create',
+  tenancyEdit: 'tenancy.edit',
+  tenancyManage: 'tenancy.manage',
+  notificationsView: 'notifications.view',
+  notificationsManage: 'notifications.manage',
+  integrationView: 'integration.view',
+  integrationManage: 'integration.manage',
+  settingsView: 'settings.view',
+  settingsManage: 'settings.manage',
+  walletView: 'wallet.view',
+  walletCreate: 'wallet.create',
+} as const;
+
+/** The largest code file SA-17 accepts. */
+export const CODE_IMPORT_MAX_BYTES = 20 * 1024 * 1024;

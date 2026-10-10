@@ -1,0 +1,49 @@
+.picker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.picker select {
+  width: auto;
+  min-width: 240px;
+}
+
+.note {
+  margin: var(--sp-3) var(--sp-4) 0;
+}
+
+.list-problem {
+  margin: var(--sp-3) var(--sp-4) 0;
+}
+
+.inline {
+  min-width: 90px;
+  padding-block: 2px;
+}
+
+.inline.narrow {
+  width: 90px;
+  min-width: 0;
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+}
+
+.autosend span {
+  font-weight: 600;
+}
+
+.floating {
+  position: fixed;
+  inset-block-end: var(--sp-4);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+}

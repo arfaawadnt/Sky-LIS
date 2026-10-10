@@ -1,0 +1,39 @@
+<header class="topbar">
+  <button type="button" class="icon-btn menu-btn" (click)="menuToggled.emit()" aria-controls="app-sidebar" [attr.aria-expanded]="mobileOpen()" [attr.aria-label]="i18n.t('shell.openMenu')"><app-icon name="menu" /></button>
+  <a class="brand" [routerLink]="portal.homePath()">
+    <img src="/brand/sky-lis-logo.png" alt="" height="30" />
+    <span>{{ i18n.t('shell.brand') }}</span>
+  </a>
+
+  <app-search-box class="global-search" [fallback]="true" [debounce]="120" [placeholder]="i18n.t('shell.searchPlaceholder')" [label]="i18n.t('shell.searchLabel')" [(value)]="navSearch" (keydown.enter)="searchSubmitted.emit()" />
+
+  <div class="grow"></div>
+
+  <span class="pill">{{ portalLabel() }}</span>
+
+  <button type="button" class="lang-btn" (click)="onLanguage()" [attr.aria-label]="i18n.t('shell.switchLanguage')">
+    <app-icon name="globe" [size]="15" />
+    <span>{{ otherLanguageLabel() }}</span>
+  </button>
+
+  <div class="profile-wrap">
+    <button type="button" class="profile" (click)="toggleUserMenu()" aria-haspopup="menu" aria-controls="app-user-menu" [attr.aria-expanded]="menuOpen()">
+      <span class="avatar" aria-hidden="true">{{ initials() }}</span>
+      <span class="who">
+        <b>{{ displayName() }}</b>
+        <span>{{ roleName() ?? portalLabel() }}</span>
+      </span>
+      <app-icon name="chevron-down" [size]="14" />
+    </button>
+    @if (menuOpen()) {
+      <div class="menu-pop" role="menu" id="app-user-menu" [attr.aria-label]="i18n.t('shell.userMenu')">
+        <div class="menu-head">
+          <b>{{ displayName() }}</b>
+          <span>{{ roleName() ?? portalLabel() }}</span>
+        </div>
+        <button type="button" class="mi" role="menuitem" (click)="onLanguage()"><app-icon name="globe" [size]="16" />{{ otherLanguageLabel() }}</button>
+        <button type="button" class="mi danger" role="menuitem" (click)="onSignOut()"><app-icon name="log-out" [size]="16" />{{ i18n.t('shell.signOut') }}</button>
+      </div>
+    }
+  </div>
+</header>

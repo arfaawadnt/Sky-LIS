@@ -1,0 +1,88 @@
+.merge {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.warn-strip {
+  margin: 0;
+}
+
+.candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-1);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.candidate {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--sp-3);
+  text-align: start;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.candidate:hover {
+  background: var(--row-hover);
+}
+
+.candidate:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.candidate.selected {
+  border-color: var(--bad);
+  background: var(--bad-soft);
+}
+
+.name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+
+.side {
+  display: grid;
+  gap: var(--sp-2);
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: var(--sp-3);
+}
+
+.side.keep {
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+}
+
+.side.drop {
+  border-color: color-mix(in srgb, var(--bad) 40%, transparent);
+}
+
+.gender-warning {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .compare,
+  .candidate {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

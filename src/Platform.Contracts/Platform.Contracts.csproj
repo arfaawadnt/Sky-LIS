@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 01 §2.1: references SharedKernel only (DomainFault, codes). Never Domain entities. Gate: LayerRulesTests. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Description>Request/response DTOs, problem codes, the [CredentialField] marker (D-03) and the OpenAPI source of truth.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Platform.SharedKernel\Platform.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

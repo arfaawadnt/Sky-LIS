@@ -1,0 +1,10 @@
+@if (auth.isHydrated()) {
+  <router-outlet />
+} @else {
+  <div class="boot" role="status">
+    <img class="brand" src="/brand/sky-lis-logo.png" alt="Sky LIS" />
+    <p class="muted">{{ i18n.t('shell.loading') }}</p>
+  </div>
+}
+<app-toast-host />
+<app-dialog-host />

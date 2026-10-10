@@ -1,0 +1,63 @@
+<app-page-header [title]="text('title')" [subtitle]="text('subtitle')">
+  <button pageActions type="button" class="btn" *appCan="permissions.export" [disabled]="facade.exportCsv.pending()" (click)="exportCsv()">
+    <app-icon name="arrow-down" [size]="15" />{{ facade.exportCsv.pending() ? i18n.t('catalogue-b.common.exporting') : i18n.t('catalogue-b.common.export') }}
+  </button>
+  <button pageActions type="button" class="btn primary" *appCan="permissions.create" (click)="openCreate()"><app-icon name="plus" [size]="16" />{{ text('add') }}</button>
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="text('searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+    <label toolbarFilters class="filter">
+      <span class="visually-hidden">{{ i18n.t('catalogue-b.common.status') }}</span>
+      <select class="inp" (change)="onStatusFilter($event)">
+        <option value="active" [selected]="facade.filter().isActive === true">{{ i18n.t('catalogue-b.common.active') }}</option>
+        <option value="inactive" [selected]="facade.filter().isActive === false">{{ i18n.t('catalogue-b.common.inactive') }}</option>
+        <option value="all" [selected]="facade.filter().isActive === null">{{ i18n.t('catalogue-b.common.all') }}</option>
+      </select>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.list.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('catalogue-b.common.refresh') }}</button>
+  </app-toolbar>
+
+  <p class="info-strip">{{ i18n.t('catalogue-b.shortcutSets.note') }}</p>
+
+  @if (facade.list.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('catalogue-b.common.loadError') }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.list.isLoading()" [caption]="text('title')" [emptyTitle]="i18n.t('catalogue-b.common.empty')" (rowActivate)="openEdit($event)">
+    <ng-template appCell="services" [appCellOf]="facade.rows()" let-row>
+      <app-catalogue-b-chips [chips]="chips(row)" [max]="8" />
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
+      <app-badge [status]="row.isActive ? 'Active' : 'Inactive'" />
+      <button type="button" class="row-btn" *appCan="permissions.edit" (click)="openEdit(row)" [attr.aria-label]="text('edit')" [title]="text('edit')"><app-icon name="edit" [size]="15" /></button>
+      <button type="button" class="row-btn" [class.danger]="row.isActive" *appCan="permissions.manage" (click)="toggleActive(row)" [attr.aria-label]="text(row.isActive ? 'deactivate' : 'activate')" [title]="text(row.isActive ? 'deactivate' : 'activate')"><app-icon name="power" [size]="15" /></button>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="facade.totalCount()" (pageChange)="facade.setPage($event)" />
+</app-section-card>
+
+<app-drawer [(open)]="drawerOpen" [title]="drawerTitle()" size="lg" (closed)="onDrawerClosed()">
+  <form [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+    @if (saveProblem(); as problem) {
+      <p class="problem" role="alert">{{ problemText(problem) }}</p>
+    }
+    <div class="form-grid">
+      <app-form-field [label]="i18n.t('catalogue-b.shortcutSets.field.code')" [hint]="i18n.t('catalogue-b.shortcutSets.hint.code')" [problem]="saveProblem()">
+        <input type="text" formControlName="code" appUppercase maxlength="20" autocomplete="off" spellcheck="false" />
+      </app-form-field>
+      <app-localized-text-input class="full" [group]="form.controls.name" name="name" [label]="i18n.t('catalogue-b.shortcutSets.field.name')" [problem]="saveProblem()" />
+      <div class="full">
+        <app-form-field [label]="i18n.t('catalogue-b.shortcutSets.field.serviceIds')" [hint]="i18n.t('catalogue-b.shortcutSets.hint.serviceIds')" [problem]="saveProblem()">
+          <app-catalogue-b-picker formControlName="serviceIds" [search]="searchServices" [known]="knownServices()" [ordered]="true" [label]="i18n.t('catalogue-b.shortcutSets.field.serviceIds')" />
+        </app-form-field>
+      </div>
+    </div>
+  </form>
+  <ng-container drawerFooter>
+    <button type="button" class="btn" (click)="closeDrawer()">{{ i18n.t('catalogue-b.common.cancel') }}</button>
+    <button type="button" class="btn primary" [disabled]="saving()" (click)="save()">{{ saving() ? i18n.t('catalogue-b.common.saving') : i18n.t('catalogue-b.common.save') }}</button>
+  </ng-container>
+</app-drawer>

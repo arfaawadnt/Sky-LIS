@@ -1,0 +1,357 @@
+<app-page-header [title]="title()" [subtitle]="i18n.t('catalogue-a.tests.editorSubtitle')" [breadcrumb]="crumbs()">
+  <button pageActions type="button" class="btn ghost" (click)="back()"><app-icon name="chevron-left" [size]="15" />{{ i18n.t('catalogue-a.back') }}</button>
+  @if (detail(); as current) {
+    <button pageActions ngProjectAs="[pageActions]" type="button" class="btn" [class.danger]="current.isActive" *appCan="permissions.manage" (click)="toggleActive()">
+      <app-icon name="power" [size]="15" />{{ current.isActive ? i18n.t('catalogue-a.deactivate') : i18n.t('catalogue-a.activate') }}
+    </button>
+  }
+  <button pageActions ngProjectAs="[pageActions]" type="button" class="btn primary" *appCan="isNew ? permissions.create : permissions.edit" [disabled]="saving()" (click)="save()">
+    {{ saving() ? i18n.t('catalogue-a.saving') : i18n.t('catalogue-a.save') }}
+  </button>
+</app-page-header>
+
+@if (facade.detail.error()) {
+  <p class="problem" role="alert">{{ i18n.t('catalogue-a.loadError') }}</p>
+}
+
+<app-section-card [padded]="false">
+  <div class="tabs-bar">
+    <app-tabs [tabs]="tabs()" [(active)]="activeTab" />
+    @if (detail(); as current) {
+      <span class="state">
+        <app-badge tone="violet">{{ typeLabel(current.type) }}</app-badge>
+        @if (current.isHiddenHelper) {
+          <app-badge tone="warn">{{ i18n.t('catalogue-a.tests.hiddenHelper') }}</app-badge>
+        }
+        <app-badge [status]="current.isActive ? 'Active' : 'Inactive'" />
+      </span>
+    }
+  </div>
+
+  <div class="editor" appSaveShortcut (appSaveShortcut)="save()">
+    <!-- general -->
+    <form role="tabpanel" [hidden]="activeTab() !== 'general'" [formGroup]="general" (ngSubmit)="save()" novalidate>
+      @if (problemOf('general'); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+      <div class="form-grid three">
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.code')" [hint]="i18n.t('catalogue-a.tests.hint.code')">
+          <input type="text" formControlName="code" appUppercase maxlength="16" autocomplete="off" spellcheck="false" class="mono" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.type')" [hint]="i18n.t('catalogue-a.tests.hint.type')">
+          <select formControlName="type">
+            @for (type of types; track type) {
+              <option [ngValue]="type">{{ typeLabel(type) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.clinicalGroupId')" [required]="true">
+          <select formControlName="clinicalGroupId">
+            <option [ngValue]="null">{{ i18n.t('shared.form.choose') }}</option>
+            @for (option of groupOptions(); track option.value) {
+              <option [ngValue]="option.value" [disabled]="!option.isActive">{{ optionText(option) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-localized-text-input class="full" [group]="general.controls.name" [label]="i18n.t('catalogue-a.tests.field.name')" [problem]="problemOf('general')" />
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.reportName')">
+          <input type="text" formControlName="reportName" maxlength="200" autocomplete="off" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.unitId')">
+          <select formControlName="unitId">
+            <option [ngValue]="null">{{ i18n.t('catalogue-a.none') }}</option>
+            @for (option of unitOptions(); track option.value) {
+              <option [ngValue]="option.value" [disabled]="!option.isActive">{{ optionText(option) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.decimals')">
+          <input type="number" formControlName="decimals" min="0" max="6" step="1" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.sampleTypeId')">
+          <select formControlName="sampleTypeId">
+            <option [ngValue]="null">{{ i18n.t('catalogue-a.none') }}</option>
+            @for (option of sampleTypeOptions(); track option.value) {
+              <option [ngValue]="option.value" [disabled]="!option.isActive">{{ optionText(option) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.sampleConditionId')">
+          <select formControlName="sampleConditionId">
+            <option [ngValue]="null">{{ i18n.t('catalogue-a.none') }}</option>
+            @for (condition of conditions(); track condition.id) {
+              <option [ngValue]="condition.id" [disabled]="!condition.isActive && condition.id !== detail()?.sampleConditionId">{{ conditionText(condition) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.gender')" [hint]="i18n.t('catalogue-a.tests.hint.gender')">
+          <select formControlName="gender">
+            @for (gender of genders; track gender) {
+              <option [ngValue]="gender">{{ i18n.t('catalogue-a.gender.' + gender) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.methodology')">
+          <input type="text" formControlName="methodology" maxlength="200" autocomplete="off" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.loinc')">
+          <input type="text" formControlName="loinc" maxlength="20" autocomplete="off" class="mono" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.cpt')">
+          <input type="text" formControlName="cpt" maxlength="20" autocomplete="off" class="mono" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.labelCount')">
+          <input type="number" formControlName="labelCount" min="0" max="20" step="1" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.field.prefix')" [hint]="i18n.t('catalogue-a.tests.hint.prefix')">
+          <input type="text" formControlName="prefix" maxlength="10" autocomplete="off" />
+        </app-form-field>
+        <div class="full flags">
+          <label class="check"><input type="checkbox" formControlName="printReference" /><span>{{ i18n.t('catalogue-a.tests.field.printReference') }}</span></label>
+          <label class="check"><input type="checkbox" formControlName="isHiddenHelper" /><span>{{ i18n.t('catalogue-a.tests.field.isHiddenHelper') }}</span></label>
+        </div>
+        @if (general.controls.isHiddenHelper.value) {
+          <p class="full warn-strip">{{ i18n.t('catalogue-a.tests.hiddenHelperHint') }}</p>
+        }
+      </div>
+    </form>
+
+    <!-- range bands (BR-08) -->
+    @if (allows().ranges) {
+      <div role="tabpanel" [hidden]="activeTab() !== 'ranges'">
+        @if (problemOf('ranges'); as problem) {
+          <p class="problem" role="alert">{{ problemText(problem) }}</p>
+        }
+        <p class="muted small">{{ i18n.t(textOnlyBands() ? 'catalogue-a.tests.ranges.textHint' : 'catalogue-a.tests.ranges.hint') }}</p>
+        <div class="scroll">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.sex') }}</th>
+                <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.ageFrom') }}</th>
+                <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.ageTo') }}</th>
+                <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.ageUnit') }}</th>
+                <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.condition') }}</th>
+                @if (!textOnlyBands()) {
+                  <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.low') }}</th>
+                  <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.high') }}</th>
+                  <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.panicLow') }}</th>
+                  <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.panicHigh') }}</th>
+                  <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.reportableLow') }}</th>
+                  <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.reportableHigh') }}</th>
+                }
+                <th scope="col">{{ i18n.t('catalogue-a.tests.ranges.textRange') }}</th>
+                <th scope="col"><span class="visually-hidden">{{ i18n.t('catalogue-a.actions') }}</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (band of bands.controls; track band; let i = $index; let first = $first; let last = $last) {
+                <tr [formGroup]="band">
+                  <td>
+                    <select class="inp sm" formControlName="sex" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.sex')">
+                      @for (gender of genders; track gender) {
+                        <option [ngValue]="gender">{{ i18n.t('catalogue-a.gender.' + gender) }}</option>
+                      }
+                    </select>
+                  </td>
+                  <td><input class="inp sm" type="number" formControlName="ageFrom" min="0" step="1" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.ageFrom')" [class.invalid]="band.controls.ageFrom.invalid && band.controls.ageFrom.touched" /></td>
+                  <td><input class="inp sm" type="number" formControlName="ageTo" min="1" step="1" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.ageTo')" [class.invalid]="band.controls.ageTo.invalid && band.controls.ageTo.touched" /></td>
+                  <td>
+                    <select class="inp sm" formControlName="ageUnit" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.ageUnit')">
+                      @for (unit of ageUnits; track unit) {
+                        <option [ngValue]="unit">{{ i18n.t('catalogue-a.ageUnit.' + unit) }}</option>
+                      }
+                    </select>
+                  </td>
+                  <td>
+                    <select class="inp sm wide" formControlName="patientConditionId" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.condition')">
+                      <option [ngValue]="null">{{ i18n.t('catalogue-a.tests.ranges.anyCondition') }}</option>
+                      @for (option of conditionOptions(); track option.value) {
+                        <option [ngValue]="option.value">{{ optionText(option) }}</option>
+                      }
+                    </select>
+                  </td>
+                  @if (!textOnlyBands()) {
+                    <td><input class="inp sm" type="number" step="any" formControlName="low" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.low')" /></td>
+                    <td><input class="inp sm" type="number" step="any" formControlName="high" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.high')" /></td>
+                    <td><input class="inp sm" type="number" step="any" formControlName="panicLow" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.panicLow')" /></td>
+                    <td><input class="inp sm" type="number" step="any" formControlName="panicHigh" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.panicHigh')" /></td>
+                    <td><input class="inp sm" type="number" step="any" formControlName="reportableLow" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.reportableLow')" /></td>
+                    <td><input class="inp sm" type="number" step="any" formControlName="reportableHigh" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.reportableHigh')" /></td>
+                  }
+                  <td><input class="inp sm wide" type="text" formControlName="textRange" maxlength="200" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.textRange')" /></td>
+                  <td class="actions">
+                    <button type="button" class="row-btn" [disabled]="first" (click)="move('bands', i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
+                    <button type="button" class="row-btn" [disabled]="last" (click)="move('bands', i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
+                    <button type="button" class="row-btn danger" (click)="removeAt('bands', i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="13" class="muted">{{ i18n.t('catalogue-a.tests.ranges.none') }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <button type="button" class="btn sm soft add-row" (click)="addBand()"><app-icon name="plus" [size]="14" />{{ i18n.t('catalogue-a.tests.ranges.add') }}</button>
+      </div>
+    }
+
+    <!-- list values (BR-19) -->
+    @if (allows().values) {
+      <div role="tabpanel" [hidden]="activeTab() !== 'values'">
+        @if (problemOf('values'); as problem) {
+          <p class="problem" role="alert">{{ problemText(problem) }}</p>
+        }
+        <p class="info-strip">{{ i18n.t('catalogue-a.tests.values.hint') }}</p>
+        <table class="grid">
+          <thead>
+            <tr>
+              <th scope="col" class="num">#</th>
+              <th scope="col">{{ i18n.t('catalogue-a.tests.values.value') }}</th>
+              <th scope="col" class="center">{{ i18n.t('catalogue-a.tests.values.isNormal') }}</th>
+              <th scope="col" class="center">{{ i18n.t('catalogue-a.tests.values.isCritical') }}</th>
+              <th scope="col" class="center">{{ i18n.t('catalogue-a.tests.values.isDefault') }}</th>
+              <th scope="col" class="center">{{ i18n.t('catalogue-a.tests.values.isPlaceholder') }}</th>
+              <th scope="col">{{ i18n.t('catalogue-a.tests.values.colour') }}</th>
+              <th scope="col"><span class="visually-hidden">{{ i18n.t('catalogue-a.actions') }}</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (value of values.controls; track value; let i = $index; let first = $first; let last = $last) {
+              <tr [formGroup]="value">
+                <td class="num mono">{{ i + 1 }}</td>
+                <td><input class="inp sm wide" type="text" formControlName="value" maxlength="200" [attr.aria-label]="i18n.t('catalogue-a.tests.values.value')" [class.invalid]="value.controls.value.invalid && value.controls.value.touched" /></td>
+                <td class="center"><input type="checkbox" formControlName="isNormal" [attr.aria-label]="i18n.t('catalogue-a.tests.values.isNormal')" /></td>
+                <td class="center"><input type="checkbox" formControlName="isCritical" [attr.aria-label]="i18n.t('catalogue-a.tests.values.isCritical')" /></td>
+                <td class="center"><input type="checkbox" formControlName="isDefault" (change)="onDefault(i)" [attr.aria-label]="i18n.t('catalogue-a.tests.values.isDefault')" /></td>
+                <td class="center"><input type="checkbox" formControlName="isPlaceholder" [attr.aria-label]="i18n.t('catalogue-a.tests.values.isPlaceholder')" /></td>
+                <td>
+                  <span class="swatch-cell">
+                    <span class="swatch" [style.background]="value.controls.colour.valid && value.controls.colour.value ? value.controls.colour.value : 'transparent'"></span>
+                    <input class="inp sm mono" type="text" formControlName="colour" maxlength="7" placeholder="#RRGGBB" [attr.aria-label]="i18n.t('catalogue-a.tests.values.colour')" [class.invalid]="value.controls.colour.invalid" />
+                  </span>
+                </td>
+                <td class="actions">
+                  <button type="button" class="row-btn" [disabled]="first" (click)="move('values', i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
+                  <button type="button" class="row-btn" [disabled]="last" (click)="move('values', i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
+                  <button type="button" class="row-btn danger" (click)="removeAt('values', i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="8" class="muted">{{ i18n.t('catalogue-a.tests.values.none') }}</td></tr>
+            }
+          </tbody>
+        </table>
+        <button type="button" class="btn sm soft add-row" (click)="addValue()"><app-icon name="plus" [size]="14" />{{ i18n.t('catalogue-a.tests.values.add') }}</button>
+      </div>
+    }
+
+    <!-- formula -->
+    @if (allows().formula) {
+      <div role="tabpanel" [hidden]="activeTab() !== 'formula'">
+        @if (problemOf('formula'); as problem) {
+          <p class="problem" role="alert">{{ problemText(problem) }}</p>
+        }
+        <div class="members">
+          <div>
+            <app-form-field [label]="i18n.t('catalogue-a.tests.formula.expression')" [hint]="i18n.t('catalogue-a.tests.formula.syntax')">
+              <textarea class="formula" [formControl]="formula" rows="4" maxlength="1000" dir="ltr" spellcheck="false"></textarea>
+            </app-form-field>
+            <button type="button" class="btn soft" [disabled]="facade.check.pending()" (click)="checkFormula()"><app-icon name="check" [size]="15" />{{ i18n.t('catalogue-a.tests.formula.check') }}</button>
+            @if (verdict(); as current) {
+              <p class="verdict" [class.info-strip]="current.valid" [class.problem]="!current.valid" role="status">{{ current.text }}</p>
+            }
+          </div>
+          <section class="picker" [attr.aria-label]="i18n.t('catalogue-a.tests.formula.insert')">
+            <h3>{{ i18n.t('catalogue-a.tests.formula.insert') }}</h3>
+            <app-search-box [placeholder]="i18n.t('catalogue-a.tests.formula.searchTests')" (searchChange)="searchReferences($event)" />
+            <ul class="candidates">
+              @for (item of referenceResults(); track item.id) {
+                @if (item.id !== testId) {
+                  <li>
+                    <span class="mono">{{ item.code }}</span>
+                    <span class="grow">{{ name(item) }}</span>
+                    <button type="button" class="btn sm soft" (click)="insertReference(item)"><app-icon name="plus" [size]="13" />{{ i18n.t('catalogue-a.add') }}</button>
+                  </li>
+                }
+              } @empty {
+                <li class="muted">{{ i18n.t('catalogue-a.tests.formula.searchHint') }}</li>
+              }
+            </ul>
+          </section>
+        </div>
+      </div>
+    }
+
+    <!-- paragraphs -->
+    @if (allows().paragraphs) {
+      <div role="tabpanel" [hidden]="activeTab() !== 'paragraphs'">
+        @if (problemOf('paragraphs'); as problem) {
+          <p class="problem" role="alert">{{ problemText(problem) }}</p>
+        }
+        <p class="muted small">{{ i18n.t('catalogue-a.tests.paragraphs.hint') }}</p>
+        @for (paragraph of paragraphs.controls; track paragraph; let i = $index; let first = $first; let last = $last) {
+          <fieldset class="paragraph" [formGroup]="paragraph">
+            <legend class="mono">{{ i + 1 }}</legend>
+            <div class="form-grid">
+              <app-form-field class="full" [label]="i18n.t('catalogue-a.tests.paragraphs.title')">
+                <input type="text" formControlName="title" maxlength="200" />
+              </app-form-field>
+              <app-form-field class="full" [label]="i18n.t('catalogue-a.tests.paragraphs.text')">
+                <textarea formControlName="text" rows="3" maxlength="4000"></textarea>
+              </app-form-field>
+            </div>
+            <div class="actions">
+              <button type="button" class="row-btn" [disabled]="first" (click)="move('paragraphs', i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
+              <button type="button" class="row-btn" [disabled]="last" (click)="move('paragraphs', i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
+              <button type="button" class="row-btn danger" (click)="removeAt('paragraphs', i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
+            </div>
+          </fieldset>
+        } @empty {
+          <p class="muted">{{ i18n.t('catalogue-a.tests.paragraphs.none') }}</p>
+        }
+        <button type="button" class="btn sm soft add-row" (click)="addParagraph()"><app-icon name="plus" [size]="14" />{{ i18n.t('catalogue-a.tests.paragraphs.add') }}</button>
+      </div>
+    }
+
+    <!-- timing (BR-11, BR-12, BR-13) -->
+    <form role="tabpanel" [hidden]="activeTab() !== 'timing'" [formGroup]="timing" (ngSubmit)="save()" novalidate>
+      @if (problemOf('timing'); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+      <div class="form-grid three">
+        <app-form-field [label]="i18n.t('catalogue-a.tests.timing.durationHours')" [hint]="i18n.t('catalogue-a.tests.timing.durationHint')">
+          <input type="number" formControlName="durationHours" min="0" max="8760" step="1" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.timing.minDurationHours')" [hint]="i18n.t('catalogue-a.tests.timing.minDurationHint')">
+          <input type="number" formControlName="minDurationHours" min="0" max="8760" step="1" />
+        </app-form-field>
+        <span></span>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.timing.frequencyCheckDays')" [hint]="i18n.t('catalogue-a.tests.timing.frequencyHint')">
+          <input type="number" formControlName="frequencyCheckDays" min="1" max="3650" step="1" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.timing.frequencyAction')">
+          <select formControlName="frequencyAction">
+            @for (action of frequencyActions; track action) {
+              <option [ngValue]="action">{{ i18n.t('catalogue-a.frequencyAction.' + action) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <span></span>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.timing.deltaPercent')" [hint]="i18n.t('catalogue-a.tests.timing.deltaHint')">
+          <input type="number" formControlName="deltaPercent" min="0" max="1000" step="any" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.tests.timing.deltaWindowDays')">
+          <input type="number" formControlName="deltaWindowDays" min="1" max="3650" step="1" />
+        </app-form-field>
+      </div>
+      <h3 class="section-title">{{ i18n.t('catalogue-a.tests.timing.testDays') }}</h3>
+      <p class="muted small">{{ i18n.t('catalogue-a.tests.timing.testDaysHint') }}</p>
+      <div class="weekdays" formArrayName="testDays">
+        @for (day of weekdays; track day) {
+          <label class="check"><input type="checkbox" [formControlName]="day" /><span>{{ i18n.t('catalogue-a.weekday.' + day) }}</span></label>
+        }
+      </div>
+    </form>
+  </div>
+</app-section-card>

@@ -1,0 +1,106 @@
+<app-page-header [title]="title()" [subtitle]="i18n.t('organization.roles.editorSubtitle')" [breadcrumb]="breadcrumb()">
+  <ng-container pageActions>
+  @if (facade.role(); as role) {
+    <app-badge [status]="role.isActive ? 'Active' : 'Inactive'" />
+    @if (role.holdsPrimaryAdministrator) {
+      <app-badge tone="violet">{{ i18n.t('organization.roles.adminRole') }}</app-badge>
+    }
+    <button
+      type="button"
+      class="btn ghost"
+      *appCan="permissions.manage"
+      [disabled]="facade.setActive.pending() || (role.isActive && role.memberCount > 0)"
+      [attr.title]="role.isActive && role.memberCount > 0 ? i18n.t('organization.roles.hasMembers') : null"
+      (click)="toggleActive()">
+      <app-icon name="power" [size]="15" />{{ role.isActive ? i18n.t('organization.deactivate') : i18n.t('organization.activate') }}
+    </button>
+  }
+  </ng-container>
+</app-page-header>
+
+@if (facade.detail.error()) {
+  <p class="problem" role="alert">{{ i18n.t('organization.roles.loadError') }}</p>
+}
+
+<div class="editor" appSaveShortcut (appSaveShortcut)="saveActive()">
+  <app-tabs [tabs]="tabs()" [active]="activeTab()" (activeChange)="onTab($event)" />
+
+  @if (problem(); as current) {
+    <p class="problem" role="alert">{{ problemText(current) }}</p>
+  }
+
+  @switch (activeTab()) {
+    @case ('general') {
+      <app-section-card role="tabpanel" [title]="i18n.t('organization.roles.tab.general')">
+        <form class="form-grid" [formGroup]="form" (ngSubmit)="saveGeneral()" novalidate>
+          <app-localized-text-input class="full" [group]="form.controls.name" [label]="i18n.t('organization.roles.field.name')" [maxLength]="200" />
+          <app-form-field class="full" [label]="i18n.t('organization.roles.field.description')">
+            <textarea formControlName="description" rows="3" maxlength="500"></textarea>
+          </app-form-field>
+          @if (facade.role(); as role) {
+            <dl class="kv full">
+              <dt>{{ i18n.t('organization.roles.column.members') }}</dt>
+              <dd>{{ role.memberCount }}</dd>
+              <dt>{{ i18n.t('organization.roles.column.permissions') }}</dt>
+              <dd>{{ role.permissionKeys.length }}</dd>
+            </dl>
+          }
+          @if (isNew()) {
+            <p class="info-strip full">{{ i18n.t('organization.roles.newHint') }}</p>
+          }
+          @if (canEdit()) {
+            <div class="actions full">
+              <button type="submit" class="btn primary" [disabled]="facade.create.pending() || facade.update.pending()">
+                {{ isNew() ? i18n.t('organization.roles.create') : i18n.t('organization.save') }}
+              </button>
+            </div>
+          }
+        </form>
+      </app-section-card>
+    }
+    @case ('permissions') {
+      <app-section-card role="tabpanel" [title]="i18n.t('organization.roles.tab.permissions')" [subtitle]="i18n.t('organization.roles.permissionsHint')">
+        <app-privilege-matrix
+          [modules]="catalogue().modules"
+          [actions]="catalogue().actions"
+          [selected]="keys()"
+          [disabled]="!canEdit()"
+          [caption]="i18n.t('organization.roles.tab.permissions')"
+          (selectedChange)="setKeys($event)" />
+        @if (canEdit() && !isNew()) {
+          <div class="actions">
+            <button type="button" class="btn ghost" [disabled]="!permissionsDirty()" (click)="discard('permissions')">{{ i18n.t('organization.discard') }}</button>
+            <button type="button" class="btn primary" [disabled]="!permissionsDirty() || facade.savePermissions.pending()" (click)="savePermissions()">{{ i18n.t('organization.save') }}</button>
+          </div>
+        }
+        @if (isNew() && canEdit()) {
+          <div class="actions">
+            <button type="button" class="btn primary" [disabled]="facade.create.pending()" (click)="saveGeneral()">{{ i18n.t('organization.roles.create') }}</button>
+          </div>
+        }
+      </app-section-card>
+    }
+    @case ('special') {
+      <app-section-card role="tabpanel" [title]="i18n.t('organization.roles.tab.special')" [subtitle]="i18n.t('organization.roles.specialHint')">
+        <app-special-rights-form [value]="special()" [disabled]="!canEdit()" (valueChange)="special.set($event)" />
+        @if (canEdit()) {
+          <div class="actions">
+            <button type="button" class="btn ghost" [disabled]="!specialDirty()" (click)="discard('special')">{{ i18n.t('organization.discard') }}</button>
+            <button type="button" class="btn primary" [disabled]="!specialDirty() || facade.saveSpecialRights.pending()" (click)="saveSpecial()">{{ i18n.t('organization.save') }}</button>
+          </div>
+        }
+      </app-section-card>
+    }
+    @case ('results') {
+      <app-section-card role="tabpanel" [title]="i18n.t('organization.roles.tab.results')" [subtitle]="i18n.t('organization.roles.resultsHint')">
+        <app-result-rights-grid [groups]="groups()" [branches]="branches()" [value]="results()" [disabled]="!canEdit()" (valueChange)="results.set($event)" />
+        @if (canEdit()) {
+          <div class="actions">
+            <button type="button" class="btn ghost" [disabled]="!resultsDirty()" (click)="discard('results')">{{ i18n.t('organization.discard') }}</button>
+            <button type="button" class="btn primary" [disabled]="!resultsDirty() || facade.saveResultRights.pending()" (click)="saveResults()">{{ i18n.t('organization.save') }}</button>
+          </div>
+        }
+      </app-section-card>
+    }
+  }
+</div>

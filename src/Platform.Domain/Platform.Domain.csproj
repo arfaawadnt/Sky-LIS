@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 01 §2.1: references SharedKernel only. Never EF Core, ASP.NET, MediatR, Contracts or Application. Gate: LayerRulesTests, DomainHardeningTests. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Description>Aggregates, value objects, domain events and the code-defined PermissionCatalog. One folder per module.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Platform.SharedKernel\Platform.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

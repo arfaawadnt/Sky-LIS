@@ -1,0 +1,276 @@
+# LIS — Workspace Rules
+
+This workspace (`E:\LIS`) is a **new, standalone application**. Everything in it — design
+decisions, domain model, database schemas, source code, configuration, scripts, data and
+deployment artifacts — is **fully isolated** from every other application on this machine.
+
+## 1. Isolation rules (non-negotiable)
+
+1. **Own mindset.** Design LIS from its own requirements. Do not inherit architecture,
+   naming, entities, workflows or "how we did it before" from any other project.
+2. **No cross-project reads or reuse.** Never read, copy, import, reference, symlink or
+   borrow from other applications on this machine. In particular, do not touch:
+   - `E:\QMS`, `E:\qms publish`, `E:\ntqams-data`, `E:\ntqams-backups`, `E:\ntqams-hqms`
+   - `C:\inetpub\wwwroot\qams-ui*`, `C:\install\secrets-vault.dpapi`
+   - any file named like `*QAMS*`, `*QMS*`, `*ntqams*`
+3. **Own git repository.** `E:\LIS` is its own repo (branch `main`). No submodules,
+   subtrees or remotes pointing at other local projects.
+4. **Own database.** LIS never connects to another app's database (e.g. `ntqams`). It has
+   its own database, its own roles and its own credentials. See section 2.
+5. **Own secrets.** Never reuse another project's credentials. LIS secrets live only in
+   LIS-specific stores (dotnet user-secrets with a LIS `UserSecretsId`, git-ignored `.env`
+   files, or a LIS-only vault). Never commit secrets.
+6. **Own runtime footprint.** Distinct ports, service names, IIS sites, container, volume
+   and network names and data folders, reserved in section 2. Never reuse, stop or alter
+   another app's service, site, container or port.
+7. **Own dependencies.** `node_modules`, build output, local tool manifests and package
+   lock files live inside `E:\LIS`. No global `npm link`, no project references outside
+   this folder. (Machine-wide package caches are fine; they hold no app state.)
+8. **Own documentation.** Specs, ADRs, audits and reports for LIS are written fresh inside
+   this repo (`docs/`). Do not cite or adapt another project's documents.
+9. **Own configuration root.** This host sets machine-wide variables for the other application
+   (`ConnectionStrings__Postgres`, `Jwt__Secret`, `ASPNETCORE_URLS`, `ASPNETCORE_ENVIRONMENT`) that every .NET
+   process inherits. LIS reads configuration only under the **`Lis`** root (`Lis:Database:ConnectionString`,
+   `Lis:Jwt:*`, `Lis:DataProtection:*`, `Lis:Security:*`; environment form `Lis__…`), pins its Kestrel endpoint in
+   `appsettings.json`, and its start-up guard refuses any database not named `lis*` or role not named `lis_*`
+   before connecting. Gates: `WebApiHardeningTests.The_host_reads_no_generic_configuration_key`,
+   `InfrastructureHardeningTests.The_database_guard_refuses_a_target_that_is_not_LIS`. (Found on 2026-10-09: a
+   first smoke run of the API read the machine-wide connection string and reached the other application's
+   database with read-only probes; nothing was written.)
+
+## 2. Reserved resource names for LIS
+
+Chosen to avoid everything already in use on this machine (checked 2026-10-08).
+
+| Resource                     | LIS value                                                | Avoid (already taken)                        |
+|------------------------------|----------------------------------------------------------|----------------------------------------------|
+| Workspace                    | `E:\LIS`                                                 | `E:\QMS`, `E:\qms publish`, `E:\ntqams-*`    |
+| Code prefix / namespace      | `Platform.*` (per the architecture pack, `prompt/`; the product name may replace it later) | `NT.QAMS.*`  |
+| Dev API (HTTP / HTTPS)       | `5100` / `5101`                                          | `5000`, `5080` (QMS APIs)                    |
+| Dev SPA server               | `4300`                                                   | `4200` (keep free for other dev work)        |
+| Dev PostgreSQL               | private instance `E:\LIS\.local\pg17` (in use) or Docker container `lis-postgres`; host port `5433` | `5432` (shared PostgreSQL 17, holds `ntqams`) |
+| Other dev services           | ports `5102`–`5199`                                      | `80`, `443`, `8080`, `5985`, `3389`          |
+| Database and roles           | db `lis`, owner role `lis_owner`, app role `lis_app`     | db `ntqams`, role `postgres`                 |
+| Docker Compose project       | `name: lis` → containers `lis-*`, volumes `lis_*`, network `lis_default` | none yet (daemon was off)    |
+| Windows services (prod/test) | `NTLIS` (port `5100`) / `NTLIS_TEST` (port `5180`)       | `NTQAMS`, `NTQAMS_TEST`                      |
+| IIS sites                    | `lis-ui` (own host header) / `lis-ui-test` (port `8081`) | `qams-ui` (80/443), `qams-ui-test` (8080)    |
+| IIS physical paths           | `C:\inetpub\wwwroot\lis-ui*`                             | `C:\inetpub\wwwroot\qams-ui*`                |
+| Prod data / backups          | `E:\lis-data`, `E:\lis-backups`                          | `E:\ntqams-data`, `E:\ntqams-backups`        |
+| Uploaded files (`Lis:Files:Root`) | dev `E:LIS.localiles` (git-ignored), production `E:lis-datailes` | none |
+| Publish output               | `E:\LIS\publish` (git-ignored)                           | `E:\qms publish`                             |
+
+If a reserved value turns out to be taken when it is first used, pick another LIS-prefixed
+value and update this table in the same change.
+
+## 3. Machine toolchain (as found on 2026-10-08)
+
+- .NET SDK **9.0.316** (only SDK installed). Pin with `global.json` once scaffolded.
+- Node **v24.18.1**, npm **11.16.0**. Pin with `.nvmrc` and `engines` once scaffolded.
+- PostgreSQL **17** at `127.0.0.1:5432` (shared instance; LIS gets its own db and roles
+  there, or its own Docker instance on 5433). A PostgreSQL 16 service exists but is stopped.
+- Docker Desktop **29.6.1** (daemon was not running at setup time; start it before Compose).
+- git **2.55.0**; IIS with the WebAdministration module.
+
+## 4. Domain knowledge base — LDM
+
+`LDM_Manual.html` (repo root) is the engineer's guide to **LDM — Laboratory Data Manager 9.2.0/9.3.0**, National
+Technology's existing Oracle Forms LIS. It is the reference for the business domain LIS serves. It is extracted into
+`docs/knowledge/ldm/`:
+
+- `LDM_Business_Knowledge.md` — structured synthesis of the business, rules and features. **Read this first** before
+  designing any LIS feature; cite its manual section numbers (§x.y) in design docs.
+- `LDM_Manual.en.md` / `LDM_Manual.ar.md` — full extracted text; `img/` — the 117 screenshots.
+
+LDM is domain reference material, not code: nothing is imported from it, and LIS is designed on its own merits
+(see the "known weaknesses" section of the synthesis). The manual leaves 73 items unconfirmed (its chapter 21);
+treat those as open questions for the user, never as facts.
+
+### Sky LIS prototypes — the target product
+
+`Sky-LIS-Client-Portal-Interactive-Prototype-v1.html` and `Sky-LIS-Super-Admin-Production-Prototype-v2 (1).html`
+(repo root) are interactive UI prototypes of **Sky LIS**, National Technology's new cloud multi-tenant LIS. Synthesis in
+`docs/knowledge/sky-lis/`:
+
+- `SkyLIS_Prototypes_Knowledge.md` — every screen, field and rule in both portals, plus a Sky ↔ LDM terminology map.
+- `SkyLIS_vs_LDM_Gap_Analysis.md` — what matches LDM, what Sky adds, what Sky still lacks, by area.
+
+Use Sky LIS terminology (Service / Test / Package, Payer / Contract, Clinical Group, Treasury) in LIS design. The
+prototypes cite an SRS that is not in this repo; ask for it before treating a gap as a scope decision.
+
+### Prototypes v2 / v3 (built here)
+
+`prototypes/dist/` holds the rebuilt Sky LIS prototypes that implement the gap-analysis items: the Client Portal
+(`Sky-LIS-Client-Portal-Prototype-v2.html`) and the Super Admin Portal (`Sky-LIS-Super-Admin-Portal-Prototype-v3.html`),
+plus the **release-1 scoped builds** (`…-v2.1-Release1.html`, `…-v3.1-Release1.html`) produced from the same sources with
+`window.SCOPE = "r1"` (client: existing pages enhanced only, payment inside registration, no Location/Room; admin: all
+except the integration library). Scope rules live in `app.client.1.js`/`app.client.4.js` (`R1`) and `app.admin.js`.
+They are **generated** from `prototypes/src/` (see `prototypes/README.md`): edit the sources, then run
+`node prototypes/src/build.js`. Never edit the dist HTML by hand. The design system (`core.css`) carries the brand
+palette derived from the logo; keep new screens on it. Preview with the `prototypes-preview` launch configuration
+(port 5151). The original v1/v2 prototypes supplied by the user stay in the repo root as reference.
+
+`docs/prototypes/Sky-LIS_Prototype_Comparison.html` compares old vs new prototypes (enhanced pages, new pages, new
+modules, dependencies). Generated from `docs/prototypes/src/comparison.data.js` via `node docs/prototypes/src/build.js`.
+A PDF twin for hard-copy review is produced with headless Edge: `powershell -File docs/prototypes/src/pdf.ps1 -Html <file.html>`
+(no Python on this machine; Edge honours the documents' `@media print` CSS). Regenerate the PDF after every HTML rebuild.
+
+`docs/plan/Sky-LIS_Build_Phases.html` (+ `.pdf`) is the phased build plan (foundation → existing pages enhanced → new
+pages → new modules → go-live). Generated from `docs/plan/src/plan.data.js` via `node docs/plan/src/build.js`.
+
+### Requirements specification
+
+`docs/requirements/LIS_Requirements_Specification.html` (LIS-RS-001) is the consolidated requirements document:
+functional requirements per module (PLT, SEC, CAT, REG, SMP, RES, RPT, WRK, FIN, INT, AUT, DSH, QCM), non-functional
+requirements, business rules (BR-xx), gap register, open questions and glossary. It is **generated**: edit
+`docs/requirements/src/requirements.data.js`, then run `node docs/requirements/src/build.js`. Never edit the HTML by
+hand. Requirement IDs are stable; bump `meta.version` and add a revision-history row on every change. Preview with
+the `requirements-preview` launch configuration (port 5150, inside the LIS reserved range).
+
+### Business SRS
+
+`docs/srs/Sky-LIS_Business_SRS.html` (+ `.pdf`, LIS-SRS-001) is the business Software Requirements Specification of
+both portals as last built: actors, modules, every page (CP-01…CP-68 client, SA-01…SA-21 admin) with purpose, data,
+actions, rules and dependencies, status models, 12 end-to-end workflows (WF-01…WF-12), business rules BR-01…BR-27,
+conceptual data model, documents, release-1 scope matrix and glossary. Generated from `docs/srs/src/srs.data.js` via
+`node docs/srs/src/build.js`; PDF via the same `pdf.ps1`. Page IDs, WF and BR codes are stable; bump `meta.version`
+and add a history row on every change. Preview with the `srs-preview` launch configuration (port 5153).
+
+## 5. Backend solution (`Platform.sln`)
+
+The backend is built task by task from the **architecture pack in `prompt/`** (README + documents 00–04: ratified
+decisions D-01…D-07, blueprint, security spec, intake guide, pitfalls). Those documents are the constitution; the
+business content comes from the SRS (`docs/srs`) and the prototypes. The pack cites NT.QAMS as its baseline, but the
+QMS source is never read or copied (section 1); everything here is written from the documents.
+
+- Layout (01 §3.2): `src/Platform.{SharedKernel,Domain,Contracts,Application,Infrastructure,WebApi}`,
+  `tests/Platform.{ArchitectureTests,Domain.UnitTests}`; module-first folders inside every layer.
+- Reference matrix (01 §2.1) is enforced by `tests/Platform.ArchitectureTests/LayerRulesTests.cs` on both the IL and
+  the `.csproj` files. Other gates: `DomainHardeningTests` (no public set/init on entities, roots sealed, factories),
+  `RequestPolicyTests` (every `ICommand`/`IQuery` carries exactly one policy attribute with a catalogued key; no
+  handler for a raw `IRequest`; no `RequireRole`), `GateSelfTests` (proves each gate on deliberately wrong fixtures).
+  Add a gate for every new rule; a rule without a test is a suggestion (01 §8).
+- Build hygiene: `Directory.Build.props` (net9.0, C# 13, nullable, TreatWarningsAsErrors, analyzers) and
+  `Directory.Packages.props` (central versions; MediatR pinned to **12.5.0**, the last Apache-2.0 release, until
+  action A-2 closes). `BannedSymbols.txt` makes `DateTime.Now/UtcNow`, `DateTimeOffset.Now/UtcNow` and
+  `Guid.NewGuid` compile errors everywhere except `SystemClock` (pitfall P-14).
+- Commands: `dotnet build Platform.sln -c Release` · `dotnet test Platform.sln -c Release` (report per-suite counts,
+  never a bare total: pitfall P-71). WebApi listens on `http://127.0.0.1:5100` (launch profile); TLS is the proxy's.
+- Persistence (Task 2, 01 §4 / 02 §4): `AppDbContext` with `TenantKeyConvention` (every `ITenantScoped` keyed
+  `(tenant_id, id)`), `XminConcurrencyConvention` (`uint RowVersion` ↔ the `xmin` system column, no physical column),
+  a tenant query filter applied to every tenant type, enum `CHECK` constraints `ck_<table>_<col>_domain`, snake_case
+  names (EFCore.NamingConventions). Interceptors in fixed order: `TenantConnectionInterceptor` (session-scoped
+  `set_config('app.current_tenant')` + `app.bypass_rls` on every connection open; never `SET LOCAL`), then
+  `TenantStampInterceptor` (TENANT-000 on an unresolved tenant, TENANT-403 on a cross-tenant write),
+  `AuditStampInterceptor`, `OutboxInterceptor` (events → `ops.outbox_events` in the same transaction). `UnitOfWork` is
+  the only type that saves and maps engine refusals to CONCURRENCY-409 / TENANT-403 / UNIQUE-409. Repositories extend
+  `Repository<T>` and never save. Identity split (D-06): `identity.platform_users`, `identity.refresh_sessions` (no
+  RLS) and `app.tenant_memberships` (FORCE RLS + `tenant_isolation` policy declared in the creating migration).
+- Migrations: `dotnet ef migrations add <Name> --project src/Platform.Infrastructure --startup-project src/Platform.Infrastructure --output-dir Persistence/Migrations`
+  (local tool in `.config/dotnet-tools.json`; the design-time factory needs no server). After every migration regenerate
+  the committed idempotent script: `dotnet ef migrations script --idempotent -o deploy/postgres/migrations.sql --project src/Platform.Infrastructure --startup-project src/Platform.Infrastructure`
+  (MigrationScriptTests fails when it is stale). Tenant tables declare RLS in their own migration; migrations never set `app.bypass_rls`.
+- Database roles and bootstrap: `deploy/postgres/roles.sql` (lis_owner BYPASSRLS = migrations, lis_app NOBYPASSRLS =
+  runtime) and `schema.sql` (schemas, grants, default privileges) run once before the first migration;
+  `deploy/postgres/compose.yaml` is the Docker variant (Docker Desktop cannot start on this server: no WSL distribution).
+  The working dev server is a **private PostgreSQL 17 instance on 127.0.0.1:5433** under git-ignored `E:\LIS\.local\pg17`
+  (initialised from the installed 17 binaries, separate from the shared 5432 cluster). Control it with
+  `"C:\Program Files\PostgreSQL\17\bin\pg_ctl" -D E:\LIS\.local\pg17\data [-o "-p 5433 -c listen_addresses=127.0.0.1"] start|stop`;
+  passwords are in git-ignored `deploy/postgres/.env`.
+- Integration tests (`tests/Platform.IntegrationTests`, real PostgreSQL) run only when `LIS_TEST_OWNER_CONNECTION` and
+  `LIS_TEST_APP_CONNECTION` are set (owner/app role connection strings); otherwise they are skipped with a reason, never
+  faked. The WebApi reads `Lis:Database:ConnectionString` (user-secrets or environment; appsettings carries no password).
+- Security edge (Task 3, 02 §2–§6, D-01/D-02/D-03): Infrastructure `Security/` holds `ConfigGuard` + `SecurityOptions`,
+  `MasterKeyProtector` (HKDF + AES-GCM at rest), `Argon2idHasher`, `SigningKeys` (ES256, JWKS), `SubjectProtector`
+  (`sub` = `v1.<kid>.<…>`), `AccessTokenService` (claims iss/aud/sub/sid/tid/scope/jti/iat/nbf/exp only, 15 min),
+  `RefreshTokenService`, `EnvelopeKeyStore` (RSA-3072 in `identity.envelope_keys`, rotated 24 h, lazy under an advisory
+  lock), `NonceStore` (`app.credential_nonces`, UNLOGGED, insert = consume), `CredentialEnvelopeOpener` (CRED-001…005 in
+  the specified order), `SessionPrincipalQuery` (one elevated query per request, cached 10 s) and `MembershipDirectory`
+  (sign-in tenant selection); both are the only allow-listed `Elevate()` sites (gate in WebApiHardeningTests).
+  WebApi: `PipelineOrder.Sequence` is walked by `Program` (ForwardedHeaders → Correlation → SecurityHeaders →
+  ExceptionHandler → Authentication → CredentialAccountKey → RateLimiter → AuthOriginCheck → TenantResolution →
+  MfaEnrollmentGate → Authorization → Endpoints); `EncryptedSubjectEvents` decrypts `sub` and loads the session;
+  `RefreshCookie` (`__Secure-rt; Path=/api/v1/auth; Secure; HttpOnly; SameSite=Strict`, `rt` only under
+  `Lis:Security:AllowInsecureLocalDevelopment`); `AuthOriginCheckMiddleware` guards the two cookie endpoints with
+  Sec-Fetch-Site + Origin + `X-Requested-With: Platform`; `CredentialTransportFilter` is a global action filter; rate
+  limits follow the 02 §5.2 matrix (policies `credential-account`, `credential-challenge`, `refresh`, global chain),
+  in-process counters. Endpoints: `GET/POST /api/v1/auth/{credential-challenge,sign-in,refresh,sign-out,me}`,
+  `/.well-known/jwks.json`, `/health/{live,ready}`. Every setting is read lazily from `IConfiguration` (a test host
+  injects configuration at `Build()`); `StartupGuards.RunAsync` enforces forbidden keys, ConfigGuard, loopback bind,
+  relaxation event and `DatabaseRoleGuard`. Secrets and rotation runbooks: `deploy/SECRETS.md`; dev secrets:
+  `node scripts/new-dev-secrets.mjs` (user-secrets store). Security events currently go to the structured log
+  (`LoggerSecurityEventLog`) until the audit ledger lands.
+- Test suites: Domain.UnitTests, ArchitectureTests (gates), Application.UnitTests (crypto primitives, ConfigGuard),
+  IntegrationTests and WebApi.FunctionalTests (both real PostgreSQL via the two env vars; each process takes the
+  advisory lock `lis:test-database` for its lifetime so suites serialize by themselves). Run everything with
+  `dotnet test Platform.sln -c Release` and report per-suite counts.
+- Frontend (Task 4, 01 §6): `frontend/` is an Angular 22 zoneless workspace (project `platform-web`, Vitest + jsdom,
+  TypeScript 6 strict with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`, angular-eslint). Dev server on
+  `127.0.0.1:4300` proxying `/api`, `/health`, `/.well-known` to the API on 5100 (`proxy.conf.json`), so the browser sees one
+  origin. Structure: `core/auth` (`AuthStore`: token in a signal only, `hydrate` = silent refresh at start-up, single-flight
+  `refresh`, `isAuthenticated/currentUser/currentTenant/hasPermission`; guards), `core/http` (`csrfInterceptor` sends
+  `X-Requested-With: Platform` on every API request, `authInterceptor` bearer + one refresh and replay on 401,
+  `credentialEnvelopeInterceptor` seals `[CredentialField]` properties from `core/api/credential-fields.ts` and retries once
+  on CRED-002/003, `problemDetailsInterceptor` → typed `ProblemError`), `core/crypto` (`credential-envelope.ts`: WebCrypto-only
+  compact JWE seal; `CredentialEnvelopeClient` fetches the challenge), `core/api` (hand-written auth contracts until the
+  OpenAPI generator lands), `core/i18n` (lang/dir signals, per-feature JSON in `public/i18n`), `core/state/mutation.ts`,
+  `shell/nav.registry.ts`, `features/auth` (login page), `features/home`. Commands in `frontend/`: `npm run build`,
+  `npm run lint` (ESLint + `scripts/check-boundaries.mjs`), `npm run test:ci`. Rules: no `any`/`$any()`, no web storage, no
+  `subscribe()` in components, core/shared never import features, features never import each other.
+- Business modules (Task 5, 03 §3–§10, D-04/D-07): the first feature module is **Treasury access** (SRS CP-28/CP-29,
+  BR-27), specified in `docs/intake/LIS-INT-TRS-001_Treasury-Access.md` (full 16-section intake; the business owner has not
+  yet reviewed it). Pattern for every module: aggregates in `Platform.Domain/<Module>` (state enum, codes `<MOD>-nnn`,
+  events, SoD inside the transition methods via `EnsureActorIsNot`), contracts in `Platform.Contracts/<Module>`, commands and
+  queries in `Platform.Application/<Module>/{Commands,Queries}` (every request carries `[RequirePermissionPolicy]`; one
+  `SaveChangesAsync` per command handler, enforced by `TransitionAtomicityTests`), EF configuration + repositories in
+  `Platform.Infrastructure/Persistence/<Module>` (key `(tenant_id, id)`, RLS declared in the creating migration),
+  controllers under `Platform.WebApi/Controllers/<Module>` (ISender only), and an Angular feature under
+  `frontend/src/app/features/<module>` (API service → facade with `resource()`/`mutation()` → smart page; `*appCan`
+  gates buttons, the server decides). Permissions come from tenant roles: `Role` aggregate (`app.roles`, permission keys
+  validated against `PermissionCatalog`) assigned to a `TenantMembership` (`role_id`); `SessionPrincipalQuery` joins the role
+  so sign-in, refresh and `me` return the same permission set the authorization behavior enforces. Reference numbers
+  (`TRQ-yyyy-nnnnn`) come from `IReferenceNumbers` over `app.reference_counters` (atomic upsert). Endpoints:
+  `/api/v1/treasuries`, `/api/v1/treasury-access-requests`. Frontend route `/treasury/access`, nav entry gated by
+  `treasury.view`, dictionaries `public/i18n/treasury.{en,ar}.json`, device id minted by `core/device` (the only allowed
+  localStorage use, documented inline).
+- Dev tooling: `tools/Platform.DevTools` (`seed-user <username> <password> [tenantId]`,
+  `grant-role <username> <tenantId> <roleNameEn> <perm,perm,…>`, `seed-treasury <tenantId> <code> <nameEn> <nameAr>` with
+  `LIS_DEVTOOLS_CONNECTION`, guarded like the API; the test suites truncate the dev database, so reseed after a test run);
+  launch configurations `backend-api` (5100) and `frontend-dev` (4300) in `.claude/launch.json`. Stop `backend-api` before
+  `dotnet build`: the running API locks the Release binaries.
+- Foundation (wave 0, slot `found`; intake `docs/intake/LIS-INT-FND-001_Foundation.md`; migration `Foundation`):
+  **platform tenant** — `seed-platform-admin <username> <password>` in DevTools (→ `PlatformAdministratorSeeder`: user +
+  membership in `TenantIds.Platform` + role "Platform Administrator" with every catalogue key). **Branch of the session**
+  (CP-04) — `RefreshSession.BranchId` (inherited through rotation, auto-selected when the membership has one branch),
+  `POST /api/v1/auth/select-branch` (`TENANT-005` when not assigned), `ICurrentUser.BranchId`, `AuthProfile.BranchId/BranchIds`,
+  `BranchScope.Require(ICurrentUser)` → `TENANT-004` for branch-stamped modules. **Audit** — `audit.field_changes`
+  (`FieldChangeInterceptor`: every aggregate/entity/`IFieldChangeTracked` row, before/after, reason from the event),
+  `audit.audit_trail` (`AuditTrailInterceptor`: per-tenant sequence under `pg_advisory_xact_lock('audit_chain:<tenant>')`,
+  SHA-256 chain over the stored columns), `audit.security_events` (`SecurityEventLedger`, one INSERT per event, nullable
+  tenant with its own policy); all append-only (trigger `audit.refuse_change()`); `GET /api/v1/audit/entries` and
+  `/verify-chain` [audit.view]. Interceptor order (gated): TenantConnection → TenantStamp → AuditStamp → FieldChange →
+  AuditTrail → Outbox. **Outbox processor** — `OutboxProcessor.RunOnceAsync` (claim `FOR UPDATE SKIP LOCKED` + 30 s lease,
+  batch 50, back-off `2 s·2^n`, dead letter at 10, tenant scope per event, no elevation) hosted by `OutboxHostedService`
+  under `Lis:Outbox:{Enabled,PollInterval,BatchSize,Lease,MaxAttempts}`; policies = `sealed class XPolicy :
+  IDomainEventHandler<TEvent>` under `Application/<Module>/Policies/`, registered by `AddApplication`
+  (`DomainEventPolicyTests`). **Notifications/OTP** — `INotificationSender`, `INotificationTemplateSource` (codes `otp`,
+  `password-recovery`, `portal-url`, `treasury-request`, `panic-value`; defaults `TryAdd`ed after the convention so a
+  module adapter wins), `IOtpService` over `identity.otp_challenges` (HMAC digests, 5 min, 5 attempts;
+  `Lis:Security:Session:Otp{Length,Lifetime,MaxAttempts}`; the code is logged at Debug only under
+  `AllowInsecureLocalDevelopment`); `PlatformUser.Mobile`; `POST /api/v1/auth/recovery/{start,complete}` (always 202 /
+  204 or `AUTH-013`). **Tenant settings** — `app.tenant_settings` + `Platform.Domain.Settings.SettingKeys` (25 typed
+  descriptors, `SET-001`/`SET-002`), `ITenantSettings.GetAsync(SettingKeys.X)` (loaded once per scope),
+  `GET/PUT /api/v1/settings` [settings.view / settings.manage]. Test host: `ApiFactory` disables the outbox loop
+  (`Lis:Outbox:Enabled=false`, override per test) and replaces the sender with `RecordingNotificationSender`
+  (`factory.Notifications`). Frontend: `core/api/{auth,audit,settings}.contracts.ts`, `AuthStore.currentBranch/branchIds/
+  selectBranch/startPasswordRecovery/completePasswordRecovery`. `dotnet ef` under a slot needs
+  `--msbuildprojectextensionspath .local/build/<slot>/obj/Platform.Infrastructure/`.
+- Not yet built (later tasks): MFA/TOTP endpoints, step-up re-authentication, machine credentials, role administration
+  screens and the privilege matrix UI, scheduled jobs and the retention purge, the remaining LIS business modules
+  (registration, samples, results, billing …), the OpenAPI document and generated client.
+
+## 6. Working conventions
+
+- Use the `enterprise-app-architect` skill for design and implementation work.
+- Keep this file current: every new port, service, database, folder or external
+  dependency LIS claims gets added to section 2 in the same change that introduces it.
+- Commit only when asked. Never push to a remote that was not created for LIS.

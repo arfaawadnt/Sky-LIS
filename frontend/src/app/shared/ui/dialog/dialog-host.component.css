@@ -1,0 +1,32 @@
+.message {
+  margin: 0 0 var(--sp-3);
+  color: var(--ink-2);
+  white-space: pre-line;
+}
+
+.reason-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.reason-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.req {
+  color: var(--bad);
+  margin-inline-start: 2px;
+}
+
+.invalid .inp {
+  border-color: var(--bad);
+}
+
+.error {
+  margin: 0;
+  font-size: 11px;
+  color: var(--bad);
+}

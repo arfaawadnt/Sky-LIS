@@ -1,0 +1,154 @@
+<app-page-header [title]="i18n.t('integration.mapping.title')" [subtitle]="i18n.t('integration.mapping.subtitle')">
+  @if (facade.analyserId()) {
+    <button pageActions type="button" class="btn ghost" *appCan="permissions.export" (click)="printCodeSheet()" [disabled]="facade.codeSheet.pending()"><app-icon name="printer" [size]="15" />{{ i18n.t('integration.codeSheet.print') }}</button>
+    <button pageActions type="button" class="btn primary" *appCan="permissions.edit" (click)="add()"><app-icon name="plus" [size]="15" />{{ i18n.t('integration.mapping.add') }}</button>
+  }
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <label toolbarFilters class="picker">
+      <span>{{ i18n.t('integration.field.analyser') }}</span>
+      <select class="inp" (change)="onAnalyser($event)" data-testid="analyser-picker">
+        <option value="">{{ i18n.t('integration.chooseAnalyser') }}</option>
+        @for (analyser of analysers(); track analyser.id) {
+          <option [value]="analyser.id" [selected]="analyser.id === facade.analyserId()">{{ analyser.code }} · {{ optionName(analyser) }}</option>
+        }
+      </select>
+    </label>
+    @if (facade.analyserId()) {
+      <app-search-box toolbarFilters [placeholder]="i18n.t('integration.mapping.search')" (searchChange)="facade.setSearch($event)" />
+    }
+  </app-toolbar>
+
+  @if (!facade.analyserId()) {
+    <app-empty-state [title]="i18n.t('integration.chooseAnalyser')" [message]="i18n.t('integration.mapping.chooseHint')" icon="layers" />
+  } @else {
+    <p class="info-strip note">{{ i18n.t('integration.mapping.autoSendRule') }}</p>
+    @for (problem of [facade.autoSend.problem(), facade.setMappingActive.problem(), editingRowId() ? facade.save.problem() : null]; track $index) {
+      @if (problem) {
+        <p class="problem list-problem" role="alert">{{ problemText(problem.code) }}</p>
+      }
+    }
+    @if (facade.mappings.error()) {
+      <p class="problem list-problem" role="alert">{{ i18n.t('integration.loadError') }}</p>
+    }
+
+    <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.mappings.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('integration.mapping.empty')" [caption]="i18n.t('integration.mapping.title')">
+      <ng-template appCell="analyserCode" [appCellOf]="rows()" let-row>
+        @if (editingRowId() === row.id) {
+          <input class="inp mono inline" [formControl]="inline.controls.analyserCode" maxlength="32" (keydown)="onInlineKey($event, row)" [attr.aria-label]="i18n.t('integration.mapping.analyserCode')" />
+        } @else {
+          <span class="mono">{{ row.analyserCode }}</span>
+        }
+      </ng-template>
+      <ng-template appCell="hostCode" [appCellOf]="rows()" let-row>
+        @if (editingRowId() === row.id) {
+          <input class="inp mono inline" [formControl]="inline.controls.hostCode" maxlength="32" (keydown)="onInlineKey($event, row)" [attr.aria-label]="i18n.t('integration.mapping.hostCode')" />
+        } @else {
+          <span class="mono">{{ row.hostCode ?? '' }}</span>
+        }
+      </ng-template>
+      <ng-template appCell="resultSelection" [appCellOf]="rows()" let-row>
+        @if (editingRowId() === row.id) {
+          <input class="inp inline narrow" type="number" min="1" max="99" [formControl]="inline.controls.resultSelection" (keydown)="onInlineKey($event, row)" [attr.aria-label]="i18n.t('integration.mapping.resultSelection')" />
+        } @else {
+          {{ row.resultSelection }}
+        }
+      </ng-template>
+      <ng-template appCell="slope" [appCellOf]="rows()" let-row>
+        @if (editingRowId() === row.id) {
+          <input class="inp inline narrow" inputmode="decimal" [formControl]="inline.controls.slope" (keydown)="onInlineKey($event, row)" [attr.aria-label]="i18n.t('integration.mapping.slope')" />
+        } @else {
+          {{ row.slope }}
+        }
+      </ng-template>
+      <ng-template appCell="intercept" [appCellOf]="rows()" let-row>
+        @if (editingRowId() === row.id) {
+          <input class="inp inline narrow" inputmode="decimal" [formControl]="inline.controls.intercept" (keydown)="onInlineKey($event, row)" [attr.aria-label]="i18n.t('integration.mapping.intercept')" />
+        } @else {
+          {{ row.intercept }}
+        }
+      </ng-template>
+      <ng-template appCell="autoSend" [appCellOf]="rows()" let-row>
+        <label class="switch">
+          <input type="checkbox" [checked]="row.autoSend" [disabled]="facade.autoSend.pending() || !row.isActive" (change)="toggleAutoSend(row)" [attr.aria-label]="i18n.tf('integration.mapping.autoSendFor', { code: row.analyserCode })" />
+          <span>{{ i18n.t(row.autoSend ? 'integration.on' : 'integration.off') }}</span>
+        </label>
+      </ng-template>
+      <ng-template appCell="conversions" [appCellOf]="rows()" let-row>
+        <button type="button" class="btn sm ghost" (click)="openConversions(row)">{{ row.conversions.length }} <app-icon name="edit" [size]="13" /></button>
+      </ng-template>
+      <ng-template appCell="range" [appCellOf]="rows()" let-row>
+        <button type="button" class="btn sm ghost" (click)="openRange(row)">{{ rangeText(row) || i18n.t('integration.mapping.testRange') }}</button>
+      </ng-template>
+      <ng-template appCell="status" [appCellOf]="rows()" let-row>
+        <app-badge [tone]="tone(row.isActive ? 'Active' : 'Inactive')">{{ i18n.t(row.isActive ? 'integration.active' : 'integration.inactive') }}</app-badge>
+      </ng-template>
+      <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+        @if (editingRowId() === row.id) {
+          <button type="button" class="btn sm primary" (click)="saveInline(row)" [disabled]="facade.save.pending()">{{ i18n.t('integration.save') }}</button>
+          <button type="button" class="btn sm" (click)="cancelInline()">{{ i18n.t('integration.cancel') }}</button>
+        } @else {
+          <ng-container *appCan="permissions.edit">
+            <button type="button" class="icon-btn" (click)="startInline(row)" [attr.aria-label]="i18n.t('integration.mapping.inlineEdit')" [title]="i18n.t('integration.mapping.inlineEdit')"><app-icon name="edit" [size]="15" /></button>
+            <button type="button" class="icon-btn" (click)="edit(row)" [attr.aria-label]="i18n.t('integration.mapping.edit')" [title]="i18n.t('integration.mapping.edit')"><app-icon name="settings" [size]="15" /></button>
+          </ng-container>
+          <button type="button" class="icon-btn" *appCan="permissions.manage" (click)="toggleActive(row)" [attr.aria-label]="i18n.t(row.isActive ? 'integration.mapping.deactivate' : 'integration.mapping.activate')" [title]="i18n.t(row.isActive ? 'integration.mapping.deactivate' : 'integration.mapping.activate')"><app-icon name="power" [size]="15" /></button>
+        }
+      </ng-template>
+    </app-data-table>
+
+    <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="total()" (pageChange)="onPage($event)" />
+  }
+</app-section-card>
+
+<app-drawer [(open)]="drawerOpen" size="lg" [title]="i18n.t(editingId() === null ? 'integration.mapping.add' : 'integration.mapping.edit')">
+  <form [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+    <div class="form-grid">
+      <app-form-field class="full" [label]="i18n.t('integration.mapping.findTest')" [hint]="i18n.t('integration.mapping.findTestHint')">
+        <input type="search" [value]="testSearch()" (input)="onTestSearch($event)" autocomplete="off" data-testid="test-search" />
+      </app-form-field>
+      <app-form-field class="full" [label]="i18n.t('integration.mapping.test')">
+        <select formControlName="testId" (change)="chooseTest($event)" data-testid="test-select">
+          <option value="">{{ i18n.t('integration.choose') }}</option>
+          @for (test of testOptions(); track test.id) {
+            <option [value]="test.id">{{ test.code }} · {{ optionName(test) }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('integration.mapping.analyserCode')"><input type="text" formControlName="analyserCode" class="mono" maxlength="32" autocomplete="off" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.mapping.hostCode')" [hint]="i18n.t('integration.mapping.hostCodeHint')"><input type="text" formControlName="hostCode" class="mono" maxlength="32" autocomplete="off" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.mapping.resultSelection')" [hint]="i18n.t('integration.mapping.resultSelectionHint')"><input type="number" formControlName="resultSelection" min="1" max="99" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.mapping.unit')">
+        <select formControlName="unitId">
+          <option value="">{{ i18n.t('integration.none') }}</option>
+          @for (unit of units(); track unit.id) {
+            <option [value]="unit.id">{{ unit.code }} · {{ optionName(unit) }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('integration.mapping.slope')" [hint]="i18n.t('integration.mapping.slopeHint')"><input type="text" inputmode="decimal" formControlName="slope" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.mapping.intercept')"><input type="text" inputmode="decimal" formControlName="intercept" /></app-form-field>
+      <label class="check"><input type="checkbox" formControlName="query" /> <span>{{ i18n.t('integration.mapping.query') }}</span></label>
+      <label class="check autosend"><input type="checkbox" formControlName="autoSend" /> <span>{{ i18n.t('integration.mapping.autoSend') }}</span></label>
+      <app-form-field class="full" [label]="i18n.t('integration.mapping.queryDetails')" [hint]="i18n.t('integration.mapping.queryDetailsHint')"><input type="text" formControlName="queryDetails" maxlength="500" /></app-form-field>
+      <app-form-field class="full" [label]="i18n.t('integration.mapping.methodology')"><textarea formControlName="methodology" rows="2" maxlength="500"></textarea></app-form-field>
+    </div>
+    <p class="muted small">{{ i18n.t('integration.mapping.autoSendRule') }}</p>
+    @if (facade.save.problem(); as problem) {
+      <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
+    }
+  </form>
+  <button drawerFooter type="button" class="btn ghost" (click)="drawerOpen.set(false)">{{ i18n.t('integration.cancel') }}</button>
+  <button drawerFooter type="button" class="btn primary" [disabled]="facade.save.pending()" (click)="save()">{{ i18n.t('integration.save') }}</button>
+</app-drawer>
+
+<app-integration-conversions-dialog [(open)]="conversionsOpen" [conversions]="dialogRow()?.conversions ?? []" [pending]="facade.conversions.pending()" (saved)="saveConversions($event)" />
+<app-integration-range-dialog [(open)]="rangeOpen" [range]="dialogRow()?.rangeOverride ?? null" [pending]="facade.range.pending()" (saved)="saveRange($event)" />
+@if (conversionsOpen() && facade.conversions.problem(); as problem) {
+  <p class="problem floating" role="alert">{{ problemText(problem.code) }}</p>
+}
+@if (rangeOpen() && facade.range.problem(); as problem) {
+  <p class="problem floating" role="alert">{{ problemText(problem.code) }}</p>
+}

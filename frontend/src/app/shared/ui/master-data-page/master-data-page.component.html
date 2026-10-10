@@ -1,0 +1,126 @@
+<app-page-header [title]="text('title')" [subtitle]="subtitle()">
+  <ng-container pageActions><ng-content select="[pageActions]" /></ng-container>
+  @if (permissions().create; as permission) {
+    <button pageActions ngProjectAs="[pageActions]" type="button" class="btn primary" *appCan="permission" (click)="openCreate()"><app-icon name="plus" [size]="16" />{{ text('add') }}</button>
+  } @else {
+    <button pageActions type="button" class="btn primary" (click)="openCreate()"><app-icon name="plus" [size]="16" />{{ text('add') }}</button>
+  }
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="text('searchPlaceholder')" (searchChange)="setSearch($event)" />
+    @if (activation()) {
+      <label toolbarFilters class="filter">
+        <span class="visually-hidden">{{ i18n.t('shared.masterData.filter.label') }}</span>
+        <select class="inp" (change)="onActiveChange($event)">
+          <option value="active" [selected]="filter().active === true">{{ i18n.t('shared.masterData.filter.active') }}</option>
+          <option value="inactive" [selected]="filter().active === false">{{ i18n.t('shared.masterData.filter.inactive') }}</option>
+          <option value="all" [selected]="filter().active === null">{{ i18n.t('shared.masterData.filter.all') }}</option>
+        </select>
+      </label>
+    }
+    <button toolbarActions type="button" class="btn ghost" (click)="reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('shared.masterData.refresh') }}</button>
+  </app-toolbar>
+
+  @if (list.error()) {
+    <p class="problem list-problem" role="alert">{{ loadErrorText() }}</p>
+  }
+
+  <app-data-table [columns]="config().columns" [rows]="rows()" [rowId]="rowId()" [loading]="list.isLoading()" [cellTemplates]="cellTemplates()" [rowClass]="rowClass()" [caption]="text('title')" (rowActivate)="openEdit($event)">
+    <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+      @if (activation()) {
+        <app-badge [status]="isActive()(row) ? 'Active' : 'Inactive'" />
+      }
+      @if (permissions().update; as permission) {
+        <button type="button" class="row-btn" *appCan="permission" (click)="openEdit(row)" [attr.aria-label]="text('edit')" [title]="text('edit')"><app-icon name="edit" [size]="15" /></button>
+      } @else {
+        <button type="button" class="row-btn" (click)="openEdit(row)" [attr.aria-label]="text('edit')" [title]="text('edit')"><app-icon name="edit" [size]="15" /></button>
+      }
+      @if (activation()) {
+        @if (permissions().activate; as permission) {
+          <button type="button" class="row-btn" [class.danger]="isActive()(row)" *appCan="permission" (click)="toggleActive(row)" [attr.aria-label]="text(isActive()(row) ? 'deactivate' : 'activate')" [title]="text(isActive()(row) ? 'deactivate' : 'activate')"><app-icon name="power" [size]="15" /></button>
+        } @else {
+          <button type="button" class="row-btn" [class.danger]="isActive()(row)" (click)="toggleActive(row)" [attr.aria-label]="text(isActive()(row) ? 'deactivate' : 'activate')" [title]="text(isActive()(row) ? 'deactivate' : 'activate')"><app-icon name="power" [size]="15" /></button>
+        }
+      }
+      @for (action of visibleRowActions(); track action.id) {
+        @if (actionVisible(action, row)) {
+          @if (action.permission; as permission) {
+            <button type="button" class="row-btn" [class.danger]="action.danger ?? false" *appCan="permission" (click)="runAction(action, row)" [attr.aria-label]="i18n.t(action.label)" [title]="i18n.t(action.label)"><app-icon [name]="action.icon" [size]="15" /></button>
+          } @else {
+            <button type="button" class="row-btn" [class.danger]="action.danger ?? false" (click)="runAction(action, row)" [attr.aria-label]="i18n.t(action.label)" [title]="i18n.t(action.label)"><app-icon [name]="action.icon" [size]="15" /></button>
+          }
+        }
+      }
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="page().page" [pageSize]="page().pageSize" [totalCount]="totalCount()" (pageChange)="onPageChange($event)" />
+</app-section-card>
+
+<app-drawer [(open)]="drawerOpen" [title]="drawerTitle()" [size]="config().drawerSize ?? 'md'" (closed)="onDrawerClosed()">
+  @if (form(); as form) {
+    <form [id]="formId" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+      @if (saveProblem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+      <div class="form-grid">
+        @for (field of config().fields; track field.name) {
+          <div class="cell" [class.full]="isFull(field)">
+            @switch (field.kind) {
+              @case ('localizedText') {
+                <app-localized-text-input [group]="localizedGroup(form, field)" [label]="fieldLabel(field)" [name]="field.name" [hint]="fieldHint(field)" [maxLength]="field.maxLength ?? 200" [problem]="saveProblem()" />
+              }
+              @case ('boolean') {
+                <label class="check boolean">
+                  <input type="checkbox" [formControlName]="field.name" />
+                  <span>{{ fieldLabel(field) }}</span>
+                </label>
+              }
+              @case ('select') {
+                <app-form-field [label]="fieldLabel(field)" [hint]="fieldHint(field)" [required]="field.required ?? false" [problem]="saveProblem()">
+                  <select [formControlName]="field.name">
+                    <option [ngValue]="null">{{ i18n.t('shared.form.choose') }}</option>
+                    @for (option of optionsFor(field); track option.value) {
+                      <option [ngValue]="option.value">{{ optionLabel(option) }}</option>
+                    }
+                  </select>
+                </app-form-field>
+              }
+              @case ('textarea') {
+                <app-form-field [label]="fieldLabel(field)" [hint]="fieldHint(field)" [problem]="saveProblem()">
+                  <textarea [formControlName]="field.name" rows="3" [attr.maxlength]="field.maxLength ?? 2000"></textarea>
+                </app-form-field>
+              }
+              @case ('number') {
+                <app-form-field [label]="fieldLabel(field)" [hint]="fieldHint(field)" [problem]="saveProblem()">
+                  <input type="number" [formControlName]="field.name" [attr.min]="field.min ?? null" [attr.max]="field.max ?? null" [attr.step]="field.step ?? null" />
+                </app-form-field>
+              }
+              @case ('date') {
+                <app-form-field [label]="fieldLabel(field)" [hint]="fieldHint(field)" [problem]="saveProblem()">
+                  <input type="date" [formControlName]="field.name" />
+                </app-form-field>
+              }
+              @case ('code') {
+                <app-form-field [label]="fieldLabel(field)" [hint]="fieldHint(field)" [problem]="saveProblem()">
+                  <input type="text" appUppercase [formControlName]="field.name" [attr.maxlength]="field.maxLength ?? 32" autocomplete="off" spellcheck="false" class="code" />
+                </app-form-field>
+              }
+              @default {
+                <app-form-field [label]="fieldLabel(field)" [hint]="fieldHint(field)" [problem]="saveProblem()">
+                  <input type="text" [formControlName]="field.name" [attr.maxlength]="field.maxLength ?? 200" autocomplete="off" />
+                </app-form-field>
+              }
+            }
+          </div>
+        }
+      </div>
+    </form>
+  }
+  <ng-container drawerFooter>
+    <button type="button" class="btn" (click)="closeDrawer()">{{ i18n.t('shared.masterData.cancel') }}</button>
+    <button type="button" class="btn primary" [disabled]="saving()" (click)="save()">{{ saving() ? i18n.t('shared.masterData.saving') : i18n.t('shared.masterData.save') }}</button>
+  </ng-container>
+</app-drawer>

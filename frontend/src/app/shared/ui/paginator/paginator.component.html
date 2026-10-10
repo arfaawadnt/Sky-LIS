@@ -1,0 +1,32 @@
+<nav class="grid-foot" [attr.aria-label]="i18n.t('shared.paginator.label')">
+  <span class="summary">{{ summary() }}</span>
+
+  <div class="controls">
+    <label class="size">
+      <span>{{ i18n.t('shared.paginator.pageSize') }}</span>
+      <select class="inp sm" (change)="onSizeChange($event)">
+        @for (size of pageSizes(); track size) {
+          <option [value]="size" [selected]="size === pageSize()">{{ size }}</option>
+        }
+      </select>
+    </label>
+
+    <div class="pager">
+      <button type="button" class="pg" [disabled]="page() <= 1" (click)="go(1)" [attr.aria-label]="i18n.t('shared.paginator.first')">
+        <app-icon [name]="isRtl() ? 'chevrons-right' : 'chevrons-left'" [size]="14" />
+      </button>
+      <button type="button" class="pg" [disabled]="page() <= 1" (click)="go(page() - 1)" [attr.aria-label]="i18n.t('shared.paginator.previous')">
+        <app-icon [name]="isRtl() ? 'chevron-right' : 'chevron-left'" [size]="14" />
+      </button>
+      @for (p of window(); track p) {
+        <button type="button" class="pg num" [class.active]="p === page()" [attr.aria-current]="p === page() ? 'page' : null" (click)="go(p)">{{ p }}</button>
+      }
+      <button type="button" class="pg" [disabled]="page() >= totalPages()" (click)="go(page() + 1)" [attr.aria-label]="i18n.t('shared.paginator.next')">
+        <app-icon [name]="isRtl() ? 'chevron-left' : 'chevron-right'" [size]="14" />
+      </button>
+      <button type="button" class="pg" [disabled]="page() >= totalPages()" (click)="go(totalPages())" [attr.aria-label]="i18n.t('shared.paginator.last')">
+        <app-icon [name]="isRtl() ? 'chevrons-left' : 'chevrons-right'" [size]="14" />
+      </button>
+    </div>
+  </div>
+</nav>

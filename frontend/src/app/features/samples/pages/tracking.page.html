@@ -1,0 +1,34 @@
+<app-page-header [title]="i18n.t('samples.tracking.title')" [subtitle]="i18n.t('samples.tracking.subtitle')" />
+
+<app-section-card class="lookup" [title]="i18n.t('samples.tracking.lookupTitle')">
+  <app-scan-box
+    [label]="i18n.t('samples.scan.label')"
+    [placeholder]="i18n.t('samples.scan.placeholder')"
+    [submitLabel]="i18n.t('samples.track')"
+    [busy]="facade.timeline.isLoading()"
+    (scanned)="track($event)"
+  />
+  @if (problem(); as problem) {
+    <p class="problem lookup-problem" role="alert">{{ problemText(problem) }}</p>
+  }
+</app-section-card>
+
+@if (facade.timeline.hasValue()) {
+  @let timeline = facade.timeline.value();
+  <div class="stats">
+    <app-stat-card [label]="i18n.t('samples.tracking.orderedToCollected')" [value]="duration(timeline.durations.orderedToCollectedSeconds)" tone="info" icon="flask" />
+    <app-stat-card [label]="i18n.t('samples.tracking.collectedToReceived')" [value]="duration(timeline.durations.collectedToReceivedSeconds)" tone="brand" icon="layers" />
+    <app-stat-card [label]="i18n.t('samples.tracking.orderedToReceived')" [value]="duration(timeline.durations.orderedToReceivedSeconds)" tone="ok" icon="check" />
+  </div>
+
+  <div class="layout">
+    <app-section-card [title]="i18n.t('samples.tracking.sampleTitle')">
+      <app-sample-summary [detail]="timeline.sample" />
+    </app-section-card>
+    <app-section-card [title]="i18n.t('samples.tracking.timeline')" [subtitle]="i18n.t('samples.tracking.timelineHint')">
+      <app-sample-timeline [steps]="timeline.steps" />
+    </app-section-card>
+  </div>
+} @else if (!facade.timeline.isLoading() && !problem()) {
+  <app-empty-state [title]="i18n.t('samples.tracking.start')" [message]="i18n.t('samples.tracking.startHint')" icon="barcode" />
+}

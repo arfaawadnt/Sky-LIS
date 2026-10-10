@@ -1,0 +1,76 @@
+<app-page-header [title]="i18n.t('account.dashboard.title')" [subtitle]="subtitle()">
+  <label pageActions class="date">
+    <span class="visually-hidden">{{ i18n.t('account.dashboard.date') }}</span>
+    <input class="inp" type="date" [value]="facade.query().date" (change)="onDate($event)" />
+  </label>
+  <button pageActions type="button" class="btn ghost" (click)="facade.refresh()"><app-icon name="refresh" [size]="15" />{{ i18n.t('account.refresh') }}</button>
+</app-page-header>
+
+@if (facade.dashboard.error()) {
+  <p class="problem" role="alert">{{ i18n.t('account.dashboard.loadError') }}</p>
+}
+
+<section class="kpis" [attr.aria-busy]="facade.dashboard.isLoading()" [attr.aria-label]="i18n.t('account.dashboard.kpis')">
+  @for (kpi of kpis(); track kpi.key) {
+    <app-stat-card [label]="i18n.t('account.dashboard.kpi.' + kpi.key)" [value]="kpi.value" [hint]="kpi.hint" [icon]="kpi.icon" [tone]="kpi.tone" />
+  }
+</section>
+
+<div class="grid">
+  <app-section-card [title]="i18n.t('account.dashboard.last7')">
+    @if (chart().length > 0) {
+      <app-bar-chart [data]="chart()" [label]="i18n.t('account.dashboard.last7')" [rtl]="i18n.dir() === 'rtl'" />
+    } @else {
+      <p class="muted">{{ i18n.t('account.dashboard.noChart') }}</p>
+    }
+  </app-section-card>
+
+  <app-section-card [title]="i18n.t('account.dashboard.quickActions')">
+    <div class="actions">
+      @for (action of quickActions; track action.key) {
+        <a class="btn action" *appCan="action.permission" [routerLink]="action.path"><app-icon [name]="action.icon" [size]="16" />{{ i18n.t('account.dashboard.action.' + action.key) }}</a>
+      }
+    </div>
+  </app-section-card>
+</div>
+
+<div class="grid">
+  <app-section-card [title]="i18n.t('account.dashboard.delayedTitle')" [subtitle]="i18n.t('account.dashboard.delayedSub')" [padded]="false">
+    <app-data-table
+      [columns]="delayedColumns"
+      [rows]="delayedRows()"
+      [rowId]="delayedRowId"
+      [interactive]="false"
+      [compact]="true"
+      [loading]="facade.dashboard.isLoading()"
+      [emptyTitle]="resultsLive() ? i18n.t('account.dashboard.noDelays') : i18n.t('account.dashboard.delaysNotYet')"
+      [caption]="i18n.t('account.dashboard.delayedTitle')"
+    >
+      <ng-template appCell="delay" [appCellOf]="delayedRows()" let-row><span class="delay">{{ delay(row.delayMinutes) }}</span></ng-template>
+    </app-data-table>
+  </app-section-card>
+
+  <app-section-card [title]="i18n.t('account.dashboard.activity')">
+    @if (!facade.canSeeActivity()) {
+      <p class="muted">{{ i18n.t('account.dashboard.activityNoPermission') }}</p>
+    } @else if (facade.activity.error()) {
+      <p class="problem" role="alert">{{ i18n.t('account.dashboard.activityError') }}</p>
+    } @else if (activity().length === 0) {
+      <p class="muted">{{ facade.activity.isLoading() ? i18n.t('account.loading') : i18n.t('account.dashboard.noActivity') }}</p>
+    } @else {
+      <ul class="activity">
+        @for (entry of activity(); track entry.id) {
+          <li>
+            <span class="aico" aria-hidden="true"><app-icon name="layers" [size]="14" /></span>
+            <div>
+              <b>{{ entry.action }}</b>
+              <p class="muted small">{{ entry.entityType }} · {{ entry.actorName ?? i18n.t('account.audit.system') }}</p>
+            </div>
+            <time [attr.datetime]="entry.atUtc" [attr.title]="when(entry.atUtc)">{{ time(entry.atUtc) }}</time>
+          </li>
+        }
+      </ul>
+      <a class="small" routerLink="/account/audit" *appCan="'audit.view'">{{ i18n.t('account.dashboard.openAudit') }}</a>
+    }
+  </app-section-card>
+</div>

@@ -1,0 +1,48 @@
+<app-page-header [title]="i18n.t('catalogue-a.tests.title')" [subtitle]="i18n.t('catalogue-a.tests.subtitle')">
+  <app-catalogue-export-button pageActions ngProjectAs="[pageActions]" *appCan="permissions.export" [exporter]="exportCsv" />
+  <button pageActions ngProjectAs="[pageActions]" type="button" class="btn primary" *appCan="permissions.create" (click)="add()"><app-icon name="plus" [size]="16" />{{ i18n.t('catalogue-a.tests.add') }}</button>
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="i18n.t('catalogue-a.tests.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+    <label toolbarFilters class="filter">
+      <span class="visually-hidden">{{ i18n.t('catalogue-a.tests.column.type') }}</span>
+      <select class="inp" (change)="onType($event)">
+        <option value="">{{ i18n.t('catalogue-a.allTypes') }}</option>
+        @for (type of types; track type) {
+          <option [value]="type" [selected]="facade.filter().type === type">{{ typeLabel(type) }}</option>
+        }
+      </select>
+    </label>
+    <label toolbarFilters class="filter">
+      <span class="visually-hidden">{{ i18n.t('catalogue-a.tests.column.group') }}</span>
+      <select class="inp" (change)="onGroup($event)">
+        <option value="">{{ i18n.t('catalogue-a.allGroups') }}</option>
+        @for (group of groups(); track group.value) {
+          <option [value]="group.value" [selected]="facade.filter().clinicalGroupId === group.value">{{ groupLabel(group) }}</option>
+        }
+      </select>
+    </label>
+    <label toolbarFilters class="filter">
+      <span class="visually-hidden">{{ i18n.t('catalogue-a.tests.column.status') }}</span>
+      <select class="inp" (change)="onActive($event)">
+        <option value="active" [selected]="facade.filter().isActive === true">{{ i18n.t('shared.masterData.filter.active') }}</option>
+        <option value="inactive" [selected]="facade.filter().isActive === false">{{ i18n.t('shared.masterData.filter.inactive') }}</option>
+        <option value="all" [selected]="facade.filter().isActive === null">{{ i18n.t('shared.masterData.filter.all') }}</option>
+      </select>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.list.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('catalogue-a.refresh') }}</button>
+  </app-toolbar>
+
+  @if (facade.list.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('catalogue-a.loadError') }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.list.isLoading()" [emptyTitle]="i18n.t('catalogue-a.tests.empty')" [caption]="i18n.t('catalogue-a.tests.title')" (rowActivate)="open($event)">
+    <ng-template appCell="type" [appCellOf]="rows()" let-row><app-badge tone="violet">{{ typeLabel(row.type) }}</app-badge></ng-template>
+    <ng-template appCell="status" [appCellOf]="rows()" let-row><app-badge [status]="row.isActive ? 'Active' : 'Inactive'" /></ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="total()" (pageChange)="onPage($event)" />
+</app-section-card>

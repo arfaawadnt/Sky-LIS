@@ -1,0 +1,106 @@
+<app-page-header [title]="i18n.t('platform.templates.title')" [subtitle]="i18n.t('platform.templates.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="exportCsv()"><app-icon name="printer" [size]="15" />{{ i18n.t('platform.exportCsv') }}</button>
+  <button pageActions type="button" class="btn primary" *appCan="permissions.notificationsManage" (click)="openEdit(null)"><app-icon name="plus" [size]="16" />{{ i18n.t('platform.templates.add') }}</button>
+</app-page-header>
+
+<app-section-card [title]="i18n.t('platform.templates.placeholders')" [subtitle]="i18n.t('platform.templates.placeholdersHint')">
+  <div class="chips">
+    @for (token of tokens(); track token) {
+      <span class="chip" [title]="i18n.t('platform.templates.token.' + token)">{{ tokenText(token) }}</span>
+    }
+  </div>
+</app-section-card>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="i18n.t('platform.templates.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+    <label toolbarFilters class="inline-filter">
+      <span class="visually-hidden">{{ i18n.t('platform.templates.column.status') }}</span>
+      <select class="inp" (change)="onActive($event)">
+        <option value="active">{{ i18n.t('platform.status.Active') }}</option>
+        <option value="inactive">{{ i18n.t('platform.status.Inactive') }}</option>
+        <option value="all">{{ i18n.t('platform.all') }}</option>
+      </select>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.templates.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('platform.refresh') }}</button>
+  </app-toolbar>
+
+  @if (facade.templates.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('platform.loadError') }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.templates.isLoading()" [emptyTitle]="i18n.t('platform.templates.empty')"
+                  [caption]="i18n.t('platform.templates.title')" (rowActivate)="openEdit($event)">
+    <ng-template appCell="channel" [appCellOf]="facade.rows()" let-row>
+      <app-badge [tone]="tone(row.channel)">{{ channelLabel(row.channel) }}</app-badge>
+    </ng-template>
+    <ng-template appCell="status" [appCellOf]="facade.rows()" let-row>
+      <app-badge [status]="row.isActive ? 'Active' : 'Inactive'">{{ i18n.t(row.isActive ? 'platform.status.Active' : 'platform.status.Inactive') }}</app-badge>
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
+      <button type="button" class="row-btn" (click)="openEdit(row)" [attr.aria-label]="i18n.t('platform.templates.edit')" [title]="i18n.t('platform.templates.edit')"><app-icon name="edit" [size]="15" /></button>
+      <button type="button" class="row-btn" [class.danger]="row.isActive" *appCan="permissions.notificationsManage" (click)="toggle(row)"
+              [attr.aria-label]="i18n.t(row.isActive ? 'platform.deactivate' : 'platform.activate')" [title]="i18n.t(row.isActive ? 'platform.deactivate' : 'platform.activate')"><app-icon name="power" [size]="15" /></button>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="facade.templates.value()?.totalCount ?? 0" (pageChange)="onPage($event)" />
+</app-section-card>
+
+<app-drawer [(open)]="drawerOpen" [title]="i18n.t(editing() === null ? 'platform.templates.add' : 'platform.templates.edit')" size="lg">
+  @if (form(); as form) {
+    <form id="platform-template-form" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+      @if (saveProblem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+      <div class="form-grid">
+        <app-form-field [label]="i18n.t('platform.templates.field.code')" [hint]="i18n.t('platform.templates.hint.code')" [problem]="saveProblem()">
+          <input type="text" formControlName="code" dir="ltr" maxlength="40" autocomplete="off" spellcheck="false" class="mono" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.templates.field.channel')">
+          <select formControlName="channel">
+            @for (channel of channels; track channel) {
+              <option [value]="channel">{{ channelLabel(channel) }}</option>
+            }
+          </select>
+        </app-form-field>
+        @if (isEmail()) {
+          <app-form-field [label]="i18n.t('platform.templates.field.subjectEn')" [problem]="saveProblem()">
+            <input type="text" formControlName="subjectEn" dir="ltr" lang="en" maxlength="200" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('platform.templates.field.subjectAr')" [problem]="saveProblem()">
+            <input type="text" formControlName="subjectAr" dir="rtl" lang="ar" maxlength="200" />
+          </app-form-field>
+        }
+
+        <div class="full stack">
+          <span class="small muted">{{ i18n.t('platform.templates.insertHint') }}</span>
+          <div class="chips">
+            @for (token of tokens(); track token) {
+              <button type="button" class="chip" (click)="insert(form, token)" [title]="i18n.t('platform.templates.token.' + token)">{{ tokenText(token) }}</button>
+            }
+          </div>
+        </div>
+
+        <app-form-field class="full" [label]="i18n.t('platform.templates.field.textEn')" [problem]="saveProblem()">
+          <textarea formControlName="textEn" rows="4" dir="ltr" lang="en" maxlength="2000" (focus)="onFocus('textEn', $event)"></textarea>
+        </app-form-field>
+        <app-form-field class="full" [label]="i18n.t('platform.templates.field.textAr')" [problem]="saveProblem()">
+          <textarea formControlName="textAr" rows="4" dir="rtl" lang="ar" maxlength="2000" (focus)="onFocus('textAr', $event)"></textarea>
+        </app-form-field>
+
+        <div class="full stack">
+          <h3 class="section-title">{{ i18n.t('platform.templates.preview') }}</h3>
+          <p class="preview" dir="ltr" lang="en">{{ previewEn() || '—' }}</p>
+          <p class="preview" dir="rtl" lang="ar">{{ previewAr() || '—' }}</p>
+        </div>
+      </div>
+    </form>
+  }
+  <ng-container drawerFooter>
+    <button type="button" class="btn" (click)="drawerOpen.set(false)">{{ i18n.t('platform.cancel') }}</button>
+    <button type="submit" form="platform-template-form" class="btn primary" *appCan="permissions.notificationsManage" [disabled]="facade.save.pending()">
+      {{ facade.save.pending() ? i18n.t('platform.saving') : i18n.t('platform.save') }}
+    </button>
+  </ng-container>
+</app-drawer>

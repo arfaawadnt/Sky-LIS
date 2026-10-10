@@ -1,0 +1,202 @@
+<app-public-header [compact]="true" />
+
+<main class="wizard-wrap">
+  <section class="wizard card" [attr.aria-label]="i18n.t('public.wizard.title')">
+    <header class="wizard-head">
+      <h1>{{ i18n.t('public.wizard.title') }}</h1>
+      <p class="muted">{{ i18n.t('public.wizard.subtitle') }}</p>
+    </header>
+
+    <ol class="steps" [attr.aria-label]="i18n.t('public.wizard.progress')">
+      @for (item of stepKeys; track item.step) {
+        <li class="step" [class.active]="facade.step() === item.step" [class.done]="facade.step() > item.step" [attr.aria-current]="facade.step() === item.step ? 'step' : null">
+          <span class="step-dot">
+            @if (facade.step() > item.step) {
+              <app-icon name="check" [size]="14" />
+            } @else {
+              {{ item.step }}
+            }
+          </span>
+          <span>{{ i18n.t('public.wizard.step.' + item.key) }}</span>
+        </li>
+      }
+    </ol>
+
+    @switch (facade.step()) {
+      @case (1) {
+        <form [formGroup]="details" (ngSubmit)="sendCode()" novalidate>
+          @if (facade.countries.error()) {
+            <p class="problem" role="alert">{{ i18n.t('public.wizard.countriesError') }}</p>
+          }
+          <div class="form-grid">
+            <app-form-field [label]="i18n.t('public.field.labNameEn')">
+              <input type="text" formControlName="labNameEn" maxlength="200" autocomplete="organization" />
+            </app-form-field>
+            <app-form-field [label]="i18n.t('public.field.labNameAr')">
+              <input type="text" formControlName="labNameAr" maxlength="200" dir="rtl" lang="ar" />
+            </app-form-field>
+            <app-form-field [label]="i18n.t('public.field.country')">
+              <select formControlName="countryId" (change)="onCountryChange()">
+                <option value="">{{ i18n.t('public.wizard.chooseCountry') }}</option>
+                @for (country of countries(); track country.id) {
+                  <option [value]="country.id">{{ name(country) }} ({{ country.dialCode }})</option>
+                }
+              </select>
+            </app-form-field>
+            <app-form-field [label]="i18n.t('public.field.governorate')">
+              <select formControlName="governorateId">
+                <option value="">{{ facade.countryId() ? i18n.t('public.wizard.chooseGovernorate') : i18n.t('public.wizard.chooseCountryFirst') }}</option>
+                @for (governorate of governorates(); track governorate.id) {
+                  <option [value]="governorate.id">{{ name(governorate) }}</option>
+                }
+              </select>
+            </app-form-field>
+            <app-form-field class="full" [label]="i18n.t('public.field.address')">
+              <input type="text" formControlName="address" maxlength="300" autocomplete="street-address" />
+            </app-form-field>
+            <app-form-field [label]="i18n.t('public.field.mobile')" [hint]="mobileHint()">
+              <input type="tel" formControlName="mobile" inputmode="tel" autocomplete="tel" dir="ltr" />
+            </app-form-field>
+            <app-form-field [label]="i18n.t('public.field.licenceNo')" [hint]="i18n.t('public.wizard.optional')">
+              <input type="text" formControlName="licenceNo" maxlength="64" />
+            </app-form-field>
+            <app-form-field [label]="i18n.t('public.field.managerName')">
+              <input type="text" formControlName="managerName" maxlength="200" autocomplete="name" />
+            </app-form-field>
+            <app-form-field [label]="i18n.t('public.field.managerMobile')" [hint]="i18n.t('public.wizard.managerMobileHint')">
+              <input type="tel" formControlName="managerMobile" inputmode="tel" autocomplete="tel" dir="ltr" />
+            </app-form-field>
+            <app-form-field class="full" [label]="i18n.t('public.field.email')" [hint]="i18n.t('public.wizard.optional')">
+              <input type="email" formControlName="email" maxlength="254" autocomplete="email" dir="ltr" />
+            </app-form-field>
+          </div>
+
+          @if (facade.start.problem(); as problem) {
+            <p class="problem" role="alert">{{ problemText(problem) }}</p>
+          }
+
+          <div class="wizard-actions">
+            <a class="btn" routerLink="/welcome">{{ i18n.t('public.wizard.back') }}</a>
+            <button type="submit" class="btn primary" [disabled]="facade.start.pending()">
+              {{ facade.start.pending() ? i18n.t('public.wizard.sending') : i18n.t('public.wizard.sendCode') }}
+            </button>
+          </div>
+        </form>
+      }
+
+      @case (2) {
+        <form class="narrow center" [formGroup]="codeForm" (ngSubmit)="verifyCode()" novalidate>
+          <span class="badge-icon" aria-hidden="true"><app-icon name="shield" [size]="26" /></span>
+          <h2>{{ i18n.t('public.wizard.verifyTitle') }}</h2>
+          <p class="muted">{{ i18n.tf('public.wizard.codeSent', { mobile: facade.started()?.maskedMobile ?? '' }) }}</p>
+          <p class="info-strip">{{ i18n.tf('public.wizard.codeValidity', { minutes: facade.codeMinutes() }) }}</p>
+
+          <app-form-field [label]="i18n.t('public.field.code')">
+            <input class="otp" type="text" formControlName="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" dir="ltr" />
+          </app-form-field>
+
+          @if (facade.verify.problem() ?? facade.resend.problem(); as problem) {
+            <p class="problem" role="alert">{{ problemText(problem) }}</p>
+            @if (mustRestart(problem)) {
+              <button type="button" class="btn" (click)="restart()">{{ i18n.t('public.wizard.startAgain') }}</button>
+            }
+          }
+
+          <button type="button" class="link" (click)="resendCode()" [disabled]="facade.resendIn() > 0 || facade.resend.pending()">
+            @if (facade.resendIn() > 0) {
+              {{ i18n.tf('public.wizard.resendIn', { seconds: facade.resendIn() }) }}
+            } @else {
+              {{ i18n.t('public.wizard.resend') }}
+            }
+          </button>
+
+          <div class="wizard-actions">
+            <button type="button" class="btn" (click)="facade.backToDetails()">{{ i18n.t('public.wizard.back') }}</button>
+            <button type="submit" class="btn primary" [disabled]="facade.verify.pending()">
+              {{ facade.verify.pending() ? i18n.t('public.wizard.verifying') : i18n.t('public.wizard.verify') }}
+            </button>
+          </div>
+        </form>
+      }
+
+      @case (3) {
+        <form class="narrow" [formGroup]="account" (ngSubmit)="createAccount()" novalidate>
+          <h2>{{ i18n.t('public.wizard.accountTitle') }}</h2>
+          <p class="muted">{{ i18n.t('public.wizard.accountText') }}</p>
+
+          <app-form-field [label]="i18n.t('public.field.username')" [hint]="i18n.t('public.wizard.usernameHint')">
+            <input type="text" formControlName="username" maxlength="64" autocomplete="username" autocapitalize="none" spellcheck="false" dir="ltr" (input)="onUsernameInput()" />
+          </app-form-field>
+          <p class="availability" [attr.data-state]="facade.usernameState()" aria-live="polite">
+            @switch (facade.usernameState()) {
+              @case ('checking') {
+                {{ i18n.t('public.wizard.username.checking') }}
+              }
+              @case ('available') {
+                <app-icon name="check" [size]="14" />{{ i18n.t('public.wizard.username.available') }}
+              }
+              @case ('taken') {
+                <app-icon name="x" [size]="14" />{{ i18n.t('public.wizard.username.taken') }}
+              }
+              @case ('invalid') {
+                <app-icon name="alert" [size]="14" />{{ i18n.t('public.wizard.username.invalid') }}
+              }
+              @case ('error') {
+                {{ i18n.t('public.wizard.username.error') }}
+              }
+            }
+          </p>
+
+          <app-form-field [label]="i18n.t('public.field.password')">
+            <input [type]="showPassword() ? 'text' : 'password'" formControlName="password" autocomplete="new-password" dir="ltr" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('public.field.confirmation')">
+            <input [type]="showPassword() ? 'text' : 'password'" formControlName="confirmation" autocomplete="new-password" dir="ltr" />
+          </app-form-field>
+          <label class="check">
+            <input type="checkbox" [checked]="showPassword()" (change)="showPassword.set(!showPassword())" />
+            <span>{{ i18n.t('public.wizard.showPassword') }}</span>
+          </label>
+
+          <ul class="rules" [attr.aria-label]="i18n.t('public.wizard.rulesTitle')">
+            <li [class.ok]="checks().length">
+              <app-icon [name]="checks().length ? 'check' : 'x'" [size]="14" />{{ i18n.tf('public.rule.length', { min: rule.minLength, max: rule.maxLength }) }}
+            </li>
+            <li [class.ok]="checks().notUsername"><app-icon [name]="checks().notUsername ? 'check' : 'x'" [size]="14" />{{ i18n.t('public.rule.notUsername') }}</li>
+            <li [class.ok]="checks().matches"><app-icon [name]="checks().matches ? 'check' : 'x'" [size]="14" />{{ i18n.t('public.rule.matches') }}</li>
+          </ul>
+          <p class="muted small">{{ i18n.t('public.rule.noComposition') }}</p>
+
+          @if (facade.complete.problem(); as problem) {
+            <p class="problem" role="alert">{{ problemText(problem) }}</p>
+            @if (mustRestart(problem)) {
+              <button type="button" class="btn" (click)="restart()">{{ i18n.t('public.wizard.startAgain') }}</button>
+            }
+          }
+
+          <div class="wizard-actions">
+            <span></span>
+            <button type="submit" class="btn primary" [disabled]="facade.complete.pending()">
+              {{ facade.complete.pending() ? i18n.t('public.wizard.creating') : i18n.t('public.wizard.createAccount') }}
+            </button>
+          </div>
+        </form>
+      }
+
+      @case (4) {
+        <div class="narrow center done">
+          <span class="badge-icon ok" aria-hidden="true"><app-icon name="check" [size]="30" /></span>
+          <h2>{{ i18n.t('public.wizard.readyTitle') }}</h2>
+          <p class="muted">{{ i18n.t('public.wizard.readyText') }}</p>
+          @if (facade.completed(); as completed) {
+            <div class="portal-url" dir="ltr">
+              <a [href]="completed.portalUrl" target="_blank" rel="noopener">{{ completed.portalUrl }}</a>
+            </div>
+            <p class="small">{{ i18n.tf('public.wizard.yourUsername', { username: completed.username }) }}</p>
+          }
+          <button type="button" class="btn primary" (click)="signIn()">{{ i18n.t('public.signIn') }}</button>
+        </div>
+      }
+    }
+  </section>
+</main>

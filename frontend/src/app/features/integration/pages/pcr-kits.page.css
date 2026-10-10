@@ -1,0 +1,45 @@
+.filter {
+  width: auto;
+  min-width: 150px;
+}
+
+.list-problem {
+  margin: var(--sp-3) var(--sp-4) 0;
+}
+
+.section {
+  margin: var(--sp-4) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+
+.genes,
+.verdicts {
+  width: 100%;
+  border-collapse: collapse;
+  margin-block: var(--sp-2);
+}
+
+.genes th,
+.genes td,
+.verdicts th,
+.verdicts td {
+  padding: var(--sp-1) var(--sp-2);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.verdicts td app-badge {
+  margin-inline-end: var(--sp-1);
+}
+
+.narrow {
+  width: 90px;
+}
+
+.problem-text {
+  color: var(--bad, #b42318);
+  font-size: var(--fs-sm);
+}

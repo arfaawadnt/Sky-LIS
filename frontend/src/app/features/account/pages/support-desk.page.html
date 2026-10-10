@@ -1,0 +1,66 @@
+<app-page-header [title]="i18n.t('account.desk.title')" [subtitle]="i18n.t('account.desk.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="facade.tickets.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('account.refresh') }}</button>
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="i18n.t('account.desk.search')" [label]="i18n.t('account.desk.search')" (searchChange)="facade.setSearch($event)" />
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('account.support.statusLabel') }}</span>
+      <select class="inp" (change)="onStatus($event)">
+        <option value="" [selected]="facade.filter().status === null">{{ i18n.t('account.support.allStatuses') }}</option>
+        @for (status of statuses; track status) {
+          <option [value]="status" [selected]="facade.filter().status === status">{{ i18n.t('account.support.status.' + status) }}</option>
+        }
+      </select>
+    </label>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('account.support.priorityLabel') }}</span>
+      <select class="inp" (change)="onPriority($event)">
+        <option value="">{{ i18n.t('account.support.allPriorities') }}</option>
+        @for (priority of priorities; track priority) {
+          <option [value]="priority" [selected]="facade.filter().priority === priority">{{ i18n.t('account.support.priority.' + priority) }}</option>
+        }
+      </select>
+    </label>
+    @if (facade.filter().tenantId !== null) {
+      <button toolbarActions type="button" class="btn sm" (click)="facade.setLaboratory(null)"><app-icon name="x" [size]="14" />{{ i18n.t('account.desk.allLaboratories') }}</button>
+    }
+  </app-toolbar>
+
+  @if (facade.tickets.error()) {
+    <p class="problem list-problem" role="alert">{{ loadError() }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.tickets.isLoading()" [emptyTitle]="i18n.t('account.desk.empty')" [caption]="i18n.t('account.desk.title')" (rowActivate)="facade.select($event.id)">
+    <ng-template appCell="laboratory" [appCellOf]="rows()" let-row>
+      <button type="button" class="link" (click)="facade.setLaboratory(row.tenantId)" [attr.title]="i18n.t('account.desk.onlyThisLaboratory')">{{ laboratory(row) }}</button>
+    </ng-template>
+    <ng-template appCell="priority" [appCellOf]="rows()" let-row><app-badge [tone]="priorityTone(row.priority)">{{ i18n.t('account.support.priority.' + row.priority) }}</app-badge></ng-template>
+    <ng-template appCell="status" [appCellOf]="rows()" let-row><app-badge [tone]="statusTone(row.status)">{{ i18n.t('account.support.status.' + row.status) }}</app-badge></ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="totalCount()" (pageChange)="onPage($event)" />
+</app-section-card>
+
+<app-drawer [open]="threadOpen()" (openChange)="onThreadOpenChange($event)" [title]="detail()?.number ?? i18n.t('account.support.ticket')" size="lg">
+  @if (facade.detail.error()) {
+    <p class="problem" role="alert">{{ i18n.t('account.support.ticketError') }}</p>
+  } @else if (detail(); as ticket) {
+    <app-ticket-thread [ticket]="ticket" [canReply]="canAnswer()" [showLaboratory]="true" [pending]="facade.answer.pending()" [problem]="threadProblem()" (replied)="answer($event)">
+      <ng-container threadActions>
+        @if (ticket.status === 'Open') {
+          <button type="button" class="btn" *appCan="permissions.supportManage" (click)="start(ticket)" [disabled]="facade.start.pending()">{{ i18n.t('account.support.start') }}</button>
+        }
+        @if (ticket.status === 'Open' || ticket.status === 'InProgress') {
+          <button type="button" class="btn ok" *appCan="permissions.supportManage" (click)="resolve(ticket)" [disabled]="facade.resolve.pending()">{{ i18n.t('account.support.resolve') }}</button>
+        }
+        @if (ticket.status !== 'Closed') {
+          <button type="button" class="btn" *appCan="permissions.supportManage" (click)="close(ticket)" [disabled]="facade.close.pending()">{{ i18n.t('account.support.close') }}</button>
+        }
+      </ng-container>
+    </app-ticket-thread>
+  } @else {
+    <p class="muted">{{ i18n.t('account.loading') }}</p>
+  }
+</app-drawer>

@@ -1,0 +1,76 @@
+<app-page-header [title]="i18n.t('platform.pcrKits.title')" [subtitle]="i18n.t('platform.pcrKits.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="exportCsv()"><app-icon name="printer" [size]="15" />{{ i18n.t('platform.exportCsv') }}</button>
+  <button pageActions type="button" class="btn primary" *appCan="permissions.integrationManage" (click)="openEdit(null)"><app-icon name="plus" [size]="16" />{{ i18n.t('platform.pcrKits.add') }}</button>
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="i18n.t('platform.pcrKits.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+    <label toolbarFilters class="inline-filter">
+      <span class="visually-hidden">{{ i18n.t('platform.pcrKits.column.status') }}</span>
+      <select class="inp" (change)="onActive($event)">
+        <option value="active">{{ i18n.t('platform.status.Active') }}</option>
+        <option value="inactive">{{ i18n.t('platform.status.Inactive') }}</option>
+        <option value="all">{{ i18n.t('platform.all') }}</option>
+      </select>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.kits.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('platform.refresh') }}</button>
+  </app-toolbar>
+
+  @if (facade.kits.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('platform.loadError') }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.kits.isLoading()" [emptyTitle]="i18n.t('platform.pcrKits.empty')"
+                  [caption]="i18n.t('platform.pcrKits.title')" (rowActivate)="openEdit($event)">
+    <ng-template appCell="status" [appCellOf]="facade.rows()" let-row>
+      <app-badge [status]="row.isActive ? 'Active' : 'Inactive'">{{ i18n.t(row.isActive ? 'platform.status.Active' : 'platform.status.Inactive') }}</app-badge>
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
+      <button type="button" class="row-btn" (click)="openEdit(row)" [attr.aria-label]="i18n.t('platform.pcrKits.edit')" [title]="i18n.t('platform.pcrKits.edit')"><app-icon name="edit" [size]="15" /></button>
+      <button type="button" class="row-btn" [class.danger]="row.isActive" *appCan="permissions.integrationManage" (click)="toggle(row)"
+              [attr.aria-label]="i18n.t(row.isActive ? 'platform.deactivate' : 'platform.activate')" [title]="i18n.t(row.isActive ? 'platform.deactivate' : 'platform.activate')"><app-icon name="power" [size]="15" /></button>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="facade.kits.value()?.totalCount ?? 0" (pageChange)="onPage($event)" />
+</app-section-card>
+
+<app-drawer [(open)]="drawerOpen" [title]="i18n.t(editing() === null ? 'platform.pcrKits.add' : 'platform.pcrKits.edit')" size="lg">
+  @if (form(); as form) {
+    <form id="platform-pcr-kit-form" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+      @if (saveProblem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+      <div class="form-grid">
+        <app-form-field [label]="i18n.t('platform.pcrKits.field.name')" [problem]="saveProblem()">
+          <input type="text" formControlName="name" maxlength="150" autocomplete="off" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.pcrKits.field.analyserModel')" [hint]="i18n.t('platform.pcrKits.hint.analyserModel')">
+          <select formControlName="analyserModelId">
+            <option value="">{{ i18n.t('platform.none') }}</option>
+            @for (model of modelOptions(); track model.id) {
+              <option [value]="model.id">{{ model.vendor }} {{ model.model }}</option>
+            }
+          </select>
+        </app-form-field>
+        @for (document of documents; track document) {
+          <div class="full stack">
+            <app-form-field [label]="i18n.t('platform.pcrKits.field.' + document)" [hint]="i18n.t('platform.pcrKits.hint.' + document)" [name]="document" [problem]="saveProblem()">
+              <textarea class="json" [formControlName]="document" rows="7" dir="ltr" spellcheck="false" maxlength="20000"></textarea>
+            </app-form-field>
+            <div class="row-gap">
+              <button type="button" class="btn sm ghost" (click)="format(form, document)">{{ i18n.t('platform.pcrKits.format') }}</button>
+            </div>
+          </div>
+        }
+      </div>
+    </form>
+  }
+  <ng-container drawerFooter>
+    <button type="button" class="btn" (click)="drawerOpen.set(false)">{{ i18n.t('platform.cancel') }}</button>
+    <button type="submit" form="platform-pcr-kit-form" class="btn primary" *appCan="permissions.integrationManage" [disabled]="facade.save.pending()">
+      {{ facade.save.pending() ? i18n.t('platform.saving') : i18n.t('platform.save') }}
+    </button>
+  </ng-container>
+</app-drawer>

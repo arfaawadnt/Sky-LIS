@@ -1,0 +1,205 @@
+<app-page-header [title]="i18n.t('pricing.contract.title')" [subtitle]="i18n.t('pricing.contract.subtitle')">
+  <ng-container pageActions>
+    @if (detail()?.exists) {
+      <button type="button" class="btn ghost" (click)="printReview()" [disabled]="printing()"><app-icon name="printer" [size]="15" />{{ i18n.t('pricing.contract.reviewReport') }}</button>
+      <button type="button" class="btn" *appCan="permissions.export" (click)="exportCsv()"><app-icon name="arrow-down" [size]="15" />{{ i18n.t('pricing.exportCsv') }}</button>
+    }
+    @if (detail()) {
+      <button type="button" class="btn" *appCan="permissions.edit" (click)="openCopy()"><app-icon name="clipboard" [size]="15" />{{ i18n.t('pricing.copyTier.title') }}</button>
+    }
+    @if (detail()?.exists) {
+      <button type="button" class="btn primary" *appCan="permissions.approve" (click)="apply()" [disabled]="facade.apply.pending()">
+        <app-icon name="zap" [size]="15" />{{ i18n.t('pricing.contract.apply') }}
+      </button>
+    }
+  </ng-container>
+</app-page-header>
+
+<p class="info-strip">{{ i18n.t('pricing.contract.note') }}</p>
+
+<app-section-card class="picker-card">
+  <div class="picker">
+    <label class="field">
+      <span>{{ i18n.t('pricing.contract.payer') }}</span>
+      <select class="inp" (change)="onPayerChange($event)" [disabled]="!facade.tierOptions.hasValue()">
+        <option value="" [selected]="payerId() === ''">{{ i18n.t('pricing.choose') }}</option>
+        @for (option of payers(); track option.payerId) {
+          <option [value]="option.payerId" [selected]="option.payerId === payerId()">{{ payerLabel(option) }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span>{{ i18n.t('pricing.contract.tier') }}</span>
+      <select class="inp" (change)="onTierChange($event)" [disabled]="payerTiers().length === 0">
+        <option value="" [selected]="!tierId()">{{ i18n.t('pricing.choose') }}</option>
+        @for (option of payerTiers(); track option.id) {
+          <option [value]="option.id" [selected]="option.id === tierId()">{{ tierLabel(option) }}</option>
+        }
+      </select>
+    </label>
+    @if (detail(); as current) {
+      <div class="status" role="status">
+        @if (!current.payerIsActive || !current.tierIsActive) {
+          <app-badge tone="bad">{{ i18n.t('pricing.contract.inactiveTier') }}</app-badge>
+        } @else if (current.exists && current.inEffect && current.appliedAtUtc) {
+          <app-badge tone="ok">{{ i18n.t('pricing.contract.inEffect') }}</app-badge>
+        } @else if (current.exists && !current.inEffect) {
+          <app-badge tone="warn">{{ i18n.t('pricing.contract.outOfEffect') }}</app-badge>
+        } @else {
+          <app-badge tone="neutral">{{ i18n.t('pricing.contract.notApplied') }}</app-badge>
+        }
+        <span class="muted small">{{ i18n.t('pricing.contract.lastApplied') }}: {{ appliedText(current) }}</span>
+        <span class="muted small">{{ i18n.t('pricing.contract.currency') }}: {{ current.currency }}</span>
+      </div>
+    }
+  </div>
+</app-section-card>
+
+@if (facade.detail.error()) {
+  <p class="problem" role="alert">{{ i18n.t('pricing.contract.loadError') }}</p>
+}
+
+@if (!tierId()) {
+  <app-empty-state [title]="i18n.t('pricing.contract.chooseTitle')" [message]="i18n.t('pricing.contract.chooseHint')" icon="coins" />
+} @else if (detail(); as current) {
+  @if (current.tierIsDefault && !current.appliedAtUtc) {
+    <p class="info-strip">{{ i18n.t('pricing.contract.cashFallback') }}</p>
+  }
+
+  <app-section-card [title]="i18n.t('pricing.contract.formula')" [subtitle]="i18n.t('pricing.contract.formulaHelp')">
+    <form [formGroup]="formulaForm" (ngSubmit)="saveFormula()" appSaveShortcut (appSaveShortcut)="saveFormula()" novalidate class="formula">
+      @if (facade.saveFormula.problem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
+      }
+      <div class="dates">
+        <app-form-field [label]="i18n.t('pricing.contract.effectiveFrom')">
+          <input type="date" formControlName="effectiveFrom" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('pricing.contract.effectiveTo')" [hint]="i18n.t('pricing.contract.effectiveToHint')">
+          <input type="date" formControlName="effectiveTo" />
+        </app-form-field>
+      </div>
+
+      <div class="terms" formArrayName="terms" role="table" [attr.aria-label]="i18n.t('pricing.contract.formula')">
+        <div class="term head" role="row">
+          <span role="columnheader">{{ i18n.t('pricing.contract.priority') }}</span>
+          <span role="columnheader">{{ i18n.t('pricing.contract.baseList') }}</span>
+          <span role="columnheader">{{ i18n.t('pricing.contract.patientFactor') }}</span>
+          <span role="columnheader">{{ i18n.t('pricing.contract.payerFactor') }}</span>
+          <span role="columnheader">{{ i18n.t('pricing.contract.exampleHeader') }}</span>
+        </div>
+        @for (index of priorities; track index) {
+          <div class="term" role="row" [formGroupName]="index">
+            <span role="cell" class="priority">{{ i18n.t('pricing.contract.priority' + (index + 1)) }}</span>
+            <span role="cell">
+              <select class="inp" formControlName="baseListId" [attr.aria-label]="i18n.t('pricing.contract.baseList') + ' ' + (index + 1)">
+                <option value="">{{ index === 0 ? i18n.t('pricing.choose') : i18n.t('pricing.contract.none') }}</option>
+                @for (list of lists(); track list.id) {
+                  <option [value]="list.id">{{ listLabel(list) }}</option>
+                }
+              </select>
+            </span>
+            <span role="cell">
+              <input type="number" class="inp factor" formControlName="patientFactor" min="0" max="10" step="0.01" [attr.aria-label]="i18n.t('pricing.contract.patientFactor') + ' ' + (index + 1)" />
+            </span>
+            <span role="cell">
+              <input type="number" class="inp factor" formControlName="payerFactor" min="0" max="10" step="0.01" [attr.aria-label]="i18n.t('pricing.contract.payerFactor') + ' ' + (index + 1)" />
+            </span>
+            <span role="cell" class="example small">{{ example(index) }}</span>
+          </div>
+        }
+      </div>
+
+      @for (error of formulaErrors(); track error) {
+        <p class="problem small" role="alert">{{ i18n.t('pricing.contract.formulaError.' + error) }}</p>
+      }
+
+      <div class="form-actions">
+        <span class="muted small">{{ i18n.t('pricing.contract.fallbackHelp') }}</span>
+        <button type="submit" class="btn primary" *appCan="permissions.edit" [disabled]="facade.saveFormula.pending() || formulaForm.pristine">
+          <app-icon name="check" [size]="15" />{{ i18n.t(facade.saveFormula.pending() ? 'pricing.saving' : 'pricing.contract.saveFormula') }}
+        </button>
+      </div>
+    </form>
+  </app-section-card>
+
+  <app-section-card [padded]="false" [title]="i18n.t('pricing.contract.derived')" [subtitle]="i18n.t('pricing.contract.derivedHelp')">
+    <app-toolbar>
+      <app-search-box toolbarFilters [placeholder]="i18n.t('pricing.contract.searchPlaceholder')" (searchChange)="onSearch($event)" />
+      @if (current.exists) {
+        <app-service-picker
+          toolbarFilters
+          *appCan="permissions.edit"
+          [search]="searchService"
+          [label]="i18n.t('pricing.contract.negotiateService')"
+          [placeholder]="i18n.t('pricing.contract.negotiateServicePlaceholder')"
+          (picked)="onNegotiateService($event)"
+        />
+      }
+      <span toolbarActions class="muted small">{{ i18n.tf('pricing.contract.counts', { priced: facade.prices().length, excluded: facade.excludedCount() }) }}</span>
+    </app-toolbar>
+
+    @for (problem of [facade.apply.problem(), facade.clearExclusion.problem(), facade.copyFrom.problem()]; track $index) {
+      @if (problem) {
+        <p class="problem list-problem" role="alert">{{ problemText(problem.code) }}</p>
+      }
+    }
+
+    <app-data-table
+      [columns]="columns"
+      [rows]="pagedPrices()"
+      [rowId]="priceRowId"
+      [loading]="facade.detail.isLoading()"
+      [interactive]="false"
+      [compact]="true"
+      [emptyTitle]="i18n.t(current.exists ? 'pricing.contract.emptyPrices' : 'pricing.contract.noFormula')"
+      [emptyMessage]="i18n.t(current.exists ? 'pricing.contract.emptyPricesHint' : 'pricing.contract.noFormulaHint')"
+      [caption]="i18n.t('pricing.contract.derived')"
+    >
+      <ng-template appCell="code" [appCellOf]="pagedPrices()" let-row>
+        <span class="mono">{{ facade.names.code(row.serviceId) || '—' }}</span>
+      </ng-template>
+      <ng-template appCell="service" [appCellOf]="pagedPrices()" let-row>
+        {{ facade.names.name(row.serviceId, i18n.lang()) || '—' }}
+      </ng-template>
+      <ng-template appCell="listPrice" [appCellOf]="pagedPrices()" let-row><span class="num">{{ amount(row.listPrice) }}</span></ng-template>
+      <ng-template appCell="patientShare" [appCellOf]="pagedPrices()" let-row><span class="num">{{ amount(row.patientShare) }}</span></ng-template>
+      <ng-template appCell="payerShare" [appCellOf]="pagedPrices()" let-row><span class="num">{{ amount(row.payerShare) }}</span></ng-template>
+      <ng-template appCell="total" [appCellOf]="pagedPrices()" let-row><span class="num">{{ amount(row.patientShare + row.payerShare) }}</span></ng-template>
+      <ng-template appCell="flags" [appCellOf]="pagedPrices()" let-row>
+        <span class="flags">
+          @if (row.isExcluded) {
+            <app-badge tone="violet">{{ i18n.t('pricing.grid.excluded') }}</app-badge>
+          }
+          @if (row.alertCondition) {
+            <span class="alert-flag" [title]="row.alertCondition"><app-icon name="alert" [size]="14" /><span class="visually-hidden">{{ row.alertCondition }}</span></span>
+          }
+        </span>
+      </ng-template>
+      <ng-template appRowActions [appRowActionsOf]="pagedPrices()" let-row>
+        <ng-container *appCan="permissions.edit">
+          <button type="button" class="row-btn" (click)="openNegotiate(row)" [attr.aria-label]="i18n.t('pricing.negotiate.title')" [title]="i18n.t('pricing.negotiate.title')"><app-icon name="edit" [size]="15" /></button>
+          @if (row.isExcluded) {
+            <button type="button" class="row-btn" (click)="restore(row)" [attr.aria-label]="i18n.t('pricing.contract.restore')" [title]="i18n.t('pricing.contract.restore')"><app-icon name="refresh" [size]="15" /></button>
+          }
+          <button type="button" class="row-btn" (click)="openAlert(row)" [attr.aria-label]="i18n.t('pricing.alert.title')" [title]="i18n.t('pricing.alert.title')"><app-icon name="alert" [size]="15" /></button>
+        </ng-container>
+      </ng-template>
+    </app-data-table>
+
+    <app-paginator [page]="page().page" [pageSize]="page().pageSize" [totalCount]="facade.visiblePrices().length" (pageChange)="page.set($event)" />
+  </app-section-card>
+} @else if (facade.detail.isLoading()) {
+  <p class="muted">{{ i18n.t('pricing.loading') }}</p>
+}
+
+<app-negotiate-price-dialog [(open)]="negotiateOpen" [target]="negotiation()" [pending]="facade.negotiate.pending()" [problem]="facade.negotiate.problem()" (negotiate)="runNegotiate($event)" />
+<app-price-alert-dialog
+  [(open)]="alertOpen"
+  [label]="alertLabel()"
+  [current]="alertTarget()?.alertCondition ?? null"
+  [pending]="facade.setAlert.pending()"
+  [problem]="facade.setAlert.problem()"
+  (save)="runAlert($event)"
+/>
+<app-copy-tier-dialog [(open)]="copyOpen" [sources]="facade.copySources()" [pending]="facade.copyFrom.pending()" [problem]="facade.copyFrom.problem()" (confirmCopy)="runCopy($event)" />

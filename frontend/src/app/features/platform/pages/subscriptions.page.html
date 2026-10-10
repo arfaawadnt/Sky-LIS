@@ -1,0 +1,173 @@
+<app-page-header [title]="i18n.t('platform.subscriptions.title')" [subtitle]="i18n.t('platform.subscriptions.subtitle')" />
+
+<app-tabs [tabs]="tabs()" [(active)]="tab" />
+
+@if ((tab() ?? 'wallets') === 'wallets') {
+  <div role="tabpanel" class="stack">
+    <app-section-card [title]="i18n.t('platform.wallet.title')" [subtitle]="i18n.t('platform.wallet.subtitle')">
+      <div cardActions class="row-gap">
+        <label class="inline-filter">
+          <span>{{ i18n.t('platform.wallet.client') }}</span>
+          <select class="inp" (change)="onClient($event)">
+            @for (client of clients(); track client.id) {
+              <option [value]="client.id" [selected]="facade.clientId() === client.id">{{ name(client) }}</option>
+            }
+          </select>
+        </label>
+        @if (wallet()) {
+          <button type="button" class="btn primary sm" *appCan="permissions.tenancyManage" (click)="openTopUp(null)"><app-icon name="plus" [size]="15" />{{ i18n.t('platform.wallet.topUp') }}</button>
+        }
+      </div>
+
+      @if (facade.wallet.error()) {
+        <p class="problem" role="alert">{{ problemText(null) }}</p>
+      }
+      @if (wallet(); as w) {
+        <div class="kpis">
+          <app-stat-card [label]="i18n.t('platform.wallet.balance')" [value]="money(w.balance, w.currencyCode)" [tone]="w.balance <= 0 ? 'bad' : 'ok'" icon="coins"
+                         [hint]="w.balance <= 0 ? i18n.t('platform.wallet.atZero') : null" />
+          <app-stat-card [label]="i18n.t('platform.wallet.monthlyFee')" [value]="money(w.monthlyFee, w.planCurrencyCode)" [hint]="w.planCode + ' · ' + pickPlan(w)" icon="clipboard" />
+          <app-stat-card [label]="i18n.t('platform.wallet.nextCharge')" [value]="date(w.nextChargeAtUtc)" icon="refresh" tone="info" />
+          <app-stat-card [label]="i18n.t('platform.wallet.smsUsed')" [value]="number(w.smsUsedThisMonth) + ' / ' + number(w.smsQuota)" [hint]="i18n.t('platform.wallet.thisMonth')" icon="inbox" />
+        </div>
+
+        @if (w.pendingTopUpRequests.length > 0) {
+          <h3 class="section-title">{{ i18n.t('platform.wallet.pendingRequests') }}</h3>
+          <ul class="stack" role="list">
+            @for (request of w.pendingTopUpRequests; track request.id) {
+              <li class="row-gap warn-strip">
+                <strong>{{ money(request.amount, w.currencyCode) }}</strong>
+                <span class="small">{{ request.requestedByName ?? '—' }} · {{ date(request.requestedAtUtc) }}</span>
+                @if (request.note) {
+                  <span class="small muted">“{{ request.note }}”</span>
+                }
+                <span class="row-gap" *appCan="permissions.tenancyManage">
+                  <button type="button" class="btn sm primary" (click)="openTopUp(request)">{{ i18n.t('platform.wallet.settle') }}</button>
+                  <button type="button" class="btn sm" (click)="declineRequest(request)">{{ i18n.t('platform.wallet.decline') }}</button>
+                </span>
+              </li>
+            }
+          </ul>
+        }
+      } @else if (!facade.wallet.isLoading()) {
+        <app-empty-state [title]="i18n.t('platform.wallet.noClient')" icon="coins" />
+      }
+    </app-section-card>
+
+    @if (wallet()) {
+      <app-section-card [title]="i18n.t('platform.wallet.transactions')" [padded]="false">
+        <app-toolbar>
+          <label toolbarFilters class="inline-filter">
+            <span>{{ i18n.t('platform.wallet.column.kind') }}</span>
+            <select class="inp" (change)="onKind($event)">
+              <option value="">{{ i18n.t('platform.all') }}</option>
+              @for (kind of kinds; track kind) {
+                <option [value]="kind" [selected]="facade.transactionFilter().kind === kind">{{ kindLabel(kind) }}</option>
+              }
+            </select>
+          </label>
+          <button toolbarActions type="button" class="btn ghost" (click)="exportTransactions()"><app-icon name="printer" [size]="15" />{{ i18n.t('platform.exportCsv') }}</button>
+        </app-toolbar>
+        <app-data-table [columns]="transactionColumns" [rows]="facade.transactionRows()" [loading]="facade.transactions.isLoading()" [interactive]="false"
+                        [emptyTitle]="i18n.t('platform.wallet.noTransactions')" [caption]="i18n.t('platform.wallet.transactions')">
+          <ng-template appCell="kind" [appCellOf]="facade.transactionRows()" let-row>
+            <app-badge [tone]="tone(row.kind)">{{ kindLabel(row.kind) }}</app-badge>
+          </ng-template>
+          <ng-template appCell="amount" [appCellOf]="facade.transactionRows()" let-row>
+            <span class="mono" [class.amount-negative]="row.amount < 0" [class.amount-positive]="row.amount > 0">{{ money(row.amount) }}</span>
+          </ng-template>
+        </app-data-table>
+        <app-paginator [page]="facade.transactionFilter().page" [pageSize]="facade.transactionFilter().pageSize" [totalCount]="facade.transactions.value()?.totalCount ?? 0" (pageChange)="onTransactionPage($event)" />
+      </app-section-card>
+    }
+  </div>
+} @else {
+  <div role="tabpanel">
+    <app-section-card [title]="i18n.t('platform.plans.title')" [subtitle]="i18n.t('platform.plans.subtitle')" [padded]="false">
+      <div cardActions class="row-gap">
+        <label class="inline-filter">
+          <span class="visually-hidden">{{ i18n.t('platform.plans.column.status') }}</span>
+          <select class="inp" (change)="onPlanFilter($event)">
+            <option value="all">{{ i18n.t('platform.all') }}</option>
+            <option value="active">{{ i18n.t('platform.status.Active') }}</option>
+            <option value="inactive">{{ i18n.t('platform.status.Inactive') }}</option>
+          </select>
+        </label>
+        <button type="button" class="btn primary sm" *appCan="permissions.tenancyManage" (click)="openPlan(null)"><app-icon name="plus" [size]="15" />{{ i18n.t('platform.plans.add') }}</button>
+      </div>
+      <app-data-table [columns]="planColumns" [rows]="facade.planRows()" [loading]="facade.plans.isLoading()" [emptyTitle]="i18n.t('platform.plans.empty')"
+                      [caption]="i18n.t('platform.plans.title')" (rowActivate)="openPlan($event)">
+        <ng-template appCell="status" [appCellOf]="facade.planRows()" let-row>
+          <app-badge [status]="row.isActive ? 'Active' : 'Inactive'">{{ i18n.t(row.isActive ? 'platform.status.Active' : 'platform.status.Inactive') }}</app-badge>
+        </ng-template>
+        <ng-template appRowActions [appRowActionsOf]="facade.planRows()" let-row>
+          <button type="button" class="row-btn" *appCan="permissions.tenancyManage" (click)="openPlan(row)" [attr.aria-label]="i18n.t('platform.plans.edit')" [title]="i18n.t('platform.plans.edit')"><app-icon name="edit" [size]="15" /></button>
+          <button type="button" class="row-btn" [class.danger]="row.isActive" *appCan="permissions.tenancyManage" (click)="togglePlan(row)"
+                  [attr.aria-label]="i18n.t(row.isActive ? 'platform.plans.deactivate' : 'platform.plans.activate')" [title]="i18n.t(row.isActive ? 'platform.plans.deactivate' : 'platform.plans.activate')"><app-icon name="power" [size]="15" /></button>
+        </ng-template>
+      </app-data-table>
+    </app-section-card>
+  </div>
+}
+
+<app-drawer [(open)]="planDrawerOpen" [title]="i18n.t(editingPlan() === null ? 'platform.plans.add' : 'platform.plans.edit')">
+  @if (planForm(); as form) {
+    <form id="platform-plan-form" [formGroup]="form" appSaveShortcut (appSaveShortcut)="savePlan()" (ngSubmit)="savePlan()" novalidate>
+      @if (planProblem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+      <div class="form-grid">
+        <app-form-field [label]="i18n.t('platform.plans.column.code')" [hint]="i18n.t('platform.plans.hint.code')" [problem]="planProblem()">
+          <input type="text" formControlName="code" appUppercase maxlength="20" autocomplete="off" class="code" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.plans.field.currencyCode')" [problem]="planProblem()">
+          <input type="text" formControlName="currencyCode" appUppercase maxlength="3" autocomplete="off" />
+        </app-form-field>
+        <app-localized-text-input class="full" [group]="form.controls.name" [label]="i18n.t('platform.plans.column.name')" [maxLength]="100" [problem]="planProblem()" />
+        <app-form-field [label]="i18n.t('platform.plans.column.monthlyFee')" [problem]="planProblem()">
+          <input type="number" formControlName="monthlyFee" min="0" step="0.01" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.plans.column.branches')" [problem]="planProblem()">
+          <input type="number" formControlName="maxBranches" min="1" step="1" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.plans.column.users')" [problem]="planProblem()">
+          <input type="number" formControlName="maxUsers" min="1" step="1" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.plans.column.smsQuota')" [problem]="planProblem()">
+          <input type="number" formControlName="smsQuota" min="0" step="1" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.plans.column.analysers')" [problem]="planProblem()">
+          <input type="number" formControlName="maxAnalysers" min="0" step="1" />
+        </app-form-field>
+      </div>
+    </form>
+  }
+  <ng-container drawerFooter>
+    <button type="button" class="btn" (click)="planDrawerOpen.set(false)">{{ i18n.t('platform.cancel') }}</button>
+    <button type="submit" form="platform-plan-form" class="btn primary" [disabled]="facade.savePlan.pending()">{{ facade.savePlan.pending() ? i18n.t('platform.saving') : i18n.t('platform.save') }}</button>
+  </ng-container>
+</app-drawer>
+
+<app-dialog [(open)]="topUpOpen" [title]="i18n.t('platform.wallet.topUp')" size="sm">
+  <form id="platform-topup-form" [formGroup]="topUpForm" (ngSubmit)="submitTopUp()" appSaveShortcut (appSaveShortcut)="submitTopUp()" novalidate class="stack">
+    @if (wallet(); as w) {
+      <p class="small">{{ i18n.tf('platform.wallet.topUpIntro', { client: name({ nameEn: w.clientNameEn, nameAr: w.clientNameAr }), balance: money(w.balance, w.currencyCode) }) }}</p>
+    }
+    @if (facade.topUp.problem(); as problem) {
+      <p class="problem" role="alert">{{ problemText(problem) }}</p>
+    }
+    <app-form-field [label]="i18n.t('platform.wallet.column.amount')">
+      <input type="number" formControlName="amount" min="0.01" step="0.01" />
+    </app-form-field>
+    <app-form-field [label]="i18n.t('platform.wallet.column.reference')" [hint]="i18n.t('platform.wallet.hint.reference')">
+      <input type="text" formControlName="reference" maxlength="100" autocomplete="off" />
+    </app-form-field>
+    <app-form-field [label]="i18n.t('platform.wallet.column.note')">
+      <input type="text" formControlName="note" maxlength="500" autocomplete="off" />
+    </app-form-field>
+  </form>
+  <ng-container dialogFooter>
+    <button type="button" class="btn" (click)="topUpOpen.set(false)">{{ i18n.t('platform.cancel') }}</button>
+    <button type="submit" form="platform-topup-form" class="btn primary" [disabled]="facade.topUp.pending()">{{ i18n.t('platform.confirm') }}</button>
+  </ng-container>
+</app-dialog>

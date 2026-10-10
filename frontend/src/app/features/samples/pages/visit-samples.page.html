@@ -1,0 +1,86 @@
+<app-page-header [title]="i18n.t('samples.visit.title')" [subtitle]="i18n.t('samples.visit.subtitle')">
+  @if (facade.visit()) {
+    <button pageActions type="button" class="btn primary" [disabled]="facade.printAll.pending() || printableCount() === 0" (click)="printAll()">
+      <app-icon name="printer" [size]="15" />{{ i18n.t('samples.labels.printAll') }}
+    </button>
+  }
+  @if (facade.visit(); as visit) {
+    <a pageActions class="btn ghost" [routerLink]="links.jobOrder(visit.visitId)"><app-icon name="clipboard" [size]="15" />{{ i18n.t('samples.visit.jobOrder') }}</a>
+  }
+</app-page-header>
+
+<app-section-card [title]="i18n.t('samples.visit.lookupTitle')">
+  <app-scan-box
+    [label]="i18n.t('samples.column.accession')"
+    [placeholder]="i18n.t('samples.visit.accessionPlaceholder')"
+    [submitLabel]="i18n.t('samples.visit.show')"
+    [busy]="facade.samples.isLoading()"
+    (scanned)="lookUp($event)"
+  />
+</app-section-card>
+
+@if (facade.samples.error()) {
+  <p class="problem page-problem" role="alert">{{ i18n.t('samples.loadError') }}</p>
+}
+
+@if (facade.visit(); as visit) {
+  <app-section-card class="tubes" [padded]="false">
+    <div class="visit-head">
+      <div class="visit-facts">
+        <span class="muted small">{{ i18n.t('samples.column.accession') }}</span>
+        <b class="mono">{{ visit.accession }}</b>
+      </div>
+      <div class="visit-facts">
+        <span class="muted small">{{ i18n.t('samples.column.patient') }}</span>
+        <b>{{ patient() || '—' }}</b>
+      </div>
+      <div class="visit-facts">
+        <span class="muted small">{{ i18n.t('samples.visit.tubes') }}</span>
+        <b>{{ facade.rows().length }}</b>
+      </div>
+    </div>
+
+    <app-toolbar>
+      <label toolbarFilters class="filter">
+        <span>{{ i18n.t('samples.labels.size') }}</span>
+        <select class="inp" (change)="onLabelSize($event)">
+          @for (size of labelSizes; track size) {
+            <option [value]="size" [selected]="facade.labels.size() === size">{{ labelSizeText(size) }}</option>
+          }
+        </select>
+      </label>
+      <button toolbarActions type="button" class="btn ghost" [disabled]="facade.exporting.pending()" (click)="exportCsv()">{{ i18n.t('samples.exportCsv') }}</button>
+      <button toolbarActions type="button" class="btn ghost" (click)="facade.samples.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('samples.refresh') }}</button>
+    </app-toolbar>
+
+    @for (problem of [facade.printOne.problem(), facade.printAll.problem()]; track $index) {
+      @if (problem) {
+        <p class="problem list-problem" role="alert">{{ problemText(problem) }}</p>
+      }
+    }
+
+    <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.samples.isLoading()" [interactive]="false" [caption]="i18n.t('samples.visit.title')" [emptyTitle]="i18n.t('samples.visit.empty')">
+      <ng-template appCell="status" [appCellOf]="facade.rows()" let-row>
+        <app-badge [status]="row.status" />
+      </ng-template>
+      <ng-template appCell="sampleNumber" [appCellOf]="facade.rows()" let-row>
+        <a class="mono link" [routerLink]="links.track(row.sampleNumber)">{{ row.sampleNumber }}</a>
+      </ng-template>
+      <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
+        @if (printable(row)) {
+          <button type="button" class="btn sm" [disabled]="facade.printOne.pending()" (click)="printOne(row)" [attr.aria-label]="i18n.t('samples.labels.printOne') + ' ' + row.sampleNumber">
+            <app-icon name="printer" [size]="14" />{{ i18n.t('samples.labels.printOne') }}
+          </button>
+        }
+        <a class="btn sm ghost" [routerLink]="links.track(row.sampleNumber)">{{ i18n.t('samples.track') }}</a>
+        @if (row.status === 'Collected' || row.status === 'Received') {
+          <a class="btn sm ghost" *appCan="permissions.edit" [routerLink]="links.rejections" [queryParams]="{ sampleNumber: row.sampleNumber }">{{ i18n.t('samples.reject.action') }}</a>
+        }
+      </ng-template>
+    </app-data-table>
+  </app-section-card>
+} @else if (facade.samples.hasValue() && !facade.samples.isLoading()) {
+  <app-empty-state [title]="i18n.t('samples.visit.notFound')" [message]="i18n.t('samples.visit.notFoundHint')" icon="search" />
+} @else if (!facade.samples.isLoading()) {
+  <app-empty-state [title]="i18n.t('samples.visit.start')" [message]="i18n.t('samples.visit.startHint')" icon="barcode" />
+}

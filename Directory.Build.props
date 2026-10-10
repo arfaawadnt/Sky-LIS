@@ -1,0 +1,35 @@
+<Project>
+  <!-- Applies to every project in the solution (01 §3.2). Project files only declare references. -->
+  <PropertyGroup>
+    <LangVersion>13</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+    <IsPackable>false</IsPackable>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <RootNamespace>$(MSBuildProjectName)</RootNamespace>
+    <AssemblyName>$(MSBuildProjectName)</AssemblyName>
+    <Product>Sky LIS</Product>
+    <Company>National Technology</Company>
+  </PropertyGroup>
+
+  <!-- Build slots: several developers (or agents) build the same tree at once without sharing obj/bin. Set the
+       LisBuildSlot environment variable (or -p:LisBuildSlot=name) and every project compiles under .local/build/<slot>/.
+       The default (empty) keeps the usual obj/bin folders, which the design-time ef commands and launch profiles use. -->
+  <PropertyGroup Condition="'$(LisBuildSlot)' != ''">
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).local/build/$(LisBuildSlot)/obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory).local/build/$(LisBuildSlot)/bin/$(MSBuildProjectName)/</BaseOutputPath>
+    <!-- The default obj/bin of the same project may hold generated sources from a slot-less build; never glob them. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**;bin/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <!-- Pitfall P-14: time and identifiers never come from the environment. The banned-symbols list makes
+       DateTime.Now / UtcNow and Guid.NewGuid compile errors everywhere except SystemClock. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" Link="BannedSymbols.txt" />
+  </ItemGroup>
+</Project>

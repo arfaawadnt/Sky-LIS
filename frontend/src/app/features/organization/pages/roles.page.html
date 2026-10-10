@@ -1,0 +1,62 @@
+<app-page-header [title]="i18n.t('organization.roles.title')" [subtitle]="i18n.t('organization.roles.subtitle')">
+  <button pageActions type="button" class="btn primary" *appCan="permissions.create" (click)="add()"><app-icon name="plus" [size]="15" />{{ i18n.t('organization.roles.add') }}</button>
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="i18n.t('organization.roles.searchPlaceholder')" [label]="i18n.t('organization.roles.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('organization.status') }}</span>
+      <select class="inp" (change)="onStatus($event)">
+        <option value="">{{ i18n.t('organization.allStatuses') }}</option>
+        <option value="active">{{ i18n.t('organization.statusActive') }}</option>
+        <option value="inactive">{{ i18n.t('organization.statusInactive') }}</option>
+      </select>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.list.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('organization.refresh') }}</button>
+  </app-toolbar>
+
+  @if (facade.setActive.problem(); as problem) {
+    <p class="problem list-problem" role="alert">{{ problemText(problem.code) }}</p>
+  }
+  @if (facade.list.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('organization.roles.loadError') }}</p>
+  }
+
+  <app-data-table
+    [columns]="columns"
+    [rows]="rows()"
+    [loading]="facade.list.isLoading()"
+    [emptyTitle]="i18n.t('organization.roles.empty')"
+    [caption]="i18n.t('organization.roles.title')"
+    (rowActivate)="open($event)">
+    <ng-template appCell="name" [appCellOf]="rows()" let-row>
+      <strong>{{ name(row) }}</strong>
+      @if (row.description) {
+        <span class="muted small description">{{ row.description }}</span>
+      }
+    </ng-template>
+    <ng-template appCell="isActive" [appCellOf]="rows()" let-row>
+      <app-badge [status]="row.isActive ? 'Active' : 'Inactive'" />
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+      <button type="button" class="btn sm" (click)="open(row)">{{ i18n.t('organization.open') }}</button>
+      <ng-container *appCan="permissions.manage">
+        @if (row.isActive) {
+          <button
+            type="button"
+            class="btn sm ghost"
+            [disabled]="row.memberCount > 0 || facade.setActive.pending()"
+            [attr.title]="row.memberCount > 0 ? i18n.t('organization.roles.hasMembers') : null"
+            (click)="toggle(row)">
+            {{ i18n.t('organization.deactivate') }}
+          </button>
+        } @else {
+          <button type="button" class="btn sm ghost" [disabled]="facade.setActive.pending()" (click)="toggle(row)">{{ i18n.t('organization.activate') }}</button>
+        }
+      </ng-container>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="totalCount()" (pageChange)="facade.setPage($event)" />
+</app-section-card>

@@ -1,0 +1,115 @@
+<app-public-header />
+
+<main class="landing">
+  <section class="hero">
+    <div class="hero-text">
+      <span class="eyebrow">{{ i18n.t('public.hero.eyebrow') }}</span>
+      <h1>{{ i18n.t('public.hero.title') }}</h1>
+      <p>{{ i18n.t('public.hero.text') }}</p>
+      <div class="cta">
+        <a class="btn primary lg" routerLink="/welcome/subscribe">{{ i18n.t('public.subscribeNow') }}</a>
+        <a class="btn lg" routerLink="/login">{{ i18n.t('public.signIn') }}</a>
+      </div>
+      <ul class="qualities">
+        @for (quality of qualities; track quality.key) {
+          <li><app-icon [name]="quality.icon" [size]="15" />{{ i18n.t('public.quality.' + quality.key) }}</li>
+        }
+      </ul>
+    </div>
+
+    <aside class="hero-card" [attr.aria-label]="i18n.t('public.demo.title')">
+      <div class="demo-head">
+        <span class="avatar" aria-hidden="true">AN</span>
+        <div>
+          <b>{{ i18n.t('public.demo.lab') }}</b>
+          <span class="muted small">{{ i18n.t('public.demo.subtitle') }}</span>
+        </div>
+        <span class="demo-tag">{{ i18n.t('public.demo.tag') }}</span>
+      </div>
+      <div class="kpis">
+        <app-stat-card [label]="i18n.t('public.demo.registrations')" value="42" [hint]="i18n.t('public.demo.today')" icon="clipboard" />
+        <app-stat-card [label]="i18n.t('public.demo.collected')" value="EGP 18.6K" [hint]="i18n.t('public.demo.today')" icon="coins" tone="ok" />
+        <app-stat-card [label]="i18n.t('public.demo.received')" value="126" [hint]="i18n.t('public.demo.today')" icon="barcode" tone="info" />
+        <app-stat-card [label]="i18n.t('public.demo.verified')" value="98" [hint]="i18n.t('public.demo.today')" icon="check" tone="ok" />
+      </div>
+    </aside>
+  </section>
+
+  <section id="features" class="block">
+    <h2>{{ i18n.t('public.features.title') }}</h2>
+    <p class="lead">{{ i18n.t('public.features.subtitle') }}</p>
+    <div class="feature-grid">
+      @for (feature of clientFeatures; track feature.key) {
+        <article class="feature">
+          <span class="fi"><app-icon [name]="feature.icon" [size]="18" /></span>
+          <h3>{{ i18n.t('public.feature.' + feature.key + '.title') }}</h3>
+          <p>{{ i18n.t('public.feature.' + feature.key + '.text') }}</p>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section id="portals" class="block portals">
+    <h2>{{ i18n.t('public.portals.title') }}</h2>
+    <div class="portal-grid">
+      <article class="portal">
+        <header>
+          <app-icon name="microscope" [size]="20" />
+          <h3>{{ i18n.t('public.portals.client.title') }}</h3>
+        </header>
+        <p>{{ i18n.t('public.portals.client.text') }}</p>
+        <ul>
+          @for (feature of clientFeatures; track feature.key) {
+            <li><app-icon name="check" [size]="14" />{{ i18n.t('public.feature.' + feature.key + '.title') }}</li>
+          }
+        </ul>
+      </article>
+      <article class="portal admin">
+        <header>
+          <app-icon name="server" [size]="20" />
+          <h3>{{ i18n.t('public.portals.admin.title') }}</h3>
+        </header>
+        <p>{{ i18n.t('public.portals.admin.text') }}</p>
+        <ul>
+          @for (feature of adminFeatures; track feature.key) {
+            <li><app-icon name="check" [size]="14" />{{ i18n.t('public.admin.' + feature.key) }}</li>
+          }
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section id="release" class="block">
+    <h2>{{ i18n.t('public.release.title') }}</h2>
+    <p class="lead">{{ i18n.t('public.release.subtitle') }}</p>
+    <ol class="release">
+      @for (item of releaseHighlights; track item) {
+        <li>
+          <b>{{ i18n.t('public.release.' + item + '.title') }}</b>
+          <span>{{ i18n.t('public.release.' + item + '.text') }}</span>
+        </li>
+      }
+    </ol>
+  </section>
+
+  <section class="block start">
+    <h2>{{ i18n.t('public.start.title') }}</h2>
+    <ol class="steps">
+      @for (step of steps; track step; let index = $index) {
+        <li>
+          <span class="dot">{{ index + 1 }}</span>
+          <b>{{ i18n.t('public.start.' + step + '.title') }}</b>
+          <span class="muted small">{{ i18n.t('public.start.' + step + '.text') }}</span>
+        </li>
+      }
+    </ol>
+    <div class="cta center">
+      <a class="btn primary lg" routerLink="/welcome/subscribe">{{ i18n.t('public.getStarted') }}</a>
+    </div>
+  </section>
+</main>
+
+<footer class="public-footer">
+  <span>{{ i18n.t('public.footer.copyright') }}</span>
+  <a routerLink="/login">{{ i18n.t('public.signIn') }}</a>
+</footer>

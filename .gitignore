@@ -1,0 +1,40 @@
+# --- secrets & local config (never commit) ---
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+*.pem
+secrets.json
+appsettings.*.local.json
+appsettings.Local.json
+
+# --- local-only state ---
+.local/
+publish/
+*.log
+logs/
+
+# --- OS / editor ---
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# --- Claude Code local permissions ---
+.claude/settings.local.json
+
+# --- .NET build output ---
+bin/
+obj/
+TestResults/
+*.user
+*.swp
+.dotnet/
+
+# npm caches created by stray installs at the repo root (frontend/ has its own ignore file)
+node_modules/

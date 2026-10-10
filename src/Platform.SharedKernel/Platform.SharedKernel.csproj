@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 01 §2.1: references the BCL only. No PackageReference, no ProjectReference. Gate: LayerRulesTests. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Description>Base primitives shared by every layer: Entity, AggregateRoot, ValueObject, domain events, Result/Error, DomainException, IClock, tenancy markers.</Description>
+  </PropertyGroup>
+
+</Project>

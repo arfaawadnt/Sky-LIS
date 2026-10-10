@@ -1,0 +1,107 @@
+<app-page-header [title]="i18n.t('samples.rejections.title')" [subtitle]="i18n.t('samples.rejections.subtitle')">
+  <a pageActions class="btn ghost" [routerLink]="links.collection"><app-icon name="barcode" [size]="15" />{{ i18n.t('samples.nav.collection') }}</a>
+</app-page-header>
+
+@if (facade.settings.hasValue()) {
+  <p class="info-strip policy" role="note">
+    {{ facade.reinstatementAllowed() ? i18n.t('samples.rejections.policyReinstate') : i18n.t('samples.rejections.policyNewBarcode') }}
+  </p>
+}
+
+@if (facade.replacement(); as replacement) {
+  <div class="replacement" role="status">
+    <app-icon name="check" [size]="20" />
+    <span>{{ i18n.tf('samples.replace.created', { number: replacement.summary.sampleNumber }) }}</span>
+    <span class="grow"></span>
+    <button type="button" class="btn sm primary" [disabled]="facade.printLabel.pending()" (click)="printLabel(replacement.summary.id)"><app-icon name="printer" [size]="14" />{{ i18n.t('samples.labels.printOne') }}</button>
+    <a class="btn sm ghost" [routerLink]="links.track(replacement.summary.sampleNumber)">{{ i18n.t('samples.track') }}</a>
+    <button type="button" class="icon-btn" (click)="facade.dismissReplacement()" [attr.aria-label]="i18n.t('samples.dismiss')"><app-icon name="x" [size]="16" /></button>
+  </div>
+}
+
+@for (problem of actionProblems(); track $index) {
+  <p class="problem page-problem" role="alert">{{ problemText(problem) }}</p>
+}
+
+<div class="layout">
+  <app-section-card class="lookup-card" [title]="i18n.t('samples.rejections.lookupTitle')">
+    <app-scan-box
+      [label]="i18n.t('samples.scan.label')"
+      [placeholder]="i18n.t('samples.scan.placeholder')"
+      [submitLabel]="i18n.t('samples.rejections.find')"
+      [busy]="facade.lookup.isLoading()"
+      (scanned)="find($event)"
+    />
+
+    @if (lookupProblem(); as problem) {
+      <p class="problem lookup-problem" role="alert">{{ problemText(problem) }}</p>
+    }
+
+    @if (facade.lookup.hasValue()) {
+      @let detail = facade.lookup.value();
+      <div class="found">
+        <app-sample-summary [detail]="detail" />
+        <div class="actions" *appCan="permissions.edit">
+          @if (rejectable(detail.summary.status)) {
+            <button type="button" class="btn danger" (click)="openReject({ id: detail.summary.id, sampleNumber: detail.summary.sampleNumber })">{{ i18n.t('samples.reject.action') }}</button>
+          }
+          @if (detail.summary.status === 'Rejected') {
+            @if (facade.reinstatementAllowed()) {
+              <button type="button" class="btn" [disabled]="facade.unreject.pending()" (click)="unreject({ id: detail.summary.id, sampleNumber: detail.summary.sampleNumber })">{{ i18n.t('samples.unreject.action') }}</button>
+            }
+            <button type="button" class="btn primary" [disabled]="facade.replace.pending()" (click)="replace({ id: detail.summary.id, sampleNumber: detail.summary.sampleNumber })">{{ i18n.t('samples.replace.action') }}</button>
+          }
+          @if (!rejectable(detail.summary.status) && detail.summary.status !== 'Rejected') {
+            <p class="muted small">{{ i18n.tf('samples.rejections.noAction', { status: i18n.t('shared.status.' + detail.summary.status) }) }}</p>
+          }
+        </div>
+      </div>
+    }
+  </app-section-card>
+
+  <app-section-card class="list-card" [padded]="false" [title]="i18n.t('samples.rejections.listTitle')">
+    <app-toolbar>
+      <label toolbarFilters class="filter">
+        <span>{{ i18n.t('samples.from') }}</span>
+        <input type="date" class="inp" [value]="facade.filter().fromDate ?? ''" (change)="onFrom($event)" />
+      </label>
+      <label toolbarFilters class="filter">
+        <span>{{ i18n.t('samples.to') }}</span>
+        <input type="date" class="inp" [value]="facade.filter().toDate ?? ''" (change)="onTo($event)" />
+      </label>
+      <button toolbarActions type="button" class="btn ghost" [disabled]="facade.exporting.pending()" (click)="exportCsv()">{{ i18n.t('samples.exportCsv') }}</button>
+      <button toolbarActions type="button" class="btn ghost" (click)="facade.rejected.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('samples.refresh') }}</button>
+    </app-toolbar>
+
+    @if (facade.rejected.error()) {
+      <p class="problem list-problem" role="alert">{{ i18n.t('samples.loadError') }}</p>
+    }
+
+    <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.rejected.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('samples.rejections.empty')" [caption]="i18n.t('samples.rejections.listTitle')">
+      <ng-template appCell="sampleNumber" [appCellOf]="rows()" let-row>
+        <a class="mono link" [routerLink]="links.track(row.sampleNumber)">{{ row.sampleNumber }}</a>
+      </ng-template>
+      <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+        <ng-container *appCan="permissions.edit">
+          @if (facade.reinstatementAllowed()) {
+            <button type="button" class="btn sm" [disabled]="facade.unreject.pending()" (click)="unreject(row)">{{ i18n.t('samples.unreject.action') }}</button>
+          }
+          <button type="button" class="btn sm primary" [disabled]="facade.replace.pending()" (click)="replace(row)">{{ i18n.t('samples.replace.action') }}</button>
+        </ng-container>
+        <a class="btn sm ghost" [routerLink]="links.track(row.sampleNumber)">{{ i18n.t('samples.track') }}</a>
+      </ng-template>
+    </app-data-table>
+
+    <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="totalCount()" (pageChange)="onPage($event)" />
+  </app-section-card>
+</div>
+
+<app-reject-dialog
+  [(open)]="dialogOpen"
+  [sampleNumber]="dialogTarget()?.sampleNumber ?? ''"
+  [reasons]="reasons()"
+  [reasonsUnavailable]="reasonsUnavailable()"
+  [busy]="facade.reject.pending()"
+  [problemText]="dialogProblem()"
+  (confirmed)="onRejectConfirmed($event)"
+/>

@@ -1,0 +1,88 @@
+<section class="recovery card">
+  <header class="head">
+    <img src="/brand/sky-lis-logo.png" alt="" height="36" />
+    <div>
+      <h1>{{ i18n.t('auth.recovery.title') }}</h1>
+      <p class="muted">{{ i18n.t('auth.recovery.subtitle') }}</p>
+    </div>
+  </header>
+
+  <ol class="steps" [attr.aria-label]="i18n.t('auth.recovery.progress')">
+    <li [class.active]="step() === 1" [class.done]="step() > 1">{{ i18n.t('auth.recovery.step.identify') }}</li>
+    <li [class.active]="step() === 2" [class.done]="step() > 2">{{ i18n.t('auth.recovery.step.code') }}</li>
+    <li [class.active]="step() === 3">{{ i18n.t('auth.recovery.step.password') }}</li>
+  </ol>
+
+  @switch (step()) {
+    @case (1) {
+      <form [formGroup]="identifyForm" (ngSubmit)="sendCode()" novalidate>
+        <app-form-field [label]="i18n.t('auth.recovery.identifier')" [hint]="i18n.t('auth.recovery.identifierHint')">
+          <input type="text" formControlName="identifier" maxlength="64" autocomplete="username" autocapitalize="none" spellcheck="false" dir="ltr" />
+        </app-form-field>
+        @if (start.problem(); as problem) {
+          <p class="problem" role="alert">{{ problemText(problem) }}</p>
+        }
+        <button type="submit" class="btn primary wide" [disabled]="start.pending()">
+          {{ start.pending() ? i18n.t('auth.recovery.sending') : i18n.t('auth.recovery.sendCode') }}
+        </button>
+      </form>
+    }
+
+    @case (2) {
+      <form [formGroup]="codeForm" (ngSubmit)="toPasswords()" novalidate>
+        <p class="info-strip">{{ i18n.t('auth.recovery.codeSent') }}</p>
+        <app-form-field [label]="i18n.t('auth.recovery.code')" [hint]="i18n.t('auth.recovery.codeHint')">
+          <input class="otp" type="text" formControlName="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" dir="ltr" />
+        </app-form-field>
+        @if (complete.problem(); as problem) {
+          <p class="problem" role="alert">{{ problemText(problem) }}</p>
+        }
+        @if (start.problem(); as problem) {
+          <p class="problem" role="alert">{{ problemText(problem) }}</p>
+        }
+        <button type="button" class="link" (click)="resend()" [disabled]="resendIn() > 0 || start.pending()">
+          @if (resendIn() > 0) {
+            {{ i18n.tf('auth.recovery.resendIn', { seconds: resendIn() }) }}
+          } @else {
+            {{ i18n.t('auth.recovery.resend') }}
+          }
+        </button>
+        <div class="actions">
+          <button type="button" class="btn" (click)="back()">{{ i18n.t('auth.recovery.back') }}</button>
+          <button type="submit" class="btn primary">{{ i18n.t('auth.recovery.next') }}</button>
+        </div>
+      </form>
+    }
+
+    @case (3) {
+      <form [formGroup]="passwords" (ngSubmit)="submit()" novalidate>
+        <app-form-field [label]="i18n.t('auth.recovery.newPassword')">
+          <input [type]="showPassword() ? 'text' : 'password'" formControlName="password" autocomplete="new-password" dir="ltr" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('auth.recovery.confirmation')">
+          <input [type]="showPassword() ? 'text' : 'password'" formControlName="confirmation" autocomplete="new-password" dir="ltr" />
+        </app-form-field>
+        <label class="check">
+          <input type="checkbox" [checked]="showPassword()" (change)="showPassword.set(!showPassword())" />
+          <span>{{ i18n.t('auth.showPassword') }}</span>
+        </label>
+        <ul class="rules" [attr.aria-label]="i18n.t('auth.recovery.rulesTitle')">
+          <li [class.ok]="checks().length"><app-icon [name]="checks().length ? 'check' : 'x'" [size]="14" />{{ i18n.tf('auth.recovery.rule.length', { min: rule.minLength, max: rule.maxLength }) }}</li>
+          <li [class.ok]="checks().notUsername"><app-icon [name]="checks().notUsername ? 'check' : 'x'" [size]="14" />{{ i18n.t('auth.recovery.rule.notUsername') }}</li>
+          <li [class.ok]="checks().matches"><app-icon [name]="checks().matches ? 'check' : 'x'" [size]="14" />{{ i18n.t('auth.recovery.rule.matches') }}</li>
+        </ul>
+        @if (complete.problem(); as problem) {
+          <p class="problem" role="alert">{{ problemText(problem) }}</p>
+        }
+        <div class="actions">
+          <button type="button" class="btn" (click)="back()">{{ i18n.t('auth.recovery.back') }}</button>
+          <button type="submit" class="btn primary" [disabled]="complete.pending()">
+            {{ complete.pending() ? i18n.t('auth.recovery.saving') : i18n.t('auth.recovery.save') }}
+          </button>
+        </div>
+      </form>
+    }
+  }
+
+  <p class="foot"><a routerLink="/login">← {{ i18n.t('auth.recovery.backToLogin') }}</a></p>
+</section>

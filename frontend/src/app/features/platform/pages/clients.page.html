@@ -1,0 +1,186 @@
+<app-page-header [title]="i18n.t('platform.clients.title')" [subtitle]="i18n.t('platform.clients.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="exportCsv()"><app-icon name="printer" [size]="15" />{{ i18n.t('platform.exportCsv') }}</button>
+  <button pageActions type="button" class="btn primary" *appCan="permissions.tenancyCreate" (click)="openCreate()"><app-icon name="plus" [size]="16" />{{ i18n.t('platform.clients.add') }}</button>
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="i18n.t('platform.clients.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+    <label toolbarFilters class="inline-filter">
+      <span>{{ i18n.t('platform.clients.column.source') }}</span>
+      <select class="inp" (change)="onSource($event)">
+        <option value="">{{ i18n.t('platform.all') }}</option>
+        @for (source of sources; track source) {
+          <option [value]="source" [selected]="facade.filter().source === source">{{ i18n.t('platform.source.' + source) }}</option>
+        }
+      </select>
+    </label>
+    <label toolbarFilters class="inline-filter">
+      <span>{{ i18n.t('platform.clients.column.plan') }}</span>
+      <select class="inp" (change)="onPlan($event)">
+        <option value="">{{ i18n.t('platform.all') }}</option>
+        @for (plan of facade.plans.value()?.items ?? []; track plan.id) {
+          <option [value]="plan.id" [selected]="facade.filter().planId === plan.id">{{ plan.code }} · {{ name(plan) }}</option>
+        }
+      </select>
+    </label>
+    <label toolbarFilters class="inline-filter">
+      <span>{{ i18n.t('platform.clients.column.status') }}</span>
+      <select class="inp" (change)="onStatus($event)">
+        <option value="">{{ i18n.t('platform.all') }}</option>
+        @for (status of statuses; track status) {
+          <option [value]="status" [selected]="facade.filter().status === status">{{ i18n.t('platform.status.' + status) }}</option>
+        }
+      </select>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.clients.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('platform.refresh') }}</button>
+  </app-toolbar>
+
+  @if (facade.clients.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('platform.clients.loadError') }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.clients.isLoading()" [emptyTitle]="i18n.t('platform.clients.empty')"
+                  [caption]="i18n.t('platform.clients.title')" (rowActivate)="openEdit($event)">
+    <ng-template appCell="name" [appCellOf]="facade.rows()" let-row>
+      <strong>{{ name(row) }}</strong>
+      <div class="small muted mono">{{ row.portalUrl }}</div>
+    </ng-template>
+    <ng-template appCell="manager" [appCellOf]="facade.rows()" let-row>
+      {{ row.managerName }}
+      <div class="small muted mono" dir="ltr">{{ row.managerMobile }}</div>
+    </ng-template>
+    <ng-template appCell="walletBalance" [appCellOf]="facade.rows()" let-row>
+      <span class="mono" [class.amount-negative]="row.walletBalance <= 0">{{ money(row) }}</span>
+    </ng-template>
+    <ng-template appCell="source" [appCellOf]="facade.rows()" let-row>
+      <app-badge [tone]="tone(row.source)">{{ i18n.t('platform.source.' + row.source) }}</app-badge>
+    </ng-template>
+    <ng-template appCell="status" [appCellOf]="facade.rows()" let-row>
+      <app-badge [tone]="tone(row.status)">{{ i18n.t('platform.status.' + row.status) }}</app-badge>
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
+      <button type="button" class="row-btn" *appCan="permissions.tenancyEdit" (click)="openEdit(row)" [attr.aria-label]="i18n.t('platform.clients.edit')" [title]="i18n.t('platform.clients.edit')"><app-icon name="edit" [size]="15" /></button>
+      <button type="button" class="row-btn" *appCan="permissions.tenancyManage" (click)="openReset(row)" [attr.aria-label]="i18n.t('platform.clients.resetPassword')" [title]="i18n.t('platform.clients.resetPassword')"><app-icon name="shield" [size]="15" /></button>
+      <button type="button" class="row-btn" *appCan="permissions.tenancyView" (click)="openWallet(row)" [attr.aria-label]="i18n.t('platform.clients.openWallet')" [title]="i18n.t('platform.clients.openWallet')"><app-icon name="coins" [size]="15" /></button>
+      <button type="button" class="row-btn" [class.danger]="row.status !== 'Inactive'" *appCan="permissions.tenancyManage" (click)="toggle(row)"
+              [attr.aria-label]="i18n.t(row.status === 'Inactive' ? 'platform.clients.activate' : 'platform.clients.deactivate')"
+              [title]="i18n.t(row.status === 'Inactive' ? 'platform.clients.activate' : 'platform.clients.deactivate')"><app-icon name="power" [size]="15" /></button>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="facade.totalCount()" (pageChange)="onPage($event)" />
+</app-section-card>
+
+<app-drawer [(open)]="drawerOpen" [title]="i18n.t(editing() === null ? 'platform.clients.add' : 'platform.clients.edit')" size="lg" (closed)="onDrawerClosed()">
+  @if (form(); as form) {
+    <form id="platform-client-form" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+      @if (saveProblem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+      @if (editing(); as detail) {
+        <p class="info-strip small">{{ i18n.tf('platform.clients.editInfo', { url: detail.portalUrl, username: detail.administratorUsername ?? '—' }) }}</p>
+      }
+
+      <h3 class="section-title">{{ i18n.t('platform.clients.section.laboratory') }}</h3>
+      <div class="form-grid">
+        <app-localized-text-input class="full" [group]="form.controls.name" [label]="i18n.t('platform.clients.field.name')" name="name" [maxLength]="200" [problem]="saveProblem()" />
+        <app-form-field [label]="i18n.t('platform.clients.field.country')" [problem]="saveProblem()">
+          <select formControlName="countryId" (change)="onCountryChange(form)">
+            <option value="">{{ i18n.t('platform.choose') }}</option>
+            @for (country of facade.countries.value()?.items ?? []; track country.id) {
+              <option [value]="country.id">{{ country.flag ?? '' }} {{ name(country) }} ({{ country.dialCode }})</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.clients.field.governorate')" [problem]="saveProblem()">
+          <select formControlName="governorateId">
+            <option value="">{{ i18n.t('platform.choose') }}</option>
+            @for (governorate of governorateOptions(); track governorate.id) {
+              <option [value]="governorate.id">{{ name(governorate) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field class="full" [label]="i18n.t('platform.clients.field.address')" [problem]="saveProblem()">
+          <input type="text" formControlName="address" maxlength="300" autocomplete="off" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.clients.field.mobile')" [hint]="i18n.t('platform.clients.hint.mobile')" [problem]="saveProblem()">
+          <input type="tel" formControlName="mobile" dir="ltr" maxlength="30" autocomplete="off" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.clients.field.licenceNo')" [problem]="saveProblem()">
+          <input type="text" formControlName="licenceNo" maxlength="64" autocomplete="off" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.clients.field.managerName')" [problem]="saveProblem()">
+          <input type="text" formControlName="managerName" maxlength="200" autocomplete="off" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.clients.field.managerMobile')" [hint]="i18n.t('platform.clients.hint.managerMobile')" [problem]="saveProblem()">
+          <input type="tel" formControlName="managerMobile" dir="ltr" maxlength="30" autocomplete="off" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.clients.field.email')" [problem]="saveProblem()">
+          <input type="email" formControlName="email" dir="ltr" maxlength="254" autocomplete="off" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.clients.field.language')">
+          <select formControlName="language">
+            <option value="en">English</option>
+            <option value="ar">العربية</option>
+          </select>
+        </app-form-field>
+      </div>
+
+      <h3 class="section-title">{{ i18n.t('platform.clients.section.subscription') }}</h3>
+      <div class="form-grid">
+        <app-form-field [label]="i18n.t('platform.clients.field.plan')" [problem]="saveProblem()">
+          <select formControlName="planId">
+            <option value="">{{ i18n.t('platform.choose') }}</option>
+            @for (plan of facade.plans.value()?.items ?? []; track plan.id) {
+              <option [value]="plan.id" [disabled]="!plan.isActive && plan.id !== form.controls.planId.value">{{ plan.code }} · {{ name(plan) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.clients.field.portalSlug')" [hint]="i18n.t('platform.clients.hint.portalSlug')" [problem]="saveProblem()">
+          <input type="text" formControlName="portalSlug" dir="ltr" maxlength="40" autocomplete="off" spellcheck="false" />
+        </app-form-field>
+      </div>
+
+      @if (editing() === null) {
+        <h3 class="section-title">{{ i18n.t('platform.clients.section.administrator') }}</h3>
+        <div class="form-grid">
+          <app-form-field class="full" [label]="i18n.t('platform.clients.field.adminUsername')" [hint]="i18n.t('platform.clients.hint.adminUsername')" [problem]="saveProblem()">
+            <input type="text" formControlName="adminUsername" dir="ltr" maxlength="64" autocomplete="off" spellcheck="false" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('platform.clients.field.adminPassword')" [hint]="i18n.tf('platform.hint.password', { min: passwordMin })" [problem]="saveProblem()">
+            <input type="password" formControlName="adminPassword" dir="ltr" maxlength="128" autocomplete="new-password" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('platform.clients.field.adminPasswordConfirm')">
+            <input type="password" formControlName="adminPasswordConfirm" dir="ltr" maxlength="128" autocomplete="new-password" />
+          </app-form-field>
+        </div>
+      }
+    </form>
+  }
+  <ng-container drawerFooter>
+    <button type="button" class="btn" (click)="drawerOpen.set(false)">{{ i18n.t('platform.cancel') }}</button>
+    <button type="submit" form="platform-client-form" class="btn primary" [disabled]="saving()">{{ saving() ? i18n.t('platform.saving') : i18n.t(editing() === null ? 'platform.clients.provision' : 'platform.save') }}</button>
+  </ng-container>
+</app-drawer>
+
+<app-dialog [(open)]="resetOpen" [title]="i18n.t('platform.clients.resetPassword')" size="sm">
+  @if (resetTarget(); as target) {
+    <form id="platform-reset-form" [formGroup]="resetForm" (ngSubmit)="submitReset()" appSaveShortcut (appSaveShortcut)="submitReset()" novalidate class="stack">
+      <p class="small">{{ i18n.tf('platform.clients.resetIntro', { name: name(target) }) }}</p>
+      @if (facade.resetPassword.problem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+      <app-form-field [label]="i18n.t('platform.clients.field.newPassword')" [hint]="i18n.tf('platform.hint.password', { min: passwordMin })">
+        <input type="password" formControlName="newPassword" dir="ltr" maxlength="128" autocomplete="new-password" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('platform.clients.field.adminPasswordConfirm')">
+        <input type="password" formControlName="confirm" dir="ltr" maxlength="128" autocomplete="new-password" />
+      </app-form-field>
+    </form>
+  }
+  <ng-container dialogFooter>
+    <button type="button" class="btn" (click)="resetOpen.set(false)">{{ i18n.t('platform.cancel') }}</button>
+    <button type="submit" form="platform-reset-form" class="btn primary" [disabled]="facade.resetPassword.pending()">{{ i18n.t('platform.clients.resetPassword') }}</button>
+  </ng-container>
+</app-dialog>

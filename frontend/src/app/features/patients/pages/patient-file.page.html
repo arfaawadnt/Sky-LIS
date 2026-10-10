@@ -1,0 +1,241 @@
+@if (patient(); as patient) {
+  <app-page-header [title]="patient.number + ' · ' + patient.fullName" [subtitle]="patient.nameAr" [breadcrumb]="breadcrumb()">
+    @if (isActive()) {
+      <a pageActions class="btn ghost" *appCan="permissions.registrationCreate" routerLink="/registration" [queryParams]="{ patientId: patient.id }">
+        <app-icon name="plus" [size]="15" />{{ i18n.t('patients.newVisit') }}
+      </a>
+    }
+    @if (isActive()) {
+      <button pageActions type="button" class="btn" *appCan="permissions.manage" (click)="openMerge()"><app-icon name="layers" [size]="15" />{{ i18n.t('patients.merge.open') }}</button>
+    }
+    @if (isActive()) {
+      <button pageActions type="button" class="btn primary" *appCan="permissions.edit" (click)="openEdit()"><app-icon name="edit" [size]="15" />{{ i18n.t('patients.edit') }}</button>
+    }
+  </app-page-header>
+
+  @if (patient.merge; as merge) {
+    <div class="warn-strip merged" role="status">
+      <app-icon name="alert" [size]="16" />
+      <span>
+        {{ i18n.tf('patients.mergedBanner', { number: merge.survivorNumber, by: merge.mergedByName ?? '—' }) }}
+        {{ when(merge.mergedAtUtc) }} · {{ merge.reason }}
+      </span>
+      <a class="btn sm" [routerLink]="['/patients', merge.survivorId]">{{ i18n.tf('patients.openSurvivor', { number: merge.survivorNumber }) }}</a>
+    </div>
+  }
+
+  <app-tabs [tabs]="tabs()" [(active)]="activeTab" />
+
+  @switch (activeTab()) {
+    @case ('file') {
+      <div class="grid" role="tabpanel">
+        <app-section-card [title]="i18n.t('patients.section.identity')">
+          <dl class="kv">
+            <dt>{{ i18n.t('patients.column.number') }}</dt>
+            <dd class="mono">{{ patient.number }}</dd>
+            <dt>{{ i18n.t('patients.field.title') }}</dt>
+            <dd>{{ i18n.t('patients.honorific.' + patient.title) }}</dd>
+            <dt>{{ i18n.t('patients.field.fullName') }}</dt>
+            <dd>{{ patient.fullName }}</dd>
+            <dt>{{ i18n.t('patients.field.nameAr') }}</dt>
+            <dd dir="rtl" lang="ar">{{ patient.nameAr ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.field.gender') }}</dt>
+            <dd>{{ i18n.t('patients.gender.' + patient.gender) }}</dd>
+            <dt>{{ i18n.t('patients.field.dateOfBirth') }}</dt>
+            <dd>
+              {{ patient.dateOfBirth ?? '—' }}
+              @if (patient.dateOfBirthIsEstimated) {
+                <span class="muted small">({{ i18n.t('patients.estimated') }})</span>
+              }
+            </dd>
+            <dt>{{ i18n.t('patients.column.age') }}</dt>
+            <dd>{{ ageText(patient.age) }}</dd>
+            <dt>{{ i18n.t('patients.field.condition') }}</dt>
+            <dd>{{ optionName(facade.conditionName()) ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.column.status') }}</dt>
+            <dd>
+              <app-badge [tone]="patient.status === 'Merged' ? 'neutral' : 'ok'">{{ i18n.t('patients.status.' + patient.status) }}</app-badge>
+              @if (patient.isVip) {
+                <app-badge tone="violet">{{ i18n.t('patients.vip') }}</app-badge>
+              }
+            </dd>
+          </dl>
+        </app-section-card>
+
+        <app-section-card [title]="i18n.t('patients.section.contact')">
+          <dl class="kv">
+            <dt>{{ i18n.t('patients.field.mobile') }}</dt>
+            <dd class="mono" dir="ltr">{{ patient.mobile ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.field.nationalId') }}</dt>
+            <dd class="mono">{{ patient.nationalId ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.field.nationality') }}</dt>
+            <dd>{{ countryName(patient.nationality) ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.field.email') }}</dt>
+            <dd dir="ltr">{{ patient.email ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.field.governorate') }}</dt>
+            <dd>{{ governorateName(patient.governorateId) ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.field.city') }}</dt>
+            <dd>{{ patient.city ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.field.address') }}</dt>
+            <dd>{{ patient.address ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.field.comments') }}</dt>
+            <dd class="pre">{{ patient.comments ?? '—' }}</dd>
+          </dl>
+        </app-section-card>
+
+        <app-section-card [title]="i18n.t('patients.section.record')">
+          <dl class="kv">
+            <dt>{{ i18n.t('patients.registeredOn') }}</dt>
+            <dd>{{ patient.registeredOn }}</dd>
+            <dt>{{ i18n.t('patients.createdBy') }}</dt>
+            <dd>{{ patient.createdByName ?? '—' }} · {{ when(patient.createdAtUtc) }}</dd>
+            @if (patient.modifiedAtUtc) {
+              <dt>{{ i18n.t('patients.modifiedBy') }}</dt>
+              <dd>{{ patient.modifiedByName ?? '—' }} · {{ when(patient.modifiedAtUtc) }}</dd>
+            }
+          </dl>
+          @if (patient.mergedFiles.length > 0) {
+            <h3 class="sub">{{ i18n.t('patients.mergedFiles') }}</h3>
+            <ul class="merged-files">
+              @for (file of patient.mergedFiles; track file.id) {
+                <li>
+                  <a class="mono" [routerLink]="['/patients', file.id]">{{ file.number }}</a>
+                  @if (file.mergedAtUtc) {
+                    <span class="muted small">{{ when(file.mergedAtUtc) }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          }
+        </app-section-card>
+      </div>
+    }
+
+    @case ('documents') {
+      <div class="documents" role="tabpanel">
+        @if (isActive()) {
+          <app-section-card *appCan="permissions.filesCreate" [title]="i18n.t('patients.document.attachTitle')" [subtitle]="i18n.t('patients.document.attachHint')">
+            <div class="upload">
+              <label class="file-pick">
+                <span class="visually-hidden">{{ i18n.t('patients.document.choose') }}</span>
+                <input #fileInput type="file" [accept]="documentRules.accept" (change)="onFileChosen($event)" />
+              </label>
+              <app-form-field class="note" [label]="i18n.t('patients.document.note')">
+                <input type="text" [formControl]="note" maxlength="500" autocomplete="off" />
+              </app-form-field>
+              <button type="button" class="btn primary" [disabled]="chosenFile() === null || fileProblem() !== null || facade.upload.pending()" (click)="upload()">
+                <app-icon name="arrow-up" [size]="15" />{{ facade.upload.pending() ? i18n.t('patients.document.uploading') : i18n.t('patients.document.upload') }}
+              </button>
+            </div>
+            @if (fileProblem(); as message) {
+              <p class="problem" role="alert">{{ message }}</p>
+            }
+            @if (facade.upload.problem(); as problem) {
+              <p class="problem" role="alert">{{ problemText(problem) }}</p>
+            }
+          </app-section-card>
+        }
+
+        <app-section-card [padded]="false">
+          <div class="doc-toolbar">
+            <label class="check">
+              <input type="checkbox" [checked]="facade.includeInactive()" (change)="onIncludeInactive($event)" />
+              <span>{{ i18n.t('patients.document.showInactive') }}</span>
+            </label>
+          </div>
+          @if (facade.documents.error()) {
+            <p class="problem list-problem" role="alert">{{ i18n.t('patients.document.loadError') }}</p>
+          }
+          <app-data-table
+            [columns]="documentColumns"
+            [rows]="documents()"
+            [loading]="facade.documents.isLoading()"
+            [interactive]="false"
+            [emptyTitle]="i18n.t('patients.document.empty')"
+            [caption]="i18n.t('patients.tab.documents')"
+            [rowClass]="inactiveRow"
+          >
+            <ng-template appCell="uploaded" [appCellOf]="documents()" let-row>
+              <span>{{ row.uploadedByName ?? '—' }}</span>
+              <span class="muted small block">{{ when(row.uploadedAtUtc) }}</span>
+            </ng-template>
+            <ng-template appCell="patientNumber" [appCellOf]="documents()" let-row>
+              <span class="mono" [class.muted]="row.patientId === patient.id">{{ row.patientNumber }}</span>
+            </ng-template>
+            <ng-template appCell="isActive" [appCellOf]="documents()" let-row>
+              @if (row.isActive) {
+                <app-badge tone="ok">{{ i18n.t('patients.document.active') }}</app-badge>
+              } @else {
+                <app-badge tone="neutral" [attr.title]="row.deactivationReason">{{ i18n.t('patients.document.inactive') }}</app-badge>
+                <span class="muted small block">{{ row.deactivatedByName ?? '—' }} · {{ row.deactivationReason }}</span>
+              }
+            </ng-template>
+            <ng-template appRowActions [appRowActionsOf]="documents()" let-row>
+              <button type="button" class="btn sm ghost" [disabled]="facade.download.pending()" (click)="view(row)"><app-icon name="eye" [size]="14" />{{ i18n.t('patients.document.view') }}</button>
+              <button type="button" class="btn sm ghost" [disabled]="facade.download.pending()" (click)="save(row)"><app-icon name="arrow-down" [size]="14" />{{ i18n.t('patients.document.download') }}</button>
+              @if (row.isActive) {
+                <button type="button" class="btn sm" *appCan="permissions.filesManage" (click)="deactivate(row)"><app-icon name="power" [size]="14" />{{ i18n.t('patients.document.deactivate') }}</button>
+              }
+            </ng-template>
+          </app-data-table>
+        </app-section-card>
+      </div>
+    }
+
+    @case ('visits') {
+      <div role="tabpanel">
+        <app-section-card [padded]="false">
+          @if (facade.visits.error()) {
+            <app-empty-state icon="inbox" [title]="i18n.t('patients.visit.unavailable')" [message]="i18n.t('patients.visit.unavailableHint')" />
+          } @else {
+            <app-data-table
+              [columns]="visitColumns"
+              [rows]="visits()"
+              [loading]="facade.visits.isLoading()"
+              [interactive]="false"
+              [emptyTitle]="i18n.t('patients.visit.empty')"
+              [caption]="i18n.t('patients.tab.visits')"
+            />
+          }
+        </app-section-card>
+      </div>
+    }
+  }
+
+  <app-drawer [(open)]="editOpen" [title]="i18n.tf('patients.editTitle', { number: patient.number })" size="lg">
+    @if (editOpen()) {
+      <app-patient-form
+        [patient]="patient"
+        [settings]="facade.settings.value() ?? null"
+        [countries]="facade.countries.value() ?? []"
+        [governorates]="facade.governorates.value() ?? []"
+        [conditions]="facade.conditions.value() ?? []"
+        [problem]="facade.update.problem()"
+        [pending]="facade.update.pending()"
+        (save)="onSave($event)"
+      />
+    }
+    <ng-container drawerFooter>
+      <button type="button" class="btn ghost" (click)="editOpen.set(false)">{{ i18n.t('patients.cancel') }}</button>
+      <button type="button" class="btn primary" [disabled]="facade.update.pending()" (click)="submitEdit()">{{ facade.update.pending() ? i18n.t('patients.saving') : i18n.t('patients.save') }}</button>
+    </ng-container>
+  </app-drawer>
+
+  <app-merge-dialog
+    [(open)]="mergeOpen"
+    [survivor]="patient"
+    [candidates]="facade.mergeCandidates()"
+    [searching]="facade.mergeSearch.isLoading()"
+    [problem]="facade.merge.problem()"
+    [pending]="facade.merge.pending()"
+    (query)="facade.mergeQuery.set($event)"
+    (merge)="onMerge($event)"
+  />
+} @else if (facade.detail.error()) {
+  <app-page-header [title]="i18n.t('patients.title')" [breadcrumb]="breadcrumb()" />
+  <app-empty-state icon="alert" [title]="loadProblem()">
+    <a emptyAction class="btn" routerLink="/patients">{{ i18n.t('patients.backToList') }}</a>
+  </app-empty-state>
+} @else {
+  <p class="muted" role="status">{{ i18n.t('patients.loading') }}</p>
+}

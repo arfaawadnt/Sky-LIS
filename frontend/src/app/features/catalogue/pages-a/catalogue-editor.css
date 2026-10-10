@@ -1,0 +1,182 @@
+.tabs-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  padding-inline: var(--sp-4);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.editor {
+  padding: var(--sp-4);
+}
+
+.flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  padding-block: var(--sp-2);
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  margin-block: var(--sp-2);
+}
+
+.grid th {
+  text-align: start;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-2);
+  padding: 6px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.grid td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: middle;
+}
+
+.grid td.center,
+.grid th.center {
+  text-align: center;
+}
+
+.grid .num {
+  text-align: end;
+  width: 3rem;
+}
+
+.grid .actions {
+  white-space: nowrap;
+  text-align: end;
+}
+
+.grid tr.inactive td {
+  color: var(--muted);
+}
+
+.grid .inp {
+  min-width: 4.5rem;
+}
+
+.grid .inp.wide {
+  min-width: 10rem;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.members {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .members {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.picker {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: var(--sp-3);
+  background: var(--surface-2);
+}
+
+.picker h3 {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+.candidates {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.candidates li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.candidates .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-row {
+  margin-top: var(--sp-2);
+}
+
+.verdict {
+  margin-top: var(--sp-3);
+}
+
+.formula {
+  font-family: var(--font-mono, monospace);
+  min-height: 6rem;
+}
+
+.weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.section-title {
+  margin: var(--sp-4) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.swatch-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+
+.paragraph {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: var(--sp-3);
+  margin: 0 0 var(--sp-3);
+}
+
+.paragraph legend {
+  padding-inline: var(--sp-2);
+  color: var(--muted);
+}
+
+.paragraph .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}

@@ -1,0 +1,80 @@
+<app-page-header [title]="i18n.t('treasury.title')" [subtitle]="i18n.t('treasury.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="facade.requests.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('treasury.refresh') }}</button>
+</app-page-header>
+
+<div class="layout">
+  <app-section-card class="request-card" *appCan="permissions.create" [title]="i18n.t('treasury.requestTitle')" [subtitle]="i18n.t('treasury.device') + ': ' + facade.deviceId()">
+    <form [formGroup]="form" (ngSubmit)="submitRequest()" appSaveShortcut (appSaveShortcut)="submitRequest()" novalidate>
+      <app-form-field [label]="i18n.t('treasury.treasury')">
+        <select formControlName="treasuryId">
+          <option value="">{{ i18n.t('treasury.chooseTreasury') }}</option>
+          @for (treasury of facade.treasuries.value()?.items ?? []; track treasury.id) {
+            <option [value]="treasury.id">{{ treasury.code }} · {{ i18n.lang() === 'ar' ? treasury.nameAr : treasury.nameEn }}</option>
+          }
+        </select>
+      </app-form-field>
+
+      <app-form-field [label]="i18n.t('treasury.deviceLabel')">
+        <input type="text" formControlName="deviceLabel" maxlength="100" autocomplete="off" />
+      </app-form-field>
+
+      @if (facade.request.problem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
+      }
+
+      <button type="submit" class="btn primary wide" [disabled]="facade.request.pending()">
+        {{ facade.request.pending() ? i18n.t('treasury.requesting') : i18n.t('treasury.request') }}
+      </button>
+    </form>
+  </app-section-card>
+
+  <app-section-card class="list-card" [padded]="false">
+    <app-toolbar>
+      <label toolbarFilters class="filter">
+        <span>{{ i18n.t('treasury.status') }}</span>
+        <select class="inp" (change)="onStatusChange($event)">
+          <option value="">{{ i18n.t('treasury.allStatuses') }}</option>
+          @for (status of statuses; track status) {
+            <option [value]="status" [selected]="facade.filter().status === status">{{ statusLabel(status) }}</option>
+          }
+        </select>
+      </label>
+      <label toolbarFilters class="check">
+        <input type="checkbox" [checked]="facade.filter().mine" (change)="onMineChange($event)" />
+        <span>{{ i18n.t('treasury.mineOnly') }}</span>
+      </label>
+    </app-toolbar>
+
+    @for (problem of [facade.approve.problem(), facade.reject.problem(), facade.revoke.problem(), facade.cancel.problem()]; track $index) {
+      @if (problem) {
+        <p class="problem list-problem" role="alert">{{ problemText(problem.code) }}</p>
+      }
+    }
+    @if (facade.requests.error()) {
+      <p class="problem list-problem" role="alert">{{ i18n.t('treasury.loadError') }}</p>
+    }
+
+    <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.requests.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('treasury.empty')" [caption]="i18n.t('treasury.title')">
+      <ng-template appCell="treasury" [appCellOf]="rows()" let-row>{{ treasuryName(row) }}</ng-template>
+      <ng-template appCell="status" [appCellOf]="rows()" let-row>
+        <app-badge [status]="row.status">{{ statusLabel(row.status) }}</app-badge>
+      </ng-template>
+      <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+        @if (canApprove(row)) {
+          <ng-container *appCan="permissions.approve">
+            <button type="button" class="btn sm primary" (click)="approve(row)" [disabled]="facade.approve.pending()">{{ i18n.t('treasury.approve') }}</button>
+            <button type="button" class="btn sm" (click)="reject(row)">{{ i18n.t('treasury.reject') }}</button>
+          </ng-container>
+        }
+        @if (row.status === 'Approved') {
+          <button type="button" class="btn sm" *appCan="permissions.approve" (click)="revoke(row)">{{ i18n.t('treasury.revoke') }}</button>
+        }
+        @if (canCancel(row)) {
+          <button type="button" class="btn sm" *appCan="permissions.cancel" (click)="cancel(row)">{{ i18n.t('treasury.cancel') }}</button>
+        }
+      </ng-template>
+    </app-data-table>
+
+    <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="totalCount()" (pageChange)="onPageChange($event)" />
+  </app-section-card>
+</div>

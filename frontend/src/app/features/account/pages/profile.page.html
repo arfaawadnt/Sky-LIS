@@ -1,0 +1,140 @@
+<app-page-header [title]="i18n.t('account.profile.title')" [subtitle]="profile()?.isPlatform ? i18n.t('account.profile.subtitlePlatform') : i18n.t('account.profile.subtitle')" />
+
+@if (mustChangeNow()) {
+  <p class="warn-strip" role="alert"><app-icon name="alert" [size]="16" />{{ i18n.t('account.profile.mustChange') }}</p>
+}
+
+@if (facade.profile.error()) {
+  <p class="problem" role="alert">{{ i18n.t('account.profile.loadError') }}</p>
+} @else if (profile(); as p) {
+  <div class="layout">
+    <div class="column">
+      @if (p.laboratory; as lab) {
+        <app-section-card [title]="i18n.t('account.profile.laboratory')" [subtitle]="i18n.t('account.profile.laboratorySub')">
+          @if (lab.nameEn === null && lab.nameAr === null) {
+            <p class="info-strip">{{ i18n.t('account.profile.laboratoryUnavailable') }}</p>
+            <dl class="kv">
+              <dt>{{ i18n.t('account.profile.tenantId') }}</dt>
+              <dd class="mono">{{ lab.tenantId }}</dd>
+            </dl>
+          } @else {
+            <dl class="kv">
+              <dt>{{ i18n.t('account.profile.labName') }}</dt>
+              <dd>{{ text(lab.nameEn, lab.nameAr) }}</dd>
+              <dt>{{ i18n.t('account.profile.portalUrl') }}</dt>
+              <dd dir="ltr">
+                @if (lab.portalUrl) {
+                  <a [href]="lab.portalUrl" target="_blank" rel="noopener">{{ lab.portalUrl }}</a>
+                } @else {
+                  —
+                }
+              </dd>
+              <dt>{{ i18n.t('account.profile.country') }}</dt>
+              <dd>{{ text(lab.countryNameEn, lab.countryNameAr) }}</dd>
+              <dt>{{ i18n.t('account.profile.plan') }}</dt>
+              <dd>{{ text(lab.planNameEn, lab.planNameAr) }} @if (lab.planCode) {<span class="mono muted">({{ lab.planCode }})</span>}</dd>
+              <dt>{{ i18n.t('account.profile.status') }}</dt>
+              <dd>
+                @if (lab.status) {
+                  <app-badge [status]="lab.status">{{ i18n.has('account.clientStatus.' + lab.status) ? i18n.t('account.clientStatus.' + lab.status) : lab.status }}</app-badge>
+                }
+                @if (lab.trialEndsAtUtc) {
+                  <span class="muted small">{{ i18n.t('account.profile.trialEnds') }} {{ day(lab.trialEndsAtUtc) }}</span>
+                }
+              </dd>
+              <dt>{{ i18n.t('account.profile.manager') }}</dt>
+              <dd>{{ lab.managerName ?? '—' }}</dd>
+              <dt>{{ i18n.t('account.profile.managerMobile') }}</dt>
+              <dd dir="ltr">{{ lab.managerMobile ?? '—' }}</dd>
+              <dt>{{ i18n.t('account.profile.labMobile') }}</dt>
+              <dd dir="ltr">{{ lab.mobile ?? '—' }}</dd>
+              <dt>{{ i18n.t('account.profile.labEmail') }}</dt>
+              <dd dir="ltr">{{ lab.email ?? '—' }}</dd>
+            </dl>
+          }
+        </app-section-card>
+      } @else {
+        <app-section-card [title]="i18n.t('account.profile.platform')">
+          <p class="muted">{{ i18n.t('account.profile.platformText') }}</p>
+        </app-section-card>
+      }
+
+      <app-section-card [title]="i18n.t('account.profile.me')" [subtitle]="i18n.t('account.profile.meSub')">
+        <dl class="kv">
+          <dt>{{ i18n.t('account.profile.displayName') }}</dt>
+          <dd>{{ p.displayName }}</dd>
+          <dt>{{ i18n.t('account.profile.fullName') }}</dt>
+          <dd>{{ text(p.fullNameEn, p.fullNameAr) }}</dd>
+          <dt>{{ i18n.t('account.profile.username') }}</dt>
+          <dd class="mono" dir="ltr">{{ p.username }}</dd>
+          <dt>{{ i18n.t('account.profile.role') }}</dt>
+          <dd>{{ text(p.roleNameEn, p.roleNameAr) }}</dd>
+          <dt>{{ i18n.t('account.profile.employeeCode') }}</dt>
+          <dd class="mono">{{ p.employeeCode ?? '—' }}</dd>
+          <dt>{{ i18n.t('account.profile.designation') }}</dt>
+          <dd>{{ p.designation ?? '—' }}</dd>
+          <dt>{{ i18n.t('account.profile.mobile') }}</dt>
+          <dd dir="ltr">{{ p.mobile ?? '—' }}</dd>
+          <dt>{{ i18n.t('account.profile.email') }}</dt>
+          <dd dir="ltr">{{ p.email }}</dd>
+          <dt>{{ i18n.t('account.profile.passwordChanged') }}</dt>
+          <dd>{{ when(p.passwordChangedAtUtc) }}</dd>
+          @if (p.passwordExpiresAtUtc) {
+            <dt>{{ i18n.t('account.profile.accessEnds') }}</dt>
+            <dd>{{ day(p.passwordExpiresAtUtc) }}</dd>
+          }
+        </dl>
+        <p class="muted small">{{ i18n.t('account.profile.editByAdmin') }}</p>
+      </app-section-card>
+    </div>
+
+    <div class="column">
+      <app-section-card [title]="i18n.t('account.profile.language')" [subtitle]="i18n.t('account.profile.languageSub')">
+        <fieldset class="choices">
+          <legend class="visually-hidden">{{ i18n.t('account.profile.language') }}</legend>
+          <label class="check"><input type="radio" value="en" [formControl]="language" /><span>English</span></label>
+          <label class="check"><input type="radio" value="ar" [formControl]="language" /><span>العربية</span></label>
+        </fieldset>
+        @if (facade.saveLanguage.problem(); as problem) {
+          <p class="problem" role="alert">{{ problemText(problem) }}</p>
+        }
+        <button type="button" class="btn primary" (click)="saveLanguage()" [disabled]="facade.saveLanguage.pending()">
+          {{ facade.saveLanguage.pending() ? i18n.t('account.saving') : i18n.t('account.profile.saveLanguage') }}
+        </button>
+      </app-section-card>
+
+      <app-section-card [title]="i18n.t('account.profile.changePassword')" [subtitle]="i18n.t('account.profile.changePasswordSub')">
+        <form [formGroup]="passwords" (ngSubmit)="changePassword()" appSaveShortcut (appSaveShortcut)="changePassword()" novalidate>
+          <app-form-field [label]="i18n.t('account.profile.currentPassword')">
+            <input [type]="showPasswords() ? 'text' : 'password'" formControlName="current" autocomplete="current-password" dir="ltr" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('account.profile.newPassword')">
+            <input [type]="showPasswords() ? 'text' : 'password'" formControlName="next" autocomplete="new-password" dir="ltr" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('account.profile.confirmPassword')">
+            <input [type]="showPasswords() ? 'text' : 'password'" formControlName="confirmation" autocomplete="new-password" dir="ltr" />
+          </app-form-field>
+          <label class="check">
+            <input type="checkbox" [checked]="showPasswords()" (change)="showPasswords.set(!showPasswords())" />
+            <span>{{ i18n.t('account.profile.showPasswords') }}</span>
+          </label>
+          <ul class="rules" [attr.aria-label]="i18n.t('account.profile.rulesTitle')">
+            <li [class.ok]="checks().length"><app-icon [name]="checks().length ? 'check' : 'x'" [size]="14" />{{ i18n.tf('account.rule.length', { min: policy().minLength, max: policy().maxLength }) }}</li>
+            <li [class.ok]="checks().notUsername"><app-icon [name]="checks().notUsername ? 'check' : 'x'" [size]="14" />{{ i18n.t('account.rule.notUsername') }}</li>
+            <li [class.ok]="checks().differs"><app-icon [name]="checks().differs ? 'check' : 'x'" [size]="14" />{{ i18n.t('account.rule.differs') }}</li>
+            <li [class.ok]="checks().matches"><app-icon [name]="checks().matches ? 'check' : 'x'" [size]="14" />{{ i18n.t('account.rule.matches') }}</li>
+          </ul>
+          <p class="muted small">{{ i18n.t('account.profile.otherSessionsEnd') }}</p>
+          @if (facade.changePassword.problem(); as problem) {
+            <p class="problem" role="alert">{{ problemText(problem) }}</p>
+          }
+          <button type="submit" class="btn primary" [disabled]="facade.changePassword.pending()">
+            {{ facade.changePassword.pending() ? i18n.t('account.saving') : i18n.t('account.profile.updatePassword') }}
+          </button>
+        </form>
+      </app-section-card>
+    </div>
+  </div>
+} @else {
+  <p class="muted" aria-live="polite">{{ i18n.t('account.loading') }}</p>
+}

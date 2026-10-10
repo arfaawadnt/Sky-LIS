@@ -1,0 +1,67 @@
+<app-page-header [title]="i18n.t('platform.dashboard.title')" [subtitle]="i18n.t('platform.dashboard.subtitle')">
+  <label pageActions class="inline-filter">
+    <span>{{ i18n.t('platform.dashboard.periodLabel') }}</span>
+    <select class="inp" (change)="onPeriod($event)">
+      @for (period of periods; track period) {
+        <option [value]="period" [selected]="facade.period() === period">{{ periodLabel(period) }}</option>
+      }
+    </select>
+  </label>
+  <button pageActions type="button" class="btn ghost" (click)="facade.dashboard.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('platform.refresh') }}</button>
+</app-page-header>
+
+@if (facade.dashboard.error()) {
+  <p class="problem" role="alert">{{ i18n.t('platform.dashboard.loadError') }}</p>
+}
+
+@if (data(); as d) {
+  <div class="kpis">
+    <app-stat-card [label]="i18n.t('platform.dashboard.clients')" [value]="number(d.clients.total)"
+                   [hint]="i18n.tf('platform.dashboard.clientsHint', { active: d.clients.active, inactive: d.clients.inactive })" icon="building" />
+    <app-stat-card [label]="i18n.t('platform.dashboard.trial')" [value]="number(d.clients.trial)" tone="info" icon="clipboard" />
+    <app-stat-card [label]="i18n.t('platform.dashboard.adminUsers')" [value]="number(d.adminUsers)" [hint]="i18n.t('platform.dashboard.adminUsersHint')" icon="shield" />
+    <app-stat-card [label]="i18n.t('platform.dashboard.servedPatients')" [value]="number(d.activity.servedPatients)" [hint]="periodLabel(d.period)" icon="user" />
+    <app-stat-card [label]="i18n.t('platform.dashboard.tests')" [value]="number(d.activity.tests)" [hint]="periodLabel(d.period)" icon="flask" />
+    <app-stat-card [label]="i18n.t('platform.dashboard.registrations')" [value]="number(d.activity.registrations)" [hint]="periodLabel(d.period)" icon="clipboard" />
+    <app-stat-card [label]="i18n.t('platform.dashboard.walletsAtZero')" [value]="number(d.walletsAtOrBelowZero)" [hint]="i18n.t('platform.dashboard.walletsAtZeroHint')"
+                   [tone]="d.walletsAtOrBelowZero > 0 ? 'bad' : 'ok'" icon="coins" />
+  </div>
+
+  <div class="grid-2">
+    <app-section-card [title]="i18n.t('platform.dashboard.clientsOverview')">
+      <dl class="kv">
+        <dt>{{ i18n.t('platform.status.Active') }}</dt><dd>{{ number(d.clients.active) }}</dd>
+        <dt>{{ i18n.t('platform.status.Trial') }}</dt><dd>{{ number(d.clients.trial) }}</dd>
+        <dt>{{ i18n.t('platform.status.Inactive') }}</dt><dd>{{ number(d.clients.inactive) }}</dd>
+        <dt>{{ i18n.t('platform.dashboard.bySubscription') }}</dt><dd>{{ number(d.clients.bySubscription) }}</dd>
+        <dt>{{ i18n.t('platform.dashboard.byManual') }}</dt><dd>{{ number(d.clients.byManual) }}</dd>
+      </dl>
+    </app-section-card>
+
+    <app-section-card [title]="i18n.t('platform.dashboard.planDistribution')">
+      <app-bar-list [items]="planBars()" [emptyText]="i18n.t('platform.dashboard.noPlans')" />
+    </app-section-card>
+
+    <app-section-card [title]="i18n.t('platform.dashboard.registrationsByClient')" [subtitle]="periodLabel(d.period)">
+      <app-bar-list [items]="clientBars()" [emptyText]="i18n.t('platform.dashboard.noActivity')" />
+    </app-section-card>
+  </div>
+
+  <app-section-card [title]="i18n.t('platform.dashboard.recentClients')" [padded]="false">
+    <a cardActions class="btn sm ghost" routerLink="../clients">{{ i18n.t('platform.dashboard.viewAll') }}</a>
+    <app-data-table [columns]="recentColumns" [rows]="recentRows()" [interactive]="false" [compact]="true" [emptyTitle]="i18n.t('platform.clients.empty')" [caption]="i18n.t('platform.dashboard.recentClients')">
+      <ng-template appCell="name" [appCellOf]="recentRows()" let-row>
+        <strong>{{ clientName(row) }}</strong>
+        <div class="small muted mono">{{ row.portalUrl }}</div>
+      </ng-template>
+      <ng-template appCell="source" [appCellOf]="recentRows()" let-row>
+        <app-badge [tone]="tone(row.source)">{{ i18n.t('platform.source.' + row.source) }}</app-badge>
+      </ng-template>
+      <ng-template appCell="status" [appCellOf]="recentRows()" let-row>
+        <app-badge [tone]="tone(row.status)">{{ i18n.t('platform.status.' + row.status) }}</app-badge>
+      </ng-template>
+    </app-data-table>
+  </app-section-card>
+} @else if (facade.dashboard.isLoading()) {
+  <p class="muted">{{ i18n.t('platform.loading') }}</p>
+}

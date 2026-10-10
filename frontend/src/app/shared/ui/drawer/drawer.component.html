@@ -1,0 +1,11 @@
+@if (open()) {
+  <button type="button" class="scrim" tabindex="-1" (click)="dismiss()" [attr.aria-label]="i18n.t('shared.drawer.close')"></button>
+  <section #panel class="panel" [class.lg]="size() === 'lg'" [class.xl]="size() === 'xl'" role="dialog" aria-modal="true" [attr.aria-labelledby]="titleId" tabindex="-1" (keydown)="onKeydown($event)">
+    <header class="head">
+      <h2 [id]="titleId">{{ title() }}</h2>
+      <button type="button" class="icon-btn" (click)="close()" [attr.aria-label]="i18n.t('shared.drawer.close')"><app-icon name="x" /></button>
+    </header>
+    <div class="body"><ng-content /></div>
+    <footer class="foot"><ng-content select="[drawerFooter]" /></footer>
+  </section>
+}

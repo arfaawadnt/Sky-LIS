@@ -1,0 +1,41 @@
+<div class="shell" [class.collapsed]="collapsed()">
+  <a class="skip" href="#app-main">{{ i18n.t('shell.skipToContent') }}</a>
+
+  <app-shell-sidebar
+    [groups]="groups()"
+    [currentPath]="currentPath()"
+    [portalLabel]="portalLabel()"
+    [roleName]="roleName()"
+    [collapsed]="collapsed()"
+    [mobileOpen]="mobileOpen()"
+    (navigated)="closeMobile()"
+    (closeRequested)="closeMobile()"
+    (collapseToggled)="toggleCollapsed()"
+  />
+
+  @if (mobileOpen()) {
+    <button type="button" class="scrim" tabindex="-1" (click)="closeMobile()" [attr.aria-label]="i18n.t('shell.closeMenu')"></button>
+  }
+
+  <div class="content">
+    <app-shell-topbar
+      [portalLabel]="portalLabel()"
+      [mobileOpen]="mobileOpen()"
+      [(navSearch)]="navSearch"
+      [(menuOpen)]="userMenuOpen"
+      (menuToggled)="toggleMobile()"
+      (searchSubmitted)="openFirstMatch()"
+      (languageToggled)="toggleLanguage()"
+      (signOutRequested)="signOut()"
+    />
+
+    <main class="main" id="app-main" tabindex="-1">
+      <router-outlet />
+    </main>
+
+    <footer class="foot">
+      <span>{{ i18n.t('shell.footer') }}</span>
+      <span>{{ portalLabel() }}</span>
+    </footer>
+  </div>
+</div>

@@ -1,0 +1,26 @@
+<header class="page-head">
+  <div class="titles">
+    @if (breadcrumb().length > 0) {
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <ol>
+          @for (crumb of breadcrumb(); track $index) {
+            <li>
+              @if (crumb.path !== null) {
+                <a [routerLink]="crumb.path">{{ crumb.label }}</a>
+              } @else {
+                <span aria-current="page">{{ crumb.label }}</span>
+              }
+            </li>
+          }
+        </ol>
+      </nav>
+    }
+    <h1>{{ title() }}</h1>
+    @if (subtitle(); as subtitle) {
+      <p class="subtitle">{{ subtitle }}</p>
+    }
+  </div>
+  <div class="actions">
+    <ng-content select="[pageActions]" />
+  </div>
+</header>

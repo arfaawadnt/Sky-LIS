@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 01 §2.1: references Domain, Contracts, SharedKernel, MediatR and FluentValidation.
+       Never EF Core, Npgsql, ASP.NET or HttpContext. Gate: LayerRulesTests.Application_carries_no_EntityFrameworkCore. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Description>Commands, queries, handlers, validators, policies, ports and pipeline behaviors. Deny-by-default authorization on commands and queries (D-04).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Platform.SharedKernel\Platform.SharedKernel.csproj" />
+    <ProjectReference Include="..\Platform.Domain\Platform.Domain.csproj" />
+    <ProjectReference Include="..\Platform.Contracts\Platform.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+</Project>

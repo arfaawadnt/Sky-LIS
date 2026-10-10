@@ -1,0 +1,65 @@
+<app-page-header [title]="i18n.t(isPlatform() ? 'organization.users.adminTitle' : 'organization.users.title')" [subtitle]="i18n.t('organization.users.subtitle')">
+  <button pageActions type="button" class="btn primary" *appCan="permissions.usersCreate" (click)="add()"><app-icon name="plus" [size]="15" />{{ i18n.t('organization.users.add') }}</button>
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="i18n.t('organization.users.searchPlaceholder')" [label]="i18n.t('organization.users.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('organization.users.role') }}</span>
+      <select class="inp" (change)="onRole($event)">
+        <option value="">{{ i18n.t('organization.users.allRoles') }}</option>
+        @for (role of roles(); track role.id) {
+          <option [value]="role.id">{{ localized(role.nameEn, role.nameAr) }}</option>
+        }
+      </select>
+    </label>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('organization.status') }}</span>
+      <select class="inp" (change)="onStatus($event)">
+        <option value="">{{ i18n.t('organization.allStatuses') }}</option>
+        @for (status of statuses; track status) {
+          <option [value]="status">{{ statusLabel(status) }}</option>
+        }
+      </select>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.list.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('organization.refresh') }}</button>
+  </app-toolbar>
+
+  @if (facade.list.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('organization.users.loadError') }}</p>
+  }
+
+  <app-data-table
+    [columns]="columns"
+    [rows]="rows()"
+    [rowId]="rowId"
+    [loading]="facade.list.isLoading()"
+    [emptyTitle]="i18n.t('organization.users.empty')"
+    [caption]="i18n.t('organization.users.title')"
+    (rowActivate)="open($event)">
+    <ng-template appCell="name" [appCellOf]="rows()" let-row>
+      <strong>{{ localized(row.fullNameEn, row.fullNameAr) }}</strong>
+      <span class="muted small description mono">{{ row.username }}</span>
+    </ng-template>
+    <ng-template appCell="status" [appCellOf]="rows()" let-row>
+      <span class="flags">
+        <app-badge [tone]="statusTone(row.status)">{{ statusLabel(row.status) }}</app-badge>
+        @if (row.isPrimaryAdministrator) {
+          <app-badge tone="violet">{{ i18n.t('organization.users.primary') }}</app-badge>
+        }
+        @if (row.isModified) {
+          <app-badge tone="warn">{{ i18n.t('organization.users.modified') }}</app-badge>
+        }
+        @if (row.mustChangePassword) {
+          <app-badge tone="info">{{ i18n.t('organization.users.mustChange') }}</app-badge>
+        }
+      </span>
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+      <button type="button" class="btn sm" (click)="open(row)">{{ i18n.t('organization.open') }}</button>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="totalCount()" (pageChange)="facade.setPage($event)" />
+</app-section-card>

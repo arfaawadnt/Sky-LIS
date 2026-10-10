@@ -1,0 +1,98 @@
+<app-page-header [title]="i18n.t('billing.refunds.title')" [subtitle]="i18n.t('billing.refunds.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('billing.refresh') }}</button>
+</app-page-header>
+
+<app-section-card>
+  <div class="lookup">
+    <app-form-field [label]="i18n.t('billing.field.accession')" [hint]="i18n.t('billing.lookup.hint')">
+      <input type="search" [formControl]="search" (keydown.enter)="find()" autocomplete="off" spellcheck="false" />
+    </app-form-field>
+    <button type="button" class="btn primary" (click)="find()"><app-icon name="search" [size]="15" />{{ i18n.t('billing.lookup.find') }}</button>
+  </div>
+</app-section-card>
+
+@if (facade.account.isLoading()) {
+  <p class="muted" role="status">{{ i18n.t('billing.loading') }}</p>
+}
+@if (lookupProblem(); as problem) {
+  <p class="problem" role="alert">{{ problemText(problem) }}</p>
+}
+
+@if (facade.current(); as account) {
+  <div class="columns">
+    <app-section-card class="pay-card" *appCan="permissions.refund" [title]="i18n.t('billing.refund.title')" [subtitle]="i18n.t('billing.pay.device') + ': ' + desk.deviceId()">
+      @if (!desk.hasStation()) {
+        <p class="warn-strip">
+          {{ i18n.t('billing.pay.noTreasury') }}
+          <a routerLink="/treasury/access">{{ i18n.t('billing.pay.requestAccess') }}</a>
+        </p>
+      } @else if (account.refundable <= 0) {
+        <p class="info-strip">{{ i18n.t('billing.refund.nothingRefundable') }}</p>
+      } @else {
+        @if (facade.reasons.error()) {
+          <p class="problem" role="alert">{{ i18n.t('billing.refund.reasonsError') }}</p>
+        }
+        <app-billing-movement-form
+          mode="refund"
+          [treasuries]="desk.approved()"
+          [(treasuryId)]="desk.treasuryId"
+          [dueAmount]="account.refundable"
+          [currency]="account.currency"
+          [reasons]="reasons()"
+          [pending]="facade.refund.pending()"
+          [problem]="facade.refund.problem()"
+          [submitLabel]="i18n.t('billing.refund.submit')"
+          (submitted)="refund(account, $event)"
+        />
+      }
+    </app-section-card>
+
+    <app-section-card [title]="i18n.t('billing.account.title')">
+      <app-billing-account-summary [account]="account" />
+    </app-section-card>
+  </div>
+} @else if (facade.lookup() === null) {
+  <app-empty-state [title]="i18n.t('billing.lookup.emptyTitle')" [message]="i18n.t('billing.refunds.emptyMessage')" icon="search" />
+}
+
+<app-section-card [title]="i18n.t('billing.refunds.register')" [padded]="false">
+  <app-toolbar>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('billing.field.accession') }}</span>
+      <input #accessionFilter class="inp" type="search" (keydown.enter)="onAccessionFilter(accessionFilter.value)" (search)="onAccessionFilter(accessionFilter.value)" autocomplete="off" />
+    </label>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('billing.filter.from') }}</span>
+      <input class="inp" type="date" (change)="onFrom($event)" />
+    </label>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('billing.filter.to') }}</span>
+      <input class="inp" type="date" (change)="onTo($event)" />
+    </label>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('billing.field.method') }}</span>
+      <select class="inp" (change)="onMethod($event)">
+        <option value="">{{ i18n.t('billing.filter.all') }}</option>
+        @for (method of methods; track method) {
+          <option [value]="method">{{ methodLabel(method) }}</option>
+        }
+      </select>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" *appCan="permissions.export" (click)="exportCsv()" [disabled]="facade.exportCsv.pending()">
+      <app-icon name="arrow-down" [size]="15" />{{ i18n.t('billing.exportCsv') }}
+    </button>
+  </app-toolbar>
+
+  @if (facade.register.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('billing.loadError') }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.register.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('billing.refunds.empty')" [caption]="i18n.t('billing.refunds.register')">
+    <ng-template appCell="method" [appCellOf]="rows()" let-row>{{ methodLabel(row.method) }}</ng-template>
+    <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+      <button type="button" class="btn sm ghost" (click)="reprint(row)" [attr.aria-label]="i18n.t('billing.reprint') + ' ' + row.number"><app-icon name="printer" [size]="14" /></button>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="total()" (pageChange)="onPage($event)" />
+</app-section-card>

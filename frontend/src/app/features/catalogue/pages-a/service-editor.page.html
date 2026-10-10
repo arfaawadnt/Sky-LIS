@@ -1,0 +1,192 @@
+<app-page-header [title]="title()" [subtitle]="i18n.t('catalogue-a.services.editorSubtitle')" [breadcrumb]="crumbs()">
+  <button pageActions type="button" class="btn ghost" (click)="back()"><app-icon name="chevron-left" [size]="15" />{{ i18n.t('catalogue-a.back') }}</button>
+  @if (detail(); as current) {
+    <button pageActions ngProjectAs="[pageActions]" type="button" class="btn" [class.danger]="current.isActive" *appCan="permissions.manage" (click)="toggleActive()">
+      <app-icon name="power" [size]="15" />{{ current.isActive ? i18n.t('catalogue-a.deactivate') : i18n.t('catalogue-a.activate') }}
+    </button>
+  }
+  <button pageActions ngProjectAs="[pageActions]" type="button" class="btn primary" *appCan="isNew ? permissions.create : permissions.edit" [disabled]="saving()" (click)="save()">
+    {{ saving() ? i18n.t('catalogue-a.saving') : i18n.t('catalogue-a.save') }}
+  </button>
+</app-page-header>
+
+@if (facade.detail.error()) {
+  <p class="problem" role="alert">{{ i18n.t('catalogue-a.loadError') }}</p>
+}
+
+<app-section-card [padded]="false">
+  <div class="tabs-bar">
+    <app-tabs [tabs]="tabs()" [(active)]="activeTab" />
+    @if (detail(); as current) {
+      <span class="state">
+        <app-badge tone="info">{{ typeLabel(current.type) }}</app-badge>
+        <app-badge [status]="current.isActive ? 'Active' : 'Inactive'" />
+        <span class="muted small">{{ i18n.t('catalogue-a.services.column.sequence') }} {{ current.sequence }}</span>
+      </span>
+    }
+  </div>
+
+  <form class="editor" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+    <div role="tabpanel" [hidden]="activeTab() !== 'general'">
+      @if (generalProblem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+      <div class="form-grid three">
+        <app-form-field [label]="i18n.t('catalogue-a.services.field.code')" [hint]="i18n.t('catalogue-a.services.hint.code')">
+          <input type="text" formControlName="code" appUppercase maxlength="16" autocomplete="off" spellcheck="false" class="mono" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.services.field.type')" [hint]="i18n.t('catalogue-a.services.hint.type')">
+          <select formControlName="type">
+            @for (type of types; track type) {
+              <option [ngValue]="type">{{ typeLabel(type) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.services.field.shortName')">
+          <input type="text" formControlName="shortName" maxlength="50" autocomplete="off" />
+        </app-form-field>
+        <app-localized-text-input class="full" [group]="form.controls.name" [label]="i18n.t('catalogue-a.services.field.name')" [problem]="generalProblem()" />
+        <app-form-field [label]="i18n.t('catalogue-a.services.field.reportName')">
+          <input type="text" formControlName="reportName" maxlength="200" autocomplete="off" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.services.field.shortcutNo')" [hint]="i18n.t('catalogue-a.services.hint.shortcutNo')">
+          <input type="number" formControlName="shortcutNo" min="1" max="999999" step="1" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.services.field.header')">
+          <input type="text" formControlName="header" maxlength="200" autocomplete="off" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.services.field.clinicalGroupId')" [required]="type() !== 'Additional'">
+          <select formControlName="clinicalGroupId">
+            <option [ngValue]="null">{{ i18n.t('shared.form.choose') }}</option>
+            @for (option of groupOptions(); track option.value) {
+              <option [ngValue]="option.value" [disabled]="!option.isActive">{{ optionText(option) }}</option>
+            }
+          </select>
+        </app-form-field>
+        @if (carriesSample()) {
+          <app-form-field [label]="i18n.t('catalogue-a.services.field.sampleTypeId')" [required]="true">
+            <select formControlName="sampleTypeId">
+              <option [ngValue]="null">{{ i18n.t('shared.form.choose') }}</option>
+              @for (option of sampleTypeOptions(); track option.value) {
+                <option [ngValue]="option.value" [disabled]="!option.isActive">{{ optionText(option) }}</option>
+              }
+            </select>
+          </app-form-field>
+          <app-form-field [label]="i18n.t('catalogue-a.services.field.sampleConditionId')">
+            <select formControlName="sampleConditionId">
+              <option [ngValue]="null">{{ i18n.t('catalogue-a.none') }}</option>
+              @for (condition of conditions(); track condition.id) {
+                <option [ngValue]="condition.id" [disabled]="!condition.isActive && condition.id !== detail()?.sampleConditionId">{{ conditionText(condition) }}</option>
+              }
+            </select>
+          </app-form-field>
+        } @else {
+          <p class="info-strip">{{ i18n.t(type() === 'Additional' ? 'catalogue-a.services.additionalNoSample' : 'catalogue-a.services.packageNoSample') }}</p>
+        }
+        <app-form-field [label]="i18n.t('catalogue-a.services.field.gender')" [hint]="i18n.t('catalogue-a.services.hint.gender')">
+          <select formControlName="gender">
+            @for (gender of genders; track gender) {
+              <option [ngValue]="gender">{{ i18n.t('catalogue-a.gender.' + gender) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.services.field.loinc')">
+          <input type="text" formControlName="loinc" maxlength="20" autocomplete="off" class="mono" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('catalogue-a.services.field.cpt')">
+          <input type="text" formControlName="cpt" maxlength="20" autocomplete="off" class="mono" />
+        </app-form-field>
+        @if (type() !== 'Additional') {
+          <app-form-field [label]="i18n.t('catalogue-a.services.field.turnaroundHours')">
+            <input type="number" formControlName="turnaroundHours" min="0" max="8760" step="1" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('catalogue-a.services.field.labelCount')">
+            <input type="number" formControlName="labelCount" min="0" max="20" step="1" />
+          </app-form-field>
+        }
+        @if (isProfile()) {
+          <app-form-field [label]="i18n.t('catalogue-a.services.field.profileSum')" [hint]="i18n.t('catalogue-a.services.hint.profileSum')">
+            <input type="number" formControlName="profileSum" min="0" step="any" />
+          </app-form-field>
+        }
+        <app-form-field class="full" [label]="i18n.t('catalogue-a.services.field.aliases')" [hint]="i18n.t('catalogue-a.services.hint.aliases')">
+          <input type="text" formControlName="aliases" autocomplete="off" />
+        </app-form-field>
+        <app-form-field class="full" [label]="i18n.t('catalogue-a.services.field.precaution')" [hint]="i18n.t('catalogue-a.services.hint.precaution')">
+          <textarea formControlName="precaution" rows="2" maxlength="1000"></textarea>
+        </app-form-field>
+        <div class="full flags">
+          <label class="check"><input type="checkbox" formControlName="isOrderable" /><span>{{ i18n.t('catalogue-a.services.field.isOrderable') }}</span></label>
+          <label class="check"><input type="checkbox" formControlName="showOnWeb" /><span>{{ i18n.t('catalogue-a.services.field.showOnWeb') }}</span></label>
+          @if (type() !== 'Additional') {
+            <label class="check"><input type="checkbox" formControlName="printAlone" /><span>{{ i18n.t('catalogue-a.services.field.printAlone') }}</span></label>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div role="tabpanel" [hidden]="activeTab() !== 'members'">
+      @if (membersProblem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+      <p class="muted small">{{ i18n.t('catalogue-a.services.membersHint.' + type()) }}</p>
+      <div class="members">
+        <table class="grid">
+          <thead>
+            <tr>
+              <th scope="col" class="num">#</th>
+              <th scope="col">{{ i18n.t('catalogue-a.services.member.code') }}</th>
+              <th scope="col">{{ i18n.t('catalogue-a.services.member.name') }}</th>
+              <th scope="col">{{ i18n.t('catalogue-a.services.member.type') }}</th>
+              @if (isProfile()) {
+                <th scope="col">{{ i18n.t('catalogue-a.services.member.inSum') }}</th>
+              }
+              <th scope="col">{{ i18n.t('catalogue-a.services.member.visible') }}</th>
+              <th scope="col"><span class="visually-hidden">{{ i18n.t('catalogue-a.actions') }}</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (member of members(); track member.memberId; let i = $index; let first = $first; let last = $last) {
+              <tr [class.inactive]="!member.isActive">
+                <td class="num mono">{{ i + 1 }}</td>
+                <td class="mono">{{ member.code }}</td>
+                <td>{{ memberName(member) }} @if (!member.isActive) { <app-badge status="Inactive" /> }</td>
+                <td><app-badge tone="neutral">{{ typeLabel(member.memberType) }}</app-badge></td>
+                @if (isProfile()) {
+                  <td class="center"><input type="checkbox" [checked]="member.inSum" (change)="toggleMember(i, 'inSum', $event)" [attr.aria-label]="i18n.t('catalogue-a.services.member.inSum')" /></td>
+                }
+                <td class="center"><input type="checkbox" [checked]="member.visible" (change)="toggleMember(i, 'visible', $event)" [attr.aria-label]="i18n.t('catalogue-a.services.member.visible')" /></td>
+                <td class="actions">
+                  <button type="button" class="row-btn" [disabled]="first" (click)="moveMember(i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
+                  <button type="button" class="row-btn" [disabled]="last" (click)="moveMember(i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
+                  <button type="button" class="row-btn danger" (click)="removeMember(i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
+                </td>
+              </tr>
+            } @empty {
+              <tr><td [attr.colspan]="isProfile() ? 7 : 6" class="muted">{{ i18n.t('catalogue-a.services.noMembers') }}</td></tr>
+            }
+          </tbody>
+        </table>
+
+        @if (memberKind(); as kind) {
+          <section class="picker" [attr.aria-label]="i18n.t('catalogue-a.services.picker.title')">
+            <h3>{{ i18n.t(kind === 'Test' ? 'catalogue-a.services.picker.tests' : 'catalogue-a.services.picker.services') }}</h3>
+            <app-search-box [placeholder]="i18n.t('catalogue-a.services.picker.search')" (searchChange)="onSearch($event)" />
+            <ul class="candidates">
+              @for (candidate of candidates(); track candidate.id) {
+                <li>
+                  <span class="mono">{{ candidate.code }}</span>
+                  <span class="grow">{{ memberName(candidate) }}</span>
+                  <app-badge tone="neutral">{{ typeLabel(candidate.type) }}</app-badge>
+                  <button type="button" class="btn sm soft" (click)="addMember(candidate)"><app-icon name="plus" [size]="13" />{{ i18n.t('catalogue-a.add') }}</button>
+                </li>
+              } @empty {
+                <li class="muted">{{ facade.candidates.isLoading() ? i18n.t('catalogue-a.loading') : i18n.t('catalogue-a.services.picker.none') }}</li>
+              }
+            </ul>
+          </section>
+        }
+      </div>
+    </div>
+  </form>
+</app-section-card>

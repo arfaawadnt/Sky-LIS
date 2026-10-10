@@ -1,0 +1,14 @@
+<div class="ff" [class.disabled]="state().disabled">
+  <label class="label" [for]="controlId()">
+    {{ label() }}
+    @if (isRequired()) {
+      <span class="req" aria-hidden="true">*</span>
+    }
+  </label>
+  <div class="control"><ng-content /></div>
+  @if (errorText(); as error) {
+    <p class="error" [id]="errorId" role="alert">{{ error }}</p>
+  } @else if (hint(); as hint) {
+    <p class="hint" [id]="hintId">{{ hint }}</p>
+  }
+</div>

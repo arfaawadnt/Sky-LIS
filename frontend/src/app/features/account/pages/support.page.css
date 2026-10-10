@@ -1,0 +1,27 @@
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.filter select {
+  width: auto;
+  min-width: 140px;
+}
+
+.list-problem {
+  margin: var(--sp-3) var(--sp-4) 0;
+}
+
+.answered {
+  margin-inline-start: 6px;
+  color: var(--violet);
+  font-size: 10px;
+}
+
+form {
+  display: grid;
+  gap: var(--sp-3);
+}

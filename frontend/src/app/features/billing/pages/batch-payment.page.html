@@ -1,0 +1,99 @@
+<app-page-header [title]="i18n.t('billing.batch.title')" [subtitle]="i18n.t('billing.batch.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('billing.refresh') }}</button>
+</app-page-header>
+
+<app-section-card>
+  <div class="lookup">
+    <app-form-field [label]="i18n.t('billing.field.batch')" [hint]="i18n.t('billing.batch.lookupHint')">
+      <input type="search" [formControl]="search" (keydown.enter)="find()" autocomplete="off" spellcheck="false" />
+    </app-form-field>
+    <button type="button" class="btn primary" (click)="find()"><app-icon name="search" [size]="15" />{{ i18n.t('billing.lookup.find') }}</button>
+  </div>
+</app-section-card>
+
+@if (facade.batch.isLoading()) {
+  <p class="muted" role="status">{{ i18n.t('billing.loading') }}</p>
+}
+@if (lookupProblem(); as problem) {
+  <p class="problem" role="alert">{{ problemText(problem) }}</p>
+}
+
+@if (facade.current(); as batch) {
+  <app-section-card [title]="i18n.t('billing.field.batch') + ' ' + batch.number">
+    <div class="stack">
+      <div class="batch-head">
+        <app-badge [tone]="batch.billedThroughClaims ? 'violet' : 'info'">{{ i18n.t('billing.batch.kind.' + batch.kind) }}</app-badge>
+        <span class="muted">{{ i18n.t('billing.field.payer') }}: {{ payer(batch) }}</span>
+        <span class="muted">{{ i18n.tf('billing.batch.members', { count: batch.members.length }) }}</span>
+      </div>
+      @if (batch.billedThroughClaims) {
+        <p class="info-strip">{{ i18n.t('billing.batch.labToLab') }}</p>
+      }
+      <div class="totals-grid">
+        <app-stat-card [label]="i18n.t('billing.account.patientShare')" [value]="money(batch.patientShareTotal)" tone="brand" [hint]="batch.currency" />
+        <app-stat-card [label]="i18n.t('billing.account.payerShare')" [value]="money(batch.payerShareTotal)" tone="info" />
+        <app-stat-card [label]="i18n.t('billing.account.paid')" [value]="money(batch.paid)" tone="ok" />
+        <app-stat-card [label]="i18n.t('billing.account.remaining')" [value]="money(batch.remaining)" [tone]="batch.remaining > 0 ? 'bad' : 'ok'" />
+      </div>
+    </div>
+  </app-section-card>
+
+  <div class="columns">
+    @if (!batch.billedThroughClaims) {
+      <app-section-card class="pay-card" *appCan="permissions.pay" [title]="i18n.t('billing.batch.payAll')" [subtitle]="i18n.t('billing.batch.payAllHint')">
+        @if (!desk.hasStation()) {
+          <p class="warn-strip">
+            {{ i18n.t('billing.pay.noTreasury') }}
+            <a routerLink="/treasury/access">{{ i18n.t('billing.pay.requestAccess') }}</a>
+          </p>
+        } @else if (payable() <= 0) {
+          <p class="info-strip">{{ i18n.t('billing.pay.nothingDue') }}</p>
+        } @else {
+          <app-billing-movement-form
+            [treasuries]="desk.approved()"
+            [(treasuryId)]="desk.treasuryId"
+            [dueAmount]="payable()"
+            [currency]="batch.currency"
+            [pending]="facade.payAll.pending()"
+            [problem]="facade.payAll.problem()"
+            [submitLabel]="i18n.t('billing.batch.payAllSubmit')"
+            (submitted)="payAll(batch, $event)"
+          />
+        }
+      </app-section-card>
+    }
+
+    <app-section-card [title]="i18n.t('billing.batch.membersTitle')" [padded]="false">
+      <app-data-table [columns]="columns" [rows]="members()" [rowId]="memberId" [interactive]="false" [emptyTitle]="i18n.t('billing.batch.noMembers')" [caption]="i18n.t('billing.batch.membersTitle')">
+        <ng-template appCell="balanceStatus" [appCellOf]="members()" let-row>
+          <app-badge [tone]="tone(row.balanceStatus)">{{ statusLabel(row.balanceStatus) }}</app-badge>
+        </ng-template>
+        <ng-template appRowActions [appRowActionsOf]="members()" let-row>
+          @if (canPay(batch, row) && desk.hasStation()) {
+            <button type="button" class="btn sm primary" *appCan="permissions.pay" (click)="openMember(row)">{{ i18n.t('billing.batch.payMember') }}</button>
+          }
+        </ng-template>
+      </app-data-table>
+    </app-section-card>
+  </div>
+} @else if (facade.number() === null) {
+  <app-empty-state [title]="i18n.t('billing.batch.emptyTitle')" [message]="i18n.t('billing.batch.emptyMessage')" icon="layers" />
+}
+
+<app-dialog [(open)]="memberDialogOpen" [title]="i18n.t('billing.batch.payMember') + (member() ? ' · ' + member()?.accession : '')">
+  @if (member(); as current) {
+    <div class="member-pay">
+      <p class="muted">{{ current.patientName ?? current.patientNumber ?? '—' }}</p>
+      <app-billing-movement-form
+        [treasuries]="desk.approved()"
+        [(treasuryId)]="desk.treasuryId"
+        [dueAmount]="current.remaining"
+        [currency]="facade.current()?.currency ?? ''"
+        [pending]="facade.payMember.pending()"
+        [problem]="facade.payMember.problem()"
+        [submitLabel]="i18n.t('billing.pay.submit')"
+        (submitted)="payMember($event)"
+      />
+    </div>
+  }
+</app-dialog>

@@ -1,0 +1,209 @@
+<app-page-header [title]="i18n.t('integration.analysers.title')" [subtitle]="i18n.t('integration.analysers.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="facade.list.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('integration.refresh') }}</button>
+  <button pageActions type="button" class="btn primary" *appCan="permissions.edit" (click)="add()"><app-icon name="plus" [size]="15" />{{ i18n.t('integration.analysers.add') }}</button>
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="i18n.t('integration.analysers.search')" (searchChange)="facade.setSearch($event)" />
+    <select toolbarFilters class="inp filter" (change)="onActiveFilter($event)" [attr.aria-label]="i18n.t('integration.field.status')">
+      <option value="">{{ i18n.t('integration.allStatuses') }}</option>
+      <option value="true">{{ i18n.t('integration.active') }}</option>
+      <option value="false">{{ i18n.t('integration.inactive') }}</option>
+    </select>
+    <select toolbarFilters class="inp filter" (change)="onAgentFilter($event)" [attr.aria-label]="i18n.t('integration.field.siteAgent')">
+      <option value="">{{ i18n.t('integration.allAgents') }}</option>
+      @for (agent of agents(); track agent.id) {
+        <option [value]="agent.id">{{ agent.name }}</option>
+      }
+    </select>
+  </app-toolbar>
+
+  @if (facade.list.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('integration.loadError') }}</p>
+  }
+  @if (facade.setActive.problem(); as problem) {
+    <p class="problem list-problem" role="alert">{{ problemText(problem.code) }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.list.isLoading()" [emptyTitle]="i18n.t('integration.analysers.empty')" [caption]="i18n.t('integration.analysers.title')" (rowActivate)="edit($event)">
+    <ng-template appCell="link" [appCellOf]="rows()" let-row>
+      <app-badge [tone]="tone(row.linkStatus)">{{ i18n.t('integration.link.' + row.linkStatus) }}</app-badge>
+      @if (row.lastSeenAtUtc) {
+        <span class="muted small age">{{ age(row.lastSeenAtUtc) }}</span>
+      }
+    </ng-template>
+    <ng-template appCell="status" [appCellOf]="rows()" let-row>
+      <app-badge [tone]="tone(row.isActive ? 'Active' : 'Inactive')">{{ i18n.t(row.isActive ? 'integration.active' : 'integration.inactive') }}</app-badge>
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+      <button type="button" class="icon-btn" *appCan="permissions.edit" (click)="edit(row)" [attr.aria-label]="i18n.t('integration.edit')" [title]="i18n.t('integration.edit')"><app-icon name="edit" [size]="15" /></button>
+      <button type="button" class="icon-btn" (click)="testConnection(row)" [disabled]="facade.testConnection.pending()" [attr.aria-label]="i18n.t('integration.analysers.testConnection')" [title]="i18n.t('integration.analysers.testConnection')"><app-icon name="plug" [size]="15" /></button>
+      <button type="button" class="icon-btn" (click)="openMappings(row)" [attr.aria-label]="i18n.t('integration.analysers.mappings')" [title]="i18n.t('integration.analysers.mappings')"><app-icon name="layers" [size]="15" /></button>
+      <button type="button" class="icon-btn" (click)="openSampleCodes(row)" [attr.aria-label]="i18n.t('integration.analysers.sampleCodes')" [title]="i18n.t('integration.analysers.sampleCodes')"><app-icon name="barcode" [size]="15" /></button>
+      <button type="button" class="icon-btn" *appCan="permissions.manage" (click)="toggleActive(row)" [attr.aria-label]="i18n.t(row.isActive ? 'integration.analysers.deactivate' : 'integration.analysers.activate')" [title]="i18n.t(row.isActive ? 'integration.analysers.deactivate' : 'integration.analysers.activate')"><app-icon name="power" [size]="15" /></button>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="total()" (pageChange)="onPage($event)" />
+</app-section-card>
+
+<app-drawer [(open)]="drawerOpen" size="xl" [title]="i18n.t(editingId() === null ? 'integration.analysers.add' : 'integration.analysers.edit')">
+  <form [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+    <h3 class="section">{{ i18n.t('integration.analysers.general') }}</h3>
+    <div class="form-grid three">
+      <app-form-field [label]="i18n.t('integration.field.code')" [hint]="i18n.t('integration.analysers.codeHint')">
+        <input type="text" formControlName="code" appUppercase maxlength="16" autocomplete="off" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('integration.field.clinicalGroup')">
+        <select formControlName="clinicalGroupId">
+          <option value="">{{ i18n.t('integration.choose') }}</option>
+          @for (group of groups(); track group.id) {
+            <option [value]="group.id">{{ group.code }} · {{ name(group) }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('integration.field.defaultSampleType')">
+        <select formControlName="defaultSampleTypeId">
+          <option value="">{{ i18n.t('integration.none') }}</option>
+          @for (type of sampleTypes(); track type.id) {
+            <option [value]="type.id">{{ type.code }} · {{ name(type) }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-localized-text-input class="full" [group]="form.controls.name" [label]="i18n.t('integration.field.name')" [maxLength]="200" />
+      <app-form-field [label]="i18n.t('integration.field.model')">
+        <select formControlName="analyserModelId">
+          <option value="">{{ i18n.t('integration.none') }}</option>
+          @for (model of models(); track model.id) {
+            <option [value]="model.id">{{ model.vendor }} {{ model.model }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('integration.field.mode')">
+        <select formControlName="mode" (change)="onMode($event)">
+          @for (mode of modes; track mode) {
+            <option [value]="mode">{{ i18n.t('integration.mode.' + mode) }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('integration.field.siteAgent')">
+        <select formControlName="siteAgentId">
+          <option value="">{{ i18n.t('integration.none') }}</option>
+          @for (agent of agents(); track agent.id) {
+            <option [value]="agent.id">{{ agent.name }}</option>
+          }
+        </select>
+      </app-form-field>
+    </div>
+
+    <h3 class="section">{{ i18n.t('integration.analysers.connection') }}</h3>
+    <div class="form-grid three">
+      <app-form-field [label]="i18n.t('integration.field.connectionKind')">
+        <select formControlName="kind" (change)="onKind($event)">
+          @for (kind of kinds; track kind) {
+            <option [value]="kind">{{ i18n.t('integration.kind.' + kind) }}</option>
+          }
+        </select>
+      </app-form-field>
+      @switch (kind()) {
+        @case ('Serial') {
+          <app-form-field [label]="i18n.t('integration.field.serialSettings')" [hint]="i18n.t('integration.analysers.serialHint')">
+            <input type="text" formControlName="serialSettings" class="mono" placeholder="9600,n,8,1" autocomplete="off" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('integration.field.serialPort')">
+            <input type="text" formControlName="serialPort" class="mono" placeholder="COM3" autocomplete="off" />
+          </app-form-field>
+        }
+        @case ('Tcp') {
+          <app-form-field [label]="i18n.t('integration.field.tcpRole')" [hint]="i18n.t('integration.analysers.roleHint')">
+            <select formControlName="tcpRole">
+              @for (role of roles; track role) {
+                <option [value]="role">{{ i18n.t('integration.role.' + role) }}</option>
+              }
+            </select>
+          </app-form-field>
+          <app-form-field [label]="i18n.t('integration.field.host')">
+            <input type="text" formControlName="host" class="mono" placeholder="10.0.0.20" autocomplete="off" />
+          </app-form-field>
+          <app-form-field [label]="i18n.t('integration.field.port')">
+            <input type="number" formControlName="port" min="1" max="65535" />
+          </app-form-field>
+        }
+        @case ('File') {
+          <app-form-field class="full" [label]="i18n.t('integration.field.folderPath')">
+            <input type="text" formControlName="folderPath" class="mono" placeholder="D:\COMM\Results" autocomplete="off" />
+          </app-form-field>
+        }
+      }
+    </div>
+
+    <h3 class="section">{{ i18n.t('integration.analysers.behaviour') }}</h3>
+    <div class="switches">
+      <label class="check"><input type="checkbox" formControlName="autoPrint" /> <span>{{ i18n.t('integration.field.autoPrint') }}</span></label>
+      <label class="check"><input type="checkbox" formControlName="downloadOrders" /> <span>{{ i18n.t('integration.field.downloadOrders') }}</span></label>
+      <label class="check"><input type="checkbox" formControlName="appendUnregisteredTests" /> <span>{{ i18n.t('integration.field.appendUnregisteredTests') }}</span></label>
+      <label class="check"><input type="checkbox" formControlName="appendUnregisteredSamples" /> <span>{{ i18n.t('integration.field.appendUnregisteredSamples') }}</span></label>
+      <label class="check"><input type="checkbox" formControlName="overwriteReviewed" /> <span>{{ i18n.t('integration.field.overwriteReviewed') }}</span></label>
+      <label class="check"><input type="checkbox" formControlName="overwriteVerified" /> <span>{{ i18n.t('integration.field.overwriteVerified') }}</span></label>
+      <app-form-field [label]="i18n.t('integration.field.printCopies')">
+        <input type="number" formControlName="printCopies" min="0" max="10" />
+      </app-form-field>
+    </div>
+
+    <h3 class="section">{{ i18n.t('integration.analysers.flags') }}</h3>
+    <p class="muted small">{{ i18n.t('integration.analysers.flagsHint') }}</p>
+    <table class="flags" formArrayName="flags">
+      <thead>
+        <tr>
+          <th scope="col">{{ i18n.t('integration.flag.code') }}</th>
+          <th scope="col">{{ i18n.t('integration.flag.action') }}</th>
+          <th scope="col">{{ i18n.t('integration.flag.description') }}</th>
+          <th scope="col"><span class="visually-hidden">{{ i18n.t('integration.actions') }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (flag of form.controls.flags.controls; track flag; let index = $index) {
+          <tr [formGroupName]="index">
+            <td><input class="inp mono" formControlName="code" maxlength="32" [attr.aria-label]="i18n.t('integration.flag.code')" /></td>
+            <td>
+              <select class="inp" formControlName="action" [attr.aria-label]="i18n.t('integration.flag.action')">
+                @for (action of flagActions; track action) {
+                  <option [value]="action">{{ i18n.t('integration.flagAction.' + action) }}</option>
+                }
+              </select>
+            </td>
+            <td><input class="inp" formControlName="description" maxlength="200" [attr.aria-label]="i18n.t('integration.flag.description')" /></td>
+            <td><button type="button" class="icon-btn" (click)="removeFlag(index)" [attr.aria-label]="i18n.t('integration.remove')"><app-icon name="x" [size]="14" /></button></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    <button type="button" class="btn sm" (click)="addFlag()" [disabled]="form.controls.flags.length >= 50"><app-icon name="plus" [size]="14" />{{ i18n.t('integration.analysers.addFlag') }}</button>
+
+    @if (facade.save.problem(); as problem) {
+      <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
+    }
+  </form>
+  <button drawerFooter type="button" class="btn ghost" (click)="drawerOpen.set(false)">{{ i18n.t('integration.cancel') }}</button>
+  <button drawerFooter type="button" class="btn primary" [disabled]="facade.save.pending()" (click)="save()">{{ i18n.t('integration.save') }}</button>
+</app-drawer>
+
+<app-dialog [(open)]="connectionOpen" size="sm" [title]="i18n.t('integration.analysers.testConnection')">
+  @if (connection(); as state) {
+    <dl class="kv">
+      <dt>{{ i18n.t('integration.field.siteAgent') }}</dt>
+      <dd>{{ state.siteAgentName ?? i18n.t('integration.none') }} · <app-badge [tone]="tone(state.agentStatus)">{{ i18n.t('integration.agentStatus.' + state.agentStatus) }}</app-badge></dd>
+      <dt>{{ i18n.t('integration.agents.heartbeat') }}</dt>
+      <dd>{{ age(state.agentLastHeartbeatAtUtc) }}</dd>
+      <dt>{{ i18n.t('integration.field.link') }}</dt>
+      <dd><app-badge [tone]="tone(state.linkStatus)">{{ i18n.t('integration.link.' + state.linkStatus) }}</app-badge> {{ age(state.lastSeenAtUtc) }}</dd>
+      @if (state.message) {
+        <dt>{{ i18n.t('integration.agents.message') }}</dt>
+        <dd>{{ state.message }}</dd>
+      }
+    </dl>
+    <p class="muted small">{{ i18n.t('integration.analysers.connectionHint') }}</p>
+  }
+  <button dialogFooter type="button" class="btn" (click)="connectionOpen.set(false)">{{ i18n.t('integration.close') }}</button>
+</app-dialog>

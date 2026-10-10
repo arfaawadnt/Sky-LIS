@@ -1,0 +1,38 @@
+@if (confirm.current(); as current) {
+  <app-dialog [open]="isOpen()" (openChange)="onDialogOpenChange($event)" [title]="current.options.title" [danger]="current.options.danger ?? false" size="sm">
+    <p class="message">{{ current.options.message }}</p>
+
+    @if (current.kind === 'prompt') {
+      <div class="reason-field" [class.invalid]="reasonMissing()">
+        <label for="app-confirm-reason">
+          {{ current.options.label ?? i18n.t('shared.dialog.reason') }}
+          @if (reasonRequired()) {
+            <span class="req" aria-hidden="true">*</span>
+          }
+        </label>
+        <textarea
+          id="app-confirm-reason"
+          class="inp"
+          rows="3"
+          data-autofocus="true"
+          [formControl]="reason"
+          [placeholder]="current.options.placeholder ?? ''"
+          [attr.maxlength]="current.options.maxLength ?? 1000"
+          [attr.aria-invalid]="reasonMissing()"
+          [attr.aria-describedby]="reasonMissing() ? 'app-confirm-reason-error' : null"
+          (keydown)="onReasonKeydown($event)"
+        ></textarea>
+        @if (reasonMissing()) {
+          <p class="error" id="app-confirm-reason-error" role="alert">{{ i18n.t('shared.dialog.reasonRequired') }}</p>
+        }
+      </div>
+    }
+
+    <ng-container dialogFooter>
+      <button type="button" class="btn" (click)="cancel()">{{ current.options.cancelLabel ?? i18n.t('shared.dialog.cancel') }}</button>
+      <button type="button" class="btn" [class.primary]="!current.options.danger" [class.danger]="current.options.danger" [attr.data-autofocus]="current.kind === 'confirm' ? 'true' : null" (click)="accept()">
+        {{ current.options.confirmLabel ?? i18n.t('shared.dialog.confirm') }}
+      </button>
+    </ng-container>
+  </app-dialog>
+}

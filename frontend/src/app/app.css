@@ -1,0 +1,26 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
+.boot {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--sp-3);
+}
+
+.boot .brand {
+  width: min(260px, 70vw);
+  height: auto;
+  background: #fff;
+  border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4);
+  box-shadow: var(--sh);
+}
+
+.muted {
+  color: var(--muted);
+}

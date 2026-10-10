@@ -1,0 +1,13 @@
+@if (open()) {
+  <div class="modal-root">
+    <button type="button" class="scrim" tabindex="-1" (click)="dismiss()" [attr.aria-label]="i18n.t('shared.dialog.close')"></button>
+    <section #panel class="modal" [class.sm]="size() === 'sm'" [class.lg]="size() === 'lg'" [class.danger]="danger()" role="dialog" aria-modal="true" [attr.aria-labelledby]="titleId" tabindex="-1" (keydown)="onKeydown($event)">
+      <header class="head">
+        <h2 [id]="titleId">{{ title() }}</h2>
+        <button type="button" class="icon-btn" (click)="close()" [attr.aria-label]="i18n.t('shared.dialog.close')"><app-icon name="x" /></button>
+      </header>
+      <div class="body"><ng-content /></div>
+      <footer class="foot"><ng-content select="[dialogFooter]" /></footer>
+    </section>
+  </div>
+}

@@ -1,0 +1,106 @@
+.recovery {
+  max-width: 460px;
+  margin: 3rem auto;
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+h1 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 1.35rem;
+}
+
+.head p {
+  margin: 2px 0 0;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-2);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.steps li {
+  padding-block-end: var(--sp-1);
+  border-block-end: 3px solid var(--line-soft);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.steps li.active {
+  color: var(--blue-2);
+  border-block-end-color: var(--blue);
+}
+
+.steps li.done {
+  color: var(--ok);
+  border-block-end-color: var(--ok);
+}
+
+form {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.wide {
+  width: 100%;
+}
+
+.otp {
+  text-align: center;
+  letter-spacing: 0.6em;
+  font-family: var(--mono);
+  font-size: var(--fs-xl);
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.rules {
+  list-style: none;
+  padding: var(--sp-3);
+  margin: 0;
+  display: grid;
+  gap: var(--sp-1);
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+}
+
+.rules li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--bad);
+  font-size: var(--fs-sm);
+}
+
+.rules li.ok {
+  color: var(--ok);
+}
+
+.foot {
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 520px) {
+  .recovery {
+    margin: var(--sp-4) var(--sp-3);
+  }
+}

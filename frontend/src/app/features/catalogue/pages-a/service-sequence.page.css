@@ -1,0 +1,8 @@
+.seq {
+  width: 7rem;
+}
+
+.seq.changed {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}

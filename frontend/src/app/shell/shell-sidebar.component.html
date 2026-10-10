@@ -1,0 +1,41 @@
+<aside class="sidebar" [attr.aria-label]="i18n.t('shell.navLabel')">
+  <div class="sb-brand">
+    <a class="logo-card" [routerLink]="portal.homePath()" (click)="navigated.emit()">
+      <img src="/brand/sky-lis-logo.png" alt="Sky LIS" />
+    </a>
+    <button type="button" class="icon-btn sb-close" (click)="closeRequested.emit()" [attr.aria-label]="i18n.t('shell.closeMenu')"><app-icon name="x" /></button>
+  </div>
+  <div class="sb-tenant txt">
+    <b>{{ portalLabel() }}</b>
+    @if (roleName(); as role) {
+      <span>{{ role }}</span>
+    }
+  </div>
+
+  <nav class="sb-scroll" [attr.aria-label]="i18n.t('shell.navLabel')">
+    @for (group of groups(); track group.group.i18nKey) {
+      <div class="nav-group" [attr.title]="i18n.t(group.group.i18nKey)">
+        <app-icon [name]="group.group.icon" [size]="13" />
+        <span class="txt">{{ i18n.t(group.group.i18nKey) }}</span>
+      </div>
+      @for (entry of group.entries; track entry.path) {
+        <a class="nav-item" [routerLink]="entry.path" [class.active]="isActive(entry)" [attr.aria-current]="isActive(entry) ? 'page' : null" [attr.title]="i18n.t(entry.i18nKey)" (click)="navigated.emit()">
+          <app-icon [name]="entry.icon ?? 'layers'" [size]="17" />
+          <span class="txt">{{ i18n.t(entry.i18nKey) }}</span>
+          @if (entry.release === 'R2') {
+            <span class="rel txt" [attr.aria-label]="i18n.t('shell.releaseTwo')">R2</span>
+          }
+        </a>
+      }
+    } @empty {
+      <p class="sb-empty txt">{{ i18n.t('shell.noMatches') }}</p>
+    }
+  </nav>
+
+  <div class="sb-foot">
+    <button type="button" class="collapse-btn" (click)="collapseToggled.emit()" [attr.aria-expanded]="!collapsed()" [attr.aria-label]="i18n.t(collapsed() ? 'shell.expandMenu' : 'shell.collapseMenu')">
+      <app-icon [name]="collapseIcon()" [size]="16" />
+      <span class="txt">{{ i18n.t('shell.collapseMenu') }}</span>
+    </button>
+  </div>
+</aside>

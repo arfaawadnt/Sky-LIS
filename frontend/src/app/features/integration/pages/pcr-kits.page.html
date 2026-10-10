@@ -1,0 +1,173 @@
+<app-page-header [title]="i18n.t('integration.kits.title')" [subtitle]="i18n.t('integration.kits.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="facade.list.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('integration.refresh') }}</button>
+  <button pageActions type="button" class="btn primary" *appCan="permissions.edit" (click)="add()"><app-icon name="plus" [size]="15" />{{ i18n.t('integration.kits.add') }}</button>
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="i18n.t('integration.kits.search')" (searchChange)="facade.setSearch($event)" />
+    <select toolbarFilters class="inp filter" (change)="onActiveFilter($event)" [attr.aria-label]="i18n.t('integration.field.status')">
+      <option value="">{{ i18n.t('integration.allStatuses') }}</option>
+      <option value="true">{{ i18n.t('integration.active') }}</option>
+      <option value="false">{{ i18n.t('integration.inactive') }}</option>
+    </select>
+  </app-toolbar>
+
+  @if (facade.list.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('integration.loadError') }}</p>
+  }
+  @if (facade.setActive.problem(); as problem) {
+    <p class="problem list-problem" role="alert">{{ problemText(problem.code) }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.list.isLoading()" [emptyTitle]="i18n.t('integration.kits.empty')" [caption]="i18n.t('integration.kits.title')" (rowActivate)="edit($event)">
+    <ng-template appCell="status" [appCellOf]="rows()" let-row>
+      <app-badge [tone]="tone(row.isActive ? 'Active' : 'Inactive')">{{ i18n.t(row.isActive ? 'integration.active' : 'integration.inactive') }}</app-badge>
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+      <button type="button" class="icon-btn" (click)="edit(row)" [attr.aria-label]="i18n.t('integration.kits.view')" [title]="i18n.t('integration.kits.view')"><app-icon name="eye" [size]="15" /></button>
+      <button type="button" class="icon-btn" (click)="openSimulate(row)" [attr.aria-label]="i18n.t('integration.kits.simulate')" [title]="i18n.t('integration.kits.simulate')"><app-icon name="flask" [size]="15" /></button>
+      <button type="button" class="icon-btn" *appCan="permissions.manage" (click)="toggleActive(row)" [attr.aria-label]="i18n.t(row.isActive ? 'integration.kits.deactivate' : 'integration.kits.activate')" [title]="i18n.t(row.isActive ? 'integration.kits.deactivate' : 'integration.kits.activate')"><app-icon name="power" [size]="15" /></button>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="total()" (pageChange)="onPage($event)" />
+</app-section-card>
+
+<app-drawer [(open)]="drawerOpen" size="xl" [title]="i18n.t(editingId() === null ? 'integration.kits.add' : 'integration.kits.edit')">
+  <form [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+    <div class="form-grid three">
+      <app-form-field [label]="i18n.t('integration.field.name')" [hint]="i18n.t('integration.kits.nameHint')"><input type="text" formControlName="name" maxlength="100" autocomplete="off" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.instrument')">
+        <select formControlName="analyserId">
+          <option value="">{{ i18n.t('integration.choose') }}</option>
+          @for (analyser of analysers(); track analyser.id) {
+            <option [value]="analyser.id">{{ analyser.code }} · {{ analyserName(analyser) }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.testCode')" [hint]="i18n.t('integration.kits.testCodeHint')"><input type="text" formControlName="analyserTestCode" class="mono" maxlength="32" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.serialLock')" [hint]="i18n.t('integration.kits.serialLockHint')"><input type="text" formControlName="serialLock" class="mono" maxlength="64" /></app-form-field>
+    </div>
+
+    <h3 class="section">{{ i18n.t('integration.kits.layout') }}</h3>
+    <div class="form-grid three">
+      <app-form-field [label]="i18n.t('integration.kits.delimiter')">
+        <select formControlName="delimiter">
+          @for (delimiter of delimiters; track delimiter.value) {
+            <option [value]="delimiter.value">{{ delimiter.label }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.sampleColumn')"><input type="text" formControlName="sampleColumn" maxlength="64" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.geneColumn')"><input type="text" formControlName="geneColumn" maxlength="64" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.valueColumn')" [hint]="i18n.t('integration.kits.valueColumnHint')"><input type="text" formControlName="valueColumn" maxlength="64" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.wellColumn')"><input type="text" formControlName="wellColumn" maxlength="64" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.serialLabel')" [hint]="i18n.t('integration.kits.serialLabelHint')"><input type="text" formControlName="serialLabel" maxlength="100" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.contentColumn')"><input type="text" formControlName="contentColumn" maxlength="64" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.patientContentValue')" [hint]="i18n.t('integration.kits.patientContentHint')"><input type="text" formControlName="patientContentValue" maxlength="64" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.noAmplification')" [hint]="i18n.t('integration.kits.noAmplificationHint')"><input type="text" formControlName="noAmplificationTokens" maxlength="250" /></app-form-field>
+    </div>
+
+    <h3 class="section">{{ i18n.t('integration.kits.genes') }}</h3>
+    <p class="muted small">{{ i18n.t('integration.kits.genesHint') }}</p>
+    <table class="genes" formArrayName="genes">
+      <thead>
+        <tr>
+          <th scope="col">{{ i18n.t('integration.kits.gene') }}</th>
+          <th scope="col">{{ i18n.t('integration.kits.internalControl') }}</th>
+          <th scope="col">{{ i18n.t('integration.kits.positiveCtMax') }}</th>
+          <th scope="col">{{ i18n.t('integration.kits.borderlineCtMax') }}</th>
+          <th scope="col"><span class="visually-hidden">{{ i18n.t('integration.actions') }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (gene of form.controls.genes.controls; track gene; let index = $index) {
+          <tr [formGroupName]="index">
+            <td><input class="inp" formControlName="name" maxlength="64" [attr.aria-label]="i18n.t('integration.kits.gene')" /></td>
+            <td><input type="checkbox" formControlName="isInternalControl" [attr.aria-label]="i18n.t('integration.kits.internalControl')" /></td>
+            <td><input class="inp narrow" inputmode="decimal" formControlName="positiveCtMax" [attr.aria-label]="i18n.t('integration.kits.positiveCtMax')" /></td>
+            <td><input class="inp narrow" inputmode="decimal" formControlName="borderlineCtMax" [attr.aria-label]="i18n.t('integration.kits.borderlineCtMax')" /></td>
+            <td><button type="button" class="icon-btn" (click)="removeGene(index)" [attr.aria-label]="i18n.t('integration.remove')"><app-icon name="x" [size]="14" /></button></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    <button type="button" class="btn sm" (click)="addGene()" [disabled]="form.controls.genes.length >= 12"><app-icon name="plus" [size]="14" />{{ i18n.t('integration.kits.addGene') }}</button>
+
+    <h3 class="section">{{ i18n.t('integration.kits.rules') }}</h3>
+    <p class="muted small">{{ i18n.t('integration.kits.rulesHint') }}</p>
+    <div class="form-grid three">
+      <app-form-field [label]="i18n.t('integration.kits.minTargets')"><input type="number" formControlName="detectedMinPositiveTargets" min="1" max="10" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.verdict.Detected')"><input type="text" formControlName="detectedText" maxlength="100" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.verdict.NotDetected')"><input type="text" formControlName="notDetectedText" maxlength="100" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.verdict.Presumptive')"><input type="text" formControlName="presumptiveText" maxlength="100" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.verdict.Invalid')"><input type="text" formControlName="invalidText" maxlength="100" /></app-form-field>
+    </div>
+
+    <h3 class="section">{{ i18n.t('integration.kits.folders') }}</h3>
+    <div class="form-grid three">
+      <app-form-field [label]="i18n.t('integration.kits.resultFolder')"><input type="text" formControlName="resultFolder" class="mono" maxlength="260" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.backupFolder')"><input type="text" formControlName="backupFolder" class="mono" maxlength="260" /></app-form-field>
+      <app-form-field [label]="i18n.t('integration.kits.failedFolder')"><input type="text" formControlName="failedFolder" class="mono" maxlength="260" /></app-form-field>
+    </div>
+
+    @if (facade.save.problem(); as problem) {
+      <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
+    }
+  </form>
+  <button drawerFooter type="button" class="btn ghost" (click)="drawerOpen.set(false)">{{ i18n.t('integration.cancel') }}</button>
+  <button drawerFooter type="button" class="btn primary" *appCan="permissions.edit" [disabled]="facade.save.pending()" (click)="save()">{{ i18n.t('integration.save') }}</button>
+</app-drawer>
+
+<app-dialog [(open)]="simulateOpen" size="lg" [title]="i18n.t('integration.kits.simulate') + (simulateKit() ? ' · ' + simulateKit()?.name : '')">
+  <form [formGroup]="simulateForm" (ngSubmit)="runSimulation()" novalidate class="form-grid">
+    <app-form-field [label]="i18n.t('integration.kits.instrumentSerial')"><input type="text" formControlName="instrumentSerial" class="mono" maxlength="64" /></app-form-field>
+    <app-form-field [label]="i18n.t('integration.kits.runFile')"><input type="file" accept=".csv,.txt,.tsv" (change)="loadFile($event)" /></app-form-field>
+    <app-form-field class="full" [label]="i18n.t('integration.kits.paste')" [hint]="i18n.t('integration.kits.pasteHint')">
+      <textarea formControlName="content" rows="8" class="mono" spellcheck="false" data-testid="run-content"></textarea>
+    </app-form-field>
+  </form>
+  @if (facade.simulate.problem(); as problem) {
+    <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
+  }
+  @if (simulation(); as run) {
+    @if (!run.readable) {
+      <p class="problem" role="alert" data-testid="run-refused">{{ i18n.t('integration.kits.failedFile') }} {{ problemText(run.refusalCode ?? '') }} — {{ run.refusalReason }}</p>
+    } @else {
+      <p class="info-strip">{{ i18n.tf('integration.kits.readFile', { count: run.samples.length, serial: run.fileSerial ?? '—' }) }}</p>
+      <table class="verdicts" data-testid="verdicts">
+        <thead>
+          <tr>
+            <th scope="col">{{ i18n.t('integration.intake.sample') }}</th>
+            <th scope="col">{{ i18n.t('integration.kits.well') }}</th>
+            <th scope="col">{{ i18n.t('integration.kits.readings') }}</th>
+            <th scope="col">{{ i18n.t('integration.kits.verdict') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (sample of run.samples; track sample.sampleNumber) {
+            <tr>
+              <td class="mono">{{ sample.sampleNumber }}</td>
+              <td class="mono">{{ sample.well ?? '' }}</td>
+              <td>
+                @for (gene of sample.genes; track gene.gene) {
+                  <app-badge [tone]="callTone(gene.call)">{{ gene.gene }} {{ gene.ct ?? 'NA' }}</app-badge>
+                }
+              </td>
+              <td>
+                @if (sample.verdict) {
+                  <app-badge [tone]="verdictTone(sample.verdict)">{{ sample.verdictText }}</app-badge>
+                } @else {
+                  <span class="problem-text">{{ sample.problem }}</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  }
+  <button dialogFooter type="button" class="btn ghost" (click)="simulateOpen.set(false)">{{ i18n.t('integration.close') }}</button>
+  <button dialogFooter type="button" class="btn primary" [disabled]="facade.simulate.pending()" (click)="runSimulation()"><app-icon name="flask" [size]="15" />{{ i18n.t('integration.kits.run') }}</button>
+</app-dialog>

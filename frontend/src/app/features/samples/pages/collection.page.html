@@ -1,0 +1,117 @@
+<app-page-header [title]="i18n.t('samples.collection.title')" [subtitle]="i18n.t('samples.collection.subtitle')">
+  <a pageActions class="btn ghost" [routerLink]="links.rejections" *appCan="permissions.edit"><app-icon name="alert" [size]="15" />{{ i18n.t('samples.nav.rejections') }}</a>
+  <a pageActions class="btn ghost" routerLink="/samples/track"><app-icon name="search" [size]="15" />{{ i18n.t('samples.nav.tracking') }}</a>
+</app-page-header>
+
+<div class="layout">
+  <app-section-card class="scan-card" [title]="i18n.t('samples.collection.scanTitle')" [subtitle]="modeHint()">
+    <ng-container *appCan="permissions.create">
+      <app-scan-box
+        [label]="i18n.t('samples.scan.label')"
+        [placeholder]="i18n.t('samples.scan.placeholder')"
+        [submitLabel]="facade.mode() === 'Collect' ? i18n.t('samples.scan.collect') : i18n.t('samples.scan.receive')"
+        [mode]="facade.mode()"
+        [busy]="facade.scan.pending()"
+        (modeChange)="facade.setMode($event)"
+        (scanned)="onScan($event)"
+      />
+    </ng-container>
+
+    <div class="feedback-slot" aria-live="polite" role="status">
+      @if (facade.lastOutcome(); as outcome) {
+        <div class="feedback" [class.ok]="outcome.ok" [class.bad]="!outcome.ok">
+          <app-icon [name]="outcome.ok ? 'check' : 'alert'" [size]="28" />
+          <div class="feedback-text">
+            <b>{{ outcomeText(outcome) }}</b>
+            @if (outcome.ok) {
+              <span class="small">{{ outcomeDetails(outcome) }}</span>
+            } @else {
+              <span class="small mono">{{ outcome.sampleNumber }}</span>
+            }
+          </div>
+          @if (outcome.detail; as detail) {
+            <app-badge [status]="detail.summary.status" />
+          }
+        </div>
+      }
+    </div>
+
+    @if (facade.outcomes().length > 1) {
+      <div class="log-head">
+        <span class="muted small">{{ i18n.t('samples.collection.recent') }}</span>
+        <button type="button" class="btn sm ghost" (click)="facade.clearLog()">{{ i18n.t('samples.collection.clearRecent') }}</button>
+      </div>
+      <ul class="log">
+        @for (outcome of facade.outcomes().slice(1); track outcome.id) {
+          <li [class.bad]="!outcome.ok">
+            <app-icon [name]="outcome.ok ? 'check' : 'alert'" [size]="14" />
+            <a class="mono link" [routerLink]="links.track(outcome.sampleNumber)">{{ outcome.sampleNumber }}</a>
+            <span class="small">{{ outcome.ok && outcome.detail ? statusLabel(outcome.detail.summary.status) : outcomeText(outcome) }}</span>
+          </li>
+        }
+      </ul>
+    }
+  </app-section-card>
+
+  <app-section-card class="bulk-card" *appCan="permissions.create" [title]="i18n.t('samples.collection.bulkTitle')" [subtitle]="i18n.t('samples.collection.bulkSubtitle')">
+    <form class="bulk" (submit)="onBulkSubmit($event)" novalidate>
+      <label class="field">
+        <span>{{ i18n.t('samples.column.accession') }}</span>
+        <input type="text" class="inp mono" [formControl]="accession" maxlength="40" autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="bulk-actions">
+        <button type="button" class="btn" [disabled]="facade.bulk.pending()" (click)="runBulk('collect')">{{ i18n.t('samples.collection.collectAll') }}</button>
+        <button type="button" class="btn primary" [disabled]="facade.bulk.pending()" (click)="runBulk('receive')">{{ i18n.t('samples.collection.receiveAll') }}</button>
+      </div>
+      @if (accession.touched && accession.invalid) {
+        <p class="problem" role="alert">{{ i18n.t('samples.collection.accessionRequired') }}</p>
+      }
+      @if (facade.bulk.problem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+    </form>
+  </app-section-card>
+</div>
+
+<app-section-card class="today-card" [padded]="false" [title]="i18n.t('samples.collection.todayTitle')">
+  <app-toolbar>
+    <div toolbarFilters class="chips" role="group" [attr.aria-label]="i18n.t('samples.column.status')">
+      @for (status of statusFilters; track $index) {
+        <button type="button" class="btn sm" [class.primary]="facade.filter().status === status" [attr.aria-pressed]="facade.filter().status === status" (click)="onStatus(status)">
+          {{ statusLabel(status) }}
+        </button>
+      }
+    </div>
+    <app-search-box toolbarFilters [placeholder]="i18n.t('samples.searchPlaceholder')" [label]="i18n.t('samples.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+    <label toolbarFilters class="check">
+      <input type="checkbox" [checked]="facade.filter().branchOnly" (change)="onBranchOnly($event)" />
+      <span>{{ i18n.t('samples.collection.branchOnly') }}</span>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" [disabled]="facade.exporting.pending()" (click)="exportCsv()">{{ i18n.t('samples.exportCsv') }}</button>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.today.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('samples.refresh') }}</button>
+  </app-toolbar>
+
+  @if (facade.today.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('samples.loadError') }}</p>
+  }
+  @if (facade.exporting.problem(); as problem) {
+    <p class="problem list-problem" role="alert">{{ problemText(problem) }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.today.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('samples.collection.empty')" [caption]="i18n.t('samples.collection.todayTitle')">
+    <ng-template appCell="sampleNumber" [appCellOf]="rows()" let-row>
+      <a class="mono link" [routerLink]="links.track(row.sampleNumber)">{{ row.sampleNumber }}</a>
+    </ng-template>
+    <ng-template appCell="accession" [appCellOf]="rows()" let-row>
+      <a class="mono link" routerLink="/samples/visits" [queryParams]="{ accession: row.accession }">{{ row.accession }}</a>
+    </ng-template>
+    <ng-template appCell="status" [appCellOf]="rows()" let-row>
+      <app-badge [status]="row.status" />
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+      <a class="btn sm ghost" [routerLink]="links.track(row.sampleNumber)" [attr.aria-label]="i18n.t('samples.track') + ' ' + row.sampleNumber"><app-icon name="eye" [size]="14" />{{ i18n.t('samples.track') }}</a>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="totalCount()" (pageChange)="onPage($event)" />
+</app-section-card>

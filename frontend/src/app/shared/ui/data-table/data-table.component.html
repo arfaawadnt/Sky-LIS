@@ -1,0 +1,86 @@
+<div class="table-wrap" [attr.aria-busy]="loading() ? 'true' : null">
+  <table class="g" [class.compact]="compact()" [class.zebra]="zebra()" [class.interactive]="interactive()" [class.selectable]="selection() !== 'none'">
+    @if (caption(); as caption) {
+      <caption class="visually-hidden">{{ caption }}</caption>
+    }
+    <thead>
+      <tr>
+        @if (selection() === 'multi') {
+          <th class="sel">
+            <input type="checkbox" [checked]="allSelected()" [indeterminate]="someSelected()" (change)="toggleAll()" [attr.aria-label]="i18n.t('shared.table.selectAll')" />
+          </th>
+        }
+        @for (column of columns(); track column.key) {
+          <th [style.width]="column.width ?? null" [class]="'al-' + (column.align ?? 'start')" [class.secondary]="column.secondary ?? false" [attr.aria-sort]="ariaSort(column)">
+            @if (column.sortable) {
+              <button type="button" class="sort-btn" (click)="toggleSort(column)">
+                <span>{{ i18n.t(column.header) }}</span>
+                <app-icon [name]="sortIcon(column)" [size]="13" />
+              </button>
+            } @else {
+              {{ i18n.t(column.header) }}
+            }
+          </th>
+        }
+        @if (actions()) {
+          <th class="actions">{{ i18n.t('shared.table.actions') }}</th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      @if (loading() && view().length === 0) {
+        <tr class="state">
+          <td [attr.colspan]="columnCount()">
+            <div class="loading" role="status">
+              <span class="spinner" aria-hidden="true"></span>
+              {{ i18n.t('shared.table.loading') }}
+            </div>
+          </td>
+        </tr>
+      } @else if (view().length === 0) {
+        <tr class="state">
+          <td [attr.colspan]="columnCount()">
+            <ng-content select="[tableEmpty]">
+              <app-empty-state [title]="emptyTitle() ?? i18n.t('shared.table.empty')" [message]="emptyMessage()" />
+            </ng-content>
+          </td>
+        </tr>
+      }
+      @for (row of view(); track idOf(row); let i = $index) {
+        <tr
+          [attr.data-row]="idOf(row)"
+          [class]="rowClass()?.(row) ?? ''"
+          [class.sel]="isSelected(row)"
+          [class.loading]="loading()"
+          [tabindex]="tabIndexFor(i)"
+          [attr.aria-selected]="selection() !== 'none' ? isSelected(row) : null"
+          (click)="onRowClick($event, row, i)"
+          (keydown)="onRowKeydown($event, row, i)"
+          (focus)="onRowFocus(i)"
+        >
+          @if (selection() === 'multi') {
+            <td class="sel">
+              <input type="checkbox" [checked]="isSelected(row)" (change)="toggle(row)" [attr.aria-label]="i18n.t('shared.table.selectRow')" />
+            </td>
+          }
+          @for (column of columns(); track column.key) {
+            <td [class]="'al-' + (column.align ?? 'start')" [class.mono]="column.mono ?? false" [class.secondary]="column.secondary ?? false" [attr.data-label]="i18n.t(column.header)">
+              @if (templateFor(column.key); as template) {
+                <ng-container *ngTemplateOutlet="template; context: { $implicit: row, row: row, index: i }" />
+              } @else {
+                {{ cellText(column, row) }}
+              }
+            </td>
+          }
+          @if (rowActionsTemplate(); as actionsTemplate) {
+            <td class="actions">
+              <div class="row-actions">
+                <ng-container *ngTemplateOutlet="actionsTemplate; context: { $implicit: row, row: row, index: i }" />
+              </div>
+            </td>
+          }
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

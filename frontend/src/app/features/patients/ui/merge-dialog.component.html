@@ -1,0 +1,75 @@
+<app-dialog [(open)]="open" [title]="i18n.tf('patients.merge.title', { number: survivor().number })" size="lg" [danger]="true">
+  <div class="merge">
+    <p class="warn-strip">{{ i18n.t('patients.merge.warning') }}</p>
+
+    <app-search-box [placeholder]="i18n.t('patients.merge.searchPlaceholder')" [label]="i18n.t('patients.merge.search')" (searchChange)="onSearch($event)" />
+
+    @if (searched()) {
+      @if (searching() && candidates().length === 0) {
+        <p class="muted small" role="status">{{ i18n.t('patients.loading') }}</p>
+      } @else if (candidates().length === 0) {
+        <p class="muted small" role="status">{{ i18n.t('patients.merge.noCandidates') }}</p>
+      } @else {
+        <ul class="candidates" role="listbox" [attr.aria-label]="i18n.t('patients.merge.candidates')">
+          @for (candidate of candidates(); track candidate.id) {
+            <li>
+              <button type="button" class="candidate" role="option" [attr.aria-selected]="selected()?.id === candidate.id" [class.selected]="selected()?.id === candidate.id" (click)="choose(candidate)">
+                <span class="mono">{{ candidate.number }}</span>
+                <span class="name">{{ candidate.fullName }}</span>
+                <span class="small muted">{{ i18n.t('patients.gender.' + candidate.gender) }} · {{ ageText(candidate.age) }}</span>
+                <span class="small mono muted" dir="ltr">{{ candidate.mobile ?? '' }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    }
+
+    @if (selected(); as duplicate) {
+      <div class="compare" role="group" [attr.aria-label]="i18n.t('patients.merge.compare')">
+        <div class="side keep">
+          <app-badge tone="ok">{{ i18n.t('patients.merge.survivor') }}</app-badge>
+          <dl class="kv">
+            <dt>{{ i18n.t('patients.column.number') }}</dt><dd class="mono">{{ survivor().number }}</dd>
+            <dt>{{ i18n.t('patients.column.name') }}</dt><dd>{{ survivor().fullName }}</dd>
+            <dt>{{ i18n.t('patients.column.gender') }}</dt><dd>{{ i18n.t('patients.gender.' + survivor().gender) }}</dd>
+            <dt>{{ i18n.t('patients.column.age') }}</dt><dd>{{ ageText(survivor().age) }}</dd>
+            <dt>{{ i18n.t('patients.column.mobile') }}</dt><dd class="mono" dir="ltr">{{ survivor().mobile ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.column.nationalId') }}</dt><dd class="mono">{{ survivor().nationalId ?? '—' }}</dd>
+          </dl>
+        </div>
+        <div class="side drop">
+          <app-badge tone="bad">{{ i18n.t('patients.merge.duplicate') }}</app-badge>
+          <dl class="kv">
+            <dt>{{ i18n.t('patients.column.number') }}</dt><dd class="mono">{{ duplicate.number }}</dd>
+            <dt>{{ i18n.t('patients.column.name') }}</dt><dd>{{ duplicate.fullName }}</dd>
+            <dt>{{ i18n.t('patients.column.gender') }}</dt><dd>{{ i18n.t('patients.gender.' + duplicate.gender) }}</dd>
+            <dt>{{ i18n.t('patients.column.age') }}</dt><dd>{{ ageText(duplicate.age) }}</dd>
+            <dt>{{ i18n.t('patients.column.mobile') }}</dt><dd class="mono" dir="ltr">{{ duplicate.mobile ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.column.nationalId') }}</dt><dd class="mono">{{ duplicate.nationalId ?? '—' }}</dd>
+          </dl>
+        </div>
+      </div>
+
+      @if (genderMismatch()) {
+        <label class="check gender-warning">
+          <input type="checkbox" [checked]="confirmGender()" (change)="onConfirmGender($event)" />
+          <span>{{ i18n.t('patients.merge.confirmGender') }}</span>
+        </label>
+      }
+
+      <app-form-field [label]="i18n.t('patients.merge.reason')" [hint]="i18n.t('patients.merge.reasonHint')">
+        <textarea [formControl]="reason" rows="3" maxlength="1000"></textarea>
+      </app-form-field>
+    }
+
+    @if (problemText(); as message) {
+      <p class="problem" role="alert">{{ message }}</p>
+    }
+  </div>
+
+  <ng-container dialogFooter>
+    <button type="button" class="btn ghost" (click)="open.set(false)">{{ i18n.t('patients.cancel') }}</button>
+    <button type="button" class="btn danger" [disabled]="!canSubmit()" (click)="submit()">{{ pending() ? i18n.t('patients.merge.merging') : i18n.t('patients.merge.action') }}</button>
+  </ng-container>
+</app-dialog>

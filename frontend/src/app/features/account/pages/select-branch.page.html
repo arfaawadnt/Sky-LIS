@@ -1,0 +1,33 @@
+<app-page-header [title]="i18n.t('account.branch.title')" [subtitle]="i18n.t('account.branch.subtitle')" />
+
+@if (facade.branches.isLoading()) {
+  <p class="muted" aria-live="polite">{{ i18n.t('account.branch.loading') }}</p>
+} @else if (facade.branches.error()) {
+  <p class="problem" role="alert">{{ i18n.t('account.branch.loadError') }}</p>
+  <button type="button" class="btn" (click)="facade.branches.reload()">{{ i18n.t('account.refresh') }}</button>
+} @else if (branches().length === 0) {
+  <app-empty-state [title]="i18n.t('account.branch.noneTitle')" [message]="i18n.t('account.branch.noneText')" icon="building">
+    <button emptyAction type="button" class="btn" (click)="signOut()">{{ i18n.t('account.signOut') }}</button>
+  </app-empty-state>
+} @else {
+  @if (facade.select.problem()) {
+    <p class="problem" role="alert">{{ problemText() }}</p>
+  }
+  <ul class="branches" [attr.aria-label]="i18n.t('account.branch.title')">
+    @for (branch of branches(); track branch.id) {
+      <li>
+        <button type="button" class="branch" [class.current]="branch.id === current()" [disabled]="facade.select.pending()" (click)="choose(branch)">
+          <span class="icon" aria-hidden="true"><app-icon name="building" [size]="20" /></span>
+          <span class="text">
+            <span class="code mono">{{ branch.code }}</span>
+            <b>{{ name(branch) }}</b>
+            <span class="muted small">{{ secondName(branch) }}</span>
+          </span>
+          @if (branch.id === current()) {
+            <span class="tag">{{ i18n.t('account.branch.current') }}</span>
+          }
+        </button>
+      </li>
+    }
+  </ul>
+}

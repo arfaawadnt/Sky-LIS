@@ -1,0 +1,43 @@
+/* The projected control itself is styled by the global `app-form-field input|select|textarea` rules (styles.css). */
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.ff {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.req {
+  color: var(--bad);
+  margin-inline-start: 2px;
+}
+
+.control {
+  min-width: 0;
+}
+
+.hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.error {
+  margin: 0;
+  font-size: 11px;
+  color: var(--bad);
+}
+
+.disabled .label {
+  color: var(--muted);
+}

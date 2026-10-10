@@ -1,0 +1,173 @@
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+
+import type { PageRequest } from '../../../core/api/paging';
+import { TREASURY_ACCESS_STATUSES, TREASURY_PERMISSIONS, type TreasuryAccessRequestListItem, type TreasuryAccessStatus } from '../../../core/api/treasury.contracts';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { localizedPick } from '../../../shared/forms/localized-text';
+import { markAllTouched } from '../../../shared/forms/mark-all-touched';
+import { problemMessage } from '../../../shared/forms/problem-text';
+import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
+import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
+import { CanDirective } from '../../../shared/ui/can.directive';
+import { CellTemplateDirective, RowActionsTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
+import { DataTableComponent } from '../../../shared/ui/data-table/data-table.component';
+import type { TableColumn } from '../../../shared/ui/data-table/data-table.types';
+import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
+import { FormFieldComponent } from '../../../shared/ui/form-field/form-field.component';
+import { IconComponent } from '../../../shared/ui/icon/icon.component';
+import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
+import { PaginatorComponent } from '../../../shared/ui/paginator/paginator.component';
+import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
+import { ToastService } from '../../../shared/ui/toast/toast.service';
+import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
+import { TreasuryAccessFacade } from '../state/treasury-access.facade';
+
+/**
+ * Treasury access (SRS CP-29): request access from this device, and decide on requests. The reference page of the
+ * UI kit: page header, section cards, toolbar, data table with cell and row-action templates, paginator, form
+ * fields, confirm/prompt dialogs and toasts. Every action is gated by `*appCan` and by the row's state; the
+ * server still decides (D-04).
+ */
+@Component({
+  selector: 'app-treasury-access-page',
+  imports: [
+    ReactiveFormsModule,
+    CanDirective,
+    SaveShortcutDirective,
+    PageHeaderComponent,
+    SectionCardComponent,
+    ToolbarComponent,
+    DataTableComponent,
+    CellTemplateDirective,
+    RowActionsTemplateDirective,
+    PaginatorComponent,
+    BadgeComponent,
+    FormFieldComponent,
+    IconComponent,
+  ],
+  templateUrl: './treasury-access.page.html',
+  styleUrl: './treasury-access.page.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class TreasuryAccessPage {
+  protected readonly i18n = inject(I18nService);
+  protected readonly facade = inject(TreasuryAccessFacade);
+  private readonly confirm = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
+
+  protected readonly permissions = TREASURY_PERMISSIONS;
+  protected readonly statuses = TREASURY_ACCESS_STATUSES;
+
+  protected readonly columns: readonly TableColumn<TreasuryAccessRequestListItem>[] = [
+    { key: 'number', header: 'treasury.number', mono: true, width: '150px' },
+    { key: 'treasury', header: 'treasury.treasury' },
+    { key: 'requestedByName', header: 'treasury.requestedBy' },
+    { key: 'device', header: 'treasury.device', value: (row) => row.deviceLabel ?? row.deviceId, secondary: true },
+    { key: 'status', header: 'treasury.status', width: '120px' },
+    { key: 'decidedByName', header: 'treasury.decidedBy', secondary: true },
+  ];
+
+  protected readonly rows = computed<readonly TreasuryAccessRequestListItem[]>(() => (this.facade.requests.hasValue() ? this.facade.requests.value().items : []));
+
+  protected readonly totalCount = computed(() => (this.facade.requests.hasValue() ? this.facade.requests.value().totalCount : 0));
+
+  protected readonly form = new FormGroup({
+    treasuryId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    deviceLabel: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(100)] }),
+  });
+
+  constructor() {
+    void this.i18n.load('treasury');
+  }
+
+  protected treasuryName(item: TreasuryAccessRequestListItem): string {
+    return `${item.treasuryCode} · ${localizedPick({ en: item.treasuryNameEn, ar: item.treasuryNameAr }, this.i18n.lang())}`;
+  }
+
+  protected onStatusChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.facade.setStatus(this.statuses.find((status) => status === value) ?? null);
+  }
+
+  protected onMineChange(event: Event): void {
+    this.facade.setMine((event.target as HTMLInputElement).checked);
+  }
+
+  protected onPageChange(page: PageRequest): void {
+    this.facade.setPage(page);
+  }
+
+  protected async submitRequest(): Promise<void> {
+    if (!markAllTouched(this.form) || this.facade.request.pending()) {
+      return;
+    }
+
+    const { treasuryId, deviceLabel } = this.form.getRawValue();
+    const created = await this.facade.request.execute({ treasuryId, deviceLabel: deviceLabel.trim() === '' ? null : deviceLabel.trim() });
+    if (created !== null) {
+      this.form.controls.treasuryId.reset();
+      this.toast.success(this.i18n.t('treasury.requested'));
+    }
+  }
+
+  protected async approve(item: TreasuryAccessRequestListItem): Promise<void> {
+    const confirmed = await this.confirm.confirm({ title: this.i18n.t('treasury.approve'), message: this.i18n.tf('treasury.confirmApprove', { number: item.number }) });
+    if (!confirmed) {
+      return;
+    }
+
+    if ((await this.facade.approve.execute({ id: item.id, comment: null })) !== null) {
+      this.toast.success(this.i18n.t('treasury.approved'));
+    }
+  }
+
+  protected async reject(item: TreasuryAccessRequestListItem): Promise<void> {
+    const reason = await this.confirm.promptReason({ title: this.i18n.t('treasury.reject'), message: this.i18n.tf('treasury.promptReject', { number: item.number }), danger: true });
+    if (reason === null) {
+      return;
+    }
+
+    if ((await this.facade.reject.execute({ id: item.id, reason })) !== null) {
+      this.toast.success(this.i18n.t('treasury.rejected'));
+    }
+  }
+
+  protected async revoke(item: TreasuryAccessRequestListItem): Promise<void> {
+    const reason = await this.confirm.promptReason({ title: this.i18n.t('treasury.revoke'), message: this.i18n.tf('treasury.promptRevoke', { number: item.number }), danger: true });
+    if (reason === null) {
+      return;
+    }
+
+    if ((await this.facade.revoke.execute({ id: item.id, reason })) !== null) {
+      this.toast.success(this.i18n.t('treasury.revoked'));
+    }
+  }
+
+  protected async cancel(item: TreasuryAccessRequestListItem): Promise<void> {
+    const reason = await this.confirm.promptReason({ title: this.i18n.t('treasury.cancel'), message: this.i18n.tf('treasury.promptCancel', { number: item.number }), required: false });
+    if (reason === null) {
+      return;
+    }
+
+    if ((await this.facade.cancel.execute({ id: item.id, reason: reason === '' ? null : reason })) !== null) {
+      this.toast.success(this.i18n.t('treasury.cancelled'));
+    }
+  }
+
+  protected canApprove(item: TreasuryAccessRequestListItem): boolean {
+    return item.status === 'Pending' && !this.facade.isOwn(item);
+  }
+
+  protected canCancel(item: TreasuryAccessRequestListItem): boolean {
+    return item.status === 'Pending' && this.facade.isOwn(item);
+  }
+
+  protected statusLabel(status: TreasuryAccessStatus): string {
+    return this.i18n.t(`treasury.status.${status}`);
+  }
+
+  protected problemText(code: string): string {
+    return problemMessage(this.i18n, 'treasury', { code });
+  }
+}

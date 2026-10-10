@@ -1,0 +1,83 @@
+.login {
+  max-width: 420px;
+  margin: 3rem auto;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-4);
+}
+
+.brand {
+  display: inline-flex;
+}
+
+.lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  border-radius: var(--r-pill);
+  padding: 4px 10px;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+h1 {
+  margin: 0 0 0.25rem;
+  color: var(--navy);
+  font-size: 1.5rem;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 0 0 1.25rem;
+}
+
+.password {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.password input {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-links {
+  display: flex;
+  justify-content: flex-end;
+  margin: calc(-1 * var(--sp-1)) 0 var(--sp-3);
+  font-size: var(--fs-sm);
+}
+
+button.primary {
+  width: 100%;
+}
+
+.foot {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.center {
+  text-align: center;
+  margin: var(--sp-3) 0 0;
+}
+
+@media (max-width: 480px) {
+  .login {
+    margin: var(--sp-4) var(--sp-3);
+  }
+}
