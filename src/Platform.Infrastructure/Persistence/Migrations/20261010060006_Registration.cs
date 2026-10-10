@@ -749,6 +749,12 @@ namespace Platform.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // The Up step adds fk_visit_accounts_visits (billing -> registration) once app.visits exists; the table cannot be
+            // dropped while that key remains, so the key goes first. Idempotent, like the Up block.
+            migrationBuilder.Sql("""
+                ALTER TABLE IF EXISTS app.visit_accounts DROP CONSTRAINT IF EXISTS fk_visit_accounts_visits;
+                """);
+
             migrationBuilder.DropTable(
                 name: "visit_lines",
                 schema: "app");

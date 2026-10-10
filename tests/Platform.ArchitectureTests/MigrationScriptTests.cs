@@ -60,6 +60,20 @@ public sealed partial class MigrationScriptTests
     }
 
     [Fact]
+    public void The_deploy_script_records_every_migration()
+    {
+        // The committed idempotent script is what deploys; a migration added without regenerating it would never reach a server.
+        Assert.True(File.Exists(DeployScript), $"{DeployScript} is missing");
+        var script = File.ReadAllText(DeployScript);
+        foreach (var (name, _) in Migrations)
+        {
+            Assert.True(
+                script.Contains($"VALUES ('{name}', ", StringComparison.Ordinal),
+                $"deploy/postgres/migrations.sql does not record migration {name}: regenerate it with dotnet ef migrations script --idempotent");
+        }
+    }
+
+    [Fact]
     public void The_generated_sql_never_creates_an_xmin_column()
     {
         // The migration source carries the provider's xmin marker (rowVersion: true, type xid); the SQL generator must strip it.

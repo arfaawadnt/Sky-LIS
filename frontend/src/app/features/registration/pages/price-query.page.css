@@ -1,0 +1,75 @@
+/* Price query (CP-12): module-specific layout only. */
+:host {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.label {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  margin-block-end: var(--sp-1);
+}
+
+.list-problem {
+  margin: var(--sp-3) var(--sp-4) 0;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.lines th,
+.lines td {
+  padding: var(--sp-2) var(--sp-3);
+  border-block-end: 1px solid var(--line-soft);
+  text-align: start;
+  vertical-align: top;
+}
+
+.lines thead th {
+  color: var(--ink-2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lines .num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lines .empty {
+  text-align: center;
+  padding: var(--sp-4);
+}
+
+.lines tfoot th {
+  border-block-end: 0;
+}
+
+.hint {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+}
+
+.hint.warn {
+  color: var(--warn);
+}
+
+.preparations {
+  padding: 0 var(--sp-4) var(--sp-3);
+}
+
+.sub {
+  margin: var(--sp-3) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}

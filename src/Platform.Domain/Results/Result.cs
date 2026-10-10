@@ -718,5 +718,5 @@ public sealed class Result : AggregateRoot, ITenantScoped
         ResultSource? source = null,
         Guid? analyserId = null,
         string? detail = null) =>
-        _log.Add(ResultLogEntry.Record(Id, kind, atUtc, byUserId, byName, fromStatus, toStatus, valueBefore, valueAfter, source, analyserId, detail));
+        _log.Add(ResultLogEntry.Record(Id, _log.Count == 0 ? 1 : _log.Max(entry => entry.Sequence) + 1, kind, atUtc, byUserId, byName, fromStatus, toStatus, valueBefore, valueAfter, source, analyserId, detail));
 }

@@ -114,8 +114,7 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
     public async Task<IReadOnlyList<ResultLogEntry>> ReadLogAsync(Guid resultId, CancellationToken cancellationToken) =>
         await Context.Set<ResultLogEntry>().AsNoTracking()
             .Where(entry => entry.ResultId == resultId)
-            .OrderBy(entry => entry.AtUtc)
-            .ThenBy(entry => entry.Id)
+            .OrderBy(entry => entry.Sequence)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 

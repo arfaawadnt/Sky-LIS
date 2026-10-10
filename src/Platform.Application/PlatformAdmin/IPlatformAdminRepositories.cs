@@ -66,7 +66,7 @@ public interface IGovernorateRepository : IRepository<Governorate>
 
     Task<Paged<GovernorateListItem>> ListAsync(Guid? countryId, string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<PublicGovernorate>> ListPublicAsync(Guid countryId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PublicGovernorate>> ListPublicAsync(Guid? countryId, CancellationToken cancellationToken);
 }
 
 public interface INotificationTemplateRepository : IRepository<NotificationTemplate>

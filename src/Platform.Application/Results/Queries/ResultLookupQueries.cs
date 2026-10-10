@@ -46,3 +46,38 @@ public sealed class GetResultAnalysersHandler(IResultAnalyserDirectory analysers
 {
     public Task<IReadOnlyList<AnalyserOption>> Handle(GetResultAnalysersQuery query, CancellationToken cancellationToken) => analysers.ListAsync(cancellationToken);
 }
+
+/// <summary>Active clinical groups for the worklist filter.</summary>
+[RequirePermissionPolicy(PermissionCatalog.Results, PermissionAction.View)]
+public sealed record GetResultClinicalGroupsQuery : IQuery<IReadOnlyList<LookupOption>>;
+
+public sealed class GetResultClinicalGroupsHandler(IResultReferenceLookup references) : IQueryHandler<GetResultClinicalGroupsQuery, IReadOnlyList<LookupOption>>
+{
+    public Task<IReadOnlyList<LookupOption>> Handle(GetResultClinicalGroupsQuery query, CancellationToken cancellationToken) => references.ClinicalGroupsAsync(cancellationToken);
+}
+
+/// <summary>Active tests (of a group) for the worklist filter, by code or name.</summary>
+[RequirePermissionPolicy(PermissionCatalog.Results, PermissionAction.View)]
+public sealed record GetResultTestsQuery(Guid? ClinicalGroupId, string? Search) : IQuery<IReadOnlyList<LookupOption>>;
+
+public sealed class GetResultTestsValidator : AbstractValidator<GetResultTestsQuery>
+{
+    public GetResultTestsValidator() => RuleFor(query => query.Search).MaximumLength(100);
+}
+
+public sealed class GetResultTestsHandler(IResultReferenceLookup references) : IQueryHandler<GetResultTestsQuery, IReadOnlyList<LookupOption>>
+{
+    public const int MaxRows = 200;
+
+    public Task<IReadOnlyList<LookupOption>> Handle(GetResultTestsQuery query, CancellationToken cancellationToken) =>
+        references.TestsAsync(query.ClinicalGroupId, string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim(), MaxRows, cancellationToken);
+}
+
+/// <summary>Active payers for the worklist filter.</summary>
+[RequirePermissionPolicy(PermissionCatalog.Results, PermissionAction.View)]
+public sealed record GetResultPayersQuery : IQuery<IReadOnlyList<LookupOption>>;
+
+public sealed class GetResultPayersHandler(IResultReferenceLookup references) : IQueryHandler<GetResultPayersQuery, IReadOnlyList<LookupOption>>
+{
+    public Task<IReadOnlyList<LookupOption>> Handle(GetResultPayersQuery query, CancellationToken cancellationToken) => references.ActivePayersAsync(cancellationToken);
+}

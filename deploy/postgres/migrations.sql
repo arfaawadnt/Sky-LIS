@@ -5877,5 +5877,49 @@ BEGIN
     VALUES ('20261010060455_Results', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261010061253_ResultLogSequence') THEN
+    DROP INDEX app.ix_result_log_entries_tenant_id_result_id_at_utc;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261010061253_ResultLogSequence') THEN
+    ALTER TABLE app.result_log_entries ADD sequence integer NOT NULL DEFAULT 0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261010061253_ResultLogSequence') THEN
+    ALTER TABLE app.result_log_entries DISABLE TRIGGER trg_result_log_entries_append_only;
+    UPDATE app.result_log_entries AS e
+    SET sequence = numbered.position
+    FROM (
+        SELECT tenant_id, id, row_number() OVER (PARTITION BY tenant_id, result_id ORDER BY at_utc, id) AS position
+        FROM app.result_log_entries
+    ) AS numbered
+    WHERE e.tenant_id = numbered.tenant_id AND e.id = numbered.id;
+    ALTER TABLE app.result_log_entries ENABLE TRIGGER trg_result_log_entries_append_only;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261010061253_ResultLogSequence') THEN
+    CREATE UNIQUE INDEX ix_result_log_entries_tenant_id_result_id_sequence ON app.result_log_entries (tenant_id, result_id, sequence);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261010061253_ResultLogSequence') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261010061253_ResultLogSequence', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

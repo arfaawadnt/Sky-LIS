@@ -1,0 +1,146 @@
+app-section-card {
+  display: block;
+  margin-block-end: var(--sp-4);
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--sp-3);
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  min-width: 0;
+}
+
+.field > span {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  margin-top: var(--sp-3);
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+}
+
+.check.delayed {
+  margin-inline-start: auto;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--sp-3);
+  margin-block-end: var(--sp-4);
+}
+
+.legend {
+  display: inline-flex;
+  gap: var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sw {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+}
+
+.sw.warn,
+:host ::ng-deep tr.delay-warn td {
+  background: var(--warn-soft);
+}
+
+.sw.late,
+:host ::ng-deep tr.delay-late td {
+  background: var(--bad-soft);
+}
+
+.sw.done,
+:host ::ng-deep tr.delay-done td {
+  background: var(--ok-soft);
+}
+
+.list-problem {
+  margin: var(--sp-3) var(--sp-4) 0;
+}
+
+.link {
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.group {
+  display: block;
+}
+
+.tag {
+  display: inline-block;
+  margin-inline-start: 6px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.consumed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 90px;
+}
+
+.bar {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+}
+
+.consumed.delay-warn .fill {
+  background: var(--warn);
+}
+
+.consumed.delay-late .fill {
+  background: var(--bad);
+}
+
+.consumed.delay-done .fill {
+  background: var(--ok);
+}

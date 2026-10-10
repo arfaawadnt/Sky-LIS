@@ -398,8 +398,8 @@ export const ORGANIZATION_API = {
   myPrivileges: '/api/v1/organization/me/privileges',
   settings: '/api/v1/settings',
   /** Lookups owned by other modules (agents `plat` and `cat`). */
-  countries: '/api/v1/platform/countries',
-  governorates: '/api/v1/platform/governorates',
+  countries: '/api/v1/public/countries',
+  governorates: '/api/v1/public/governorates',
   clinicalGroups: '/api/v1/catalogue/clinical-groups',
 } as const;
 

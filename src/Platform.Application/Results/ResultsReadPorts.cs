@@ -41,6 +41,15 @@ public interface IResultReferenceLookup
     /// <summary>The codes of the active sensitivity values (S, I, R …); empty when the catalogue has none (any code is then accepted).</summary>
     Task<IReadOnlySet<string>> SensitivityCodesAsync(CancellationToken cancellationToken);
 
+    /// <summary>Active clinical groups in display order (worklist filter).</summary>
+    Task<IReadOnlyList<LookupOption>> ClinicalGroupsAsync(CancellationToken cancellationToken);
+
+    /// <summary>Active tests of a group (or all), code or name starting with / containing <paramref name="search"/>, at most <paramref name="take"/>.</summary>
+    Task<IReadOnlyList<LookupOption>> TestsAsync(Guid? clinicalGroupId, string? search, int take, CancellationToken cancellationToken);
+
+    /// <summary>Active payers by name (worklist filter).</summary>
+    Task<IReadOnlyList<LookupOption>> ActivePayersAsync(CancellationToken cancellationToken);
+
     Task<ReportLetterhead> LetterheadAsync(Guid branchId, CancellationToken cancellationToken);
 
     Task<IReadOnlyDictionary<Guid, NamedReference>> PayersAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);

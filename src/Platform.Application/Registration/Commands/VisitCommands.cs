@@ -87,7 +87,9 @@ public sealed class RegisterVisitValidator : AbstractValidator<RegisterVisitComm
         RuleFor(command => command.ContractTierId).NotEmpty();
         RuleFor(command => command.TreatmentNo).MaximumLength(Visit.MaxTreatmentNoLength);
         RuleFor(command => command.InsuranceId).MaximumLength(Visit.MaxInsuranceIdLength);
-        OrderShape.Lines(this, command => command.Lines);
+        RuleFor(command => command.Lines).NotNull().Must(lines => lines is { Count: <= Visit.MaxLines }).WithMessage($"Order at most {Visit.MaxLines} services.");
+        RuleForEach(command => command.Lines).ChildRules(line => line.RuleFor(value => value.ServiceId).NotEmpty());
+        RuleFor(command => command).Must(command => command.Lines is { Count: > 0 } || command.DiagnosisId is not null).WithName("lines").WithMessage("Order at least one service or choose a diagnosis.");
         OrderShape.Answers(this, command => command.PreparationAnswers);
         OrderShape.Discount(this, command => command.Discount);
         OrderShape.Offset(this, command => command.UtcOffsetMinutes);

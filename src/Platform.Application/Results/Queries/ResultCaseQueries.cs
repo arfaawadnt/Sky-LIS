@@ -173,7 +173,7 @@ public sealed class GetResultLogHandler(IResultRepository results, IUserPrivileg
     {
         var result = await VisibleResult.ReadAsync(results, privileges, query.ResultId, cancellationToken);
         var entries = await results.ReadLogAsync(result.Id, cancellationToken);
-        return [.. entries.OrderBy(entry => entry.AtUtc).ThenBy(entry => entry.Id).Select(ResultViews.Log)];
+        return [.. entries.OrderBy(entry => entry.Sequence).Select(ResultViews.Log)];
     }
 }
 

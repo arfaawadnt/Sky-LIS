@@ -1,5 +1,6 @@
 * text=auto
 *.sh text eol=lf
+.githooks/* text eol=lf
 *.sql text eol=lf
 *.png binary
 *.webp binary

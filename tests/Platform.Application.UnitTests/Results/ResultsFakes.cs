@@ -205,6 +205,12 @@ internal sealed class FakeReferences : IResultReferenceLookup
 
     public Task<IReadOnlySet<string>> SensitivityCodesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>(["S", "I", "R"]));
 
+    public Task<IReadOnlyList<LookupOption>> ClinicalGroupsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LookupOption>>([]);
+
+    public Task<IReadOnlyList<LookupOption>> TestsAsync(Guid? clinicalGroupId, string? search, int take, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LookupOption>>([]);
+
+    public Task<IReadOnlyList<LookupOption>> ActivePayersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LookupOption>>([]);
+
     public Task<ReportLetterhead> LetterheadAsync(Guid branchId, CancellationToken cancellationToken) => Task.FromResult(new ReportLetterhead("Lab", "مختبر", "Main", "الرئيسي"));
 
     public Task<IReadOnlyDictionary<Guid, NamedReference>> PayersAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyDictionary<Guid, NamedReference>>(new Dictionary<Guid, NamedReference>());

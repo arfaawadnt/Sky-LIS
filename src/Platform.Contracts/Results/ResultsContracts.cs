@@ -311,6 +311,9 @@ public sealed record WorklistDocument(ReportLetterhead Letterhead, DateTimeOffse
 
 // ---- Entry lookups -----------------------------------------------------------------------------------------------
 
+/// <summary>A filter option of the result screens (clinical groups, tests, payers).</summary>
+public sealed record LookupOption(Guid Id, string? Code, string NameEn, string NameAr);
+
 public sealed record CommentTemplateOption(Guid Id, string ShortName, string TextEn, string TextAr, Guid? ClinicalGroupId);
 
 public sealed record OrganismOption(Guid Id, string Code, string NameEn, string NameAr);

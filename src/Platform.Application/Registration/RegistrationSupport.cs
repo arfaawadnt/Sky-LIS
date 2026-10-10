@@ -229,7 +229,7 @@ internal sealed class VisitRegistrar(RegistrarPorts ports)
         }
 
         await RegistrationRules.CheckDiagnosisAsync(ports.Rules, input.DiagnosisId, cancellationToken);
-        if (input.Lines.Count == 0)
+        if (input.Lines.Count == 0 && input.DiagnosisId is null)
         {
             throw new DomainException(RegistrationCodes.LinesRequired, "Add at least one service.", DomainFault.Validation);
         }

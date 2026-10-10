@@ -14,6 +14,8 @@
     <AssemblyName>$(MSBuildProjectName)</AssemblyName>
     <Product>Sky LIS</Product>
     <Company>National Technology</Company>
+    <!-- VERSION at the repository root is the single product version; scripts/release.mjs bumps it (README "Versioning"). -->
+    <Version>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</Version>
   </PropertyGroup>
 
   <!-- Build slots: several developers (or agents) build the same tree at once without sharing obj/bin. Set the

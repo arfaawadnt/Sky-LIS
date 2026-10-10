@@ -320,8 +320,8 @@ internal sealed class GovernorateRepository(AppDbContext context) : Repository<G
         return new Paged<GovernorateListItem>(items.OrderBy(item => item.NameEn, StringComparer.OrdinalIgnoreCase).ToList(), page.Page, page.PageSize, total);
     }
 
-    public async Task<IReadOnlyList<PublicGovernorate>> ListPublicAsync(Guid countryId, CancellationToken cancellationToken) =>
-        await Set.AsNoTracking().Where(governorate => governorate.CountryId == countryId && governorate.IsActive).OrderBy(governorate => governorate.Name.En)
+    public async Task<IReadOnlyList<PublicGovernorate>> ListPublicAsync(Guid? countryId, CancellationToken cancellationToken) =>
+        await Set.AsNoTracking().Where(governorate => (countryId == null || governorate.CountryId == countryId) && governorate.IsActive).OrderBy(governorate => governorate.Name.En)
             .Select(governorate => new PublicGovernorate(governorate.Id, governorate.CountryId, governorate.Name.En, governorate.Name.Ar, governorate.District))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 }

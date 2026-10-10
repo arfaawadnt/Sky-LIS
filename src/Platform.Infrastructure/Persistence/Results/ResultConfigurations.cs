@@ -100,6 +100,7 @@ internal sealed class ResultLogEntryConfiguration : IEntityTypeConfiguration<Res
         builder.ToTable("result_log_entries", AppDbContext.AppSchema);
 
         builder.Property(entry => entry.ResultId).IsRequired();
+        builder.Property(entry => entry.Sequence).IsRequired();
         builder.Property(entry => entry.Kind).IsRequired();
         builder.Property(entry => entry.AtUtc).IsRequired();
         builder.Property(entry => entry.ValueBefore).HasMaxLength(ResultLogEntry.MaxValueLength);
@@ -107,7 +108,7 @@ internal sealed class ResultLogEntryConfiguration : IEntityTypeConfiguration<Res
         builder.Property(entry => entry.ByName).HasMaxLength(ResultLogEntry.MaxNameLength);
         builder.Property(entry => entry.Detail).HasMaxLength(ResultLogEntry.MaxDetailLength);
 
-        builder.HasIndex(entry => new { entry.TenantId, entry.ResultId, entry.AtUtc });
+        builder.HasIndex(entry => new { entry.TenantId, entry.ResultId, entry.Sequence }).IsUnique();
     }
 }
 

@@ -18,12 +18,13 @@ public sealed class ListPublicCountriesHandler(ICountryRepository countries) : I
     public Task<IReadOnlyList<PublicCountry>> Handle(ListPublicCountriesQuery query, CancellationToken cancellationToken) => countries.ListPublicAsync(cancellationToken);
 }
 
+/// <summary>Active governorates of one country, or of every country when <paramref name="CountryId"/> is null (the patient and branch forms of a laboratory read the whole list once).</summary>
 [AllowUnauthenticated]
-public sealed record ListPublicGovernoratesQuery(Guid CountryId) : IQuery<IReadOnlyList<PublicGovernorate>>;
+public sealed record ListPublicGovernoratesQuery(Guid? CountryId) : IQuery<IReadOnlyList<PublicGovernorate>>;
 
 public sealed class ListPublicGovernoratesValidator : AbstractValidator<ListPublicGovernoratesQuery>
 {
-    public ListPublicGovernoratesValidator() => RuleFor(query => query.CountryId).NotEmpty();
+    public ListPublicGovernoratesValidator() => RuleFor(query => query.CountryId).NotEqual(Guid.Empty).When(query => query.CountryId.HasValue);
 }
 
 public sealed class ListPublicGovernoratesHandler(IGovernorateRepository governorates) : IQueryHandler<ListPublicGovernoratesQuery, IReadOnlyList<PublicGovernorate>>

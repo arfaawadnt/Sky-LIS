@@ -1,0 +1,258 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.main {
+  display: grid;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.summary {
+  position: sticky;
+  inset-block-start: var(--sp-4);
+}
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .summary {
+    position: static;
+  }
+}
+
+.label {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  margin-block-end: var(--sp-1);
+}
+
+.static {
+  display: block;
+  padding: var(--sp-2) 0;
+  font-weight: 600;
+}
+
+.flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  align-items: center;
+}
+
+.patient-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: center;
+}
+
+.kbd {
+  margin-inline-start: var(--sp-2);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.2);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs);
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin-block-start: var(--sp-3);
+}
+
+.lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.lines th,
+.lines td {
+  padding: var(--sp-2);
+  border-block-end: 1px solid var(--line-soft);
+  text-align: start;
+  vertical-align: top;
+}
+
+.lines th {
+  color: var(--ink-2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lines .num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lines tr.saved {
+  background: var(--surface-2);
+}
+
+.lines tr.cancelled td {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.lines tr.member td {
+  font-size: var(--fs-xs);
+}
+
+.lines tr.has-issue {
+  background: var(--bad-soft);
+}
+
+.lines .empty {
+  text-align: center;
+  padding: var(--sp-4);
+}
+
+.hint {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+}
+
+.hint.warn {
+  color: var(--warn);
+}
+
+.hint.bad {
+  color: var(--bad);
+}
+
+.member {
+  margin-block-start: 2px;
+}
+
+.tubes {
+  margin-block-start: var(--sp-3);
+}
+
+.tag {
+  display: inline-block;
+  margin: 2px;
+  padding: 1px var(--sp-2);
+  border-radius: var(--r-sm);
+  background: var(--blue-soft);
+  color: var(--ink);
+}
+
+.warnings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.warning {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-start;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+}
+
+.warning.bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.warning.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.warning.info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-block-end: var(--sp-3);
+}
+
+.method {
+  min-width: 110px;
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.method.active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  font-weight: 600;
+}
+
+.totals {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+}
+
+.totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.totals dt {
+  color: var(--ink-2);
+}
+
+.totals dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.totals .due {
+  border-block-start: 1px solid var(--line);
+  padding-block-start: var(--sp-2);
+  font-weight: 700;
+}
+
+.blockers {
+  margin: var(--sp-3) 0;
+  padding-inline-start: var(--sp-4);
+}
+
+.wide {
+  width: 100%;
+  margin-block-start: var(--sp-3);
+}
+
+.success {
+  text-align: center;
+}
+
+.success .accession {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  margin: 0 0 var(--sp-2);
+}
+
+.success-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  justify-content: center;
+  margin-block-start: var(--sp-3);
+}

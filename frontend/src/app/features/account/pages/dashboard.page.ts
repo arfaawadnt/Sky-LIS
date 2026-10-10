@@ -5,6 +5,7 @@ import { ACCOUNT_PERMISSIONS, type BranchDashboard, type DelayedTestItem } from 
 import type { AuditEntryItem } from '../../../core/api/audit.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { type Release, inReleaseScope } from '../../../core/release';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { CellTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
 import { DataTableComponent } from '../../../shared/ui/data-table/data-table.component';
@@ -23,6 +24,8 @@ interface Kpi {
   readonly hint: string;
   readonly icon: IconName;
   readonly tone: StatTone;
+  /** The release that shows the tile (the R1 prototype hides the sample figures). */
+  readonly release?: Release;
 }
 
 interface QuickAction {
@@ -30,7 +33,19 @@ interface QuickAction {
   readonly path: string;
   readonly icon: IconName;
   readonly permission: string;
+  readonly release: Release;
 }
+
+/** Every quick action of both releases; the R2 samples page stays hidden under RELEASE_SCOPE = R1. */
+const QUICK_ACTIONS: readonly QuickAction[] = [
+  { key: 'registration', path: '/registration', icon: 'clipboard', permission: 'registration.create', release: 'R1' },
+  { key: 'searchRegistrations', path: '/registration/visits', icon: 'search', permission: 'registration.view', release: 'R1' },
+  { key: 'resultsByAccession', path: '/results/by-accession', icon: 'flask', permission: 'results.view', release: 'R1' },
+  { key: 'worklist', path: '/results/worklist', icon: 'layers', permission: 'results.view', release: 'R1' },
+  { key: 'payments', path: '/billing/payments', icon: 'coins', permission: 'billing.view', release: 'R1' },
+  { key: 'priceQuery', path: '/registration/price-query', icon: 'coins', permission: 'registration.view', release: 'R1' },
+  { key: 'samples', path: '/samples', icon: 'barcode', permission: 'samples.view', release: 'R2' },
+];
 
 /**
  * The dashboard (SRS CP-05): the session branch's day at a glance — eight KPIs (a figure whose module is not live
@@ -49,12 +64,8 @@ export class DashboardPage {
   protected readonly facade = inject(DashboardFacade);
   private readonly auth = inject(AuthStore);
 
-  protected readonly quickActions: readonly QuickAction[] = [
-    { key: 'registration', path: '/registration', icon: 'clipboard', permission: 'registration.create' },
-    { key: 'samples', path: '/samples', icon: 'barcode', permission: 'samples.view' },
-    { key: 'payments', path: '/billing', icon: 'coins', permission: 'billing.view' },
-    { key: 'worklist', path: '/results', icon: 'flask', permission: 'results.view' },
-  ];
+  /** The quick actions of the delivered release (the R1 prototype: registration, search, results, worklist, payments, price query). */
+  protected readonly quickActions: readonly QuickAction[] = QUICK_ACTIONS.filter((action) => inReleaseScope(action.release));
 
   protected readonly delayedColumns: readonly TableColumn<DelayedTestItem>[] = [
     { key: 'accession', header: 'account.dashboard.accession', mono: true, width: '150px' },
@@ -88,7 +99,7 @@ export class DashboardPage {
     const count = (value: number | null | undefined, hint: string): { value: string; hint: string } =>
       value === null || value === undefined ? { value: '—', hint: notYet } : { value: formatNumber(value, lang), hint };
 
-    const list: Kpi[] = [
+    const all: Kpi[] = [
       { key: 'registrations', icon: 'clipboard', tone: 'brand', ...count(kpis?.registrations, today) },
       {
         key: 'collectedToday',
@@ -97,12 +108,13 @@ export class DashboardPage {
         value: formatMoney(kpis?.collectedToday, data?.currencyCode, lang),
         hint: kpis?.collectedToday === null || kpis?.collectedToday === undefined ? notYet : today,
       },
-      { key: 'samplesReceived', icon: 'barcode', tone: 'info', ...count(kpis?.samplesReceived, today) },
+      { key: 'samplesReceived', icon: 'barcode', tone: 'info', release: 'R2', ...count(kpis?.samplesReceived, today) },
       { key: 'pendingResults', icon: 'flask', tone: 'warn', ...count(kpis?.pendingResults, this.i18n.t('account.dashboard.awaitingEntry')) },
       { key: 'unverifiedBacklog', icon: 'check', tone: 'warn', ...count(kpis?.unverifiedBacklog, this.i18n.t('account.dashboard.awaitingSignOff')) },
       { key: 'delayedTests', icon: 'alert', tone: (kpis?.delayedTests ?? 0) > 0 ? 'bad' : 'ok', ...count(kpis?.delayedTests, this.i18n.t('account.dashboard.pastTurnaround')) },
-      { key: 'rejectedSamples', icon: 'x', tone: (kpis?.rejectedSamples ?? 0) > 0 ? 'bad' : 'ok', ...count(kpis?.rejectedSamples, today) },
+      { key: 'rejectedSamples', icon: 'x', tone: (kpis?.rejectedSamples ?? 0) > 0 ? 'bad' : 'ok', release: 'R2', ...count(kpis?.rejectedSamples, today) },
     ];
+    const list = all.filter((kpi) => inReleaseScope(kpi.release ?? 'R1'));
 
     if (this.auth.hasPermission(ACCOUNT_PERMISSIONS.walletView)) {
       list.push({

@@ -1,0 +1,107 @@
+:host {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.search-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.grow {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-1);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.result {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--sp-3);
+  text-align: start;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.result:hover,
+.result:focus-visible {
+  background: var(--row-hover);
+  border-color: var(--line);
+}
+
+.result:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.number {
+  font-weight: 600;
+  color: var(--blue-3);
+}
+
+.name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.chosen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+.who {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.create {
+  display: grid;
+  gap: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: var(--sp-3);
+}
+
+.create-head {
+  display: grid;
+  gap: 2px;
+}
+
+.create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+@media (max-width: 720px) {
+  .result {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

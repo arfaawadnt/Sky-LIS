@@ -94,10 +94,11 @@ public sealed class ResultsModuleTests(DatabaseFixture fixture)
         sample.Receive(Technician, branch, Now.AddMinutes(10));
         await AddSampleAsync(tenant, sample);
 
-        var late = Order(visit, group, tube: tube, branch: branch, expected: Now.AddHours(-1));
-        var onTime = Order(visit, group, tube: tube, branch: branch, expected: Now.AddDays(2));
+        var patient = Guid.CreateVersion7();
+        var late = Order(visit, group, tube: tube, branch: branch, expected: Now.AddHours(-1), patient: patient);
+        var onTime = Order(visit, group, tube: tube, branch: branch, expected: Now.AddDays(2), patient: patient);
         onTime.Enter(ResultValueInput.Number(4m), ResultTestRules.For(LabTestType.Numeric), null, null, Bench, true, Now);
-        var hidden = Order(visit, hiddenGroup, tube: tube, branch: branch);
+        var hidden = Order(visit, hiddenGroup, tube: tube, branch: branch, patient: patient);
         await AddAsync(tenant, late, onTime, hidden);
 
         using var scope = fixture.AppScope(tenant);

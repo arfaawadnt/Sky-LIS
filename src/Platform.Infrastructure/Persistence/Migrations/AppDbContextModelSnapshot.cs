@@ -6884,6 +6884,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("result_id");
 
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
                     b.Property<string>("Source")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
@@ -6907,8 +6911,9 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.HasKey("TenantId", "Id")
                         .HasName("pk_result_log_entries");
 
-                    b.HasIndex("TenantId", "ResultId", "AtUtc")
-                        .HasDatabaseName("ix_result_log_entries_tenant_id_result_id_at_utc");
+                    b.HasIndex("TenantId", "ResultId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_result_log_entries_tenant_id_result_id_sequence");
 
                     b.ToTable("result_log_entries", "app", t =>
                         {

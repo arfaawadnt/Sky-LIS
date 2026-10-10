@@ -1,0 +1,135 @@
+<app-page-header [title]="i18n.t('registration.visits.title')" [subtitle]="i18n.t('registration.visits.subtitle')">
+  <button pageActions type="button" class="btn ghost" *appCan="permissions.export" [disabled]="exporting()" (click)="export()">
+    <app-icon name="arrow-down" [size]="15" />{{ exporting() ? i18n.t('registration.exporting') : i18n.t('registration.export') }}
+  </button>
+  <a pageActions class="btn primary" *appCan="permissions.create" routerLink="/registration/new"><app-icon name="plus" [size]="15" />{{ i18n.t('registration.title') }}</a>
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [value]="facade.text()" [placeholder]="i18n.t('registration.visits.searchPlaceholder')" [label]="i18n.t('registration.visits.search')" (searchChange)="facade.setText($event)" />
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('registration.visits.from') }}</span>
+      <input class="inp" type="date" [value]="facade.days().from" (change)="onFrom($event)" />
+    </label>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('registration.visits.to') }}</span>
+      <input class="inp" type="date" [value]="facade.days().to" (change)="onTo($event)" />
+    </label>
+    <button toolbarFilters type="button" class="btn sm ghost" (click)="facade.allDays()">{{ i18n.t('registration.visits.allDates') }}</button>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('registration.column.payer') }}</span>
+      <select class="inp" (change)="onPayer($event)">
+        <option value="" [selected]="facade.payerId() === null">{{ i18n.t('registration.visits.all') }}</option>
+        @for (payer of facade.payers(); track payer.id) {
+          <option [value]="payer.id" [selected]="facade.payerId() === payer.id">{{ name(payer.nameEn, payer.nameAr) }}</option>
+        }
+      </select>
+    </label>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('registration.column.status') }}</span>
+      <select class="inp" (change)="onStatus($event)">
+        <option value="" [selected]="facade.status() === null">{{ i18n.t('registration.visits.all') }}</option>
+        @for (status of statuses; track status) {
+          <option [value]="status" [selected]="facade.status() === status">{{ i18n.t('registration.status.' + status) }}</option>
+        }
+      </select>
+    </label>
+    <label toolbarFilters class="filter check">
+      <input type="checkbox" [checked]="facade.branchOnly()" (change)="onBranchOnly($event)" />
+      <span>{{ i18n.t('registration.visits.branchOnly') }}</span>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.visits.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('registration.refresh') }}</button>
+  </app-toolbar>
+
+  @if (facade.visits.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('registration.visits.loadError') }}</p>
+  }
+
+  <app-data-table
+    [columns]="columns"
+    [rows]="rows()"
+    [loading]="facade.visits.isLoading()"
+    [interactive]="false"
+    [emptyTitle]="i18n.t('registration.visits.empty')"
+    [emptyMessage]="i18n.t('registration.visits.emptyHint')"
+    [caption]="i18n.t('registration.visits.title')"
+  >
+    <ng-template appCell="accession" [appCellOf]="rows()" let-row>
+      <b class="mono">{{ row.accession }}</b>
+      @if (row.batchNumber) {
+        <span class="tag small">{{ row.batchNumber }}</span>
+      }
+      @if (row.urgent) {
+        <app-badge status="Urgent">{{ i18n.t('registration.flag.urgent') }}</app-badge>
+      }
+    </ng-template>
+    <ng-template appCell="patient" [appCellOf]="rows()" let-row>
+      <span class="name">{{ patientName(row) }}</span>
+      <span class="small muted detail"><span class="mono">{{ row.patientNumber ?? '' }}</span>@if (row.mobile && !row.patientMasked) { · <span class="mono" dir="ltr">{{ row.mobile }}</span>}</span>
+    </ng-template>
+    <ng-template appCell="payer" [appCellOf]="rows()" let-row>
+      {{ name(row.payerNameEn, row.payerNameAr) }}
+      <span class="small muted detail">{{ name(row.tierNameEn, row.tierNameAr) }}</span>
+    </ng-template>
+    <ng-template appCell="services" [appCellOf]="rows()" let-row>
+      <span class="chips">
+        @for (line of row.lines; track line.lineId) {
+          @if (line.kind !== 'PackageMember') {
+            <span class="chip" [class.cancelled]="line.status === 'Cancelled'" [class.reserved]="line.status === 'Reserved'" [title]="name(line.nameEn, line.nameAr)">{{ line.code }}</span>
+          }
+        }
+      </span>
+    </ng-template>
+    <ng-template appCell="remaining" [appCellOf]="rows()" let-row>
+      @if (row.remaining === null) {
+        <span class="muted">—</span>
+      } @else if (row.remaining > 0) {
+        <app-badge tone="warn">{{ amount(row.remaining) }}</app-badge>
+      } @else if (row.remaining < 0) {
+        <app-badge tone="bad">{{ amount(row.remaining) }}</app-badge>
+      } @else {
+        <app-badge tone="ok">{{ i18n.t('registration.visits.settled') }}</app-badge>
+      }
+    </ng-template>
+    <ng-template appCell="status" [appCellOf]="rows()" let-row>
+      <app-badge [status]="row.status">{{ i18n.t('registration.status.' + row.status) }}</app-badge>
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+      <button type="button" class="btn sm ghost" *appCan="permissions.edit" (click)="edit(row)" [attr.aria-label]="i18n.t('registration.visits.edit') + ' ' + row.accession"><app-icon name="edit" [size]="14" />{{ i18n.t('registration.visits.edit') }}</button>
+      <button type="button" class="btn sm ghost" *appCan="'samples.view'" (click)="openSamples(row)" [attr.aria-label]="i18n.t('registration.visits.samples') + ' ' + row.accession"><app-icon name="barcode" [size]="14" />{{ i18n.t('registration.visits.samples') }}</button>
+      <button type="button" class="btn sm ghost" *appCan="'billing.view'" (click)="payments(row)" [attr.aria-label]="i18n.t('registration.visits.payments') + ' ' + row.accession"><app-icon name="coins" [size]="14" />{{ i18n.t('registration.visits.payments') }}</button>
+      <button type="button" class="btn sm ghost" (click)="openDocuments(row)" [attr.aria-label]="i18n.t('registration.visits.documents') + ' ' + row.accession"><app-icon name="printer" [size]="14" />{{ i18n.t('registration.visits.documents') }}</button>
+      <button type="button" class="btn sm ghost" *appCan="'results.view'" (click)="results(row)" [attr.aria-label]="i18n.t('registration.visits.results') + ' ' + row.accession"><app-icon name="flask" [size]="14" />{{ i18n.t('registration.visits.results') }}</button>
+      <button type="button" class="btn sm danger" *appCan="permissions.cancel" (click)="openCancel(row)" [attr.aria-label]="i18n.t('registration.cancel.action') + ' ' + row.accession"><app-icon name="x" [size]="14" />{{ i18n.t('registration.cancel.action') }}</button>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.page().page" [pageSize]="facade.page().pageSize" [totalCount]="total()" (pageChange)="onPage($event)" />
+</app-section-card>
+
+<app-reg-visit-samples-dialog [(open)]="samplesOpen" [visitId]="current()?.id ?? null" [accession]="current()?.accession ?? ''" />
+
+<app-reg-cancel-services-dialog
+  [(open)]="cancelOpen"
+  [visitId]="current()?.id ?? null"
+  [accession]="current()?.accession ?? ''"
+  [pending]="facade.cancel.pending()"
+  [problem]="cancelProblem()"
+  (submitted)="cancelServices($event)"
+/>
+
+<app-dialog [(open)]="documentsOpen" [title]="i18n.tf('registration.documents.title', { accession: current()?.accession ?? '' })" size="sm">
+  <div class="documents">
+    <button type="button" class="btn" (click)="printLabels()"><app-icon name="barcode" [size]="15" />{{ i18n.t('registration.labels.title') }}</button>
+    <button type="button" class="btn" (click)="printJobOrder()"><app-icon name="printer" [size]="15" />{{ i18n.t('registration.jobOrder.print') }}</button>
+    @if (current(); as row) {
+      <a class="btn" [routerLink]="['/registration/visits', row.id, 'job-order']" (click)="documentsOpen.set(false)"><app-icon name="eye" [size]="15" />{{ i18n.t('registration.jobOrder.open') }}</a>
+      <a class="btn" *appCan="'billing.view'" routerLink="/billing/payments" [queryParams]="{ visitId: row.id }" (click)="documentsOpen.set(false)"><app-icon name="coins" [size]="15" />{{ i18n.t('registration.documents.receipts') }}</a>
+      <a class="btn" *appCan="'results.view'" routerLink="/results/by-accession" [queryParams]="{ accession: row.accession }" (click)="documentsOpen.set(false)"><app-icon name="flask" [size]="15" />{{ i18n.t('registration.documents.report') }}</a>
+    }
+  </div>
+  <ng-container dialogFooter>
+    <button type="button" class="btn" (click)="documentsOpen.set(false)">{{ i18n.t('registration.close') }}</button>
+  </ng-container>
+</app-dialog>

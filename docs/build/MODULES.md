@@ -105,11 +105,11 @@ NoOp adapter marked `[FallbackAdapter]` (nothing verified); the Results agent sh
 | 2026-10-10 | 1 `cat` | Done (agent report): CP-39…CP-45, CP-55 (+ SA-12); app.clinical_groups, sample_types (+ sample_conditions), measurement_units, patient_conditions, services (+ service_members), tests (+ range bands, list values, paragraphs); ICatalogueLookup with ResolveRangeAsync, IFormulaEvaluator, ICatalogueACloner (wired by the platform MasterDataCloner before Catalogue B). 16 nav entries registered. Pending: the platform module's TenantProvisioning.cs elevation must be allow-listed (architecture gate). |
 | 2026-10-10 | 1 `fin` | Done (agent report): CP-32…CP-34 + quote API; IPriceLookup, IPayerLookup; lazy cash payer. |
 | 2026-10-10 | 2 `smp` | Done (agent report): CP-14…CP-17; app.samples (+ generation), app.sample_events; three policies; ISampleStatusLookup. |
-| 2026-10-10 | 2 `reg` | Started (all wave-1 read ports present). |
-| 2026-10-10 | 3 `res` | Started early (its inputs exist: registration events, ISampleStatusLookup, catalogue ranges/formulas, result rights, the AnalyserResultReceived shape). `app.results` contract added to §5. |
+| 2026-10-10 | 2 `reg` | Done: backend (visits, lines, tubes, preparation answers, transfers, bookings, batches; `VisitsController`) and the Release-1 frontend: CP-06 `/registration/new` (walk-in, payment captured on the page through Billing, BR-26), edit `/registration/visits/:visitId`, CP-10 `/registration/visits` (samples / payments / documents / results / cancel services, CSV), job order `/registration/visits/:visitId/job-order`, CP-12 price query `/registration/price-query`; dictionaries 347 keys; 53 specs. CP-07/08/09/25/26 are Release 2 (backend only). The page provisions the cash payer lazily (`POST pricing/payers/default`) so a new laboratory can register at once. |
+| 2026-10-10 | 3 `res` | Done: backend (`app.results`, `app.result_log_entries` with `sequence`, print lists, QC; `ResultsController`) and the Release-1 frontend: CP-18 worklist `/results/worklist` (filters, BR-13 colouring, CSV, bench list print) and CP-19 `/results/by-accession?accession=` (entry per test type, flags, panic, delta acknowledgement, review, verify, undo, amend, comments, notes, history, preview, print); dictionaries 297 keys; 22 specs. CP-20/21/22, analyser landing UI and auto-verification are Release 2. Other pages link with `RESULTS_LINKS.accession(acc)`. |
 | 2026-10-10 | nav | 36 entries registered for patients, samples, pricing, organization and catalogue B (client and admin); treasury 204 fix; Merged status tone. |
 
-Integrator to-do before the wave migration: kit `multiSelect` field and filtered export hook in MasterDataConfig; `Merged` in STATUS_TONES; move the patient picker to `shared/` (registration copies it meanwhile); fix the treasury page's 204-as-failure in `mutation()` handling; organization and patients pages must read countries/governorates from the anonymous `/api/v1/public/*` lookups; the 404 job-order link path; nav entries from every report; CLAUDE.md §5 summary per module.
+Integrator to-do: kit `multiSelect` field and filtered export hook in MasterDataConfig; move the patient picker to `shared/` (registration still carries its own copy); delete Registration's `[FallbackAdapter]` for `IResultStatusLookup` now that Results ships the real adapter; save the language switch to the profile (CP-65). Done 2026-10-10: `Merged` tone, treasury 204 handling, countries/governorates from the public lookups (every form), job-order route, nav entries of every module, CLAUDE.md §5 summaries.
 
 ### Integration log (2026-10-10)
 
@@ -118,6 +118,34 @@ Integrator to-do before the wave migration: kit `multiSelect` field and filtered
 - Cross-cutting fixes: signing keys get their own crypto provider cache (shared cache across hosts signed with disposed keys: random 500s on sign-in); credential envelopes are consumed once per request (several sealed fields per request); inactive laboratories cannot sign in (ITenantStatusLookup in SessionPrincipalQuery and MembershipDirectory); TenantProvisioning.cs allow-listed for elevation (one transaction + BR-25 catalogue copy).
 - First full database run (integrator slot): integration 68/91, functional 56/70 → 63/70 after the signing fix. Remaining failures dispatched to their owning agents; billing's visit-dependent tests wait for Registration.
 - Frontend: account guards (`branchGuard`, `passwordChangeGuard`) on the shell route; account admin routes under /admin; nav entries for billing, account, platform (+ dashboard as client home); status tones InProgress, Resolved, Posted, Voided, RefundDue, Merged.
+
+### Integration log (2026-10-10, afternoon)
+
+- Full run in the integrator slot: Domain 714, Architecture 85, Application 213, Integration 108, Functional 77; frontend
+  297 specs, lint and boundaries clean, production build green.
+- Fixed: the `Registration` migration's Down step now drops `fk_visit_accounts_visits` (added by its Up SQL) before
+  `app.visits`, so the round trip reverts; `ReportingModuleTests` S-D3 writes its rows in its own month (S-A3 counts the
+  whole platform and met them when xunit ran S-D3 first).
+- New gate: `MigrationScriptTests.The_deploy_script_records_every_migration` (the committed idempotent script had missed
+  `ResultLogSequence` without any test noticing).
+- Dev database `lis` migrated to `ResultLogSequence` (it was still at `Foundation`); `seed-demo-lab` added to DevTools and
+  run (tenant, branch MAIN, users lab.admin / lab.admin.manager, catalogue K/NA/GLU/HGB, cash price list, treasury
+  MAIN-CASH); treasury access of the browser device requested and approved through the UI (TRQ-2026-00001).
+- The `backend-api` launch configuration runs with `--no-build`: the API started from binaries of the previous day and its
+  outbox could not resolve the wave-1 event types. Build `src/Platform.WebApi` (no slot) before starting it.
+- Dashboard (CP-05) trimmed to the R1 prototype: the sample tiles and the Samples quick action are R2; quick actions now
+  registration, search registrations, results by accession, worklist, payments, price query. The release switch moved to
+  `core/release.ts` (re-exported by `shell/nav.registry.ts`) so features can gate their own items.
+- Registration (`reg`) and Results (`res`) frontends finished by module agents (rows above); nav entries registered
+  (reception: registration, search registrations, price query; laboratory: worklist, results by accession).
+- Browser walk-through in the dev database (lab.admin): WF-02 new patient → K + GLU on the cash contract → 210 EGP cash
+  on MAIN-CASH → saved as ACC-2026-00001 (visit 201, payment 201, labels fetched and sent to print) → listed in search
+  registrations as Settled / Open; WF-06 results created by the outbox policies with the sample received → values entered
+  (K 6.8 flagged PANIC HH) → saved → reviewed → verified → report preview; worklist lists both tests. Arabic RTL checked
+  on the registration page. Remaining: the native print dialog blocks the automated browser, so printing was not clicked.
+- Fixed on the way: the patient and branch forms read `/api/v1/platform/countries|governorates` (403 for a laboratory);
+  they now read the anonymous `/api/v1/public/*` lists and `ListPublicGovernoratesQuery` accepts no country (every
+  active governorate).
 
 ## 7. Auto-verification contract (Results ↔ Automation)
 

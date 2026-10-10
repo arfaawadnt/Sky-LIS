@@ -19,10 +19,11 @@ public sealed class ResultLogEntry : Entity, ITenantScoped
     {
     }
 
-    private ResultLogEntry(Guid resultId, ResultLogKind kind, DateTimeOffset atUtc)
+    private ResultLogEntry(Guid resultId, int sequence, ResultLogKind kind, DateTimeOffset atUtc)
         : base(Guid.CreateVersion7())
     {
         ResultId = resultId;
+        Sequence = sequence;
         Kind = kind;
         AtUtc = atUtc;
     }
@@ -30,6 +31,9 @@ public sealed class ResultLogEntry : Entity, ITenantScoped
     public Guid TenantId { get; private set; }
 
     public Guid ResultId { get; private set; }
+
+    /// <summary>1, 2, 3 … in the order the root appended the rows (steps of one transition share their time).</summary>
+    public int Sequence { get; private set; }
 
     public ResultLogKind Kind { get; private set; }
 
@@ -57,6 +61,7 @@ public sealed class ResultLogEntry : Entity, ITenantScoped
 
     internal static ResultLogEntry Record(
         Guid resultId,
+        int sequence,
         ResultLogKind kind,
         DateTimeOffset atUtc,
         Guid? byUserId,
@@ -68,7 +73,7 @@ public sealed class ResultLogEntry : Entity, ITenantScoped
         ResultSource? source = null,
         Guid? analyserId = null,
         string? detail = null) =>
-        new(resultId, kind, atUtc)
+        new(resultId, sequence, kind, atUtc)
         {
             ByUserId = byUserId is { } user && user != Guid.Empty ? user : null,
             ByName = Clip(byName, MaxNameLength),

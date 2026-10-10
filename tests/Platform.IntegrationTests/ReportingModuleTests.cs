@@ -22,6 +22,9 @@ namespace Platform.IntegrationTests;
 public sealed class ReportingModuleTests(DatabaseFixture fixture)
 {
     private static readonly DateTimeOffset Day = new(2001, 3, 1, 0, 0, 0, TimeSpan.Zero);
+    // S-D3 writes its rows in its own month: the platform-wide counts of S-A3 would otherwise include them (xunit runs the
+    // tests of a class in no fixed order and the fixture truncates once per run).
+    private static readonly DateTimeOffset BranchDay = new(2001, 4, 1, 0, 0, 0, TimeSpan.Zero);
 
     [DatabaseFact]
     public async Task S_A3_the_activity_of_each_client_is_counted_for_the_platform_tenant()
@@ -84,22 +87,22 @@ public sealed class ReportingModuleTests(DatabaseFixture fixture)
     {
         var lab = Guid.CreateVersion7();
         var branch = Guid.CreateVersion7();
-        var window = new DashboardWindow(Day, Day.AddDays(1), Day.AddDays(-6), 0);
+        var window = new DashboardWindow(BranchDay, BranchDay.AddDays(1), BranchDay.AddDays(-6), 0);
         var sources = await SourcesAsync();
 
         if (sources.Visits && sources.Results)
         {
-            var today = await InsertVisitAsync(lab, branch, Guid.CreateVersion7(), Day.AddHours(1));
-            var yesterday = await InsertVisitAsync(lab, branch, Guid.CreateVersion7(), Day.AddHours(-20));
-            var otherBranch = await InsertVisitAsync(lab, Guid.CreateVersion7(), Guid.CreateVersion7(), Day.AddHours(2));
+            var today = await InsertVisitAsync(lab, branch, Guid.CreateVersion7(), BranchDay.AddHours(1));
+            var yesterday = await InsertVisitAsync(lab, branch, Guid.CreateVersion7(), BranchDay.AddHours(-20));
+            var otherBranch = await InsertVisitAsync(lab, Guid.CreateVersion7(), Guid.CreateVersion7(), BranchDay.AddHours(2));
 
-            await InsertResultAsync(lab, today, branch, "Ordered", Day.AddHours(3));      // pending, delayed (due before the day ended)
-            await InsertResultAsync(lab, today, branch, "Complete", Day.AddDays(3));      // pending, backlog, on time
-            await InsertResultAsync(lab, today, branch, "Reviewed", Day.AddHours(23));    // pending, backlog, delayed
-            await InsertResultAsync(lab, today, branch, "Verified", Day.AddHours(2));     // done
-            await InsertResultAsync(lab, today, branch, "Cancelled", Day.AddHours(2));    // ignored
-            await InsertResultAsync(lab, yesterday, branch, "Complete", Day.AddDays(5));  // backlog only
-            await InsertResultAsync(lab, otherBranch, null, "Ordered", Day.AddHours(3));  // another branch
+            await InsertResultAsync(lab, today, branch, "Ordered", BranchDay.AddHours(3));      // pending, delayed (due before the day ended)
+            await InsertResultAsync(lab, today, branch, "Complete", BranchDay.AddDays(3));      // pending, backlog, on time
+            await InsertResultAsync(lab, today, branch, "Reviewed", BranchDay.AddHours(23));    // pending, backlog, delayed
+            await InsertResultAsync(lab, today, branch, "Verified", BranchDay.AddHours(2));     // done
+            await InsertResultAsync(lab, today, branch, "Cancelled", BranchDay.AddHours(2));    // ignored
+            await InsertResultAsync(lab, yesterday, branch, "Complete", BranchDay.AddDays(5));  // backlog only
+            await InsertResultAsync(lab, otherBranch, null, "Ordered", BranchDay.AddHours(3));  // another branch
         }
 
         using var scope = fixture.AppScope(lab);

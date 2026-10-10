@@ -1,0 +1,164 @@
+<app-page-header [title]="i18n.t('results.worklist.title')" [subtitle]="i18n.t('results.worklist.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="facade.clear()">{{ i18n.t('results.worklist.clear') }}</button>
+  <button pageActions type="button" class="btn ghost" *appCan="permissions.export" [disabled]="facade.exportCsv.pending()" (click)="exportCsv()">
+    <app-icon name="arrow-down" [size]="15" />{{ facade.exportCsv.pending() ? i18n.t('results.worklist.exporting') : i18n.t('results.worklist.export') }}
+  </button>
+  <button pageActions type="button" class="btn primary" *appCan="permissions.view" [disabled]="facade.document.pending()" (click)="printWorklist()">
+    <app-icon name="printer" [size]="15" />{{ i18n.t('results.worklist.print') }}
+  </button>
+</app-page-header>
+
+<p class="info-strip">{{ i18n.t('results.worklist.note') }}</p>
+
+<app-section-card class="filters" [title]="i18n.t('results.worklist.filters')">
+  <div class="filter-grid">
+    <label class="field">
+      <span>{{ i18n.t('results.worklist.collectionFrom') }}</span>
+      <input class="inp" type="date" [value]="facade.filter().fromDay ?? ''" (change)="onDay('fromDay', $event)" />
+    </label>
+    <label class="field">
+      <span>{{ i18n.t('results.worklist.collectionTo') }}</span>
+      <input class="inp" type="date" [value]="facade.filter().toDay ?? ''" (change)="onDay('toDay', $event)" />
+    </label>
+    <label class="field">
+      <span>{{ i18n.t('results.worklist.clinicalGroup') }}</span>
+      <select class="inp" (change)="onSelect('clinicalGroupId', $event)">
+        <option value="" [selected]="facade.filter().clinicalGroupId === null">{{ i18n.t('results.all') }}</option>
+        @for (group of facade.groups.value() ?? []; track group.id) {
+          <option [value]="group.id" [selected]="facade.filter().clinicalGroupId === group.id">{{ name(group.nameEn, group.nameAr) }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span>{{ i18n.t('results.worklist.test') }}</span>
+      <select class="inp" (change)="onSelect('testId', $event)">
+        <option value="" [selected]="facade.filter().testId === null">{{ i18n.t('results.all') }}</option>
+        @for (test of facade.tests.value() ?? []; track test.id) {
+          <option [value]="test.id" [selected]="facade.filter().testId === test.id">{{ test.code }} · {{ name(test.nameEn, test.nameAr) }}</option>
+        }
+      </select>
+    </label>
+    @if ((facade.analysers.value() ?? []).length > 0) {
+      <label class="field">
+        <span>{{ i18n.t('results.worklist.analyser') }}</span>
+        <select class="inp" (change)="onSelect('analyserId', $event)">
+          <option value="" [selected]="facade.filter().analyserId === null">{{ i18n.t('results.all') }}</option>
+          @for (analyser of facade.analysers.value() ?? []; track analyser.id) {
+            <option [value]="analyser.id" [selected]="facade.filter().analyserId === analyser.id">{{ analyser.code }} · {{ name(analyser.nameEn, analyser.nameAr) }}</option>
+          }
+        </select>
+      </label>
+    }
+    <label class="field">
+      <span>{{ i18n.t('results.worklist.sampleStatus') }}</span>
+      <select class="inp" (change)="onSampleStatus($event)">
+        <option value="" [selected]="facade.filter().sampleStatus === null">{{ i18n.t('results.all') }}</option>
+        @for (status of sampleStatuses; track status) {
+          <option [value]="status" [selected]="facade.filter().sampleStatus === status">{{ sampleStatusLabel(status) }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span>{{ i18n.t('results.worklist.payer') }}</span>
+      <select class="inp" (change)="onSelect('payerId', $event)">
+        <option value="" [selected]="facade.filter().payerId === null">{{ i18n.t('results.all') }}</option>
+        @for (payer of facade.payers.value() ?? []; track payer.id) {
+          <option [value]="payer.id" [selected]="facade.filter().payerId === payer.id">{{ name(payer.nameEn, payer.nameAr) }}</option>
+        }
+      </select>
+    </label>
+  </div>
+  <div class="boxes" role="group" [attr.aria-label]="i18n.t('results.worklist.statusBoxes')">
+    @for (status of statuses; track status) {
+      <label class="check">
+        <input type="checkbox" [checked]="hasStatus(status)" (change)="facade.toggleStatus(status)" />
+        {{ statusLabel(status) }}
+      </label>
+    }
+    <label class="check delayed">
+      <input type="checkbox" [checked]="facade.filter().delayedOnly" (change)="onToggle('delayedOnly', $event)" />
+      {{ i18n.t('results.worklist.delayedOnly') }}
+    </label>
+    <label class="check">
+      <input type="checkbox" [checked]="facade.filter().branchOnly" (change)="onToggle('branchOnly', $event)" />
+      {{ i18n.t('results.worklist.branchOnly') }}
+    </label>
+  </div>
+</app-section-card>
+
+<div class="stats">
+  <app-stat-card [label]="i18n.t('results.worklist.requests')" [value]="counters().requests" tone="info" icon="clipboard" />
+  <app-stat-card [label]="i18n.t('results.worklist.tests')" [value]="counters().tests" tone="brand" icon="flask" />
+  <app-stat-card [label]="i18n.t('results.worklist.samples')" [value]="counters().samples" tone="ok" icon="barcode" />
+  <app-stat-card [label]="i18n.t('results.worklist.delayed')" [value]="counters().delayed" [tone]="counters().delayed > 0 ? 'bad' : 'ok'" icon="alert" />
+</div>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [value]="facade.filter().search ?? ''" [placeholder]="i18n.t('results.worklist.searchPlaceholder')" [label]="i18n.t('results.worklist.search')" (searchChange)="facade.setSearch($event)" />
+    <span toolbarFilters class="legend" aria-hidden="true">
+      <span><i class="sw warn"></i>{{ i18n.tf('results.worklist.legendWarn', { percent: page()?.warnPercent ?? 80 }) }}</span>
+      <span><i class="sw late"></i>{{ i18n.tf('results.worklist.legendLate', { percent: page()?.latePercent ?? 100 }) }}</span>
+      <span><i class="sw done"></i>{{ i18n.t('results.worklist.legendDone') }}</span>
+    </span>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.list.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('results.refresh') }}</button>
+  </app-toolbar>
+
+  @if (facade.list.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('results.worklist.loadError') }}</p>
+  }
+
+  <app-data-table
+    [columns]="columns()"
+    [rows]="facade.rows()"
+    [rowId]="rowId"
+    [rowClass]="rowClass"
+    [loading]="facade.list.isLoading()"
+    [emptyTitle]="i18n.t('results.worklist.empty')"
+    [emptyMessage]="i18n.t('results.worklist.emptyHint')"
+    [caption]="i18n.t('results.worklist.title')"
+    [compact]="true"
+  >
+    <ng-template appCell="accession" [appCellOf]="facade.rows()" let-row>
+      <a class="mono link" [routerLink]="links.byAccession" [queryParams]="{ accession: row.accession }">{{ row.accession }}</a>
+      @if (row.urgent) {
+        <app-badge tone="bad">{{ i18n.t('results.urgent') }}</app-badge>
+      }
+    </ng-template>
+    <ng-template appCell="test" [appCellOf]="facade.rows()" let-row>
+      <span>{{ testLabelOf(row) }}</span>
+      <span class="small muted group">{{ name(row.groupNameEn, row.groupNameAr) }}</span>
+      @if (row.source === 'Analyser') {
+        <span class="tag">{{ row.source }}</span>
+      }
+    </ng-template>
+    <ng-template appCell="status" [appCellOf]="facade.rows()" let-row>
+      <app-badge [status]="row.status">{{ statusLabel(row.status) }}</app-badge>
+    </ng-template>
+    <ng-template appCell="sampleStatus" [appCellOf]="facade.rows()" let-row>
+      @if (row.sampleStatus) {
+        <app-badge [status]="row.sampleStatus">{{ sampleStatusLabel(row.sampleStatus) }}</app-badge>
+      } @else {
+        —
+      }
+    </ng-template>
+    <ng-template appCell="delay" [appCellOf]="facade.rows()" let-row>
+      @if (row.delaySeconds > 0 && row.delayState !== 'Done') {
+        <app-badge [tone]="delayBadgeTone(row)">{{ delay(row) }}</app-badge>
+      } @else {
+        —
+      }
+    </ng-template>
+    <ng-template appCell="consumed" [appCellOf]="facade.rows()" let-row>
+      <span class="consumed" [class]="'consumed ' + (rowClass(row) ?? '')">
+        <span class="bar"><span class="fill" [style.width.%]="row.consumedPercent > 100 ? 100 : row.consumedPercent"></span></span>
+        <span class="small muted">{{ row.consumedPercent }}%</span>
+      </span>
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
+      <a class="btn sm" [routerLink]="links.byAccession" [queryParams]="{ accession: row.accession }"><app-icon name="flask" [size]="14" />{{ i18n.t('results.worklist.openResults') }}</a>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="totalCount()" (pageChange)="onPage($event)" />
+</app-section-card>

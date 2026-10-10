@@ -165,6 +165,33 @@ internal sealed class ResultReferenceLookup(AppDbContext context) : IResultRefer
         return codes.Select(code => code.ToUpperInvariant()).ToHashSet(StringComparer.Ordinal);
     }
 
+    public async Task<IReadOnlyList<LookupOption>> ClinicalGroupsAsync(CancellationToken cancellationToken) =>
+        await context.Set<ClinicalGroup>().AsNoTracking().Where(group => group.IsActive).OrderBy(group => group.DisplayOrder).ThenBy(group => group.Code)
+            .Select(group => new LookupOption(group.Id, group.Code, group.Name.En, group.Name.Ar)).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<LookupOption>> TestsAsync(Guid? clinicalGroupId, string? search, int take, CancellationToken cancellationToken)
+    {
+        var query = context.Set<LabTest>().AsNoTracking().Where(test => test.IsActive);
+        if (clinicalGroupId is { } groupId)
+        {
+            query = query.Where(test => test.ClinicalGroupId == groupId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var upper = search.Trim().ToUpperInvariant();
+            var pattern = "%" + search.Trim().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
+            query = query.Where(test => test.Code.StartsWith(upper) || EF.Functions.ILike(test.Name.En, pattern) || EF.Functions.ILike(test.Name.Ar, pattern));
+        }
+
+        return await query.OrderBy(test => test.Code).Take(Math.Clamp(take, 1, 200))
+            .Select(test => new LookupOption(test.Id, test.Code, test.Name.En, test.Name.Ar)).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<LookupOption>> ActivePayersAsync(CancellationToken cancellationToken) =>
+        await context.Set<Payer>().AsNoTracking().Where(payer => payer.IsActive).OrderBy(payer => payer.Name.En)
+            .Select(payer => new LookupOption(payer.Id, null, payer.Name.En, payer.Name.Ar)).ToListAsync(cancellationToken).ConfigureAwait(false);
+
     public async Task<ReportLetterhead> LetterheadAsync(Guid branchId, CancellationToken cancellationToken)
     {
         var tenantId = context.CurrentTenantIdOrNil;

@@ -185,6 +185,18 @@ public sealed class ResultsController(ISender sender) : ControllerBase
     public async Task<ActionResult<MicrobiologyLookups>> Microbiology(CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetMicrobiologyLookupsQuery(), cancellationToken));
 
+    [HttpGet("lookups/clinical-groups")]
+    public async Task<ActionResult<IReadOnlyList<LookupOption>>> ClinicalGroups(CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new GetResultClinicalGroupsQuery(), cancellationToken));
+
+    [HttpGet("lookups/tests")]
+    public async Task<ActionResult<IReadOnlyList<LookupOption>>> Tests([FromQuery] Guid? clinicalGroupId, [FromQuery] string? search, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new GetResultTestsQuery(clinicalGroupId, search), cancellationToken));
+
+    [HttpGet("lookups/payers")]
+    public async Task<ActionResult<IReadOnlyList<LookupOption>>> Payers(CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new GetResultPayersQuery(), cancellationToken));
+
     [HttpGet("lookups/analysers")]
     public async Task<ActionResult<IReadOnlyList<AnalyserOption>>> Analysers(CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetResultAnalysersQuery(), cancellationToken));

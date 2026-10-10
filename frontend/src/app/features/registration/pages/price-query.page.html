@@ -1,0 +1,129 @@
+<app-page-header [title]="i18n.t('registration.quote.title')" [subtitle]="i18n.t('registration.quote.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="facade.clear()">{{ i18n.t('registration.clear') }}</button>
+  <button pageActions type="button" class="btn" [disabled]="!facade.document() || printing()" (click)="print()"><app-icon name="printer" [size]="15" />{{ i18n.t('registration.quote.print') }}</button>
+  <button pageActions type="button" class="btn primary" *appCan="permissions.create" [disabled]="facade.lines().length === 0" (click)="continueToRegistration()">
+    <app-icon name="chevron-right" [size]="15" />{{ i18n.t('registration.quote.continue') }}
+  </button>
+</app-page-header>
+
+<p class="info-strip">{{ i18n.t('registration.quote.note') }}</p>
+
+<app-section-card [title]="i18n.t('registration.quote.contractCard')">
+  <div class="form-grid three">
+    <label class="field">
+      <span class="label">{{ i18n.t('registration.field.contract') }}</span>
+      <select class="inp" (change)="facade.tierId.set(value($event))">
+        <option value="" [selected]="facade.tierId() === ''">{{ i18n.t('registration.quote.cashDefault') }}</option>
+        @for (tier of facade.tierOptions(); track tier.id) {
+          <option [value]="tier.id" [selected]="tier.id === facade.tierId()">{{ tierLabel(tier) }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span class="label">{{ i18n.t('registration.quote.gender') }}</span>
+      <select class="inp" (change)="onGender($event)">
+        <option value="" [selected]="facade.gender() === null">{{ i18n.t('registration.quote.anyGender') }}</option>
+        <option value="Male" [selected]="facade.gender() === 'Male'">{{ i18n.t('registration.gender.Male') }}</option>
+        <option value="Female" [selected]="facade.gender() === 'Female'">{{ i18n.t('registration.gender.Female') }}</option>
+      </select>
+    </label>
+    <div class="field full">
+      <span class="label">{{ i18n.t('registration.services.cardTitle') }}</span>
+      <app-reg-service-entry (added)="onAdded($event)" />
+    </div>
+  </div>
+</app-section-card>
+
+<app-section-card [title]="i18n.t('registration.quote.linesCard')" [padded]="false">
+  @if (facade.quote.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('registration.checkError') }}</p>
+  }
+  @for (issue of issues(); track $index) {
+    <p class="problem list-problem" role="alert">{{ issueText(issue) }}</p>
+  }
+
+  <div class="table-wrap">
+    <table class="lines">
+      <thead>
+        <tr>
+          <th>{{ i18n.t('registration.column.code') }}</th>
+          <th>{{ i18n.t('registration.column.service') }}</th>
+          <th class="num">{{ i18n.t('registration.column.listPrice') }}</th>
+          <th class="num">{{ i18n.t('registration.column.patientShare') }}</th>
+          <th class="num">{{ i18n.t('registration.column.payerShare') }}</th>
+          <th>{{ i18n.t('registration.column.expected') }}</th>
+          <th>{{ i18n.t('registration.column.preparation') }}</th>
+          <th><span class="visually-hidden">{{ i18n.t('registration.column.actions') }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (line of lines(); track line.serviceId) {
+          <tr>
+            <td class="mono">{{ line.code }}</td>
+            <td>
+              {{ name(line.nameEn, line.nameAr) }}
+              @if (line.alertCondition) {
+                <span class="hint warn">{{ line.alertCondition }}</span>
+              }
+            </td>
+            @if (line.priced) {
+              <td class="num">{{ amount(line.listPrice) }}</td>
+              <td class="num">{{ amount(line.patientShare) }}</td>
+              <td class="num">{{ amount(line.payerShare) }}</td>
+            } @else {
+              <td colspan="3" class="muted small">{{ i18n.t('registration.quote.unpriced') }}</td>
+            }
+            <td class="small">{{ when(line.expectedResultAtUtc) }}</td>
+            <td>
+              @if (line.precaution) {
+                <app-badge tone="warn">{{ line.precaution }}</app-badge>
+              } @else {
+                <span class="muted">—</span>
+              }
+            </td>
+            <td>
+              <button type="button" class="icon-btn" [attr.aria-label]="i18n.tf('registration.removeLine', { code: line.code })" (click)="facade.removeLine(line.serviceId)"><app-icon name="x" [size]="15" /></button>
+            </td>
+          </tr>
+        }
+        @for (line of pendingLines(); track line.serviceId) {
+          <tr class="pending">
+            <td class="mono">{{ line.code }}</td>
+            <td>{{ name(line.nameEn, line.nameAr) }}</td>
+            <td colspan="5" class="muted small">{{ facade.quote.isLoading() ? i18n.t('registration.services.pricing') : i18n.t('registration.services.notPlanned') }}</td>
+            <td>
+              <button type="button" class="icon-btn" [attr.aria-label]="i18n.tf('registration.removeLine', { code: line.code })" (click)="facade.removeLine(line.serviceId)"><app-icon name="x" [size]="15" /></button>
+            </td>
+          </tr>
+        }
+        @if (lines().length === 0 && pendingLines().length === 0) {
+          <tr>
+            <td colspan="8" class="muted small empty">{{ i18n.t('registration.quote.empty') }}</td>
+          </tr>
+        }
+      </tbody>
+      @if (facade.document(); as doc) {
+        <tfoot>
+          <tr>
+            <th colspan="2">{{ i18n.t('registration.summary.total') }} ({{ currency() }})</th>
+            <th class="num">{{ amount(doc.totalListPrice) }}</th>
+            <th class="num">{{ amount(doc.totalPatientShare) }}</th>
+            <th class="num">{{ amount(doc.totalPayerShare) }}</th>
+            <th colspan="3"></th>
+          </tr>
+        </tfoot>
+      }
+    </table>
+  </div>
+
+  @if ((facade.document()?.preparations ?? []).length > 0) {
+    <div class="preparations">
+      <h3 class="sub">{{ i18n.t('registration.preparations.title') }}</h3>
+      <ul>
+        @for (question of facade.document()?.preparations ?? []; track question.preparationId) {
+          <li>{{ name(question.questionEn, question.questionAr) }}</li>
+        }
+      </ul>
+    </div>
+  }
+</app-section-card>

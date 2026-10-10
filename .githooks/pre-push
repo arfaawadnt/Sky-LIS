@@ -1,0 +1,4 @@
+#!/bin/sh
+# Every push must be a versioned release recorded in README.md (README "Versioning and releases").
+# Enabled per clone with: git config core.hooksPath .githooks
+exec node "$(git rev-parse --show-toplevel)/scripts/check-release.mjs" "$@"

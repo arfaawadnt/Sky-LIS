@@ -123,9 +123,12 @@ describe('Account pages', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     const tiles = root.querySelectorAll('app-stat-card');
-    expect(tiles.length).toBe(8);   // seven KPIs + the wallet (wallet.view)
+    // Release 1 (prototype v2.1): registrations, collected today, pending results, unverified backlog, delayed tests + the
+    // wallet (wallet.view); the two sample tiles belong to Release 2 and stay hidden.
+    expect(tiles.length).toBe(6);
     expect(tiles[0]?.textContent).toContain('42');
-    expect(tiles[3]?.textContent).toContain('—');   // pending results: Results is not live
+    expect(tiles[2]?.textContent).toContain('—');   // pending results: Results is not live
+    expect(root.textContent).not.toContain('account.dashboard.kpi.samplesReceived');
     expect(root.querySelectorAll('app-bar-chart rect').length).toBe(7);
     expect(root.textContent).toContain('MAIN');
   });

@@ -14,7 +14,9 @@ deployment artifacts — is **fully isolated** from every other application on t
    - `C:\inetpub\wwwroot\qams-ui*`, `C:\install\secrets-vault.dpapi`
    - any file named like `*QAMS*`, `*QMS*`, `*ntqams*`
 3. **Own git repository.** `E:\LIS` is its own repo (branch `main`). No submodules,
-   subtrees or remotes pointing at other local projects.
+   subtrees or remotes pointing at other local projects. Its only remote is `origin` =
+   `https://github.com/arfaawadnt/Sky-LIS` (**public** repository, linked 2026-10-10).
+   Everything committed is published, so never commit secrets or client data.
 4. **Own database.** LIS never connects to another app's database (e.g. `ntqams`). It has
    its own database, its own roles and its own credentials. See section 2.
 5. **Own secrets.** Never reuse another project's credentials. LIS secrets live only in
@@ -233,10 +235,15 @@ QMS source is never read or copied (section 1); everything here is written from 
   `treasury.view`, dictionaries `public/i18n/treasury.{en,ar}.json`, device id minted by `core/device` (the only allowed
   localStorage use, documented inline).
 - Dev tooling: `tools/Platform.DevTools` (`seed-user <username> <password> [tenantId]`,
-  `grant-role <username> <tenantId> <roleNameEn> <perm,perm,…>`, `seed-treasury <tenantId> <code> <nameEn> <nameAr>` with
+  `grant-role <username> <tenantId> <roleNameEn> <perm,perm,…>`, `seed-treasury <tenantId> <code> <nameEn> <nameAr>`,
+  `seed-demo-lab <username> <password> [tenantId]` (a complete Release-1 laboratory: branch, catalogue with prices, treasury, a
+  role with every permission, users `<username>` and `<username>.manager`; the dev database `lis` holds one, credentials in
+  git-ignored `.local/dev-credentials.md`) with
   `LIS_DEVTOOLS_CONNECTION`, guarded like the API; the test suites truncate the dev database, so reseed after a test run);
   launch configurations `backend-api` (5100) and `frontend-dev` (4300) in `.claude/launch.json`. Stop `backend-api` before
-  `dotnet build`: the running API locks the Release binaries.
+  `dotnet build`: the running API locks the Release binaries. The launch runs with `--no-build`, so build
+  `src/Platform.WebApi` without a slot first or the API starts from stale binaries (found 2026-10-10: the outbox could not
+  resolve newer event types).
 - Foundation (wave 0, slot `found`; intake `docs/intake/LIS-INT-FND-001_Foundation.md`; migration `Foundation`):
   **platform tenant** — `seed-platform-admin <username> <password>` in DevTools (→ `PlatformAdministratorSeeder`: user +
   membership in `TenantIds.Platform` + role "Platform Administrator" with every catalogue key). **Branch of the session**
@@ -264,6 +271,21 @@ QMS source is never read or copied (section 1); everything here is written from 
   (`factory.Notifications`). Frontend: `core/api/{auth,audit,settings}.contracts.ts`, `AuthStore.currentBranch/branchIds/
   selectBranch/startPasswordRecovery/completePasswordRecovery`. `dotnet ef` under a slot needs
   `--msbuildprojectextensionspath .local/build/<slot>/obj/Platform.Infrastructure/`.
+- Registration (wave 2, slot `reg`; intake `docs/intake/LIS-INT-REG-001_Registration.md`; migration `Registration`): aggregates
+  `Visit` (lines, tubes, preparation answers, transfers), `Booking`, `Batch` in `app.visits` …; `VisitRegistered` is the wave-2
+  contract (MODULES.md §3) consumed by Samples, Results and Billing policies; `VisitsController` under `/api/v1/registration`
+  (`visits`, `visits/check` dry run, lines add/release/cancel, details, discount, documents labels/job-order, settings,
+  service-entry, preparations, quote). Frontend `features/registration`: `/registration/new` (CP-06, payment on the page via
+  `POST /api/v1/billing/payments`), `/registration/visits` (CP-10), `/registration/visits/:id` (edit), `…/job-order`,
+  `/registration/price-query` (CP-12); the page provisions the cash payer lazily (`POST /api/v1/pricing/payers/default`).
+  Bookings, batches, transfers and the cancellations register are Release 2 (backend only).
+- Results (wave 3, slot `res`; intake `docs/intake/LIS-INT-RES-001_Results.md`; migrations `Results`, `ResultLogSequence`):
+  `Result` aggregate (`app.results`, states Ordered → Complete → Reviewed → Verified → Printed, cancel/undo/amend, flags,
+  panic, delta, formula) with an append-only `app.result_log_entries` (per-result `sequence`), print lists, QC; policies on
+  `VisitRegistered`, `VisitLineCancelled`, `SampleCollected`, `PatientsMerged`, `VisitTransferred`, `AnalyserResultReceived`;
+  read ports `IResultStatusLookup`, `IResultKpiLookup`; `ResultsController` under `/api/v1/results`. Frontend
+  `features/results`: `/results/worklist` (CP-18) and `/results/by-accession?accession=` (CP-19); link with
+  `RESULTS_LINKS.accession(acc)`. Results by sample, work queue, QC and analyser landing are Release 2 (backend only).
 - Not yet built (later tasks): MFA/TOTP endpoints, step-up re-authentication, machine credentials, role administration
   screens and the privilege matrix UI, scheduled jobs and the retention purge, the remaining LIS business modules
   (registration, samples, results, billing …), the OpenAPI document and generated client.
@@ -274,3 +296,8 @@ QMS source is never read or copied (section 1); everything here is written from 
 - Keep this file current: every new port, service, database, folder or external
   dependency LIS claims gets added to section 2 in the same change that introduces it.
 - Commit only when asked. Never push to a remote that was not created for LIS.
+- **Every push is a versioned release recorded in `README.md`** (user rule, 2026-10-10). Before pushing: add one
+  bullet per change under `### Unreleased` in README "Release history" and update any README section the change
+  affects; then `node scripts/release.mjs <patch|minor|major>` (bumps `VERSION` + frontend package, commits
+  `Release vX.Y.Z`, annotated tag); then `git push` (`push.followTags`). Gates: `.githooks/pre-push` →
+  `scripts/check-release.mjs` (enable with `git config core.hooksPath .githooks`) and `VersioningTests`. Never `--no-verify`.

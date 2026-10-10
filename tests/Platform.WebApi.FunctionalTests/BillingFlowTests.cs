@@ -29,6 +29,13 @@ public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
     private const string Closings = "/api/v1/billing/cash-closings";
     private const string Device = "device-cash-desk-1";
 
+    private static readonly string[] CashierPermissions = ["billing.view", "billing.create", "treasury.view", "treasury.create", "treasury.manage"];
+    private static readonly string[] SupervisorPermissions = ["billing.view", "billing.approve", "billing.cancel", "billing.manage", "billing.export", "treasury.view", "treasury.create"];
+    private static readonly string[] ManagerPermissions = ["treasury.view", "treasury.approve"];
+
+    // The cashier may take money and print invoices (CP-37 special rights); refunds and voids belong to the supervisor.
+    private static readonly SpecialRights CashierRights = new(null, canPay: true, canRefund: false, canTransfer: false, canCancel: false, canModifyVerifiedResult: false, canPreviewWithoutVerify: false, canPrintInvoice: true, canSeeVip: false);
+
     [DatabaseFact]
     public async Task A_cashier_collects_partial_and_full_payments_and_every_refusal_has_its_code()
     {

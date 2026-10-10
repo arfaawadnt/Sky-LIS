@@ -100,6 +100,6 @@ public sealed class PublicReferenceController(ISender sender) : ControllerBase
 
     [HttpGet("governorates")]
     [EnableRateLimiting(RateLimiting.CredentialChallenge)]
-    public async Task<ActionResult<IReadOnlyList<PublicGovernorate>>> Governorates([FromQuery] Guid countryId, CancellationToken cancellationToken) =>
+    public async Task<ActionResult<IReadOnlyList<PublicGovernorate>>> Governorates([FromQuery] Guid? countryId, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new ListPublicGovernoratesQuery(countryId), cancellationToken));
 }

@@ -1,19 +1,10 @@
 import type { Portal } from '../core/portal/portal';
+import { type Release, RELEASE_SCOPE, inReleaseScope } from '../core/release';
 import type { IconName } from '../shared/ui/icon/icon.component';
 
-export type Release = 'R1' | 'R2';
-
-/**
- * The release being delivered (decided with the business on the R1 prototype builds: prototypes/dist/*-v2.1-Release1.html
- * and *-v3.1-Release1.html). Entries of a later release stay in the registry, ready, but are not shown. Raise to 'R2'
- * to open the Release 2 pages.
- */
-export const RELEASE_SCOPE: Release = 'R1';
-
-/** True when an entry belongs to the delivered scope (R1 shows R1 entries; R2 shows R1 and R2). */
-export function inReleaseScope(release: Release, scope: Release = RELEASE_SCOPE): boolean {
-  return scope === 'R2' || release === 'R1';
-}
+// The release switch lives in core/release.ts (features gate their own tiles with it); re-exported for the shell's callers.
+export { RELEASE_SCOPE, inReleaseScope };
+export type { Release };
 
 /**
  * A sidebar group: one per SRS module (`modules.client` / `modules.admin` of `srs.data.js`), in display order.
@@ -66,7 +57,12 @@ export const NAV_REGISTRY: readonly NavEntry[] = [
   { portal: 'client', group: 'shell.group.finance', path: '/treasury/treasuries', permission: 'treasury.view', i18nKey: 'shell.nav.treasuries', release: 'R1', icon: 'vault' },
   { portal: 'client', group: 'shell.group.finance', path: '/treasury/access', permission: 'treasury.view', i18nKey: 'shell.nav.treasuryAccess', release: 'R1', icon: 'shield' },
   { portal: 'admin', group: 'shell.group.overview', path: '/admin', permission: null, i18nKey: 'shell.nav.adminHome', release: 'R1', icon: 'home' },
+  { portal: 'client', group: 'shell.group.reception', path: '/registration/new', permission: 'registration.create', i18nKey: 'shell.nav.registration', release: 'R1', icon: 'clipboard' },
+  { portal: 'client', group: 'shell.group.reception', path: '/registration/visits', permission: 'registration.view', i18nKey: 'shell.nav.searchRegistrations', release: 'R1', icon: 'search' },
   { portal: 'client', group: 'shell.group.reception', path: '/patients', permission: 'patients.view', i18nKey: 'shell.nav.patients', release: 'R1', icon: 'user' },
+  { portal: 'client', group: 'shell.group.reception', path: '/registration/price-query', permission: 'registration.view', i18nKey: 'shell.nav.priceQuery', release: 'R1', icon: 'coins' },
+  { portal: 'client', group: 'shell.group.laboratory', path: '/results/worklist', permission: 'results.view', i18nKey: 'shell.nav.worklist', release: 'R1', icon: 'clipboard' },
+  { portal: 'client', group: 'shell.group.laboratory', path: '/results/by-accession', permission: 'results.view', i18nKey: 'shell.nav.resultsByAccession', release: 'R1', icon: 'flask' },
   { portal: 'client', group: 'shell.group.samples', path: '/samples/collection', permission: 'samples.view', i18nKey: 'shell.nav.sampleCollection', release: 'R2', icon: 'barcode' },
   { portal: 'client', group: 'shell.group.samples', path: '/samples/visits', permission: 'samples.view', i18nKey: 'shell.nav.samplesByVisit', release: 'R2', icon: 'layers' },
   { portal: 'client', group: 'shell.group.samples', path: '/samples/rejections', permission: 'samples.view', i18nKey: 'shell.nav.sampleRejections', release: 'R2', icon: 'alert' },

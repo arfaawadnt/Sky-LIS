@@ -1,0 +1,79 @@
+/* Search registrations (CP-10): module-specific layout only; the kit owns the components' look. */
+:host {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.filter .inp {
+  width: auto;
+  min-width: 130px;
+}
+
+.filter.check {
+  cursor: pointer;
+}
+
+.list-problem {
+  margin: var(--sp-3) var(--sp-4) 0;
+}
+
+.name {
+  display: block;
+  font-weight: 600;
+}
+
+.detail {
+  display: block;
+}
+
+.chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 320px;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-sm);
+  background: var(--blue-soft);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+}
+
+.chip.reserved {
+  background: var(--warn-soft);
+}
+
+.chip.cancelled {
+  background: var(--surface-2);
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.tag {
+  display: inline-block;
+  margin-inline-start: var(--sp-1);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.documents {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.documents .btn {
+  justify-content: flex-start;
+}

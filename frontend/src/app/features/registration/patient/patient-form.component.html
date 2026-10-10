@@ -1,0 +1,155 @@
+<form [formGroup]="form" (ngSubmit)="submit()" appSaveShortcut (appSaveShortcut)="submit()" novalidate>
+  @if (generalProblem(); as message) {
+    <p class="problem" role="alert">{{ message }}</p>
+  }
+
+  @if (similar().length > 0 && !isEdit()) {
+    <section class="similar warn-strip" role="status" aria-live="polite">
+      <header class="similar-head">
+        <app-icon name="alert" [size]="16" />
+        <strong>{{ i18n.t('registration.patient.similar.title') }}</strong>
+        <span class="small">{{ i18n.t('registration.patient.similar.hint') }}</span>
+      </header>
+      <ul class="similar-list">
+        @for (candidate of similar(); track candidate.id) {
+          <li class="similar-item">
+            <div class="who">
+              <span class="mono">{{ candidate.number }}</span>
+              <span class="name">{{ candidate.fullName }}@if (candidate.nameAr) { · <span dir="rtl" lang="ar">{{ candidate.nameAr }}</span>}</span>
+              <span class="small muted">
+                {{ i18n.t('registration.patient.gender.' + candidate.gender) }} · {{ ageText(candidate.age) }}@if (candidate.mobile) { · <span class="mono" dir="ltr">{{ candidate.mobile }}</span>}
+              </span>
+            </div>
+            <app-badge [tone]="candidate.match === 'Exact' ? 'bad' : candidate.match === 'Mobile' ? 'warn' : 'info'">{{ matchLabel(candidate) }}</app-badge>
+            <button type="button" class="btn sm" (click)="useExisting.emit(candidate)">{{ i18n.t('registration.patient.similar.use') }}</button>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  <div class="form-grid three">
+    <app-form-field [label]="i18n.t('registration.patient.field.title')">
+      <select formControlName="title" (change)="onTitleChange()">
+        @for (title of titles; track title) {
+          <option [value]="title">{{ i18n.t('registration.patient.honorific.' + title) }}</option>
+        }
+      </select>
+    </app-form-field>
+
+    <app-form-field class="span2" [label]="i18n.t('registration.patient.field.fullName')">
+      <input type="text" formControlName="fullName" maxlength="200" autocomplete="off" lang="en" dir="ltr" (input)="onIdentityInput()" />
+    </app-form-field>
+
+    <app-form-field [label]="i18n.t('registration.patient.field.gender')">
+      <select formControlName="gender">
+        @for (gender of genders; track gender) {
+          <option [value]="gender">{{ i18n.t('registration.patient.gender.' + gender) }}</option>
+        }
+      </select>
+    </app-form-field>
+
+    <app-form-field class="span2" [label]="i18n.t('registration.patient.field.nameAr')">
+      <input type="text" formControlName="nameAr" maxlength="200" autocomplete="off" lang="ar" dir="rtl" />
+    </app-form-field>
+  </div>
+
+  <fieldset class="birth">
+    <legend>{{ i18n.t('registration.patient.field.birthOrAge') }} <span class="req" aria-hidden="true">*</span></legend>
+    <div class="birth-grid">
+      <app-form-field [label]="i18n.t('registration.patient.field.dateOfBirth')" [hint]="birthSource() === 'age' ? i18n.t('registration.patient.hint.estimatedBirth') : null">
+        <input type="date" formControlName="dateOfBirth" [min]="'1900-01-01'" [max]="today" (input)="onBirthInput()" (change)="onBirthInput()" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('registration.patient.field.ageYears')">
+        <input type="number" formControlName="ageYears" min="0" max="150" step="1" inputmode="numeric" (input)="onAgeInput()" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('registration.patient.field.ageMonths')">
+        <input type="number" formControlName="ageMonths" min="0" max="11" step="1" inputmode="numeric" (input)="onAgeInput()" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('registration.patient.field.ageDays')">
+        <input type="number" formControlName="ageDays" min="0" max="31" step="1" inputmode="numeric" (input)="onAgeInput()" />
+      </app-form-field>
+    </div>
+    @if (form.hasError('birthOrAge') && (form.controls.dateOfBirth.touched || form.controls.ageYears.touched)) {
+      <p class="field-error" role="alert">{{ i18n.t('registration.patient.validation.birthOrAge') }}</p>
+    }
+  </fieldset>
+
+  <div class="form-grid three">
+    @if (mobileCountries().length > 0) {
+      <label class="ff-plain">
+        <span class="label">{{ i18n.t('registration.patient.field.mobileCountry') }}</span>
+        <select class="inp" [value]="''" (change)="onMobileCountryChange($event)">
+          <option value="">{{ i18n.t('registration.patient.field.mobileAnyCountry') }}</option>
+          @for (country of mobileCountries(); track country.code) {
+            <option [value]="country.code">{{ optionName(country) }} ({{ country.mobileLength }})</option>
+          }
+        </select>
+      </label>
+    }
+
+    <app-form-field [label]="i18n.t('registration.patient.field.mobile')" [hint]="mobileLength() !== null ? i18n.tf('registration.patient.hint.mobileLength', { length: mobileLength() ?? 0 }) : i18n.t('registration.patient.hint.mobile')">
+      <input type="tel" formControlName="mobile" maxlength="32" autocomplete="off" dir="ltr" inputmode="tel" (input)="onIdentityInput()" />
+    </app-form-field>
+
+    <app-form-field [label]="i18n.t('registration.patient.field.nationalId')">
+      <input type="text" formControlName="nationalId" maxlength="32" autocomplete="off" dir="ltr" />
+    </app-form-field>
+
+    <app-form-field [label]="i18n.t('registration.patient.field.nationality')">
+      @if (countries().length > 0) {
+        <select formControlName="nationality">
+          <option value="">—</option>
+          @for (country of countries(); track country.code) {
+            <option [value]="country.code">{{ optionName(country) }}</option>
+          }
+        </select>
+      } @else {
+        <input type="text" formControlName="nationality" maxlength="64" autocomplete="off" />
+      }
+    </app-form-field>
+
+    <app-form-field [label]="i18n.t('registration.patient.field.email')">
+      <input type="email" formControlName="email" maxlength="254" autocomplete="off" dir="ltr" />
+    </app-form-field>
+
+    @if (conditions().length > 0) {
+      <app-form-field [label]="i18n.t('registration.patient.field.condition')" [hint]="i18n.t('registration.patient.hint.condition')">
+        <select formControlName="patientConditionId">
+          <option value="">{{ i18n.t('registration.patient.noCondition') }}</option>
+          @for (condition of conditions(); track condition.id) {
+            <option [value]="condition.id">{{ optionName(condition) }}</option>
+          }
+        </select>
+      </app-form-field>
+    }
+
+    @if (governorates().length > 0) {
+      <app-form-field [label]="i18n.t('registration.patient.field.governorate')">
+        <select formControlName="governorateId">
+          <option value="">—</option>
+          @for (governorate of governorates(); track governorate.id) {
+            <option [value]="governorate.id">{{ optionName(governorate) }}</option>
+          }
+        </select>
+      </app-form-field>
+    }
+
+    <app-form-field [label]="i18n.t('registration.patient.field.city')">
+      <input type="text" formControlName="city" maxlength="100" autocomplete="off" />
+    </app-form-field>
+
+    <app-form-field class="full" [label]="i18n.t('registration.patient.field.address')">
+      <input type="text" formControlName="address" maxlength="500" autocomplete="off" />
+    </app-form-field>
+
+    <app-form-field class="full" [label]="i18n.t('registration.patient.field.comments')" [hint]="i18n.t('registration.patient.hint.comments')">
+      <textarea formControlName="comments" rows="2" maxlength="2000"></textarea>
+    </app-form-field>
+
+    <label class="check full vip" *appCan="permissionKeys.viewConfidential">
+      <input type="checkbox" formControlName="isVip" />
+      <span>{{ i18n.t('registration.patient.field.isVip') }}</span>
+    </label>
+  </div>
+</form>

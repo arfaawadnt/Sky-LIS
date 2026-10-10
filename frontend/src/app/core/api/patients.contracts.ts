@@ -210,7 +210,7 @@ export interface PatientSummary {
   readonly isVip: boolean | null;
 }
 
-/** A country of the platform list (`/api/v1/platform/countries`, agent `plat`); `mobileLength` is the local mobile length when published. */
+/** A country of the platform list (anonymous `/api/v1/public/countries`); `mobileLength` is the local mobile length when published. */
 export interface CountryOption {
   readonly id: string;
   readonly code: string;
@@ -219,7 +219,7 @@ export interface CountryOption {
   readonly mobileLength: number | null;
 }
 
-/** A governorate of the platform list (`/api/v1/platform/governorates`, agent `plat`). */
+/** A governorate of the platform list (anonymous `/api/v1/public/governorates`, every country when unfiltered). */
 export interface GovernorateOption {
   readonly id: string;
   readonly nameEn: string;
@@ -246,8 +246,8 @@ export interface PatientVisitItem {
 export const PATIENTS_API = {
   patients: '/api/v1/patients',
   documents: '/api/v1/patients/documents',
-  countries: '/api/v1/platform/countries',
-  governorates: '/api/v1/platform/governorates',
+  countries: '/api/v1/public/countries',
+  governorates: '/api/v1/public/governorates',
   conditions: '/api/v1/catalogue/patient-conditions',
   visits: '/api/v1/registration/visits',
 } as const;
