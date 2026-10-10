@@ -60,6 +60,11 @@ Chosen to avoid everything already in use on this machine (checked 2026-10-08).
 | Prod data / backups          | `E:\lis-data`, `E:\lis-backups`                          | `E:\ntqams-data`, `E:\ntqams-backups`        |
 | Uploaded files (`Lis:Files:Root`) | dev `E:LIS.localiles` (git-ignored), production `E:lis-datailes` | none |
 | Publish output               | `E:\LIS\publish` (git-ignored)                           | `E:\qms publish`                             |
+| API install root (service binaries + protected config) | `C:\lis-app\NTLIS`, `C:\lis-app\NTLIS_TEST` (`deploy/windows/install-api-service.ps1`) | none |
+| Service accounts             | virtual accounts `NT SERVICE\NTLIS`, `NT SERVICE\NTLIS_TEST` | none                                   |
+| Test / drill databases       | `lis_test` (NTLIS_TEST), `lis_drill` (restore drills)    | none                                         |
+| Backup credentials file      | `E:\lis-data\postgres.env` (read by `backup-database.ps1` / `restore-database.ps1`) | none              |
+| Release staging on a server  | `E:\lis-data\releases\<version>`                         | none                                         |
 
 If a reserved value turns out to be taken when it is first used, pick another LIS-prefixed
 value and update this table in the same change.

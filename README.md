@@ -20,6 +20,7 @@ rules are documented in [`docs/knowledge/ldm`](docs/knowledge/ldm), but Sky LIS 
 - [Repository layout](#repository-layout)
 - [Getting started](#getting-started)
 - [Documentation](#documentation)
+- [Deployment](#deployment)
 - [Versioning and releases](#versioning-and-releases)
 - [Release history](#release-history)
 
@@ -61,7 +62,7 @@ Modules in the code (backend `src/Platform.*/<Module>`, frontend `frontend/src/a
 | `tests/` | `Platform.ArchitectureTests`, `Platform.Domain.UnitTests`, `Platform.Application.UnitTests`, `Platform.IntegrationTests`, `Platform.WebApi.FunctionalTests` |
 | `tools/Platform.DevTools` | Development seeding: `seed-user`, `grant-role`, `seed-treasury`, `seed-platform-admin`, `seed-demo-lab`, `seed-reasons` |
 | `frontend/` | Angular workspace `platform-web` (both portals in one single-page app) |
-| `deploy/` | PostgreSQL roles, schemas and idempotent migration script, Docker Compose variant, secrets guide (`SECRETS.md`) |
+| `deploy/` | PostgreSQL roles, schemas and idempotent migration script, Docker Compose variant, secrets guide (`SECRETS.md`); `windows/`: publish, service, IIS site, backup/restore and smoke-test scripts, `web.config` and production configuration templates |
 | `scripts/` | Development scripts (secrets, build slots, release) |
 | `docs/` | Requirements, business SRS, build plan, module map, intake specifications, domain knowledge base |
 | `prototypes/` | Interactive UI prototypes (sources in `src/`, generated pages in `dist/`) |
@@ -169,6 +170,28 @@ dotnet run --project tools/Platform.DevTools -- seed-demo-lab <username> <passwo
 The HTML documents are generated from `src/*.data.js` files with `node <folder>/src/build.js`; edit the data, not the
 HTML.
 
+## Deployment
+
+Release 1 runs on Windows Server: the API as the Windows service `NTLIS` (Kestrel on `127.0.0.1:5100`, virtual
+service account, install root `C:\lis-app`), the SPA on the IIS site `lis-ui`, which reverse-proxies `/api`, `/health`
+and `/.well-known` to the service on the same origin (URL Rewrite + ARR), and PostgreSQL 17 (`lis`, `lis_owner`,
+`lis_app`). The package and the scripts live in [`deploy/windows`](deploy/windows):
+
+| Script | Purpose |
+| --- | --- |
+| `publish.ps1` | builds `publish/<version>/{api,tools,ui}` + `manifest.json` from `VERSION` (build box) |
+| `install-api-service.ps1` | installs or updates `NTLIS` (`-Test`: `NTLIS_TEST` on 5180), validates `appsettings.Production.json`, health probe, `-Rollback` |
+| `install-ui-site.ps1` | installs or updates `lis-ui` (`-Test`: `lis-ui-test` on 8081) with `web.config` (SPA fallback, proxy, headers, caching), `-Rollback` |
+| `backup-database.ps1`, `restore-database.ps1` | `pg_dump -Fc` into `E:\lis-backups` with retention; restore into a named `lis*` database for drills |
+| `smoke-test.ps1` | health, JWKS, SPA and proxy checks after a deployment |
+
+Every script is Windows PowerShell 5.1, idempotent and supports `-WhatIf`. The configuration template
+`appsettings.Production.template.json` lists every `Lis:*` key with a placeholder; the architecture test
+`DeploymentPackageTests` keeps it aligned with the keys the host reads and keeps the package inside the LIS reserved
+names. The step-by-step procedure (first installation, upgrade, rollback, configuration reference, logs,
+backup/restore drill, checklists) is the runbook
+[`docs/deploy/Release-1_Deployment_Runbook.md`](docs/deploy/Release-1_Deployment_Runbook.md).
+
 ## Versioning and releases
 
 Sky LIS follows [semantic versioning](https://semver.org) (`MAJOR.MINOR.PATCH`). The [`VERSION`](VERSION) file at the
@@ -211,7 +234,27 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Deployment package** (`deploy/windows`): `publish.ps1` builds `publish/<version>/{api,tools,ui}` with a manifest;
+  `install-api-service.ps1` installs the Windows service `NTLIS` / `NTLIS_TEST` from a package into `C:\lis-app`
+  (virtual service account, protected `appsettings.Production.json`, health probe, rollback); `install-ui-site.ps1`
+  installs the IIS site `lis-ui` / `lis-ui-test` with the `web.config` template (Angular fallback, same-origin reverse
+  proxy of `/api`, `/health`, `/.well-known` through URL Rewrite + ARR, security headers, `index.html` no-store, hashed
+  bundles immutable); `backup-database.ps1` / `restore-database.ps1` (pg_dump custom format, retention, drill restore);
+  `smoke-test.ps1`. All Windows PowerShell 5.1, idempotent, `-WhatIf`.
+- **Production configuration template** `deploy/windows/appsettings.Production.template.json`: every `Lis:*` key the host
+  reads, secrets as `<SET: …>` placeholders, Kestrel pinned to loopback.
+- **Runbook** `docs/deploy/Release-1_Deployment_Runbook.md` (LIS-DEP-001): prerequisites, first installation
+  (roles → schema → migrations → secrets → service → site → smoke test → `seed-platform-admin`), upgrade and rollback,
+  test lane, configuration reference, logs, backup/restore drill, checklists, open questions.
+- **Gate** `DeploymentPackageTests` (architecture suite): the package names no other application, port or generic
+  configuration root, stays inside the reserved LIS paths, embeds no secret, and the production template carries every
+  configuration key derived from the host source.
+- **Service-aware host**: the WebApi calls `builder.Host.UseWindowsService()` (package
+  `Microsoft.Extensions.Hosting.WindowsServices`), so it runs under the Service Control Manager as `NTLIS` and logs to
+  the Application event log; `install-api-service.ps1` refuses a package built without it.
+- **Reserved names** (`CLAUDE.md` §2): install root `C:\lis-app`, service accounts `NT SERVICE\NTLIS[_TEST]`, databases
+  `lis_test` / `lis_drill`, `E:\lis-data\postgres.env`, `E:\lis-data\releases\<version>`.
+- **Repository layout**: `deploy/` now also holds `windows/` (scripts and templates); `docs/deploy` is new.
 
 ### v0.2.2 — 2026-10-10
 

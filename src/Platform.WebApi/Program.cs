@@ -13,6 +13,10 @@ using Platform.WebApi.Startup;
 // from the Lis root: this host carries other applications' generic variables (CLAUDE.md §1).
 var builder = WebApplication.CreateBuilder(args);
 
+// Runs as the Windows service NTLIS / NTLIS_TEST in production (deploy/windows/install-api-service.ps1): the SCM lifetime
+// and the Application event log. A no-op when started from a console or a test host.
+builder.Host.UseWindowsService();
+
 builder.Services.AddSingleton(provider => SecurityConfiguration.ReadHost(provider.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton(provider => SecurityConfiguration.ReadOptions(provider.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton(provider => SecurityConfiguration.ReadSessionPolicy(provider.GetRequiredService<IConfiguration>()));

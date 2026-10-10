@@ -30,6 +30,7 @@
 
   <ItemGroup Label="WebApi">
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.20" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.9" />
   </ItemGroup>
 
   <ItemGroup Label="Build-time analyzers">
