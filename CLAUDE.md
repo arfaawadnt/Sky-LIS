@@ -55,7 +55,7 @@ Chosen to avoid everything already in use on this machine (checked 2026-10-08).
 | Database and roles           | db `lis`, owner role `lis_owner`, app role `lis_app`     | db `ntqams`, role `postgres`                 |
 | Docker Compose project       | `name: lis` → containers `lis-*`, volumes `lis_*`, network `lis_default` | none yet (daemon was off)    |
 | Windows services (prod/test) | `NTLIS` (port `5100`) / `NTLIS_TEST` (port `5180`); `LIS_POSTGRES` = the private PostgreSQL 17 instance of this host as a service (5433, NetworkService) | `NTQAMS`, `NTQAMS_TEST`, `postgresql-x64-17` (5432) |
-| IIS sites                    | `lis-ui` (own host header) / `lis-ui-test` (port `8081`) | `qams-ui` (80/443), `qams-ui-test` (8080)    |
+| IIS sites                    | `lis-ui` (own host header on 443, plus `https://*:5443` for access by IP) / `lis-ui-test` (port `8081`) | `qams-ui` (80/443), `qams-ui-test` (8080), `8443` (QAMS ORDS firewall rule) |
 | IIS physical paths           | `C:\inetpub\wwwroot\lis-ui*`                             | `C:\inetpub\wwwroot\qams-ui*`                |
 | Prod data / backups          | `E:\lis-data`, `E:\lis-backups`                          | `E:\ntqams-data`, `E:\ntqams-backups`        |
 | Uploaded files (`Lis:Files:Root`) | dev `E:LIS.localiles` (git-ignored), production `E:lis-datailes` | none |

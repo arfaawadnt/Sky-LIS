@@ -234,7 +234,8 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Installation on WIN-9S2KO4FA64L**: the site also answers on `https://192.168.80.38:5443` (binding without host name for
+  the LAN, firewall rule, origin added to the service configuration).
 
 ### v0.3.7 — 2026-10-10
 
