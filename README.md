@@ -234,7 +234,8 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Installation on WIN-9S2KO4FA64L upgraded to 0.3.5** (service `NTLIS` and site `lis-ui`; configuration kept; smoke
+  test 20 / 20); the development API no longer serves the site.
 
 ### v0.3.5 — 2026-10-10
 

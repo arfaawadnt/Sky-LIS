@@ -8,7 +8,7 @@ certificate, what differs from the standard layout.
 
 | Item | Value |
 | --- | --- |
-| Installed | 2026-10-10, package 0.3.2 (commit `1af25d9`), built with `publish.ps1 -SkipNpmCi` |
+| Installed | 2026-10-10, package 0.3.2 (commit `1af25d9`); upgraded the same day to **0.3.5** (service and site, configuration kept, smoke test 20 / 20); both built with `publish.ps1 -SkipNpmCi` |
 | API service | `NTLIS`, `C:\lis-app\NTLIS`, account `NT SERVICE\NTLIS`, `http://127.0.0.1:5100`, delayed-auto start, failure restarts |
 | Configuration | `C:\lis-app\NTLIS\config\appsettings.Production.json` (ACL: SYSTEM, Administrators, service read). Same signing, subject-encryption and master keys as the dev host of this machine (user-secrets), so the dev API and the service share one identity and one database |
 | Database | `lis` on the **private PostgreSQL 17 instance** `127.0.0.1:5433` (`E:\LIS\.local\pg17`), now the Windows service `LIS_POSTGRES` (automatic start, account `NT AUTHORITY\NetworkService`, options `-p 5433 -c listen_addresses=127.0.0.1`). Not the standard layout (the runbook assumes the PostgreSQL service on 5432): this host keeps the other application's cluster on 5432 untouched |
