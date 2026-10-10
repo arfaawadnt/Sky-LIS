@@ -166,6 +166,10 @@ plan's P6 for Release 1: the remaining workflow walk-throughs, the defects they 
   flows need catalogue reasons that a hand-seeded laboratory lacked.
 - Deployment package (scripts under `deploy/windows`, runbook under `docs/deploy`, gate `DeploymentPackageTests`) built by
   the packaging agent; see its row below when merged.
+- Backup and restore drill done on the private dev instance with the package scripts (dump verified, restored into
+  `lis_drill`); found and fixed: `restore-database.ps1` prompted for confirmation on every real run (ConfirmImpact High),
+  which a non-interactive host cannot answer. UAT scripts per persona written: `docs/uat/Release-1_UAT_Scripts.md` (78 scripts, 45 critical, every R1 page covered;
+  three scripts need the test lane's notification gateway).
 - Still open for go-live (plan P6): load test, penetration test, backup and recovery drill on a real host, data migration
   from LDM (needs source data), UAT scripts per persona, pilot.
 

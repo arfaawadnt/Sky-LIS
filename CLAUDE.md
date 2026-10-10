@@ -142,6 +142,12 @@ conceptual data model, documents, release-1 scope matrix and glossary. Generated
 `node docs/srs/src/build.js`; PDF via the same `pdf.ps1`. Page IDs, WF and BR codes are stable; bump `meta.version`
 and add a history row on every change. Preview with the `srs-preview` launch configuration (port 5153).
 
+### UAT scripts
+
+`docs/uat/Release-1_UAT_Scripts.md` (LIS-UAT-001) holds the Release-1 acceptance scripts per persona (ids `UAT-<area>-nn`,
+SRS page / WF / BR / intake scenario references, negative tests, Arabic check, pass/fail box) and `docs/uat/README.md` how a
+session is run and recorded. Keep script ids stable; add a revision-history row on every change.
+
 ## 5. Backend solution (`Platform.sln`)
 
 The backend is built task by task from the **architecture pack in `prompt/`** (README + documents 00–04: ratified

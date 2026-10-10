@@ -37,7 +37,7 @@
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File deploy\windows\restore-database.ps1 -DumpFile E:\lis-backups\lis-20261010-020000.dump -TargetDatabase lis_drill -Replace
 #>
-[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
 param(
     [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]

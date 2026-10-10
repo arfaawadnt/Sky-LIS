@@ -234,7 +234,11 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **UAT scripts** `docs/uat/Release-1_UAT_Scripts.md` (LIS-UAT-001): 78 acceptance scripts for ten personas with negative
+  tests, Arabic checks, results sheet, acceptance criteria and coverage matrices; `docs/uat/README.md` explains a session.
+- **Backup and restore drill**: `restore-database.ps1` runs unattended (confirm impact lowered; the production target stays
+  behind `-AllowProductionTarget`); drill performed on the private dev instance: dump of `lis` verified and restored into
+  `lis_drill` (96 tables, 9 migrations).
 
 ### v0.3.0 — 2026-10-10
 
