@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.3.7** · released 2026-10-10 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.3.8** · released 2026-10-10 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.3.8 — 2026-10-10
 
 - **Installation on WIN-9S2KO4FA64L**: the site also answers on `https://192.168.80.38:5443` (binding without host name for
   the LAN, firewall rule, origin added to the service configuration).
