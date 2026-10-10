@@ -27,13 +27,14 @@ using Platform.SharedKernel.MultiTenancy;
 //   seed-treasury <tenantId> <code> <nameEn> <nameAr>                   a treasury in a generated branch
 //   seed-demo-lab <username> <password> [tenantId]                      a complete Release-1 laboratory for browser walk-throughs: branch, catalogue with prices,
 //                                                                       treasury, a role with every permission, users <username> and <username>.manager
+//   seed-reasons <tenantId>                                             cancellation, refund, discount and rejection reasons (idempotent by name)
 //   seed-platform-admin <username> <password>                           a National Technology administrator of the platform tenant
 //                                                                       (user + membership in TenantIds.Platform + role "Platform Administrator" with every permission)
 // Connection string from LIS_DEVTOOLS_CONNECTION (an lis_* role on an lis* database; anything else is refused).
 
 if (args.Length == 0)
 {
-    Console.Error.WriteLine("usage: seed-user | grant-role | seed-treasury | seed-demo-lab | seed-platform-admin (see the header of Program.cs)");
+    Console.Error.WriteLine("usage: seed-user | grant-role | seed-treasury | seed-demo-lab | seed-reasons | seed-platform-admin (see the header of Program.cs)");
     return 2;
 }
 
@@ -224,6 +225,7 @@ switch (args[0])
         var treasury = Platform.Domain.Treasury.Treasury.Create("MAIN-CASH", new LocalizedText("Main cashier", "الخزينة الرئيسية"), branch.Id, now);
         services.GetRequiredService<ITreasuryRepository>().Add(treasury);
         await unitOfWork.SaveChangesAsync(CancellationToken.None);
+        var reasonsSeeded = await SeedReasonsAsync(services, unitOfWork, now);
 
         var role = Role.Create(new LocalizedText("Laboratory Administrator", "مدير المختبر"), PermissionCatalog.Keys, now, "Every permission of the laboratory (demo seed).", SpecialRights.All);
         role.SetResultRights([new ResultRight(chemistry.Id, null, true, true, true, true, true), new ResultRight(haematology.Id, null, true, true, true, true, true)], now);
@@ -249,7 +251,17 @@ switch (args[0])
         Console.WriteLine($"seeded demo laboratory in tenant {tenantId} on {DatabaseRoleGuard.Describe(connectionString)}");
         Console.WriteLine($"  branch {branch.Code} ({branch.Id}); treasury {treasury.Code} ({treasury.Id}); price list {priceList.Code}");
         Console.WriteLine($"  users {args[1]} and {managerUsername} (same password), role '{role.Name.En}' with every permission, all special and result rights");
-        Console.WriteLine($"  services {string.Join(", ", tests.Select(test => test.Code))}; request treasury access as {args[1]} and approve it as {managerUsername}");
+        Console.WriteLine($"  services {string.Join(", ", tests.Select(test => test.Code))}; {reasonsSeeded} reasons; request treasury access as {args[1]} and approve it as {managerUsername}");
+        return 0;
+    }
+
+    case "seed-reasons" when args.Length >= 2 && Guid.TryParse(args[1], out var reasonsTenant):
+    {
+        // Cancellation, refund, discount and rejection reasons a laboratory needs before the money and sample flows run
+        // (a provisioned laboratory receives them from the platform catalogue; a hand-seeded one has none). Idempotent by name.
+        tenantAccessor.SetTenant(reasonsTenant);
+        var count = await SeedReasonsAsync(services, unitOfWork, clock.UtcNow);
+        Console.WriteLine($"seeded {count} reasons in tenant {reasonsTenant} on {DatabaseRoleGuard.Describe(connectionString)}");
         return 0;
     }
 
@@ -261,6 +273,40 @@ switch (args[0])
     }
 
     default:
-        Console.Error.WriteLine("usage: seed-user | grant-role | seed-treasury | seed-demo-lab | seed-platform-admin (see the header of Program.cs)");
+        Console.Error.WriteLine("usage: seed-user | grant-role | seed-treasury | seed-demo-lab | seed-reasons | seed-platform-admin (see the header of Program.cs)");
         return 2;
+}
+
+static async Task<int> SeedReasonsAsync(IServiceProvider services, IUnitOfWork unitOfWork, DateTimeOffset now)
+{
+    var reasons = services.GetRequiredService<IReasonRepository>();
+    var wanted = new (ReasonKind Kind, string En, string Ar)[]
+    {
+        (ReasonKind.Cancellation, "Patient declined", "رفض المريض"),
+        (ReasonKind.Cancellation, "Ordered by mistake", "طُلب بالخطأ"),
+        (ReasonKind.Refund, "Service cancelled", "إلغاء خدمة"),
+        (ReasonKind.Refund, "Overpayment", "دفع زائد"),
+        (ReasonKind.Discount, "Staff and relatives", "العاملون وذووهم"),
+        (ReasonKind.Discount, "Management approval", "موافقة الإدارة"),
+        (ReasonKind.Rejection, "Haemolysed sample", "عينة متحللة"),
+        (ReasonKind.Rejection, "Insufficient volume", "كمية غير كافية"),
+    };
+    var added = 0;
+    foreach (var (kind, en, ar) in wanted)
+    {
+        if (await reasons.NameExistsAsync(kind, en, null, CancellationToken.None))
+        {
+            continue;
+        }
+
+        reasons.Add(Reason.Create(kind, new LocalizedText(en, ar), now));
+        added++;
+    }
+
+    if (added > 0)
+    {
+        await unitOfWork.SaveChangesAsync(CancellationToken.None);
+    }
+
+    return added;
 }

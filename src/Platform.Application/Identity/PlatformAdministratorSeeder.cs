@@ -46,6 +46,14 @@ public sealed class PlatformAdministratorSeeder(
                 user = PlatformUser.Register(username, $"{PlatformUser.NormaliseUsername(username)}@platform.lis.local", RoleName, hasher.Hash(password), now, mobile);
                 users.Add(user);
             }
+            else
+            {
+                // Re-running the bootstrap sets the given password again (a recovery path for the first administrator) and
+                // reopens a locked or deactivated account; no forced change, the operator chose the password.
+                user.ResetPasswordByAdministrator(hasher.Hash(password), mustChange: false, now);
+                user.Unlock(now);
+                user.Reactivate();
+            }
 
             var role = await roles.FindByNameAsync(RoleName, cancellationToken);
             if (role is null)

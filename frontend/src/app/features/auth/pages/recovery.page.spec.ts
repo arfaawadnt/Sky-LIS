@@ -6,6 +6,7 @@ import { Router, provideRouter } from '@angular/router';
 
 import { AUTH_API, type AuthResponse } from '../../../core/api/auth.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { PLATFORM_TENANT_ID } from '../../../core/tenancy/tenant-ids';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { LoginPage, SELECT_BRANCH_PATH } from './login.page';
@@ -130,5 +131,30 @@ describe('Sign-in and password recovery (CP-03, CP-04 entry)', () => {
 
     expect(TestBed.inject(AuthStore).isAuthenticated()).toBe(true);
     expect(router.navigate).toHaveBeenCalledWith([SELECT_BRANCH_PATH], { queryParams: { returnUrl: '/' } });
+  });
+
+  it('ignores a return URL of the other portal: a platform administrator lands on the admin home, not the client page', async () => {
+    const fixture = TestBed.createComponent(LoginPage);
+    fixture.componentRef.setInput('returnUrl', '/account/dashboard');
+    const root = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    await settle();
+    type(root, '#username', 'platform.admin');
+    type(root, '#password', 'secret-password');
+    (root.querySelector('button[type=submit]') as HTMLButtonElement).click();
+    await settle();
+
+    backend.expectOne(AUTH_API.signIn).flush({
+      step: 'signed-in',
+      accessToken: 't',
+      expiresAtUtc: null,
+      refreshToken: null,
+      profile: { userId: 'a1', displayName: 'Platform Admin', tenantId: PLATFORM_TENANT_ID, roleName: null, permissions: [], language: 'en', scope: 'full', branchId: null, branchIds: [] },
+      tenants: null,
+    } satisfies AuthResponse);
+    await settle();
+    await settle();
+
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin');
   });
 });

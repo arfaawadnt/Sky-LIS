@@ -238,9 +238,9 @@ QMS source is never read or copied (section 1); everything here is written from 
   localStorage use, documented inline).
 - Dev tooling: `tools/Platform.DevTools` (`seed-user <username> <password> [tenantId]`,
   `grant-role <username> <tenantId> <roleNameEn> <perm,perm,…>`, `seed-treasury <tenantId> <code> <nameEn> <nameAr>`,
-  `seed-demo-lab <username> <password> [tenantId]` (a complete Release-1 laboratory: branch, catalogue with prices, treasury, a
+  `seed-demo-lab <username> <password> [tenantId]` (a complete Release-1 laboratory: branch, catalogue with prices, reasons, treasury, a
   role with every permission, users `<username>` and `<username>.manager`; the dev database `lis` holds one, credentials in
-  git-ignored `.local/dev-credentials.md`) with
+  git-ignored `.local/dev-credentials.md`), `seed-reasons <tenantId>` (cancellation/refund/discount/rejection reasons) with
   `LIS_DEVTOOLS_CONNECTION`, guarded like the API; the test suites truncate the dev database, so reseed after a test run);
   launch configurations `backend-api` (5100) and `frontend-dev` (4300) in `.claude/launch.json`. Stop `backend-api` before
   `dotnet build`: the running API locks the Release binaries. The launch runs with `--no-build`, so build
@@ -288,9 +288,9 @@ QMS source is never read or copied (section 1); everything here is written from 
   read ports `IResultStatusLookup`, `IResultKpiLookup`; `ResultsController` under `/api/v1/results`. Frontend
   `features/results`: `/results/worklist` (CP-18) and `/results/by-accession?accession=` (CP-19); link with
   `RESULTS_LINKS.accession(acc)`. Results by sample, work queue, QC and analyser landing are Release 2 (backend only).
-- Not yet built (later tasks): MFA/TOTP endpoints, step-up re-authentication, machine credentials, role administration
-  screens and the privilege matrix UI, scheduled jobs and the retention purge, the remaining LIS business modules
-  (registration, samples, results, billing …), the OpenAPI document and generated client.
+- Not yet built: MFA/TOTP endpoints, step-up re-authentication, scheduled jobs and the retention purge, the OpenAPI
+  document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
+  claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).
 
 ## 6. Working conventions
 

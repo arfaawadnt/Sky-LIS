@@ -103,7 +103,12 @@ export class LoginPage {
     }
 
     const requested = this.returnUrl();
-    const target = requested && requested.startsWith('/') && !requested.startsWith('//') ? requested : this.portal.homePath();
+    const home = this.portal.homePath();
+    const local = requested && requested.startsWith('/') && !requested.startsWith('//') ? requested : home;
+    // A return URL left by the other portal (a laboratory user signed out, a platform administrator signs in) would land the
+    // session on pages it cannot use; each portal returns only to its own routes.
+    const belongsToAdmin = local === '/admin' || local.startsWith('/admin/') || local.startsWith('/admin?');
+    const target = this.portal.isPlatform() === belongsToAdmin ? local : home;
     if (this.portal.portal() === 'client' && this.auth.currentBranch() === null) {
       await this.router.navigate([SELECT_BRANCH_PATH], { queryParams: { returnUrl: target } });
       return;

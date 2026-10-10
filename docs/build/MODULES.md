@@ -147,6 +147,28 @@ Integrator to-do list closed 2026-10-10: `Merged` tone, treasury 204 handling, c
   they now read the anonymous `/api/v1/public/*` lists and `ListPublicGovernoratesQuery` accepts no country (every
   active governorate).
 
+### Wave 4 — Release-1 integration and go-live readiness (2026-10-10)
+
+Every Release-1 module is built; Release 2 (int, aut, QC, claims, financial reports) stays parked. Wave 4 is the build
+plan's P6 for Release 1: the remaining workflow walk-throughs, the defects they surface, and the deployment package.
+
+- WF-09 walked through in the dev database (lab.admin): treasury access (TRQ-2026-00001), full payment at registration
+  (RCT-2026-00001), partial payment at registration (100 of 150, RCT-2026-00002) then the remainder on the Payments
+  page (RCT-2026-00003), cancellation of the service with a free-text reason (balance −150, status "Refund due"), refund
+  of the balance with a catalogue reason from the Payments page's "Refund the balance" action (refund receipt). Cash
+  closing (CP-30) is Release 2.
+- WF-12 walked through (platform.admin): SA-03 dashboard (served patients, tests, registrations per client), SA-04 Add
+  client → "Walk-through Laboratory" provisioned with its branch and administrator (wt.admin), SA-05, SA-19, SA-20 render.
+- Fixed: a sign-in honoured a return URL of the other portal (a platform administrator signed in after a laboratory user
+  signed out and landed on the client dashboard, 403); each portal now returns only to its own routes. The platform
+  administrator seeder resets the password of an existing user (it only re-asserted the role before). DevTools
+  `seed-reasons` (cancellation, refund, discount, rejection reasons; also part of `seed-demo-lab`) because the money
+  flows need catalogue reasons that a hand-seeded laboratory lacked.
+- Deployment package (scripts under `deploy/windows`, runbook under `docs/deploy`, gate `DeploymentPackageTests`) built by
+  the packaging agent; see its row below when merged.
+- Still open for go-live (plan P6): load test, penetration test, backup and recovery drill on a real host, data migration
+  from LDM (needs source data), UAT scripts per persona, pilot.
+
 ## 7. Auto-verification contract (Results ↔ Automation)
 
 Results declares, in `Platform.Application.Results`, the port the Automation module implements (Results ships a

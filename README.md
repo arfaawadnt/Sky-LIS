@@ -59,7 +59,7 @@ Modules in the code (backend `src/Platform.*/<Module>`, frontend `frontend/src/a
 | `src/Platform.Infrastructure` | EF Core persistence, migrations, row-level security, security services, outbox, audit |
 | `src/Platform.WebApi` | ASP.NET Core host: middleware pipeline, controllers (`/api/v1/...`), health and JWKS endpoints |
 | `tests/` | `Platform.ArchitectureTests`, `Platform.Domain.UnitTests`, `Platform.Application.UnitTests`, `Platform.IntegrationTests`, `Platform.WebApi.FunctionalTests` |
-| `tools/Platform.DevTools` | Development seeding: `seed-user`, `grant-role`, `seed-treasury`, `seed-platform-admin`, `seed-demo-lab` |
+| `tools/Platform.DevTools` | Development seeding: `seed-user`, `grant-role`, `seed-treasury`, `seed-platform-admin`, `seed-demo-lab`, `seed-reasons` |
 | `frontend/` | Angular workspace `platform-web` (both portals in one single-page app) |
 | `deploy/` | PostgreSQL roles, schemas and idempotent migration script, Docker Compose variant, secrets guide (`SECRETS.md`) |
 | `scripts/` | Development scripts (secrets, build slots, release) |
@@ -211,7 +211,9 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Sign-in**: a return URL of the other portal is ignored, so a platform administrator never lands on a client page.
+- **Development**: `seed-reasons` seeds the cancellation, refund, discount and rejection reasons (also part of
+  `seed-demo-lab`); `seed-platform-admin` resets the password of an existing administrator.
 
 ### v0.2.1 — 2026-10-10
 
