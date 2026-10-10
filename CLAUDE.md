@@ -54,7 +54,7 @@ Chosen to avoid everything already in use on this machine (checked 2026-10-08).
 | Other dev services           | ports `5102`–`5199`                                      | `80`, `443`, `8080`, `5985`, `3389`          |
 | Database and roles           | db `lis`, owner role `lis_owner`, app role `lis_app`     | db `ntqams`, role `postgres`                 |
 | Docker Compose project       | `name: lis` → containers `lis-*`, volumes `lis_*`, network `lis_default` | none yet (daemon was off)    |
-| Windows services (prod/test) | `NTLIS` (port `5100`) / `NTLIS_TEST` (port `5180`)       | `NTQAMS`, `NTQAMS_TEST`                      |
+| Windows services (prod/test) | `NTLIS` (port `5100`) / `NTLIS_TEST` (port `5180`); `LIS_POSTGRES` = the private PostgreSQL 17 instance of this host as a service (5433, NetworkService) | `NTQAMS`, `NTQAMS_TEST`, `postgresql-x64-17` (5432) |
 | IIS sites                    | `lis-ui` (own host header) / `lis-ui-test` (port `8081`) | `qams-ui` (80/443), `qams-ui-test` (8080)    |
 | IIS physical paths           | `C:\inetpub\wwwroot\lis-ui*`                             | `C:\inetpub\wwwroot\qams-ui*`                |
 | Prod data / backups          | `E:\lis-data`, `E:\lis-backups`                          | `E:\ntqams-data`, `E:\ntqams-backups`        |
@@ -186,9 +186,10 @@ QMS source is never read or copied (section 1); everything here is written from 
   runtime) and `schema.sql` (schemas, grants, default privileges) run once before the first migration;
   `deploy/postgres/compose.yaml` is the Docker variant (Docker Desktop cannot start on this server: no WSL distribution).
   The working dev server is a **private PostgreSQL 17 instance on 127.0.0.1:5433** under git-ignored `E:\LIS\.local\pg17`
-  (initialised from the installed 17 binaries, separate from the shared 5432 cluster). Control it with
-  `"C:\Program Files\PostgreSQL\17\bin\pg_ctl" -D E:\LIS\.local\pg17\data [-o "-p 5433 -c listen_addresses=127.0.0.1"] start|stop`;
-  passwords are in git-ignored `deploy/postgres/.env`.
+  (initialised from the installed 17 binaries, separate from the shared 5432 cluster). Since 2026-10-10 it runs as the
+  Windows service `LIS_POSTGRES` (automatic; `Start-Service` / `Stop-Service LIS_POSTGRES`; never start it with `pg_ctl`
+  while the service runs); passwords are in git-ignored `deploy/postgres/.env`. The same instance and database `lis`
+  serve the `NTLIS` installation of this host (`docs/deploy/Installations.md`).
 - Integration tests (`tests/Platform.IntegrationTests`, real PostgreSQL) run only when `LIS_TEST_OWNER_CONNECTION` and
   `LIS_TEST_APP_CONNECTION` are set (owner/app role connection strings); otherwise they are skipped with a reason, never
   faked. The WebApi reads `Lis:Database:ConnectionString` (user-secrets or environment; appsettings carries no password).

@@ -51,7 +51,14 @@ $script:failures = 0
 $script:passes = 0
 
 if ($SkipCertificateCheck) {
-    [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+    # A script block callback fails on the background thread that validates the certificate ("no Runspace available");
+    # a compiled delegate does not.
+    Add-Type -TypeDefinition @"
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+public static class LisSmokeTrustAll { public static bool Validate(object s, X509Certificate c, X509Chain ch, SslPolicyErrors e) { return true; } }
+"@
+    [System.Net.ServicePointManager]::ServerCertificateValidationCallback = [System.Delegate]::CreateDelegate([System.Net.Security.RemoteCertificateValidationCallback], [LisSmokeTrustAll].GetMethod('Validate'))
 }
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
 

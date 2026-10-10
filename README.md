@@ -234,7 +234,11 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Installed on WIN-9S2KO4FA64L** (production lane, self-signed certificate): service `NTLIS` from package 0.3.2, IIS
+  site `lis-ui` at `https://WIN-9S2KO4FA64L`, the private PostgreSQL instance registered as the service `LIS_POSTGRES`;
+  smoke test 20 / 20. Record: `docs/deploy/Installations.md`.
+- **Smoke test**: `-SkipCertificateCheck` works (the certificate callback is a compiled delegate; a script block failed on
+  the validation thread).
 
 ### v0.3.2 — 2026-10-10
 
