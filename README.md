@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.3.0** · released 2026-10-10 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.3.1** · released 2026-10-10 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.3.1 — 2026-10-10
 
 - **UAT scripts** `docs/uat/Release-1_UAT_Scripts.md` (LIS-UAT-001): 78 acceptance scripts for ten personas with negative
   tests, Arabic checks, results sheet, acceptance criteria and coverage matrices; `docs/uat/README.md` explains a session.
