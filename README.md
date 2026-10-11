@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.5.2** · released 2026-10-11 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.5.3** · released 2026-10-11 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.5.3 — 2026-10-11
 
 - **The sidebar collapses from the top header.** The ☰ button at the start of the top bar now collapses and expands the
   sidebar on every screen size (on screens under 960 px it still opens the menu as a drawer). The "Collapse menu" button
