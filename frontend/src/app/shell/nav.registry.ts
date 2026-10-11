@@ -30,6 +30,22 @@ export interface NavEntry {
   readonly i18nKey: string;
   readonly release: Release;
   readonly icon?: IconName;
+  /**
+   * Whether the sidebar lists the entry (R1-01). Omitted: listed whenever the entry is in scope. `false`: in scope and
+   * guarded like any entry, but opened only from an action of another page, never from the menu. A release: listed from
+   * that release on, action-only before it (Release 1 refunds are an action of Payments; Release 2 gives them a menu entry).
+   * The route guard ignores this field: an action-only page opens for whoever holds its permission.
+   */
+  readonly menu?: false | Release;
+}
+
+/** True when the sidebar lists the entry in the delivered release: in scope, and not an action-only page (R1-01). */
+export function inMenu(entry: NavEntry, scope: Release = RELEASE_SCOPE): boolean {
+  if (!inReleaseScope(entry.release, scope)) {
+    return false;
+  }
+
+  return entry.menu === undefined || (entry.menu !== false && inReleaseScope(entry.menu, scope));
 }
 
 export const NAV_GROUPS: readonly NavGroup[] = [
@@ -115,7 +131,7 @@ export const NAV_REGISTRY: readonly NavEntry[] = [
   { portal: 'client', group: 'shell.group.setup', path: '/catalogue/additional-services', permission: 'catalogue.view', i18nKey: 'shell.nav.additionalServices', release: 'R2', icon: 'plus' },
   { portal: 'admin', group: 'shell.group.masterData', path: '/admin/catalogue/additional-services', permission: 'catalogue.view', i18nKey: 'shell.nav.additionalServices', release: 'R1', icon: 'plus' },
   { portal: 'client', group: 'shell.group.finance', path: '/billing/payments', permission: 'billing.view', i18nKey: 'shell.nav.payments', release: 'R1', icon: 'coins' },
-  { portal: 'client', group: 'shell.group.finance', path: '/billing/refunds', permission: 'billing.view', i18nKey: 'shell.nav.refunds', release: 'R2', icon: 'arrow-down' },
+  { portal: 'client', group: 'shell.group.finance', path: '/billing/refunds', permission: 'billing.view', i18nKey: 'shell.nav.refunds', release: 'R1', menu: 'R2', icon: 'arrow-down' },
   { portal: 'client', group: 'shell.group.finance', path: '/billing/batch-payment', permission: 'billing.view', i18nKey: 'shell.nav.batchPayment', release: 'R2', icon: 'layers' },
   { portal: 'client', group: 'shell.group.finance', path: '/billing/cash-closing', permission: 'billing.view', i18nKey: 'shell.nav.cashClosing', release: 'R2', icon: 'clipboard' },
   { portal: 'client', group: 'shell.group.account', path: '/account/profile', permission: null, i18nKey: 'shell.nav.profile', release: 'R1', icon: 'user-circle' },

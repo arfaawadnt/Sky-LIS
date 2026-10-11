@@ -26,7 +26,7 @@ internal sealed class TreasuryRepository(AppDbContext context) : Repository<Doma
         var items = await query.OrderBy(treasury => treasury.Code)
             .Skip(page.Skip)
             .Take(page.PageSize)
-            .Select(treasury => new TreasuryListItem(treasury.Id, treasury.Code, treasury.Name.En, treasury.Name.Ar, treasury.BranchId, treasury.IsActive))
+            .Select(treasury => new TreasuryListItem(treasury.Id, treasury.Code, treasury.Name.En, treasury.Name.Ar, treasury.BranchId, treasury.IsActive, null, null, null))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -36,7 +36,7 @@ internal sealed class TreasuryRepository(AppDbContext context) : Repository<Doma
     public Task<TreasuryListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken) =>
         Set.AsNoTracking()
             .Where(treasury => treasury.Id == id)
-            .Select(treasury => new TreasuryListItem(treasury.Id, treasury.Code, treasury.Name.En, treasury.Name.Ar, treasury.BranchId, treasury.IsActive))
+            .Select(treasury => new TreasuryListItem(treasury.Id, treasury.Code, treasury.Name.En, treasury.Name.Ar, treasury.BranchId, treasury.IsActive, null, null, null))
             .FirstOrDefaultAsync(cancellationToken);
 }
 

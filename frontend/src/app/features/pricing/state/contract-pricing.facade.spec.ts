@@ -101,4 +101,15 @@ describe('ContractPricingFacade (CP-34)', () => {
     await runEffects();
     backend.verify();
   });
+
+  it('re-reads the tiers, the lists and the open tier when a page opens again (UAT D-14)', async () => {
+    await openGold();
+
+    facade.refresh();
+    await runEffects();
+    backend.expectOne((request) => request.url === PRICING_API.tierOptions).flush(TIER_OPTIONS);
+    backend.expectOne((request) => request.url === PRICING_API.basePriceLists).flush(LISTS_PAGE);
+    backend.expectOne(`${PRICING_API.contractPricing}/t-gold`).flush(GOLD);
+    backend.verify();
+  });
 });

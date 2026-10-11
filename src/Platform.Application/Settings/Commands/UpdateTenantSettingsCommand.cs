@@ -31,7 +31,7 @@ public sealed class UpdateTenantSettingsCommandValidator : AbstractValidator<Upd
     }
 }
 
-public sealed class UpdateTenantSettingsCommandHandler(ITenantSettingsStore store, IUnitOfWork unitOfWork, ICurrentUser user, IClock clock) : ICommandHandler<UpdateTenantSettingsCommand, TenantSettingsResponse>
+public sealed class UpdateTenantSettingsCommandHandler(ITenantSettingsStore store, IUnitOfWork unitOfWork, ICurrentUser user, ICurrentTenant currentTenant, IClock clock) : ICommandHandler<UpdateTenantSettingsCommand, TenantSettingsResponse>
 {
     public async Task<TenantSettingsResponse> Handle(UpdateTenantSettingsCommand command, CancellationToken cancellationToken)
     {
@@ -54,7 +54,6 @@ public sealed class UpdateTenantSettingsCommandHandler(ITenantSettingsStore stor
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var stored = (await store.ListAsync(cancellationToken)).ToDictionary(setting => setting.Key, StringComparer.Ordinal);
-        return new TenantSettingsResponse(SettingKeys.All.Select(descriptor => GetTenantSettingsQueryHandler.Describe(descriptor, stored)).ToList());
+        return await GetTenantSettingsQueryHandler.DescribeAllAsync(store, currentTenant, cancellationToken);
     }
 }

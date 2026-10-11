@@ -178,6 +178,102 @@ public sealed class AuthFlowTests(ApiFactory factory) : IClassFixture<ApiFactory
     }
 
     [DatabaseFact]
+    public async Task Sign_out_honours_only_the_genuine_cookie_and_answers_the_same_for_a_forged_or_stale_one()
+    {
+        var (victimName, _, _) = await factory.SeedUserAsync();
+        var (attackerName, _, _) = await factory.SeedUserAsync();
+        var victim = new AuthClient(factory.CreateClient());
+        var attacker = new AuthClient(factory.CreateClient());
+        var (_, victimCookie, _) = await victim.SignInExpectingSuccessAsync(victimName, ApiFactory.Password);
+        var (_, attackerCookie, _) = await attacker.SignInExpectingSuccessAsync(attackerName, ApiFactory.Password);
+
+        // the victim's session id with the attacker's own secret: 204 and a cleared cookie, but nothing ends
+        var dot = victimCookie.IndexOf('.', StringComparison.Ordinal);
+        var forged = string.Concat(victimCookie.AsSpan(0, dot + 1), attackerCookie.AsSpan(attackerCookie.IndexOf('.', StringComparison.Ordinal) + 1));
+        var forgedOut = await attacker.SignOutAsync(forged);
+        Assert.Equal(HttpStatusCode.NoContent, forgedOut.StatusCode);
+        Assert.Contains(forgedOut.Headers.GetValues("Set-Cookie"), v => v.StartsWith("__Secure-rt=;", StringComparison.Ordinal) || v.Contains("expires=Thu, 01 Jan 1970", StringComparison.OrdinalIgnoreCase));
+        var refreshed = await victim.RefreshAsync(victimCookie);
+        Assert.Equal(HttpStatusCode.OK, refreshed.StatusCode);
+        var current = AuthClient.CookieValue(refreshed.Headers.GetValues("Set-Cookie").Single(v => v.StartsWith("__Secure-rt=", StringComparison.Ordinal)));
+
+        // a stale cookie (already rotated) ends nothing either
+        Assert.Equal(HttpStatusCode.NoContent, (await victim.SignOutAsync(victimCookie)).StatusCode);
+        var stillLive = await victim.RefreshAsync(current);
+        Assert.Equal(HttpStatusCode.OK, stillLive.StatusCode);
+        current = AuthClient.CookieValue(stillLive.Headers.GetValues("Set-Cookie").Single(v => v.StartsWith("__Secure-rt=", StringComparison.Ordinal)));
+
+        // the genuine cookie ends the session; the attacker's own session was never touched
+        Assert.Equal(HttpStatusCode.NoContent, (await victim.SignOutAsync(current)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await victim.RefreshAsync(current)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await attacker.RefreshAsync(attackerCookie)).StatusCode);
+    }
+
+    [DatabaseFact]
+    public async Task A_sign_in_ends_the_session_of_the_cookie_the_browser_presented_whoever_it_belonged_to()
+    {
+        // R2-04: tab A's session (user X) is still held by the browser's cookie when tab B signs in as user Y.
+        var (first, _, _) = await factory.SeedUserAsync();
+        var (second, _, _) = await factory.SeedUserAsync();
+        var auth = new AuthClient(factory.CreateClient());
+        var (previous, previousCookie, _) = await auth.SignInExpectingSuccessAsync(first, ApiFactory.Password);
+
+        var (_, newCookie, _) = await auth.SignInExpectingSuccessAsync(second, ApiFactory.Password, cookie: previousCookie);
+
+        Assert.NotEqual(previousCookie, newCookie);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await auth.RefreshAsync(previousCookie)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await auth.RefreshAsync(newCookie)).StatusCode);
+        factory.Clock.Advance(TimeSpan.FromSeconds(11));   // past the principal cache: the previous access token is dead too
+        Assert.Equal(HttpStatusCode.Unauthorized, (await auth.MeAsync(previous.AccessToken)).StatusCode);
+        factory.Clock.Advance(TimeSpan.FromSeconds(-11));
+    }
+
+    [DatabaseFact]
+    public async Task A_sign_in_ends_nothing_for_a_forged_cookie_or_a_refused_password()
+    {
+        var (username, _, _) = await factory.SeedUserAsync();
+        var auth = new AuthClient(factory.CreateClient());
+        var (_, cookie, _) = await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password);
+
+        // the session id of someone else's cookie with a secret that is not its own revokes nothing
+        var dot = cookie.IndexOf('.', StringComparison.Ordinal);
+        var forged = string.Concat(cookie.AsSpan(0, dot + 1), new string('A', cookie.Length - dot - 1));
+        await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password, cookie: forged);
+        var stillLive = await auth.RefreshAsync(cookie);
+        Assert.Equal(HttpStatusCode.OK, stillLive.StatusCode);
+        var rotated = AuthClient.CookieValue(stillLive.Headers.GetValues("Set-Cookie").Single(v => v.StartsWith("__Secure-rt=", StringComparison.Ordinal)));
+
+        // a refused sign-in leaves the browser's session as it was
+        Assert.Equal(HttpStatusCode.Unauthorized, (await auth.SignInAsync(username, "not-the-password", cookie: rotated)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await auth.RefreshAsync(rotated)).StatusCode);
+    }
+
+    [DatabaseFact]
+    public async Task An_account_locked_by_an_administrator_is_refused_with_its_own_code()
+    {
+        // Validation 2026-10-11 B-11: AUTH-015 (contact your administrator), not the automatic lockout's AUTH-003 (try again later).
+        var (username, _, userId) = await factory.SeedUserAsync();
+        await using (var connection = new Npgsql.NpgsqlConnection(TestDatabase.OwnerConnection))
+        {
+            await connection.OpenAsync();
+            await using var command = new Npgsql.NpgsqlCommand("UPDATE identity.platform_users SET is_locked_out = true, lockout_end_utc = NULL WHERE id = @id", connection);
+            command.Parameters.AddWithValue("id", userId);
+            Assert.Equal(1, await command.ExecuteNonQueryAsync());
+        }
+
+        Assert.True((await factory.LoadUserAsync(userId)).IsLockedByAdministrator);
+        var auth = new AuthClient(factory.CreateClient());
+        var locked = await auth.SignInAsync(username, ApiFactory.Password);
+        Assert.Equal((HttpStatusCode.Unauthorized, ProblemCodes.AccountLockedByAdministrator), (locked.StatusCode, await AuthClient.CodeOf(locked)));
+
+        // the same refusal whatever the password, and still AUTH-002 for an unknown username: nothing more is revealed
+        var wrong = await auth.SignInAsync(username, "not the password");
+        Assert.Equal((HttpStatusCode.Unauthorized, ProblemCodes.AccountLockedByAdministrator), (wrong.StatusCode, await AuthClient.CodeOf(wrong)));
+        var unknown = await auth.SignInAsync("nobody." + Guid.CreateVersion7().ToString("N")[..8], ApiFactory.Password);
+        Assert.Equal((HttpStatusCode.Unauthorized, ProblemCodes.InvalidCredentials), (unknown.StatusCode, await AuthClient.CodeOf(unknown)));
+    }
+
+    [DatabaseFact]
     public async Task Five_wrong_passwords_lock_the_account_and_the_right_one_is_then_refused()
     {
         var (username, _, userId) = await factory.SeedUserAsync();

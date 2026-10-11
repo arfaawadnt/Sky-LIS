@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sky LIS — Validation Report — LIS-VR-001 v1.0</title>
+<title>Sky LIS — Validation Report — LIS-VR-001 v1.1</title>
 <meta name="description" content="Full validation of Sky LIS v0.3.8: automated suites, both portals page by page, and the frontend-to-database backend cycle.">
 <style>
   :root{--bad:#C8102E;--bad-soft:#FBE7EA;--bg:#F3F6FB;--blue-soft:#E8F1FE;--blue:#2A7DF5;--grad:linear-gradient(90deg,#2A7DF5,#6E3BE4);--ink:#14213A;--line-soft:#EAEFF6;--line:#DCE3EE;--muted:#6B7A90;--navy:#0B2A5B;--ok-soft:#E3F5EC;--ok:#13865A;--paper:#fff;--violet-soft:#EFE9FD;--violet:#6E3BE4;--warn-soft:#FFF3DF;--warn:#B26B00}
@@ -51,16 +51,22 @@
   <h1>Sky LIS — Validation Report</h1>
   <p class="sub">Full validation of the application as released: the automated test suites, every Release-1 page and function of the Super Admin and client portals, the public pages, and the backend cycle from the screen to the PostgreSQL database.</p>
   <div class="meta">
-    <div><b>Document</b>LIS-VR-001 · v1.0</div>
+    <div><b>Document</b>LIS-VR-001 · v1.1 (fix verification added)</div>
     <div><b>Validation date</b>2026-10-11</div>
-    <div><b>Release under test</b>v0.3.8 (commit <code>3a83e9c</code>), github.com/arfaawadnt/Sky-LIS</div>
+    <div><b>Release under test</b>v0.3.8 (commit <code>3a83e9c</code>); fixes verified on the release that follows (v0.4.0), github.com/arfaawadnt/Sky-LIS</div>
     <div><b>Environment</b>WIN-9S2KO4FA64L: validation stack (API 127.0.0.1:5102, SPA :4300) and the installed site https://192.168.80.38:5443, one database <code>lis</code> (PostgreSQL 17, :5433)</div>
     <div><b>Detailed results</b><code>docs/validation/2026-10-11/*.md</code>, script <code>tests/validation/backend-cycle.mjs</code></div>
   </div>
 </header>
 
+<div class="verdict" style="border-left-color:var(--ok)">
+  <h3 style="color:var(--ok)">Status after the fixes (v1.1): all 49 findings fixed and verified</h3>
+  <p>All 49 findings of this validation were fixed in three rounds and verified on screen, in the database and by tests. Every finding raised while re-testing the fixes was fixed too, including one regression the fixes caused. Section 10 has the detail. The suites grew from 1,589 to 1,869 automated tests, all passing, and the backend cycle passes 36 of 36 steps on the fixed build. The two session defects of severity 1 are closed: a tab can no longer act as another user, and nothing of a previous user survives a sign-out.</p>
+  <p>One item is left open on purpose. B-09 (CSV format) is fixed on every Release-1 page, but the export of the hidden Release-2 page "sending labs" still writes payer ids.</p>
+</div>
+
 <div class="verdict">
-  <h3>Verdict: functionally and data-wise validated — two session defects must be fixed before shared-workstation use</h3>
+  <h3>Original verdict (v0.3.8): functionally and data-wise validated — two session defects must be fixed before shared-workstation use</h3>
   <p>Every Release-1 business workflow of both portals works end to end, every business rule tested is enforced by the server, and every save checked reached the database with the right values, tenant, links, audit entries and processed outbox events. No data loss or data corruption was found in the backend, and tenant isolation held at the API and at the database row level.</p>
   <p>The defects are in the browser application. Two are severity 1 and both concern <b>two users sharing one browser</b>: after a sign-out and sign-in, some pages keep the previous user's data (A-01), and a forgotten tab can continue as the user who signed in last (C-01). Five severity-2 defects lose user input or mis-report a successful save. The recommendation is to fix the S1 and S2 groups (section 6), re-test them, and then open user acceptance with the personas.</p>
 </div>
@@ -259,11 +265,87 @@
     <tr><td><code>docs/validation/2026-10-11/client-operations.md</code></td><td>tester A: coverage, 133 cases, 13 database verifications, 15 defects</td></tr>
     <tr><td><code>docs/validation/2026-10-11/client-setup.md</code></td><td>tester B: coverage, 197 cases, 20 database verifications, 14 defects</td></tr>
     <tr><td><code>docs/validation/2026-10-11/super-admin-and-public.md</code></td><td>tester C: coverage, 139 cases, 23 database verifications, 19 defects</td></tr>
+    <tr><td><code>docs/validation/2026-10-11/retest-client.md</code>, <code>retest-admin.md</code></td><td>first re-test of every finding after the first fix round, with regression smoke</td></tr>
+    <tr><td><code>docs/validation/2026-10-11/retest-client-round2.md</code>, <code>retest-admin-round2.md</code></td><td>second re-test after the second fix round, with regression smoke of every page for every persona</td></tr>
     <tr><td><code>docs/validation/2026-10-11/backend-cycle.md</code> and <code>tests/validation/backend-cycle.mjs</code></td><td>tester D: the repeatable script, 36 steps, 320 assertions, negative checks, deployed run, 1 defect; rerun with <code>node tests/validation/backend-cycle.mjs http://127.0.0.1:5102</code></td></tr>
   </tbody>
 </table>
 
-<footer>LIS-VR-001 v1.0 · 2026-10-11 · Sky LIS, National Technology · Validation of release v0.3.8. Defect ids are stable and match the detailed result files.</footer>
+<h2>10. Fix verification (v1.1)</h2>
+<div class="box">
+  <p>Every finding was assigned by file ownership to one engineer per area. Each fix carries a test: domain, application, integration, functional or architecture tests for the server, page and facade specs for the browser. After each round, the whole solution was built and tested together. Separate testers then re-ran the original steps in the browser, checked the database, and smoke-tested every page for regressions.</p>
+  <table>
+    <thead><tr><th>Round</th><th>Scope</th><th>Re-test result</th><th>Follow-up findings</th></tr></thead>
+    <tbody>
+      <tr><td>1 · four engineers</td><td>all 49 findings: sessions, routes and shared kit; organization, catalogue, pricing and treasury; registration, results, billing, patients, account and audit; platform, settings, public site and database (migration <code>AppendOnlyTruncateGuard</code>)</td><td>client: 28 of 29 fixed, 1 not verifiable · admin: 19 of 20 fixed, C-18 partly</td><td>12 (one S2 regression: the new route guard blocked the refund action) and a sign-out weakness the engineers found</td></tr>
+      <tr><td>2 · two engineers</td><td>the 12 findings, the rest of C-18, the sign-out check</td><td>client: 7 fixed, 2 partly · admin: 6 fixed, 1 partly; regression smoke clean on both portals</td><td>7 (one S3, six S4)</td></tr>
+      <tr><td>3 · integrator</td><td>the 7 findings, the two partly fixed items, a refusal notice for the portal guards</td><td>covered by page and unit specs</td><td>none</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Status of the original findings</h3>
+  <table>
+    <thead><tr><th>Group</th><th>Findings</th><th>Status</th><th>How it was fixed</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FG-1</td><td>C-01</td><td><span class="pill pass">fixed</span></td><td>a refresh that returns another user or tenant clears the state and loads the sign-in page; no request is replayed; sign-in and sign-out are announced to other tabs</td></tr>
+      <tr><td class="id">FG-2</td><td>A-01, C-13, B-07</td><td><span class="pill pass">fixed</span></td><td>sign-out ends with a full page load; every page re-reads its data on each visit</td></tr>
+      <tr><td class="id">FG-3</td><td>C-02, B-06</td><td><span class="pill pass">fixed</span></td><td>empty successful answers are confirmed in every module</td></tr>
+      <tr><td class="id">FG-4</td><td>C-05, B-04, B-08, B-13</td><td><span class="pill pass">fixed</span></td><td>the test editor keeps typed sections and shows each refusal; only active sample conditions are offered; the formula message is clean</td></tr>
+      <tr><td class="id">FG-5</td><td>B-05</td><td><span class="pill pass">fixed</span></td><td>editors follow the address on browser back and forward</td></tr>
+      <tr><td class="id">FG-6</td><td>A-08, C-14, C-15</td><td><span class="pill pass">fixed</span></td><td>a route guard derived from the navigation registry, with a notice on refusal; action-only pages stay reachable</td></tr>
+      <tr><td class="id">FG-7</td><td>A-02, A-03, A-04, B-12</td><td><span class="pill pass">fixed</span></td><td>buttons, tabs and fields follow the user's rights</td></tr>
+      <tr><td class="id">FG-8</td><td>C-04, B-10, B-09, A-15</td><td><span class="pill pass">fixed</span> (B-09: Release-1 pages)</td><td>filtered exports, new exports with their own permissions (<code>organization.export</code>, <code>treasury.export</code>), one CSV format, local times</td></tr>
+      <tr><td class="id">FG-9</td><td>B-02, B-03, C-03, C-07, C-08, C-06, C-19</td><td><span class="pill pass">fixed</span></td><td>server checks with field codes (<code>ORG-015/016/017</code>, <code>GEO-007/014</code>); field-level messages in both languages</td></tr>
+      <tr><td class="id">FG-10</td><td>A-07, A-10, A-12, C-10, C-11, C-12, C-16</td><td><span class="pill pass">fixed</span></td><td>dictionaries, Arabic hints, letterheads per language, dashboard wording and digits, landing text</td></tr>
+      <tr><td class="id">FG-11</td><td>A-05, A-06</td><td><span class="pill pass">fixed</span></td><td>billing reads its own print setting; the payment and refund form resets after each save</td></tr>
+      <tr><td class="id">FG-12</td><td>C-09, C-17, C-18</td><td><span class="pill pass">fixed</span></td><td>effective setting with its source; client creation in the platform trail; Client column, filter and export column</td></tr>
+      <tr><td class="id">FG-13</td><td>D-01</td><td><span class="pill pass">fixed</span></td><td><code>BEFORE TRUNCATE</code> guards on every append-only table, with an architecture gate</td></tr>
+      <tr><td class="id">FG-14</td><td>A-09, A-11, A-13, A-14, B-01, B-11, B-14</td><td><span class="pill pass">fixed</span></td><td>patient visit columns, refusal on price query lines, picker lists at once, name search, currency default, lock message (<code>AUTH-015</code>), role kept when saving branches</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Findings raised by the re-tests, all fixed</h3>
+  <ul class="tight">
+    <li><b>R1-01 (S2, regression):</b> the refund page was marked Release 2, so the new guard refused the refund action. Pages reached only from an action now carry <code>menu: false</code> in the registry, and a spec checks every Release-1 action target.</li>
+    <li><b>Security hardening:</b> sign-out and sign-in now act only on a refresh cookie whose secret matches. A sign-in ends the browser's previous session, and a forged or stale cookie ends nothing.</li>
+    <li><b>Smaller items:</b>
+      <ul class="tight">
+        <li>delayed-tests table, with its due time;</li>
+        <li>other tabs follow a password change;</li>
+        <li>the client home sends each user to a page they may open;</li>
+        <li>Release-2 actions, tiles and landing texts hidden;</li>
+        <li>country and governorate exports filtered;</li>
+        <li>Arabic options in the report-template dialog;</li>
+        <li>a read-only visit view and a read-only template view for users without edit rights;</li>
+        <li>the visit summary nets refunds;</li>
+        <li>no internal laboratory id on the profile;</li>
+        <li>one export notice and local file names;</li>
+        <li>a refusal notice for the portal guards.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h3>Final numbers</h3>
+  <table>
+    <thead><tr><th>Layer</th><th class="num">v0.3.8</th><th class="num">After the fixes</th></tr></thead>
+    <tbody>
+      <tr><td>Domain / architecture / application unit tests</td><td class="num">714 / 99 / 213</td><td class="num">727 / 100 / 232</td></tr>
+      <tr><td>Integration / functional tests (real PostgreSQL and API)</td><td class="num">109 / 77</td><td class="num">117 / 91</td></tr>
+      <tr><td>Frontend unit tests</td><td class="num">377</td><td class="num">602</td></tr>
+      <tr><td>Total automated tests, all passing</td><td class="num">1,589</td><td class="num">1,869</td></tr>
+      <tr><td>Frontend production build</td><td class="num">1 warning</td><td class="num">0 warnings</td></tr>
+      <tr><td>Backend cycle (API to database)</td><td class="num">36 / 36</td><td class="num">36 / 36</td></tr>
+      <tr class="total"><td>Open findings of severity 1 or 2</td><td class="num">7</td><td class="num">0</td></tr>
+    </tbody>
+  </table>
+  <p class="lead">Operational notes:</p>
+  <ul class="tight">
+    <li>Existing laboratory roles need the two new export permissions added in the role editor before their users see Export on branches, roles, users and treasuries. The demo and Walk-through laboratories have them already.</li>
+    <li>The migration <code>AppendOnlyTruncateGuard</code> is part of <code>deploy/postgres/migrations.sql</code>.</li>
+  </ul>
+</div>
+
+<footer>LIS-VR-001 v1.1 · 2026-10-11 · Sky LIS, National Technology · Validation of release v0.3.8 and verification of its fixes. Defect ids are stable and match the detailed result files.</footer>
 </div>
 </body>
 </html>

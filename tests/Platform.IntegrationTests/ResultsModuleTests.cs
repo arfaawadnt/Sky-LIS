@@ -6,6 +6,7 @@ using Platform.Application.Registration;
 using Platform.Application.Results;
 using Platform.Contracts.Common;
 using Platform.Domain.Catalogue;
+using Platform.Domain.Patients;
 using Platform.Domain.Results;
 using Platform.Domain.Samples;
 using Platform.Infrastructure.Persistence;
@@ -166,6 +167,40 @@ public sealed class ResultsModuleTests(DatabaseFixture fixture)
         await Assert.ThrowsAsync<PostgresException>(() => context.Database.ExecuteSqlRawAsync("UPDATE app.result_log_entries SET detail = 'x' WHERE result_id = {0}", result.Id));
         await Assert.ThrowsAsync<PostgresException>(() => context.Database.ExecuteSqlRawAsync("DELETE FROM app.result_log_entries WHERE result_id = {0}", result.Id));
         await Assert.ThrowsAsync<PostgresException>(() => context.Database.ExecuteSqlRawAsync("DELETE FROM app.results WHERE id = {0}", result.Id));
+    }
+
+    [DatabaseFact]
+    public async Task The_worklist_search_finds_the_patient_by_latin_or_arabic_name_as_well_as_by_identifiers()
+    {
+        // UAT A-14: CP-18 "Search" promises names; accession, patient number and sample number already matched.
+        var tenant = Guid.CreateVersion7();
+        var group = Guid.CreateVersion7();
+        var patient = Patient.Register(
+            "PAT-2026-71001",
+            new PatientDemographics(PatientTitle.Mrs, "Mona Hassan", "منى حسن", PatientGender.Female, new DateOnly(1990, 1, 1), null, null, null, null, null, null, null, null, null, null),
+            PatientFieldRules.Optional,
+            false,
+            Now);
+        using (var scope = fixture.AppScope(tenant, Guid.CreateVersion7()))
+        {
+            scope.ServiceProvider.GetRequiredService<Platform.Application.Patients.IPatientRepository>().Add(patient);
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        }
+
+        var hers = Order(Guid.CreateVersion7(), group, patient: patient.Id);
+        var other = Order(Guid.CreateVersion7(), group);
+        await AddAsync(tenant, hers, other);
+
+        using var reader = fixture.AppScope(tenant);
+        var results = reader.ServiceProvider.GetRequiredService<IResultRepository>();
+        var everything = ResultVisibility.Everything;
+        foreach (var term in new[] { "MONA", "hassan", "حسن", "PAT-2026-71" })
+        {
+            var found = await results.WorklistAsync(Filter() with { Search = term }, everything, PageRequest.Normalized(1, 50), Now, CancellationToken.None);
+            Assert.Equal(hers.Id, Assert.Single(found.Rows).ResultId);
+        }
+
+        Assert.Empty((await results.WorklistAsync(Filter() with { Search = "Nobody" }, everything, PageRequest.Normalized(1, 50), Now, CancellationToken.None)).Rows);
     }
 
     private static WorklistFilter Filter() => new(null, null, null, null, null, null, null, null, false, null, null);

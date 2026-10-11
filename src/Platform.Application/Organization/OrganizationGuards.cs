@@ -25,6 +25,25 @@ public static class OrganizationGuards
         return tenant.TenantId ?? throw new DomainException(ProblemCodes.TenantUnresolved, "No tenant is resolved for this request.", DomainFault.Refused);
     }
 
+    /// <summary>
+    /// UAT B-02: a branch's governorate exists and belongs to the branch's country (ORG-017). The aggregate already
+    /// refuses a governorate without a country (ORG-008); the pair needs the platform geography, so the handler checks it.
+    /// </summary>
+    public static async Task EnsureGovernorateInCountryAsync(IBranchGeography geography, Guid? countryId, Guid? governorateId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(geography);
+        if (governorateId is not { } governorate || governorate == Guid.Empty)
+        {
+            return;
+        }
+
+        var owner = await geography.CountryOfGovernorateAsync(governorate, cancellationToken).ConfigureAwait(false);
+        if (owner is null || owner != countryId)
+        {
+            throw new DomainException(OrganizationCodes.GovernorateNotInCountry, "The governorate must belong to the chosen country.", DomainFault.Validation);
+        }
+    }
+
     /// <summary>SOD-ORG-001: an administrator does not administer their own access.</summary>
     public static void EnsureNotSelf(Guid actorUserId, Guid targetUserId)
     {

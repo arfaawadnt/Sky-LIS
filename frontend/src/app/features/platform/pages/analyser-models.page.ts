@@ -13,7 +13,7 @@ import {
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
-import type { FormValue, MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
+import type { FormValue, MasterDataConfig, MasterDataFilter } from '../../../shared/ui/master-data-page/master-data.types';
 import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { fileStamp } from '../ui/format';
@@ -33,6 +33,9 @@ export class AnalyserModelsPage {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(PlatformApi);
   private readonly csv = inject(CsvExportService);
+
+  /** The filter of the list on screen: the export writes exactly these rows (UAT R2-02, as C-04 elsewhere). */
+  private filter: MasterDataFilter = { search: '', active: true };
 
   protected readonly config: MasterDataConfig<AnalyserModelListItem, AnalyserModelRequest> = {
     i18nPrefix: 'platform.analyserModels',
@@ -55,7 +58,10 @@ export class AnalyserModelsPage {
       { name: 'driverVersion', kind: 'text', maxLength: 40 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.listAnalyserModels({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => {
+        this.filter = filter;
+        return this.api.listAnalyserModels({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+      },
       create: (dto) => this.api.saveAnalyserModel(null, dto),
       update: (id, dto) => this.api.saveAnalyserModel(id, dto),
       setActive: (id, active) => this.api.setLibraryActive(PLATFORM_API.analyserModels, id, active),
@@ -81,7 +87,7 @@ export class AnalyserModelsPage {
   }
 
   protected async exportCsv(): Promise<void> {
-    const rows = await this.api.all((page) => this.api.listAnalyserModels({ search: null, isActive: null, ...page }));
+    const rows = await this.api.all((page) => this.api.listAnalyserModels({ search: this.filter.search || null, isActive: this.filter.active, ...page }));
     this.csv.download(`analyser-models-${fileStamp()}`, [
       { header: this.i18n.t('platform.analyserModels.column.vendor'), value: (row: AnalyserModelListItem) => row.vendor },
       { header: this.i18n.t('platform.analyserModels.column.model'), value: (row) => row.model },

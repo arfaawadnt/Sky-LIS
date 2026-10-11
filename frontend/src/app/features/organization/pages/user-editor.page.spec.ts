@@ -7,6 +7,7 @@ import { provideRouter } from '@angular/router';
 import { NO_SPECIAL_RIGHTS, ORGANIZATION_API, type UserDetail } from '../../../core/api/organization.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
+import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { UserEditorFacade } from '../state/users.facade';
 import { UserEditorPage, fromDateInput, parseShifts, toDateInput } from './user-editor.page';
 
@@ -50,9 +51,11 @@ const mona: UserDetail = {
 describe('UserEditorPage (CP-38)', () => {
   let backend: HttpTestingController;
   const currentUserId = signal('admin-1');
+  let confirmAnswer = true;
 
   beforeEach(async () => {
     currentUserId.set('admin-1');
+    confirmAnswer = true;
     await TestBed.configureTestingModule({
       imports: [UserEditorPage],
       providers: [
@@ -61,6 +64,7 @@ describe('UserEditorPage (CP-38)', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         UserEditorFacade,
+        { provide: ConfirmService, useValue: { confirm: () => Promise.resolve(confirmAnswer) } satisfies Pick<ConfirmService, 'confirm'> },
         { provide: PermissionsService, useValue: { can: () => true } satisfies Pick<PermissionsService, 'can'> },
         {
           provide: AuthStore,
@@ -155,5 +159,46 @@ describe('UserEditorPage (CP-38)', () => {
     const iso = fromDateInput('2027-01-31');
     expect(iso).not.toBeNull();
     expect(toDateInput(iso)).toBe('2027-01-31');
+  });
+
+  it('saving the branches also assigns a role picked but not assigned yet (UAT B-14)', async () => {
+    const fixture = TestBed.createComponent(UserEditorPage);
+    fixture.componentRef.setInput('userId', 'user-1');
+    await flush();
+    flushPickers();
+    backend.expectOne(`${ORGANIZATION_API.users}/user-1`).flush(mona);
+    await flush();
+
+    const component = fixture.componentInstance as unknown as { roleChoice: { set(value: string): void }; saveBranches(): Promise<void> };
+    component.roleChoice.set('role-2');
+    const saving = component.saveBranches();
+    await flush();
+    const role = backend.expectOne({ method: 'PUT', url: `${ORGANIZATION_API.users}/user-1/role` });
+    expect(role.request.body).toEqual({ roleId: 'role-2' });
+    role.flush(null, { status: 204, statusText: 'No Content' });
+    await flush();
+    backend.match(`${ORGANIZATION_API.users}/user-1`).forEach((request) => request.flush({ ...mona, roleId: 'role-2' }));
+    const branches = backend.expectOne({ method: 'PUT', url: `${ORGANIZATION_API.users}/user-1/branches` });
+    expect(branches.request.body).toEqual({ branchIds: [] });
+    branches.flush(null, { status: 204, statusText: 'No Content' });
+    await saving;
+  });
+
+  it('saving the branches with a declined role change keeps the branches and says the role was not assigned (UAT B-14)', async () => {
+    confirmAnswer = false;
+    const fixture = TestBed.createComponent(UserEditorPage);
+    fixture.componentRef.setInput('userId', 'user-1');
+    await flush();
+    flushPickers();
+    backend.expectOne(`${ORGANIZATION_API.users}/user-1`).flush(mona);
+    await flush();
+
+    const component = fixture.componentInstance as unknown as { roleChoice: { set(value: string): void }; saveBranches(): Promise<void> };
+    component.roleChoice.set('role-2');
+    const saving = component.saveBranches();
+    await flush();
+    backend.expectNone({ method: 'PUT', url: `${ORGANIZATION_API.users}/user-1/role` });
+    backend.expectOne({ method: 'PUT', url: `${ORGANIZATION_API.users}/user-1/branches` }).flush(null, { status: 204, statusText: 'No Content' });
+    await saving;
   });
 });

@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -13,6 +13,8 @@ import {
 } from '../api/auth.contracts';
 import { ACCOUNT_API } from '../api/account.contracts';
 import { I18nService } from '../i18n/i18n.service';
+import { SESSION_CHANNEL, type SessionMessage } from './session-channel';
+import { BROWSER_NAVIGATION, SIGN_IN_PATH, signInUrl } from './session-navigation';
 
 export interface CurrentUser {
   readonly id: string;
@@ -27,16 +29,25 @@ export interface CurrentUser {
  * permissions come from the sign-in and refresh responses (`profile`), so the token stays opaque to the client.
  * Refresh is single-flight: concurrent 401s share one call to `/api/v1/auth/refresh`, which the browser sends
  * with the httpOnly `__Secure-rt` cookie.
+ *
+ * That cookie is shared by every tab of the browser, so a refresh may come back as **another user** (C-01: tab B signed
+ * in as Y after tab A's session of X ended). A refresh is therefore accepted only for the user and tenant the tab was
+ * built for; on a change the state is cleared and the tab reloads the sign-in page. Every end of a session (sign-out,
+ * lost session, identity change, a sign-in or sign-out in another tab) is a **full page load** (A-01): it discards the
+ * in-memory state of every module, which a router navigation would keep. Tabs tell each other through `SESSION_CHANNEL`.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthStore {
   private readonly http = inject(HttpClient);
   private readonly i18n = inject(I18nService);
+  private readonly navigation = inject(BROWSER_NAVIGATION);
+  private readonly channel = inject(SESSION_CHANNEL);
 
   private readonly accessToken = signal<string | null>(null);
   private readonly expiresAtUtc = signal<Date | null>(null);
   private readonly profileState = signal<AuthProfile | null>(null);
   private readonly hydrated = signal(false);
+  private readonly profileRevisionState = signal(0);
   private refreshInFlight: Promise<string | null> | null = null;
 
   /** The bearer token for the auth interceptor; `null` when signed out. */
@@ -45,6 +56,12 @@ export class AuthStore {
   readonly expiresAt = this.expiresAtUtc.asReadonly();
 
   readonly profile = this.profileState.asReadonly();
+
+  /**
+   * R2-01: bumped when another tab of the same user and tenant changed the user's own profile (password, language).
+   * Whoever caches profile data (the account session, the password-change guard) re-reads it when this moves.
+   */
+  readonly profileRevision = this.profileRevisionState.asReadonly();
 
   /** True once the start-up refresh has settled, either way. */
   readonly isHydrated = this.hydrated.asReadonly();
@@ -65,6 +82,11 @@ export class AuthStore {
   readonly branchIds = computed<readonly string[]>(() => this.profileState()?.branchIds ?? []);
 
   readonly permissions = computed(() => new Set(this.profileState()?.permissions ?? []));
+
+  constructor() {
+    const stop = this.channel.listen((message) => this.onOtherTab(message));
+    inject(DestroyRef).onDestroy(stop);
+  }
 
   /** Affordance only (pitfall P-20): the server decides on every request. */
   hasPermission(permission: string): boolean {
@@ -103,15 +125,35 @@ export class AuthStore {
     }
   }
 
+  /**
+   * R2-01: tells the other tabs that this user's own profile changed (`profileChangeInterceptor` calls it after a
+   * successful password change or language save). This tab's own caches are refreshed by the caller.
+   */
+  announceProfileChange(): void {
+    const profile = this.profileState();
+    if (profile !== null) {
+      this.channel.post({ kind: 'profile-changed', userId: profile.userId, tenantId: profile.tenantId });
+    }
+  }
+
   /** The password is sealed by the envelope interceptor before it leaves the browser (D-03). */
   async signIn(username: string, password: string, tenant: string | null = null): Promise<AuthResponse> {
     const body: SignInRequest = { tenant, username, password };
     const response = await firstValueFrom(this.http.post<AuthResponse>(AUTH_API.signIn, body));
     this.apply(response);
+    const profile = this.profileState();
+    if (response.step === 'signed-in' && profile !== null) {
+      this.channel.post({ kind: 'signed-in', userId: profile.userId, tenantId: profile.tenantId });
+    }
+
     return response;
   }
 
-  /** Single-flight refresh; resolves to the new token, or `null` when the session is gone (state cleared). */
+  /**
+   * Single-flight refresh; resolves to the new token, or `null` when the session is gone or now belongs to another user
+   * or tenant (state cleared). When the tab had a session, `null` also means the tab is reloading the sign-in page: the
+   * caller must not replay anything.
+   */
   refresh(): Promise<string | null> {
     this.refreshInFlight ??= this.refreshOnce().finally(() => {
       this.refreshInFlight = null;
@@ -140,6 +182,7 @@ export class AuthStore {
     await firstValueFrom(this.http.post<void>(AUTH_API.recoveryComplete, body));
   }
 
+  /** Ends the session on the server, tells the other tabs and reloads the sign-in page without a return URL (A-01, B-11). */
   async signOut(): Promise<void> {
     try {
       await firstValueFrom(this.http.post<void>(AUTH_API.signOut, null));
@@ -147,6 +190,8 @@ export class AuthStore {
       // the server clears the cookie either way; local state is cleared below
     } finally {
       this.clear();
+      this.channel.post({ kind: 'signed-out' });
+      this.navigation.load(SIGN_IN_PATH);
     }
   }
 
@@ -157,14 +202,66 @@ export class AuthStore {
   }
 
   private async refreshOnce(): Promise<string | null> {
+    const before = this.profileState();
+    let response: AuthResponse;
     try {
-      const response = await firstValueFrom(this.http.post<AuthResponse>(AUTH_API.refresh, null));
-      this.apply(response);
-      return response.accessToken;
+      response = await firstValueFrom(this.http.post<AuthResponse>(AUTH_API.refresh, null));
     } catch {
-      this.clear();
+      this.endSession(before, true);
       return null;
     }
+
+    if (response.step !== 'signed-in' || response.accessToken === null || response.profile === null) {
+      this.endSession(before, true);
+      return null;
+    }
+
+    if (before !== null && (response.profile.userId !== before.userId || response.profile.tenantId !== before.tenantId)) {
+      // C-01: the shared cookie now belongs to someone else; a tab built for another identity never adopts it
+      this.endSession(before, false);
+      return null;
+    }
+
+    this.apply(response);
+    return response.accessToken;
+  }
+
+  /**
+   * Clears the state; a tab that had a session reloads the sign-in page (full page load, A-01). A lost session keeps
+   * where the user was as the return URL; an identity change does not (the page belonged to the previous user).
+   */
+  private endSession(before: AuthProfile | null, keepReturnUrl: boolean): void {
+    this.clear();
+    if (before !== null) {
+      this.navigation.load(signInUrl(keepReturnUrl ? this.navigation.currentUrl() : null));
+    }
+  }
+
+  /**
+   * C-01: another tab signed out, or signed in as someone else; this tab's in-memory session is stale. R2-01: another tab
+   * of the same identity changed the profile; the session stands, the profile readers re-read.
+   */
+  private onOtherTab(message: SessionMessage): void {
+    const profile = this.profileState();
+    if (profile === null) {
+      return;
+    }
+
+    const sameIdentity = message.kind !== 'signed-out' && message.userId === profile.userId && message.tenantId === profile.tenantId;
+    if (message.kind === 'profile-changed') {
+      if (sameIdentity) {
+        this.profileRevisionState.update((revision) => revision + 1);
+      }
+
+      return;
+    }
+
+    if (sameIdentity) {
+      return;
+    }
+
+    this.clear();
+    this.navigation.load(SIGN_IN_PATH);
   }
 
   private apply(response: AuthResponse): void {

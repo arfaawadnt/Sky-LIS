@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, resource, signal } from '@angular/core';
 
-import type { MergePatientsRequest, PatientDocumentItem, PatientListItem, UpdatePatientRequest } from '../../../core/api/patients.contracts';
+import { type MergePatientsRequest, PATIENTS_PERMISSIONS, type PatientDocumentItem, type PatientListItem, type UpdatePatientRequest } from '../../../core/api/patients.contracts';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { mutation } from '../../../core/state/mutation';
 import { PatientLookupApi } from '../../../shared/patient/patient-lookup.api';
 import { PatientsApi } from '../data/patients.api';
@@ -16,9 +17,14 @@ const MERGE_SEARCH_LIMIT = 10;
 export class PatientFileFacade {
   private readonly api = inject(PatientsApi);
   private readonly lookup = inject(PatientLookupApi);
+  private readonly permissions = inject(PermissionsService);
 
   readonly patientId = signal<string | null>(null);
-  readonly includeInactive = signal(true);
+  /** Active documents first; the user ticks "show deactivated" to see the others (UAT A-03 note: it was on by default). */
+  readonly includeInactive = signal(false);
+
+  /** The documents tab and its read need `files.view` (the server refuses the list without it; UAT A-03). */
+  readonly canSeeDocuments = computed(() => this.permissions.can(PATIENTS_PERMISSIONS.filesView));
   /** Visits load when their tab is first opened. */
   readonly visitsRequested = signal(false);
   readonly mergeQuery = signal('');
@@ -31,7 +37,7 @@ export class PatientFileFacade {
   readonly documents = resource({
     params: () => {
       const id = this.patientId();
-      return id === null ? undefined : { id, includeInactive: this.includeInactive() };
+      return id === null || !this.canSeeDocuments() ? undefined : { id, includeInactive: this.includeInactive() };
     },
     loader: ({ params, abortSignal }) => this.api.documents(params.id, params.includeInactive, abortSignal),
   });
@@ -90,6 +96,21 @@ export class PatientFileFacade {
       this.mergeQuery.set('');
       this.patientId.set(id);
     }
+  }
+
+  /** Re-reads the file, its documents, its visits and the form's lookups when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01). A load in flight is left alone. */
+  refresh(): void {
+    for (const write of [this.update, this.merge, this.upload, this.deactivate, this.download]) {
+      write.reset();
+    }
+
+    this.detail.reload();
+    this.documents.reload();
+    this.visits.reload();
+    this.settings.reload();
+    this.countries.reload();
+    this.governorates.reload();
+    this.conditions.reload();
   }
 
   private requireId(): string {

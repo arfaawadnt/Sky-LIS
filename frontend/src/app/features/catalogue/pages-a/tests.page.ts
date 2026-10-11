@@ -17,7 +17,7 @@ import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.com
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
 import { CatalogueAApi } from '../data-a/catalogue-a.api';
-import { csvFileName, downloadCsv, toCsv } from '../data-a/csv-export';
+import { csvFileName, downloadCsv, toCsv, yesNo } from '../data-a/csv-export';
 import { CatalogueAOptions, type CatalogueOption, optionLabel } from '../state-a/catalogue-a-options';
 import { TestsListFacade } from '../state-a/catalogue-lists.facade';
 import { CatalogueExportButtonComponent } from '../ui-a/export-button.component';
@@ -69,7 +69,8 @@ export class TestsPage {
   protected readonly groups = computed(() => (this.options.groups.hasValue() ? this.options.groups.value() : []));
 
   protected readonly exportCsv = async (): Promise<void> => {
-    const rows = await this.api.exportTests();
+    const filter = this.facade.filter();   // the export is the grid: search, status, type and group (UAT C-04)
+    const rows = await this.api.exportTests({ search: filter.search, isActive: filter.isActive }, filter.type, filter.clinicalGroupId);
     const t = (key: string): string => this.i18n.t(`catalogue-a.tests.column.${key}`);
     downloadCsv(
       csvFileName('tests'),
@@ -82,8 +83,8 @@ export class TestsPage {
         { header: t('unit'), value: (row) => row.unitName },
         { header: t('sample'), value: (row) => this.pick(row.sampleTypeNameEn, row.sampleTypeNameAr) },
         { header: this.i18n.t('catalogue-a.tests.field.gender'), value: (row) => this.i18n.t(`catalogue-a.gender.${row.gender}`) },
-        { header: t('hidden'), value: (row) => row.isHiddenHelper },
-        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => row.isActive },
+        { header: t('hidden'), value: (row) => yesNo((key) => this.i18n.t(key), row.isHiddenHelper) },
+        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => yesNo((key) => this.i18n.t(key), row.isActive) },
       ]),
     );
   };

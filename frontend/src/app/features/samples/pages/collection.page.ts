@@ -87,6 +87,7 @@ export class CollectionPage {
 
   constructor() {
     void this.i18n.load('samples');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
   }
 
   protected async onScan(value: string): Promise<void> {
@@ -114,7 +115,7 @@ export class CollectionPage {
   protected async exportCsv(): Promise<void> {
     const count = await this.facade.exporting.execute(`samples-today-${new Date().toISOString().slice(0, 10)}.csv`);
     if (count !== null) {
-      this.toast.success(this.i18n.tf('samples.exported', { count }));
+      this.toast.success(this.i18n.t('samples.exported'));
     }
   }
 

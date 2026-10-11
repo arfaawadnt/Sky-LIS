@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Security;
 using Platform.Application.Account;
 using Platform.Application.Audit;
 using Platform.Contracts.Audit;
@@ -13,7 +14,7 @@ namespace Platform.Infrastructure.Persistence.Account;
 /// tenant (query filter + RLS), merged in one pass. The paged reader of the foundation merges a window per page, which
 /// would read the same rows again for every page of a large export; this reader reads each side once.
 /// </summary>
-internal sealed class AuditExportReader(AppDbContext context) : IAuditExportReader
+internal sealed class AuditExportReader(AppDbContext context, ICurrentTenant tenant) : IAuditExportReader
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -56,6 +57,12 @@ internal sealed class AuditExportReader(AppDbContext context) : IAuditExportRead
             trail = trail.Where(entry => entry.AggregateId == entityId);
         }
 
+        var platformLog = AuditClients.IsPlatformLog(tenant.TenantId);
+        if (platformLog && filter.ClientTenantId is { } client)
+        {
+            (changes, trail) = await AuditClients.NarrowAsync(context, changes, trail, client, cancellationToken).ConfigureAwait(false);
+        }
+
         var changeRows = await changes.OrderByDescending(change => change.AtUtc).ThenByDescending(change => change.Id).Take(maxRows)
             .ToListAsync(cancellationToken).ConfigureAwait(false);
         var trailRows = await (
@@ -64,13 +71,14 @@ internal sealed class AuditExportReader(AppDbContext context) : IAuditExportRead
             from actor in actors.DefaultIfEmpty()
             select new { entry, ActorName = actor == null ? null : actor.DisplayName }).ToListAsync(cancellationToken).ConfigureAwait(false);
 
-        return changeRows.Select(ToItem)
+        var merged = changeRows.Select(ToItem)
             .Concat(trailRows.Select(row => ToItem(row.entry, row.ActorName)))
             .OrderByDescending(item => item.AtUtc)
             .ThenByDescending(item => item.Sequence ?? 0)
             .ThenByDescending(item => item.Id)
             .Take(maxRows)
             .ToList();
+        return platformLog ? await AuditClients.FillAsync(context, merged, cancellationToken).ConfigureAwait(false) : merged;
     }
 
     private static AuditEntryItem ToItem(FieldChange change)

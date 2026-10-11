@@ -8,6 +8,7 @@ import { AUTH_API, type AuthResponse } from '../api/auth.contracts';
 import { AuthStore } from '../auth/auth.store';
 import { platformGuard, tenantGuard } from '../auth/portal.guards';
 import { PLATFORM_TENANT_ID } from '../tenancy/tenant-ids';
+import { ToastService } from '../../shared/ui/toast/toast.service';
 import { PortalService } from './portal.service';
 
 async function signInTo(tenantId: string): Promise<void> {
@@ -55,6 +56,20 @@ describe('PortalService and portal guards (MODULES.md §1: two portals, one SPA)
     expect(refused).toBeInstanceOf(UrlTree);
     expect((refused as UrlTree).toString()).toBe('/');
     expect(runGuard(tenantGuard)).toBe(true);
+  });
+
+  it('a portal refusal shows the "page not available" notice; an admission shows none (validation R4)', async () => {
+    await signInTo(PLATFORM_TENANT_ID);
+    const toasts = TestBed.inject(ToastService);
+
+    expect(runGuard(platformGuard)).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(toasts.toasts()).toEqual([]);
+
+    expect((runGuard(tenantGuard) as UrlTree).toString()).toBe('/admin');
+    await vi.waitFor(() => expect(toasts.toasts().length).toBe(1));
+    expect(toasts.toasts()[0]?.kind).toBe('warn');
+    expect(toasts.toasts()[0]?.text).toMatch(/pageNotAvailable|not available/);
   });
 
   it('tenantGuard sends the platform tenant to /admin', async () => {

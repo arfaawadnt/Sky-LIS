@@ -30,6 +30,8 @@ const row: PatientListItem = {
   mergedIntoPatientId: null,
   mergedIntoNumber: null,
   registeredOn: '2026-10-01',
+  visitCount: 3,
+  lastVisitAtUtc: '2026-10-10T07:30:00Z',
 };
 
 describe('PatientsPage (CP-11 register)', () => {
@@ -75,6 +77,17 @@ describe('PatientsPage (CP-11 register)', () => {
     expect(host.querySelector('tbody tr[data-row]')?.textContent).toContain('منى حسن');
     expect(host.textContent).not.toContain('patients.column.vip');
     expect(host.querySelector('app-page-header .btn.primary')).toBeNull();
+  });
+
+  it('shows the visit count and the last visit of each file (CP-11, UAT A-09)', async () => {
+    granted = new Set(['patients.view']);
+    const host = await render();
+
+    expect(host.textContent).toContain('patients.column.visits');
+    expect(host.textContent).toContain('patients.column.lastVisit');
+    const cells = [...(host.querySelector('tbody tr[data-row]')?.querySelectorAll('td') ?? [])].map((cell) => cell.textContent?.trim());
+    expect(cells).toContain('3');
+    expect(cells.some((text) => text?.includes('2026'))).toBe(true);
   });
 
   it('shows VIP to the confidential right and opens the create drawer for a creator', async () => {

@@ -23,9 +23,9 @@ public sealed class DrugTypesController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetDrugTypeQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportDrugTypesQuery(search, isActive), cancellationToken);
+        var file = await sender.Send(new ExportDrugTypesQuery(search, isActive, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -73,9 +73,9 @@ public sealed class CommercialNamesController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetCommercialNameQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? drugTypeId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? drugTypeId, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportCommercialNamesQuery(search, isActive, drugTypeId), cancellationToken);
+        var file = await sender.Send(new ExportCommercialNamesQuery(search, isActive, drugTypeId, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -123,9 +123,9 @@ public sealed class AntibioticsController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetAntibioticQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportAntibioticsQuery(search, isActive), cancellationToken);
+        var file = await sender.Send(new ExportAntibioticsQuery(search, isActive, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -173,9 +173,9 @@ public sealed class OrganismsController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetOrganismQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportOrganismsQuery(search, isActive), cancellationToken);
+        var file = await sender.Send(new ExportOrganismsQuery(search, isActive, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -223,9 +223,9 @@ public sealed class SensitivityValuesController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetSensitivityValueQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportSensitivityValuesQuery(search, isActive), cancellationToken);
+        var file = await sender.Send(new ExportSensitivityValuesQuery(search, isActive, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 

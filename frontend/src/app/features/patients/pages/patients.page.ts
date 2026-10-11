@@ -26,6 +26,7 @@ import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.com
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
+import { formatDateTime } from '../../../shared/patient/patient-demographics';
 import { saveFile } from '../data/save-file';
 import { PatientsFacade } from '../state/patients.facade';
 import { ageParts } from '../../../shared/patient/patient-demographics';
@@ -86,6 +87,9 @@ export class PatientsPage {
       { key: 'mobile', header: 'patients.column.mobile', mono: true, width: '140px' },
       { key: 'nationalId', header: 'patients.column.nationalId', mono: true, secondary: true },
       { key: 'condition', header: 'patients.column.condition', secondary: true, value: (row) => this.conditionName(row.patientConditionId) },
+      // CP-11 "visit count, last visit" (UAT A-09), counted by Registration
+      { key: 'visitCount', header: 'patients.column.visits', width: '80px', align: 'end', value: (row) => row.visitCount ?? 0 },
+      { key: 'lastVisitAtUtc', header: 'patients.column.lastVisit', width: '150px', secondary: true, value: (row) => (row.lastVisitAtUtc ? formatDateTime(row.lastVisitAtUtc, this.i18n.lang()) : '—') },
     ];
     if (this.permissionsService.can(PATIENTS_PERMISSIONS.viewConfidential)) {
       columns.push({ key: 'isVip', header: 'patients.column.vip', width: '70px', align: 'center' });
@@ -97,6 +101,7 @@ export class PatientsPage {
 
   constructor() {
     void this.i18n.load('patients');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
   }
 
   protected open(row: PatientListItem): void {

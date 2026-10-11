@@ -4,7 +4,7 @@ import { PLATFORM_API, PLATFORM_PERMISSIONS, type RuleTemplateListItem, type Rul
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
-import type { FormValue, MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
+import type { FormValue, MasterDataConfig, MasterDataFilter } from '../../../shared/ui/master-data-page/master-data.types';
 import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { fileStamp } from '../ui/format';
@@ -25,6 +25,9 @@ export class RuleTemplatesPage {
   private readonly api = inject(PlatformApi);
   private readonly csv = inject(CsvExportService);
 
+  /** The filter of the list on screen: the export writes exactly these rows (UAT R2-02, as C-04 elsewhere). */
+  private filter: MasterDataFilter = { search: '', active: true };
+
   protected readonly config: MasterDataConfig<RuleTemplateListItem, RuleTemplateRequest> = {
     i18nPrefix: 'platform.ruleTemplates',
     columns: [
@@ -40,7 +43,10 @@ export class RuleTemplatesPage {
       { name: 'description', kind: 'textarea', maxLength: 1000 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.listRuleTemplates({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => {
+        this.filter = filter;
+        return this.api.listRuleTemplates({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+      },
       create: (dto) => this.api.saveRuleTemplate(null, dto),
       update: (id, dto) => this.api.saveRuleTemplate(id, dto),
       setActive: (id, active) => this.api.setLibraryActive(PLATFORM_API.ruleTemplates, id, active),
@@ -59,7 +65,7 @@ export class RuleTemplatesPage {
   }
 
   protected async exportCsv(): Promise<void> {
-    const rows = await this.api.all((page) => this.api.listRuleTemplates({ search: null, isActive: null, ...page }));
+    const rows = await this.api.all((page) => this.api.listRuleTemplates({ search: this.filter.search || null, isActive: this.filter.active, ...page }));
     this.csv.download(`rule-templates-${fileStamp()}`, [
       { header: this.i18n.t('platform.ruleTemplates.column.name'), value: (row: RuleTemplateListItem) => row.name },
       { header: this.i18n.t('platform.ruleTemplates.column.clinicalGroup'), value: (row) => row.clinicalGroupName },

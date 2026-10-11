@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 
 import { ACCOUNT_PERMISSIONS, type AuditActorItem } from '../../../core/api/account.contracts';
-import type { AuditEntryItem } from '../../../core/api/audit.contracts';
+import type { AuditClientItem, AuditEntryItem } from '../../../core/api/audit.contracts';
 import type { PageRequest } from '../../../core/api/paging';
 import type { ProblemDetails } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
@@ -68,28 +68,33 @@ export class AuditLogPage {
     userId: new FormControl('', { nonNullable: true }),
     entityType: new FormControl('', { nonNullable: true }),
     entityId: new FormControl('', { nonNullable: true }),
+    clientTenantId: new FormControl('', { nonNullable: true }),
   });
 
-  protected readonly columns: readonly TableColumn<AuditEntryItem>[] = [
+  protected readonly isPlatform = this.portal.isPlatform;
+
+  /** SA-09 adds the client the entry concerns (UAT C-18); a laboratory's own log has no such column. */
+  protected readonly columns = computed<readonly TableColumn<AuditEntryItem>[]>(() => [
     { key: 'atUtc', header: 'account.audit.time', width: '170px', value: (row) => formatDateTime(row.atUtc, this.i18n.lang()) },
     { key: 'actorName', header: 'account.audit.user', width: '160px', value: (row) => row.actorName ?? this.i18n.t('account.audit.system') },
+    ...(this.isPlatform() ? [{ key: 'client', header: 'account.audit.client', width: '170px', value: (row: AuditEntryItem) => this.client(row) }] : []),
     { key: 'action', header: 'account.audit.action', width: '190px' },
     { key: 'entityType', header: 'account.audit.entity', width: '170px' },
     { key: 'details', header: 'account.audit.details', value: (row) => this.summary(row) },
     { key: 'entityId', header: 'account.audit.entityId', mono: true, secondary: true, width: '120px', value: (row) => this.shortId(row.entityId) },
-  ];
+  ]);
 
   protected readonly rows = computed<readonly AuditEntryItem[]>(() => (this.facade.entries.hasValue() ? this.facade.entries.value().items : []));
   protected readonly totalCount = computed(() => (this.facade.entries.hasValue() ? this.facade.entries.value().totalCount : 0));
   protected readonly actors = computed<readonly AuditActorItem[]>(() => (this.facade.actors.hasValue() ? this.facade.actors.value() : []));
+  protected readonly clients = computed<readonly AuditClientItem[]>(() => (this.facade.clients.hasValue() ? this.facade.clients.value() : []));
 
   /** Entity types seen on the page, offered as suggestions (the field stays free text). */
   protected readonly entityTypes = computed(() => [...new Set(this.rows().map((row) => row.entityType))].sort((a, b) => a.localeCompare(b)));
 
-  protected readonly isPlatform = this.portal.isPlatform;
-
   constructor() {
     void this.i18n.load('account');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01/C-13)
   }
 
   protected apply(): void {
@@ -155,6 +160,20 @@ export class AuditLogPage {
 
   protected count(value: number): string {
     return formatNumber(value, this.i18n.lang());
+  }
+
+  /** The client's name in the interface language (SA-09); "—" for the platform's own records. */
+  protected client(row: AuditEntryItem): string {
+    if (!row.clientTenantId) {
+      return '—';
+    }
+
+    const name = this.i18n.lang() === 'ar' ? (row.clientNameAr ?? row.clientNameEn) : (row.clientNameEn ?? row.clientNameAr);
+    return name ?? this.shortId(row.clientTenantId);
+  }
+
+  protected clientName(client: AuditClientItem): string {
+    return this.i18n.lang() === 'ar' ? client.nameAr || client.nameEn : client.nameEn || client.nameAr;
   }
 
   protected kindLabel(kind: string): string {

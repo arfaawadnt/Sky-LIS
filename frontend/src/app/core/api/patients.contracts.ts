@@ -74,6 +74,10 @@ export interface PatientListItem {
   readonly mergedIntoPatientId: string | null;
   readonly mergedIntoNumber: string | null;
   readonly registeredOn: string;
+  /** CP-11 "visit count" (from Registration; UAT A-09). Optional only for lookups that do not carry it. */
+  readonly visitCount?: number;
+  /** CP-11 "last visit": the latest visit's registration instant (UTC), `null` without visits. */
+  readonly lastVisitAtUtc?: string | null;
 }
 
 export interface PatientMergeView {

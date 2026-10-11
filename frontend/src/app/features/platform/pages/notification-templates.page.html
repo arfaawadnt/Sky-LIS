@@ -47,7 +47,7 @@
   <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="facade.templates.value()?.totalCount ?? 0" (pageChange)="onPage($event)" />
 </app-section-card>
 
-<app-drawer [(open)]="drawerOpen" [title]="i18n.t(editing() === null ? 'platform.templates.add' : 'platform.templates.edit')" size="lg">
+<app-drawer [(open)]="drawerOpen" [title]="i18n.t(editing() === null ? 'platform.templates.add' : canManage() ? 'platform.templates.edit' : 'platform.templates.view')" size="lg">
   @if (form(); as form) {
     <form id="platform-template-form" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
       @if (saveProblem(); as problem) {
@@ -77,7 +77,7 @@
           <span class="small muted">{{ i18n.t('platform.templates.insertHint') }}</span>
           <div class="chips">
             @for (token of tokens(); track token) {
-              <button type="button" class="chip" (click)="insert(form, token)" [title]="i18n.t('platform.templates.token.' + token)">{{ tokenText(token) }}</button>
+              <button type="button" class="chip" [disabled]="!canManage()" (click)="insert(form, token)" [title]="i18n.t('platform.templates.token.' + token)">{{ tokenText(token) }}</button>
             }
           </div>
         </div>

@@ -50,14 +50,25 @@ public sealed class BranchTests
         Assert.Equal(OrganizationCodes.BranchContactInvalid, refusal.Code);
     }
 
-    [Theory]
-    [InlineData("not-an-email", "+20 100 000 0000")]
-    [InlineData("a@b.c", "phone!")]
-    public void AS_B3_Malformed_contact_data_is_ORG_008(string email, string phone)
+    [Fact]
+    public void AS_B3_A_malformed_email_is_ORG_016_so_the_page_marks_the_email_field()
     {
-        var refusal = Assert.Throws<DomainException>(() => Branch.Create("B1", Name, null, null, phone, email, "EGP", FixedClock.Instant));
+        var refusal = Assert.Throws<DomainException>(() => Branch.Create("B1", Name, null, null, "+20 100 000 0000", "not-an-email", "EGP", FixedClock.Instant));
 
-        Assert.Equal(OrganizationCodes.BranchContactInvalid, refusal.Code);
+        Assert.Equal(OrganizationCodes.BranchEmailInvalid, refusal.Code);
+        Assert.Equal(DomainFault.Validation, refusal.Fault);
+    }
+
+    [Fact]
+    public void AS_B3_A_malformed_phone_is_ORG_015_so_the_page_marks_the_phone_field()
+    {
+        var refusal = Assert.Throws<DomainException>(() => Branch.Create("B1", Name, null, null, "phone!", "a@b.c", "EGP", FixedClock.Instant));
+
+        Assert.Equal(OrganizationCodes.BranchPhoneInvalid, refusal.Code);
+        Assert.Equal(DomainFault.Validation, refusal.Fault);
+        // UAT R1-06: one wording with the page's ORG-015 text (both limits: at least 5 digits, at most 20 characters).
+        Assert.Equal("The phone number must have at least 5 digits and at most 20 characters: digits, spaces, '+', '-' or parentheses.", refusal.Message);
+        Assert.Equal(OrganizationCodes.BranchPhoneInvalid, Assert.Throws<DomainException>(() => Branch.Create("B1", Name, null, null, "+20 12", "a@b.c", "EGP", FixedClock.Instant)).Code);
     }
 
     [Theory]

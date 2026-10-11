@@ -2,11 +2,12 @@ import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { AUTH_API, type AuthResponse } from '../api/auth.contracts';
 import { AuthStore } from '../auth/auth.store';
+import { FakeBrowserNavigation, provideSessionTesting } from '../auth/session-testing';
 import { authInterceptor } from './auth.interceptor';
 import { csrfInterceptor } from './csrf.interceptor';
 import { problemDetailsInterceptor } from './problem-details.interceptor';
@@ -14,12 +15,12 @@ import { problemDetailsInterceptor } from './problem-details.interceptor';
 /** Promise-based steps (refresh, sealing) issue their HTTP request a tick later; let the event loop turn before asserting. */
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
-const signedIn = (token: string): AuthResponse => ({
+const signedIn = (token: string, userId = 'u1', tenantId = 't1'): AuthResponse => ({
   step: 'signed-in',
   accessToken: token,
   expiresAtUtc: null,
   refreshToken: null,
-  profile: { userId: 'u1', displayName: 'Mona', tenantId: 't1', roleName: null, permissions: [], language: 'en', scope: 'full' },
+  profile: { userId, displayName: 'Mona', tenantId, roleName: null, permissions: [], language: 'en', scope: 'full' },
   tenants: null,
 });
 
@@ -27,14 +28,17 @@ describe('authInterceptor + csrfInterceptor (01 §6.4)', () => {
   let http: HttpClient;
   let backend: HttpTestingController;
   let store: AuthStore;
+  let navigation: FakeBrowserNavigation;
 
   beforeEach(() => {
+    navigation = new FakeBrowserNavigation();
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
         provideRouter([{ path: 'login', children: [] }]),
         provideHttpClient(withInterceptors([csrfInterceptor, authInterceptor, problemDetailsInterceptor])),
         provideHttpClientTesting(),
+        ...provideSessionTesting(navigation),
       ],
     });
     http = TestBed.inject(HttpClient);
@@ -115,6 +119,49 @@ describe('authInterceptor + csrfInterceptor (01 §6.4)', () => {
 
     await expect(call).rejects.toMatchObject({ name: 'ProblemError', code: 'AUTH-006', status: 401 });
     expect(store.isAuthenticated()).toBe(false);
+    expect(navigation.loads).toEqual(['/login']); // the store reloads the sign-in page (A-01); the root carries no return URL
+  });
+
+  it('never replays a request when the refresh comes back as another user (C-01)', async () => {
+    await signInWith('token-of-x');
+    navigation.url = '/admin/profile';
+
+    const call = firstValueFrom(http.put('/api/v1/account/password', { current: 'a', next: 'b' })).catch((error: unknown) => error);
+    backend.expectOne('/api/v1/account/password').flush({ code: 'AUTH-006', title: 'expired', status: 401 }, { status: 401, statusText: 'Unauthorized' });
+    backend.expectOne(AUTH_API.refresh).flush(signedIn('token-of-y', 'u2', 't1'));
+    await settle();
+
+    backend.expectNone('/api/v1/account/password');
+    expect(await call).toMatchObject({ code: 'AUTH-006', status: 401 });
+    expect(store.isAuthenticated()).toBe(false);
+    expect(store.token()).toBeNull();
+    expect(navigation.loads).toEqual(['/login']);
+  });
+
+  it('never replays a request when the refresh comes back in another tenant (C-01)', async () => {
+    await signInWith('token-lab-b');
+
+    const call = firstValueFrom(http.post('/api/v1/things', { a: 1 })).catch((error: unknown) => error);
+    backend.expectOne('/api/v1/things').flush(null, { status: 401, statusText: 'Unauthorized' });
+    backend.expectOne(AUTH_API.refresh).flush(signedIn('token-lab-c', 'u1', 't2'));
+    await settle();
+
+    backend.expectNone('/api/v1/things');
+    expect(await call).toMatchObject({ status: 401 });
+    expect(navigation.loads).toEqual(['/login']);
+  });
+
+  it('a 401 without a session routes to sign-in without a pointless return URL', async () => {
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate');
+
+    const call = firstValueFrom(http.get('/api/v1/things'));
+    backend.expectOne('/api/v1/things').flush(null, { status: 401, statusText: 'Unauthorized' });
+    backend.expectOne(AUTH_API.refresh).flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    await expect(call).rejects.toMatchObject({ status: 401 });
+    expect(navigate).toHaveBeenCalledWith(['/login'], {});
+    expect(navigation.loads).toEqual([]);
   });
 
   it('never retries the auth endpoints themselves', async () => {

@@ -139,7 +139,10 @@ public sealed record AssignUserBranchesRequest(IReadOnlyList<Guid> BranchIds);
 /// <summary>BR-17 per-user overrides; <see cref="SpecialRights"/> null = the role's special rights apply.</summary>
 public sealed record SetUserOverridesRequest(IReadOnlyList<string> AddedPermissionKeys, IReadOnlyList<string> RemovedPermissionKeys, SpecialRightsDto? SpecialRights);
 
-/// <summary>Status names: Active, Locked, Expired, Inactive (membership deactivated).</summary>
+/// <summary>
+/// Status names: Active, Locked, Expired, Inactive (membership deactivated). <see cref="BranchCount"/> 0 = every active
+/// branch; <see cref="BranchCodes"/> the codes of the assigned branches, by code (empty = every branch; UAT R1-06).
+/// </summary>
 public sealed record UserListItem(
     Guid UserId,
     string Username,
@@ -156,7 +159,8 @@ public sealed record UserListItem(
     bool MustChangePassword,
     DateTimeOffset? PasswordExpiresAtUtc,
     bool IsModified,
-    bool IsPrimaryAdministrator);
+    bool IsPrimaryAdministrator,
+    IReadOnlyList<string>? BranchCodes = null);
 
 public sealed record UserOverridesDto(IReadOnlyList<string> AddedPermissionKeys, IReadOnlyList<string> RemovedPermissionKeys, SpecialRightsDto? SpecialRights);
 

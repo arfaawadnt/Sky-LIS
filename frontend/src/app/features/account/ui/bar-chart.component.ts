@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
-/** One bar: its axis label, its value and the accessible description. */
+/** One bar: its axis label, its value (and how to print it, e.g. Arabic-Indic digits), and the accessible description. */
 export interface BarDatum {
   readonly label: string;
   readonly value: number;
+  /** The value as shown above the bar; the raw number when omitted. */
+  readonly display?: string;
   readonly description: string;
 }
 
@@ -98,7 +100,7 @@ export class BarChartComponent {
     return data.map((datum, index) => {
       const position = rtl ? data.length - 1 - index : index;
       const height = Math.max(2, (datum.value / max) * usable);
-      return { label: datum.label, value: datum.value, x: position * slot + (slot - barWidth) / 2, y: HEIGHT - AXIS - height, width: barWidth, height };
+      return { label: datum.label, value: datum.display ?? String(datum.value), x: position * slot + (slot - barWidth) / 2, y: HEIGHT - AXIS - height, width: barWidth, height };
     });
   });
 }

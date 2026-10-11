@@ -52,7 +52,7 @@
   "allStatuses": "All",
   "searchPlaceholder": "Sample or accession number…",
   "exportCsv": "Export CSV",
-  "exported": "{count} rows exported.",
+  "exported": "The CSV file was downloaded.",
   "refresh": "Refresh",
   "loadError": "The samples could not be loaded.",
   "track": "Track",

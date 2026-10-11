@@ -6,12 +6,10 @@
   "exportCsv": "Export CSV",
   "reprint": "Reprint",
   "openVisit": "Open visit",
-
   "lookup.find": "Find",
   "lookup.hint": "Type or scan the accession and press Enter.",
   "lookup.emptyTitle": "Find a visit",
   "lookup.emptyMessage": "Enter an accession to see the visit's account and collect payments.",
-
   "field.accession": "Accession",
   "field.patient": "Patient",
   "field.payer": "Payer",
@@ -23,24 +21,19 @@
   "field.reason": "Reason",
   "field.note": "Note",
   "field.cashier": "Cashier",
-
   "filter.all": "All",
   "filter.from": "From",
   "filter.to": "To",
-
   "method.Cash": "Cash",
   "method.Card": "Card",
   "method.Pos": "POS",
   "method.Transfer": "Transfer",
-
   "status.Posted": "Posted",
   "status.Voided": "Voided",
-
   "balance.Paid": "Paid",
   "balance.Unpaid": "Unpaid",
   "balance.Partial": "Partly paid",
   "balance.RefundDue": "Refund due",
-
   "column.receipt": "Receipt",
   "column.number": "Number",
   "column.date": "Date",
@@ -65,7 +58,6 @@
   "column.countedCash": "Counted cash",
   "column.difference": "Difference",
   "column.closedBy": "Closed by",
-
   "account.title": "Visit account",
   "account.unknownPatient": "Patient",
   "account.totalListPrice": "Total",
@@ -81,13 +73,11 @@
   "account.printInvoice": "Print invoice",
   "account.refundDue": "Refund the balance",
   "account.billedThroughClaims": "This visit belongs to a lab-to-lab batch: it is billed to the sending laboratory through claims.",
-
   "payments.title": "Payments",
   "payments.subtitle": "Collect the patient share of a visit, in full or in part, on a treasury approved for this device.",
   "payments.tabCollect": "Collect",
   "payments.tabRegister": "Register",
   "payments.empty": "No payment matches the filter.",
-
   "pay.title": "Take a payment",
   "pay.device": "Device",
   "pay.chooseTreasury": "Choose a treasury…",
@@ -98,18 +88,15 @@
   "pay.noTreasury": "No treasury is approved for you on this device.",
   "pay.requestAccess": "Request treasury access",
   "pay.nothingDue": "Nothing is due on this visit.",
-
   "void.action": "Void",
   "void.title": "Void the payment",
   "void.message": "Void receipt {number} of {amount}? The amount returns to the balance. A reason is required.",
   "void.done": "Receipt {number} voided.",
-
   "refunds.title": "Refunds",
   "refunds.subtitle": "Return a negative balance (after a contract transfer or a cancelled service), never above the refundable amount.",
   "refunds.register": "Refunds",
   "refunds.empty": "No refund matches the filter.",
   "refunds.emptyMessage": "Enter an accession to see the refundable amount of the visit.",
-
   "refund.title": "Refund",
   "refund.refundable": "Refundable",
   "refund.chooseReason": "Choose a reason…",
@@ -117,7 +104,6 @@
   "refund.done": "Refund {number} recorded; print the receipt for the patient's signature.",
   "refund.nothingRefundable": "Nothing is refundable on this visit.",
   "refund.reasonsError": "The refund reasons could not be loaded.",
-
   "batch.title": "Batch payment",
   "batch.subtitle": "Settle the members of a group batch one by one or all at once.",
   "batch.lookupHint": "Type the batch number and press Enter.",
@@ -134,7 +120,6 @@
   "batch.payAllSubmit": "Pay all",
   "batch.payMember": "Pay",
   "batch.paidAll": "{count} receipts recorded for {amount}.",
-
   "closing.title": "Cash closing",
   "closing.subtitle": "Reconcile the drawer of a treasury for a cashier and a period: expected cash = cash payments − cash refunds.",
   "closing.scopeTitle": "Drawer",
@@ -178,7 +163,6 @@
   "closing.printSheet": "Sheet",
   "closing.handedOverBy": "Handed over by (cashier)",
   "closing.receivedBy": "Received by",
-
   "doc.receiptTitle": "Payment receipt",
   "doc.receiptsTitle": "Payment receipts",
   "doc.invoiceTitle": "Invoice",
@@ -202,7 +186,6 @@
   "doc.refundAcknowledgement": "I received the amount above.",
   "doc.patientSignature": "Patient signature",
   "doc.cashierSignature": "Cashier signature",
-
   "error.BIL-001": "The amount must be greater than zero.",
   "error.BIL-002": "The amount may have at most two decimals.",
   "error.BIL-003": "A reference is required for every method except cash.",
@@ -240,5 +223,6 @@
   "error.BIL-409": "The treasury was not found.",
   "error.TENANT-004": "Select a branch before taking money.",
   "error.CONCURRENCY-409": "Another cashier changed this visit's account just now; reload and try again.",
-  "error.UNIQUE-409": "Another cashier recorded a movement on this visit just now; reload and try again."
+  "error.UNIQUE-409": "Another cashier recorded a movement on this visit just now; reload and try again.",
+  "exported": "The CSV file was downloaded."
 }

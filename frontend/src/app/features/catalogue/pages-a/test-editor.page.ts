@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Location } from '@angular/common';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { type AbstractControl, FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { map } from 'rxjs';
 
 import {
   CATALOGUE_A_PERMISSIONS,
@@ -25,6 +27,7 @@ import {
 } from '../../../core/api/catalogue-a.contracts';
 import { type ProblemDetails, ProblemCodes } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import type { Mutation } from '../../../core/state/mutation';
 import { localizedPick, localizedTextGroup } from '../../../shared/forms/localized-text';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
@@ -51,6 +54,9 @@ import { TestEditorFacade } from '../state-a/test-editor.facade';
 type Section = 'general' | 'ranges' | 'values' | 'formula' | 'paragraphs' | 'timing';
 
 type RowKind = 'bands' | 'values' | 'paragraphs';
+
+/** One write of a save: the section it belongs to and the call (true = stored). */
+type Step = readonly [Section, () => Promise<boolean>];
 
 type BandForm = FormGroup<{
   sex: FormControl<GenderRestriction>;
@@ -111,6 +117,8 @@ export class TestEditorPage {
   protected readonly options = inject(CatalogueAOptions);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly location = inject(Location);
+  private readonly access = inject(PermissionsService);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
 
@@ -121,8 +129,20 @@ export class TestEditorPage {
   protected readonly frequencyActions = FREQUENCY_ACTIONS;
   protected readonly weekdays = [0, 1, 2, 3, 4, 5, 6];
 
-  protected readonly testId = this.route.snapshot.paramMap.get('id');
-  protected readonly isNew = this.testId === null;
+  /** The id in the address bar, followed reactively: the router reuses this page when only `:id` changes (UAT B-05). */
+  private readonly routeId = toSignal(this.route.paramMap.pipe(map((params) => params.get('id'))), { initialValue: this.route.snapshot.paramMap.get('id') });
+
+  /** A test created here whose configuration was partly refused: the page continues as its editor and keeps the input (UAT B-04). */
+  private readonly createdId = signal<string | null>(null);
+
+  protected readonly testId = computed(() => this.createdId() ?? this.routeId());
+  protected readonly isNew = computed(() => this.testId() === null);
+
+  /** Viewers (no create / edit right) see the test read-only (UAT B-12); the server decides regardless. */
+  protected readonly canEdit = computed(() => this.access.can(this.isNew() ? CATALOGUE_A_PERMISSIONS.create : CATALOGUE_A_PERMISSIONS.edit));
+
+  /** The record the forms were last filled from: a re-read of the same record keeps the sections still being edited (UAT B-04). */
+  private filledId: string | null = null;
 
   protected readonly general = new FormGroup({
     code: new FormControl('', { nonNullable: true, validators: [requiredText, codeValidator, Validators.maxLength(16)] }),
@@ -159,6 +179,10 @@ export class TestEditorPage {
   protected readonly paragraphs = new FormArray<ParagraphForm>([]);
   protected readonly formula = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(1000)] });
 
+  /** The forms as a new test starts: restored when the page goes back to "new" without being rebuilt (UAT R1-07). */
+  private readonly blankGeneral = this.general.getRawValue();
+  private readonly blankTiming = this.timing.getRawValue();
+
   protected readonly type = toSignal(this.general.controls.type.valueChanges, { initialValue: this.general.controls.type.value });
   private readonly sampleTypeId = toSignal(this.general.controls.sampleTypeId.valueChanges, { initialValue: this.general.controls.sampleTypeId.value });
 
@@ -180,28 +204,35 @@ export class TestEditorPage {
   protected readonly tabs = computed<readonly TabItem[]>(() => {
     this.rowsVersion();
     const allows = this.allows();
-    const tabs: TabItem[] = [{ id: 'general', label: this.i18n.t('catalogue-a.tests.tab.general') }];
+    const problems = this.problems();
+    // a refused section is marked "!" on its tab (UAT B-04)
+    const badge = (section: Section, count: number | null): string | number | null => (problems[section] ? '!' : count);
+    const tabs: TabItem[] = [{ id: 'general', label: this.i18n.t('catalogue-a.tests.tab.general'), badge: badge('general', null) }];
     if (allows.ranges) {
-      tabs.push({ id: 'ranges', label: this.i18n.t('catalogue-a.tests.tab.ranges'), badge: this.bands.length });
+      tabs.push({ id: 'ranges', label: this.i18n.t('catalogue-a.tests.tab.ranges'), badge: badge('ranges', this.bands.length) });
     }
 
     if (allows.values) {
-      tabs.push({ id: 'values', label: this.i18n.t('catalogue-a.tests.tab.values'), badge: this.values.length });
+      tabs.push({ id: 'values', label: this.i18n.t('catalogue-a.tests.tab.values'), badge: badge('values', this.values.length) });
     }
 
     if (allows.formula) {
-      tabs.push({ id: 'formula', label: this.i18n.t('catalogue-a.tests.tab.formula') });
+      tabs.push({ id: 'formula', label: this.i18n.t('catalogue-a.tests.tab.formula'), badge: badge('formula', null) });
     }
 
     if (allows.paragraphs) {
-      tabs.push({ id: 'paragraphs', label: this.i18n.t('catalogue-a.tests.tab.paragraphs'), badge: this.paragraphs.length });
+      tabs.push({ id: 'paragraphs', label: this.i18n.t('catalogue-a.tests.tab.paragraphs'), badge: badge('paragraphs', this.paragraphs.length) });
     }
 
-    tabs.push({ id: 'timing', label: this.i18n.t('catalogue-a.tests.tab.timing') });
+    tabs.push({ id: 'timing', label: this.i18n.t('catalogue-a.tests.tab.timing'), badge: badge('timing', null) });
     return tabs;
   });
 
-  protected readonly detail = computed<LabTestDetail | null>(() => (this.facade.detail.hasValue() ? this.facade.detail.value() : null));
+  /** The loaded test, only while it is the one this page edits: a previous record is never shown or acted on (UAT B-05). */
+  protected readonly detail = computed<LabTestDetail | null>(() => {
+    const detail = this.facade.detail.hasValue() ? this.facade.detail.value() : null;
+    return detail !== null && detail.id === this.testId() ? detail : null;
+  });
 
   protected readonly title = computed(() => {
     const detail = this.detail();
@@ -221,16 +252,40 @@ export class TestEditorPage {
     return (this.options.patientConditions.hasValue() ? this.options.patientConditions.value() : []).filter((option) => option.isActive || used.has(option.value));
   });
 
+  /** The active conditions of the chosen sample type, plus the one the test already holds (BR-24, UAT B-08). */
+  protected readonly conditionChoices = computed(() => {
+    const current = this.detail()?.sampleConditionId ?? null;
+    return this.conditions().filter((condition) => condition.isActive || condition.id === current);
+  });
+
   protected readonly verdict = signal<{ readonly valid: boolean; readonly text: string } | null>(null);
   protected readonly referenceResults = computed<readonly TestLookupItem[]>(() => (this.facade.references.hasValue() ? this.facade.references.value() : []));
 
   constructor() {
     void this.i18n.load('catalogue-a');
-    this.facade.load(this.testId);
     this.options.refresh();   // the options outlive the page: re-read on open (UAT D-14)
-    if (!this.isNew) {
-      this.general.controls.code.disable();
-    }
+
+    // every id in the address bar opens its own record, also when the router reuses the page (UAT B-05)
+    effect(() => {
+      const id = this.routeId();
+      untracked(() => this.open(id));
+    });
+
+    // UAT R1-07: after a partly refused create the address shows the created test (replaceState) while the router still
+    // holds the "new" route, so a history step back to /tests/new is not a navigation for the router. The page itself
+    // follows the address: "new" starts empty again.
+    const stopFollowing = this.location.onUrlChange((url) => {
+      if (this.createdId() !== null && isNewTestUrl(url)) {
+        this.startNew();
+      }
+    });
+    inject(DestroyRef).onDestroy(stopFollowing);
+
+    // read-only without the right to save (UAT B-12)
+    effect(() => {
+      this.canEdit();
+      untracked(() => this.applyAccess());
+    });
 
     effect(() => {
       const detail = this.detail();
@@ -361,7 +416,7 @@ export class TestEditorPage {
       return;
     }
 
-    const result = await this.facade.check.execute({ expression, testId: this.testId });
+    const result = await this.facade.check.execute({ expression, testId: this.testId() });
     if (result === null) {
       this.verdict.set({ valid: false, text: this.problemText(this.facade.check.problem()) });
       return;
@@ -374,8 +429,8 @@ export class TestEditorPage {
         this.formula.markAsDirty();
       }
     } else {
-      const position = result.position === null ? '' : ` ${this.i18n.tf('catalogue-a.tests.formula.position', { position: result.position })}`;
-      this.verdict.set({ valid: false, text: `${this.problemText({ code: result.code ?? 'CAT-063' } as ProblemDetails)}${position}${result.message ? ` — ${result.message}` : ''}` });
+      const position = result.position === null ? null : this.i18n.tf('catalogue-a.tests.formula.position', { position: result.position });
+      this.verdict.set({ valid: false, text: formulaVerdict(this.problemText({ code: result.code ?? 'CAT-063' } as ProblemDetails), position, result.message) });
     }
   }
 
@@ -384,6 +439,10 @@ export class TestEditorPage {
   }
 
   protected insertReference(item: TestLookupItem): void {
+    if (!this.canEdit()) {
+      return;
+    }
+
     const current = this.formula.value.trimEnd();
     this.formula.setValue(current === '' ? `[${item.code}]` : `${current} [${item.code}]`);
     this.formula.markAsDirty();
@@ -393,8 +452,9 @@ export class TestEditorPage {
   // ---- save
 
   async save(): Promise<void> {
-    if (this.saving()) {
-      return;
+    const id = this.testId();
+    if (this.saving() || !this.canEdit() || (id !== null && this.detail() === null)) {
+      return;   // nothing to save for a viewer, nor before the record in the address bar is loaded
     }
 
     if (!markAllTouched(this.general)) {
@@ -419,10 +479,10 @@ export class TestEditorPage {
     this.saving.set(true);
     this.problems.set({});
     try {
-      if (this.testId === null) {
+      if (id === null) {
         await this.createAll();
       } else {
-        await this.updateAll(this.testId);
+        await this.updateAll(id);
       }
     } finally {
       this.saving.set(false);
@@ -461,107 +521,139 @@ export class TestEditorPage {
 
     this.general.markAsPristine();
     const allows = this.allows();
-    const steps: (() => Promise<boolean>)[] = [];
+    const steps: Step[] = [];
     if (this.timing.dirty) {
-      steps.push(() => this.run('timing', this.facade.timing, { id: created.id, timing: this.timingValue() }, this.timing));
+      steps.push(['timing', () => this.run('timing', this.facade.timing, { id: created.id, timing: this.timingValue() }, this.timing)]);
     }
 
     if (allows.ranges && this.bands.length > 0) {
-      steps.push(() => this.run('ranges', this.facade.bands, { id: created.id, bands: this.bandValues() }, this.bands));
+      steps.push(['ranges', () => this.run('ranges', this.facade.bands, { id: created.id, bands: this.bandValues() }, this.bands)]);
     }
 
     if (allows.values && this.values.length > 0) {
-      steps.push(() => this.run('values', this.facade.values, { id: created.id, values: this.valueItems() }, this.values));
+      steps.push(['values', () => this.run('values', this.facade.values, { id: created.id, values: this.valueItems() }, this.values)]);
     }
 
     if (allows.formula && this.formula.value.trim() !== '') {
-      steps.push(() => this.run('formula', this.facade.formula, { id: created.id, expression: this.formula.value.trim() }, this.formula));
+      steps.push(['formula', () => this.run('formula', this.facade.formula, { id: created.id, expression: this.formula.value.trim() }, this.formula)]);
     }
 
     if (allows.paragraphs && this.paragraphs.length > 0) {
-      steps.push(() => this.run('paragraphs', this.facade.paragraphs, { id: created.id, paragraphs: this.paragraphItems() }, this.paragraphs));
+      steps.push(['paragraphs', () => this.run('paragraphs', this.facade.paragraphs, { id: created.id, paragraphs: this.paragraphItems() }, this.paragraphs)]);
     }
 
-    let complete = true;
-    for (const step of steps) {
-      if (!(await step())) {
-        complete = false;
-        break;
-      }
+    // the sections are independent: each one is tried, so every refusal shows on its own tab
+    const refused = await this.runEach(steps);
+    if (refused.length === 0) {
+      this.toast.success(this.i18n.t('catalogue-a.tests.created'));
+      await this.router.navigate(['..', created.id], { relativeTo: this.route, replaceUrl: true });
+      return;
     }
 
-    this.toast.success(this.i18n.t(complete ? 'catalogue-a.tests.created' : 'catalogue-a.tests.createdPartly'));
-    await this.router.navigate(['..', created.id], { relativeTo: this.route, replaceUrl: true });
+    // The head exists: the page continues as the editor of the created test, on its address, keeping everything the
+    // user typed; the refused sections stay dirty and are sent again by the next save (UAT B-04 / C-05).
+    this.filledId = created.id;
+    this.createdId.set(created.id);
+    this.location.replaceState(this.router.serializeUrl(this.router.createUrlTree(['..', created.id], { relativeTo: this.route })));
+    this.facade.load(created.id);
+    this.applyAccess();
+    this.activeTab.set(refused[0] ?? 'general');
+    this.toast.error(this.i18n.t('catalogue-a.tests.createdPartly'));
   }
 
   private async updateAll(id: string): Promise<void> {
     const allows = this.allows();
     const detail = this.detail();
-    let changed = false;
 
-    // 1. clearing a configuration first, so a type change that needs it passes (CAT-071)
-    const clearing: (() => Promise<boolean>)[] = [];
+    // 1. clearing a configuration first, so a type change that needs it passes (CAT-071); 2. the general data.
+    // These run in order and stop at the first refusal: the type change depends on them.
+    const ordered: Step[] = [];
     if (this.bands.dirty && this.bands.length === 0 && (detail?.rangeBands.length ?? 0) > 0) {
-      clearing.push(() => this.run('ranges', this.facade.bands, { id, bands: [] }, this.bands));
+      ordered.push(['ranges', () => this.run('ranges', this.facade.bands, { id, bands: [] }, this.bands)]);
     }
 
     if (this.values.dirty && this.values.length === 0 && (detail?.listValues.length ?? 0) > 0) {
-      clearing.push(() => this.run('values', this.facade.values, { id, values: [] }, this.values));
+      ordered.push(['values', () => this.run('values', this.facade.values, { id, values: [] }, this.values)]);
     }
 
     if (this.formula.dirty && this.formula.value.trim() === '' && detail?.formulaExpression) {
-      clearing.push(() => this.run('formula', this.facade.formula, { id, expression: null }, this.formula));
+      ordered.push(['formula', () => this.run('formula', this.facade.formula, { id, expression: null }, this.formula)]);
     }
 
     if (this.paragraphs.dirty && this.paragraphs.length === 0 && (detail?.paragraphs.length ?? 0) > 0) {
-      clearing.push(() => this.run('paragraphs', this.facade.paragraphs, { id, paragraphs: [] }, this.paragraphs));
+      ordered.push(['paragraphs', () => this.run('paragraphs', this.facade.paragraphs, { id, paragraphs: [] }, this.paragraphs)]);
     }
 
-    // 2. the general data; 3. the configurations the (new) type allows
-    const steps: (() => Promise<boolean>)[] = [...clearing];
     if (this.general.dirty) {
-      steps.push(() => this.run('general', this.facade.update, { id, request: this.generalValue() }, this.general));
+      ordered.push(['general', () => this.run('general', this.facade.update, { id, request: this.generalValue() }, this.general)]);
     }
 
+    // 3. the configurations the (new) type allows: independent, each one is tried
+    const independent: Step[] = [];
     if (this.timing.dirty) {
-      steps.push(() => this.run('timing', this.facade.timing, { id, timing: this.timingValue() }, this.timing));
+      independent.push(['timing', () => this.run('timing', this.facade.timing, { id, timing: this.timingValue() }, this.timing)]);
     }
 
     if (allows.ranges && this.bands.dirty && this.bands.length > 0) {
-      steps.push(() => this.run('ranges', this.facade.bands, { id, bands: this.bandValues() }, this.bands));
+      independent.push(['ranges', () => this.run('ranges', this.facade.bands, { id, bands: this.bandValues() }, this.bands)]);
     }
 
     if (allows.values && this.values.dirty && this.values.length > 0) {
-      steps.push(() => this.run('values', this.facade.values, { id, values: this.valueItems() }, this.values));
+      independent.push(['values', () => this.run('values', this.facade.values, { id, values: this.valueItems() }, this.values)]);
     }
 
     if (allows.formula && this.formula.dirty && this.formula.value.trim() !== '') {
-      steps.push(() => this.run('formula', this.facade.formula, { id, expression: this.formula.value.trim() }, this.formula));
+      independent.push(['formula', () => this.run('formula', this.facade.formula, { id, expression: this.formula.value.trim() }, this.formula)]);
     }
 
     if (allows.paragraphs && this.paragraphs.dirty && this.paragraphs.length > 0) {
-      steps.push(() => this.run('paragraphs', this.facade.paragraphs, { id, paragraphs: this.paragraphItems() }, this.paragraphs));
+      independent.push(['paragraphs', () => this.run('paragraphs', this.facade.paragraphs, { id, paragraphs: this.paragraphItems() }, this.paragraphs)]);
     }
 
-    for (const step of steps) {
+    let saved = 0;
+    const refused: Section[] = [];
+    for (const [section, step] of ordered) {
       if (!(await step())) {
-        if (changed) {
-          this.facade.detail.reload();
-        }
-
-        return;
+        refused.push(section);
+        break;
       }
 
-      changed = true;
+      saved++;
     }
 
-    this.toast.success(this.i18n.t(changed ? 'catalogue-a.saved' : 'catalogue-a.nothingToSave'));
-    if (changed) {
+    if (refused.length === 0) {
+      const failed = await this.runEach(independent);
+      refused.push(...failed);
+      saved += independent.length - failed.length;
+    }
+
+    // the re-read refreshes the saved sections; the refused ones are still dirty and keep the user's input (fill)
+    if (saved > 0) {
       this.facade.detail.reload();
     }
+
+    if (refused.length > 0) {
+      this.activeTab.set(refused[0] ?? 'general');
+      this.toast.error(this.i18n.t(saved > 0 ? 'catalogue-a.tests.savedPartly' : 'catalogue-a.tests.saveRefused'));
+      return;
+    }
+
+    this.toast.success(this.i18n.t(saved > 0 ? 'catalogue-a.saved' : 'catalogue-a.nothingToSave'));
   }
 
-  /** Runs one write; on success the section is pristine, on failure its problem shows on its tab. */
+  /** Runs every step, refused or not; answers the refused sections in order. */
+  private async runEach(steps: readonly Step[]): Promise<Section[]> {
+    const refused: Section[] = [];
+    for (const [section, step] of steps) {
+      if (!(await step())) {
+        refused.push(section);
+      }
+    }
+
+    return refused;
+  }
+
+  /** Runs one write; on success the section is pristine, on failure its problem shows on its tab and its input stays. */
   private async run<TIn>(section: Section, write: Mutation<TIn, unknown>, input: TIn, control: AbstractControl): Promise<boolean> {
     const done = await write.execute(input);
     if (done === null) {
@@ -584,6 +676,42 @@ export class TestEditorPage {
 
     this.problems.update((current) => ({ ...current, [section]: problem }));
     this.activeTab.set(section);
+  }
+
+  /** Back to an empty "new test": every section as a fresh page shows it. */
+  private startNew(): void {
+    this.general.reset(this.blankGeneral);
+    this.timing.reset(this.blankTiming);
+    this.bands.clear();
+    this.values.clear();
+    this.paragraphs.clear();
+    this.formula.reset('');
+    this.open(null);
+  }
+
+  /** Opens the record of the address bar: a new id resets the page and refills every section from the server. */
+  private open(id: string | null): void {
+    this.createdId.set(null);
+    this.filledId = null;
+    this.problems.set({});
+    this.verdict.set(null);
+    this.activeTab.set('general');
+    this.facade.load(id);
+    this.applyAccess();
+  }
+
+  /** Every input follows the right to save; the code never changes once created. */
+  private applyAccess(): void {
+    const sections: AbstractControl[] = [this.general, this.timing, this.bands, this.values, this.paragraphs, this.formula];
+    if (!this.canEdit()) {
+      sections.forEach((control) => control.disable({ emitEvent: false }));
+      return;
+    }
+
+    sections.forEach((control) => control.enable({ emitEvent: false }));
+    if (!this.isNew()) {
+      this.general.controls.code.disable({ emitEvent: false });
+    }
   }
 
   private generalValue(): LabTestGeneral {
@@ -655,8 +783,59 @@ export class TestEditorPage {
     return this.paragraphs.getRawValue().map((paragraph) => ({ title: paragraph.title.trim(), text: textOrNull(paragraph.text) }));
   }
 
+  /**
+   * Fills the forms from the server. A re-read of the record already on screen (after a save) refreshes only the
+   * sections the user is not editing: a refused section is still dirty and keeps its input (UAT B-04).
+   */
   private fill(detail: LabTestDetail): void {
+    const keep = this.filledId === detail.id;
+    this.filledId = detail.id;
+    const refill = (control: AbstractControl): boolean => !keep || !control.dirty;
     const general = testGeneralOf(detail);
+    if (refill(this.general)) {
+      this.fillGeneral(detail, general);
+    }
+
+    if (refill(this.timing)) {
+      this.timing.reset({
+        durationHours: detail.timing.durationHours,
+        minDurationHours: detail.timing.minDurationHours,
+        frequencyCheckDays: detail.timing.frequencyCheckDays,
+        frequencyAction: detail.timing.frequencyAction,
+        deltaPercent: detail.timing.deltaPercent,
+        deltaWindowDays: detail.timing.deltaWindowDays,
+        testDays: maskToDays(detail.timing.testDays),
+      });
+    }
+
+    if (refill(this.bands)) {
+      this.bands.clear();
+      detail.rangeBands.forEach((band) => this.bands.push(bandForm(band, 0, 'Years')));
+      this.bands.markAsPristine();
+    }
+
+    if (refill(this.values)) {
+      this.values.clear();
+      detail.listValues.forEach((value) => this.values.push(valueForm(value)));
+      this.values.markAsPristine();
+    }
+
+    if (refill(this.paragraphs)) {
+      this.paragraphs.clear();
+      detail.paragraphs.forEach((paragraph) => this.paragraphs.push(paragraphForm(paragraph)));
+      this.paragraphs.markAsPristine();
+    }
+
+    if (refill(this.formula)) {
+      this.formula.reset(detail.formulaExpression ?? '');
+      this.verdict.set(null);
+    }
+
+    this.applyAccess();
+    this.rowsVersion.update((value) => value + 1);
+  }
+
+  private fillGeneral(detail: LabTestDetail, general: LabTestGeneral): void {
     this.general.reset({
       code: detail.code,
       name: { en: general.nameEn, ar: general.nameAr },
@@ -676,30 +855,6 @@ export class TestEditorPage {
       labelCount: general.labelCount,
       prefix: general.prefix ?? '',
     });
-
-    this.timing.reset({
-      durationHours: detail.timing.durationHours,
-      minDurationHours: detail.timing.minDurationHours,
-      frequencyCheckDays: detail.timing.frequencyCheckDays,
-      frequencyAction: detail.timing.frequencyAction,
-      deltaPercent: detail.timing.deltaPercent,
-      deltaWindowDays: detail.timing.deltaWindowDays,
-      testDays: maskToDays(detail.timing.testDays),
-    });
-
-    this.bands.clear();
-    detail.rangeBands.forEach((band) => this.bands.push(bandForm(band, 0, 'Years')));
-    this.values.clear();
-    detail.listValues.forEach((value) => this.values.push(valueForm(value)));
-    this.paragraphs.clear();
-    detail.paragraphs.forEach((paragraph) => this.paragraphs.push(paragraphForm(paragraph)));
-    this.formula.reset(detail.formulaExpression ?? '');
-    for (const control of [this.bands, this.values, this.paragraphs]) {
-      control.markAsPristine();
-    }
-
-    this.verdict.set(null);
-    this.rowsVersion.update((value) => value + 1);
   }
 
   private touchRows(array: AbstractControl): void {
@@ -715,6 +870,15 @@ export class TestEditorPage {
       this.general.controls.sampleConditionId.setValue(null);
     }
   }
+}
+
+/**
+ * The verdict of a refused formula check, said once (UAT B-13): the translated code text, the position, then the
+ * server's detail without the position it already carries ("… (position 12)").
+ */
+export function formulaVerdict(codeText: string, position: string | null, detail: string | null): string {
+  const reason = detail?.replace(/\s*\(position \d+\)\s*$/i, '').trim() ?? '';
+  return [codeText, position].filter((part): part is string => part !== null && part !== '').join(' ') + (reason === '' ? '' : ` — ${reason}`);
 }
 
 /** Active options plus the one currently referenced (it may have been deactivated since, BR-24). */
@@ -755,4 +919,9 @@ function paragraphForm(paragraph: ParagraphItem | null): ParagraphForm {
     title: new FormControl(paragraph?.title ?? '', { nonNullable: true, validators: [requiredText, Validators.maxLength(200)] }),
     text: new FormControl(paragraph?.text ?? '', { nonNullable: true, validators: [Validators.maxLength(4000)] }),
   });
+}
+
+/** True for the address of the "new test" page (`…/tests/new`, any query or fragment). */
+export function isNewTestUrl(url: string): boolean {
+  return /\/tests\/new$/.test(url.split(/[?#]/)[0] ?? '');
 }

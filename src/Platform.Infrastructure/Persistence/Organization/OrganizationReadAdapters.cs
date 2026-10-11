@@ -4,6 +4,7 @@ using Platform.Application.Organization;
 using Platform.Contracts.Common;
 using Platform.Contracts.Organization;
 using Platform.Domain.Organization;
+using Platform.Domain.PlatformAdmin;
 
 namespace Platform.Infrastructure.Persistence.Organization;
 
@@ -26,6 +27,32 @@ internal sealed class BranchLookup(AppDbContext context) : IBranchLookup
 
     public Task<bool> IsActiveAsync(Guid branchId, CancellationToken cancellationToken) =>
         context.Set<Branch>().AnyAsync(branch => branch.Id == branchId && branch.IsActive, cancellationToken);
+
+    public async Task<IReadOnlyDictionary<Guid, BranchSummary>> GetManyAsync(IReadOnlyCollection<Guid> branchIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(branchIds);
+        if (branchIds.Count == 0)
+        {
+            return new Dictionary<Guid, BranchSummary>();
+        }
+
+        var ids = branchIds.Distinct().ToList();
+        return await context.Set<Branch>().AsNoTracking()
+            .Where(branch => ids.Contains(branch.Id))
+            .Select(branch => new BranchSummary(branch.Id, branch.Code, branch.Name.En, branch.Name.Ar, branch.Currency, branch.IsActive))
+            .ToDictionaryAsync(branch => branch.Id, cancellationToken)
+            .ConfigureAwait(false);
+    }
+}
+
+/// <summary><see cref="IBranchGeography"/> over <c>saas.governorates</c> (platform reference data: no tenant filter, no RLS, read-only here).</summary>
+internal sealed class BranchGeography(AppDbContext context) : IBranchGeography
+{
+    public Task<Guid?> CountryOfGovernorateAsync(Guid governorateId, CancellationToken cancellationToken) =>
+        context.Set<Governorate>().AsNoTracking()
+            .Where(governorate => governorate.Id == governorateId)
+            .Select(governorate => (Guid?)governorate.CountryId)
+            .FirstOrDefaultAsync(cancellationToken);
 }
 
 /// <summary><see cref="IUserDirectory"/>: the membership's bilingual name in the current tenant, else the platform display name.</summary>
@@ -145,6 +172,7 @@ internal sealed class StaffDirectory(AppDbContext context) : IStaffDirectory
                 RoleNameEn = role == null ? null : role.Name.En,
                 RoleNameAr = role == null ? null : role.Name.Ar,
                 BranchCount = row.membership.BranchIds.Length,
+                row.membership.BranchIds,
                 UserActive = row.user.IsActive,
                 MembershipActive = row.membership.IsActive,
                 row.user.IsLockedOut,
@@ -156,6 +184,13 @@ internal sealed class StaffDirectory(AppDbContext context) : IStaffDirectory
                 row.membership.SpecialRightsOverride,
                 row.membership.IsPrimaryAdministrator,
             }).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        // The codes of the page's assigned branches (the CSV names them, UAT R1-06), inactive ones included.
+        var branchIds = rows.SelectMany(row => row.BranchIds).Distinct().ToArray();
+        var codes = branchIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : await context.Set<Branch>().AsNoTracking().Where(branch => branchIds.Contains(branch.Id))
+                .ToDictionaryAsync(branch => branch.Id, branch => branch.Code, cancellationToken).ConfigureAwait(false);
 
         var items = rows.Select(row => new UserListItem(
             row.UserId,
@@ -173,7 +208,8 @@ internal sealed class StaffDirectory(AppDbContext context) : IStaffDirectory
             row.MustChangePassword,
             row.PasswordExpiresAtUtc,
             row.AddedCount > 0 || row.RemovedCount > 0 || row.SpecialRightsOverride != null,
-            row.IsPrimaryAdministrator)).ToList();
+            row.IsPrimaryAdministrator,
+            row.BranchIds.Select(id => codes.TryGetValue(id, out var code) ? code : id.ToString("D")).Order(StringComparer.Ordinal).ToList())).ToList();
 
         return new Paged<UserListItem>(items, page.Page, page.PageSize, total);
     }

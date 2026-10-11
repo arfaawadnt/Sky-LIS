@@ -15,6 +15,12 @@ public static class ProblemCodes
     public const string AuthenticatedActorRequired = "AUTH-001";
     public const string InvalidCredentials = "AUTH-002";
     public const string AccountLocked = "AUTH-003";
+
+    /// <summary>
+    /// The account was locked by an administrator (no end date): only an administrator can unlock it, so the sign-in page tells
+    /// the user to contact one (validation 2026-10-11, B-11). Same status and security event as <see cref="AccountLocked"/>.
+    /// </summary>
+    public const string AccountLockedByAdministrator = "AUTH-015";
     public const string AccountInactive = "AUTH-004";
 
     /// <summary>The account's access end date has passed (CP-38 expiry); refused only after a correct password.</summary>

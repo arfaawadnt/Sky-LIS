@@ -6,6 +6,7 @@ import {
   BILLING_API,
   type BatchAccountView,
   type BatchPaymentResult,
+  type BillingPrintSettings,
   type BillingReasonOption,
   type BillingTreasuryItem,
   type CashClosingCreated,
@@ -32,7 +33,6 @@ import {
   type VisitAccountView,
 } from '../../../core/api/billing.contracts';
 import { emptyPage } from '../../../core/api/paging';
-import { SETTINGS_API, SETTING_KEYS, type TenantSettingsResponse } from '../../../core/api/settings.contracts';
 import { toHttpParams } from '../../../shared/forms/paging';
 
 /** A file the API generated (CSV exports), with the name from `Content-Disposition`. */
@@ -59,21 +59,13 @@ export class BillingApi {
   }
 
   /**
-   * `autoPrintReceipt` (CP-57) through `/api/v1/settings`. A cashier without `settings.view` (403) or any failure reads the
-   * code default (true), so receipts still print (intake Q18).
+   * `autoPrintReceipt` (CP-57) through the module's own `GET /api/v1/billing/print-settings` (`billing.view`): a cashier holds
+   * no `settings.view`, so `/api/v1/settings` was refused and every payment printed (UAT A-05). The caller decides what an
+   * unknown answer means (the cash desk does not print).
    */
   async autoPrintReceipt(signal?: AbortSignal): Promise<boolean> {
-    try {
-      const response = await this.get<TenantSettingsResponse | null>(SETTINGS_API.settings, new HttpParams(), null, signal);
-      const setting = response?.settings.find((item) => item.key === SETTING_KEYS.autoPrintReceipt);
-      return setting === undefined ? true : setting.value.toLowerCase() === 'true';
-    } catch (error: unknown) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw error;
-      }
-
-      return true;
-    }
+    const settings = await this.require<BillingPrintSettings>(BILLING_API.printSettings, signal);
+    return settings.autoPrintReceipt;
   }
 
   /** Catalogue B reasons of kind Refund (CP-24 "reason mandatory"); only active ones are offered. */
@@ -189,7 +181,7 @@ export class BillingApi {
 
   private async download(url: string, params: HttpParams, fallbackName: string): Promise<DownloadedFile> {
     const response: HttpResponse<Blob> = await firstValueFrom(this.http.get(url, { params, responseType: 'blob', observe: 'response' }));
-    return { blob: response.body ?? new Blob([]), fileName: fileNameOf(response.headers.get('Content-Disposition')) ?? fallbackName };
+    return { blob: response.body ?? new Blob([]), fileName: localCsvName(fallbackName.replace(/\.csv$/i, '')) };
   }
 }
 
@@ -203,6 +195,7 @@ function paymentParams(filter: PaymentRegisterFilter, paged: boolean): HttpParam
     status: filter.status,
     page: paged ? filter.page : null,
     pageSize: paged ? filter.pageSize : null,
+    timeZone: paged ? null : browserTimeZone(),
   });
 }
 
@@ -215,6 +208,7 @@ function refundParams(filter: RefundRegisterFilter, paged: boolean): HttpParams 
     method: filter.method,
     page: paged ? filter.page : null,
     pageSize: paged ? filter.pageSize : null,
+    timeZone: paged ? null : browserTimeZone(),
   });
 }
 
@@ -225,7 +219,26 @@ function closingParams(filter: CashClosingRegisterFilter, paged: boolean): HttpP
     to: filter.toUtc,
     page: paged ? filter.page : null,
     pageSize: paged ? filter.pageSize : null,
+    timeZone: paged ? null : browserTimeZone(),
   });
+}
+
+/** The user's IANA time zone: the CSV exports write the registers' times as the screen shows them (UAT R1-06). */
+export function browserTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The file name of an export in the user's local date, the same pattern as the exports built in the browser (UAT R3-05:
+ * the server names its files with a UTC time, e.g. `payments-20261011-1449.csv` at 17:49 local).
+ */
+export function localCsvName(base: string, now: Date = new Date()): string {
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${base}-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.csv`;
 }
 
 /** `attachment; filename=payments-20261009-1400.csv; filename*=UTF-8''…` → the plain name. */

@@ -23,9 +23,9 @@ public sealed class CommentTemplatesController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetCommentTemplateQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? clinicalGroupId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? clinicalGroupId, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportCommentTemplatesQuery(search, isActive, clinicalGroupId), cancellationToken);
+        var file = await sender.Send(new ExportCommentTemplatesQuery(search, isActive, clinicalGroupId, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -74,9 +74,9 @@ public sealed class DoctorsController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetDoctorQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? branchId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? branchId, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportDoctorsQuery(search, isActive, branchId), cancellationToken);
+        var file = await sender.Send(new ExportDoctorsQuery(search, isActive, branchId, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -124,9 +124,9 @@ public sealed class SendingLabsController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetSendingLabQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? payerId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? payerId, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportSendingLabsQuery(search, isActive, payerId), cancellationToken);
+        var file = await sender.Send(new ExportSendingLabsQuery(search, isActive, payerId, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -175,9 +175,9 @@ public sealed class ReasonsController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetReasonQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? kind, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? kind, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportReasonsQuery(search, isActive, kind), cancellationToken);
+        var file = await sender.Send(new ExportReasonsQuery(search, isActive, kind, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -225,9 +225,9 @@ public sealed class ReportTemplatesController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetReportTemplateQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? type, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? type, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportReportTemplatesQuery(search, isActive, type), cancellationToken);
+        var file = await sender.Send(new ExportReportTemplatesQuery(search, isActive, type, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 

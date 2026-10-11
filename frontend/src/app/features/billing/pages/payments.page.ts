@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
@@ -69,6 +69,7 @@ export class PaymentsPage {
   protected readonly i18n = inject(I18nService);
   protected readonly facade = inject(PaymentsFacade);
   protected readonly desk = inject(CashDeskFacade);
+  private readonly form = viewChild(MovementFormComponent);
   private readonly printer = inject(BillingPrinter);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
@@ -125,6 +126,7 @@ export class PaymentsPage {
     // UAT D-08: the cash desk is shared by the module's pages for the life of the route; re-read the approved treasuries
     // (and the refund reasons) each time a page opens so an approval or a role change since the last read shows at once.
     this.desk.refresh();
+    this.facade.refresh();   // the page's facade outlives the page too: re-read on open (UAT D-14, A-01)
 
     effect(() => {
       const visitId = this.visitId();
@@ -167,6 +169,7 @@ export class PaymentsPage {
     }
 
     this.toast.success(this.i18n.tf('billing.pay.done', { number: created.receiptNumber }));
+    this.form()?.reset();   // UAT A-06: the next payment starts from a fresh form
     if (this.desk.shouldAutoPrint()) {
       await this.run(() => this.printer.receipt(created.id));
     }
@@ -216,6 +219,7 @@ export class PaymentsPage {
     }
 
     saveFile(this.document, file);
+    this.toast.success(this.i18n.t('billing.exported'));
   }
 
   protected onTab(id: string | null): void {

@@ -132,13 +132,20 @@ export class ServiceEntryComponent {
   protected readonly initialQuery = signal('');
   protected readonly candidates = signal<readonly ServiceEntryItem[]>([]);
 
+  /**
+   * The catalogue page the picker lists: the typed term, or with an empty box the first page of active services, so F2
+   * browses the catalogue at once (UAT A-13: nothing was listed until a term was typed). The candidates of an unknown
+   * entry are shown instead while the box still holds the entry's text.
+   */
   protected readonly lookup = resource({
-    params: () => (this.pickerOpen() && this.pickerQuery().trim() !== '' && this.pickerQuery() !== this.initialQuery() ? this.pickerQuery().trim() : undefined),
+    params: () => (this.pickerOpen() && !this.showsCandidates() ? this.pickerQuery().trim() : undefined),
     loader: ({ params, abortSignal }) => this.api.lookupServices(params, abortSignal),
   });
 
+  private readonly showsCandidates = computed(() => this.pickerQuery() === this.initialQuery() && this.candidates().length > 0);
+
   protected readonly rows = computed<readonly (ServiceEntryItem | ServiceLookupItem)[]>(() => {
-    if (this.pickerQuery() === this.initialQuery() && this.candidates().length > 0) {
+    if (this.showsCandidates()) {
       return this.candidates();
     }
 

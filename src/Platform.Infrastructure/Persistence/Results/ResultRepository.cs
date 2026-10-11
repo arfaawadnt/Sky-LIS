@@ -183,11 +183,15 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
 
         if (filter.Search is { Length: > 0 } search)
         {
+            // CP-18 "Search": accession, sample number and patient number by prefix, the patient's Latin or Arabic name
+            // anywhere in it, case-insensitive (UAT A-14: names found nothing).
             var term = search.ToUpperInvariant();
+            var name = LikePattern(search);
             joined = joined.Where(row =>
                 row.Result.Accession.StartsWith(term)
                 || (row.Sample != null && row.Sample.SampleNumber.StartsWith(term))
-                || patients.Any(patient => patient.Id == row.Result.PatientId && patient.Number.StartsWith(term)));
+                || patients.Any(patient => patient.Id == row.Result.PatientId
+                    && (patient.Number.StartsWith(term) || EF.Functions.ILike(patient.FullName, name) || (patient.NameAr != null && EF.Functions.ILike(patient.NameAr, name)))));
         }
 
         var total = await joined.LongCountAsync(cancellationToken).ConfigureAwait(false);

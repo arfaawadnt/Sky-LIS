@@ -86,11 +86,9 @@ export class RefundsFacade {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
   }
 
-  private refresh(): void {
-    if (this.lookup() !== null) {
-      this.account.reload();
-    }
-
+  /** Re-reads the visit account and the register (after a write, and when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01). A load in flight is left alone; an idle read (nothing looked up) stays idle.) */
+  refresh(): void {
+    this.account.reload();
     this.register.reload();
   }
 }

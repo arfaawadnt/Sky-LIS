@@ -63,6 +63,12 @@ export class SupportFacade {
     this.close.reset();
   }
 
+  /** Re-reads the tickets and the open ticket when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01/C-13). A load in flight is left alone. */
+  refresh(): void {
+    this.open.reset();
+    this.reloadAll();
+  }
+
   private reloadAll(): void {
     this.tickets.reload();
     this.detail.reload();
@@ -122,6 +128,11 @@ export class SupportDeskFacade {
     this.start.reset();
     this.resolve.reset();
     this.close.reset();
+  }
+
+  /** Re-reads the desk's tickets and the open ticket when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01/C-13). A load in flight is left alone. */
+  refresh(): void {
+    this.reloadAll();
   }
 
   private reloadAll(): void {

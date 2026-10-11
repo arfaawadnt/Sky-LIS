@@ -55,6 +55,8 @@ public sealed class PlatformAdminFlowTests(ApiFactory factory) : IClassFixture<A
         var badMobile = await ProvisionAsync(admin, place, slug + "-x", "third.admin." + slug[^8..], NewMobile(), mobile: "0101234");
         Assert.Equal(HttpStatusCode.UnprocessableEntity, badMobile.StatusCode);
         Assert.Equal("GEO-010", await AuthClient.CodeOf(badMobile));
+        var badManager = await ProvisionAsync(admin, place, slug + "-y", "fourth.admin." + slug[^8..], "+2010111100");
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "GEO-014"), (badManager.StatusCode, await AuthClient.CodeOf(badManager)));   // C-03
 
         var page = await admin.GetFromJsonAsync<Paged<ClientListItem>>($"{Clients}?search={slug}&source=Manual");
         var item = Assert.Single(page!.Items);
@@ -74,6 +76,29 @@ public sealed class PlatformAdminFlowTests(ApiFactory factory) : IClassFixture<A
         var twice = await admin.PostAsync($"{Clients}/{provisioned.Id}/activate", null);
         Assert.Equal(HttpStatusCode.Conflict, twice.StatusCode);
         Assert.Equal("CLI-010", await AuthClient.CodeOf(twice));
+    }
+
+    [DatabaseFact]
+    public async Task A_client_creation_is_filed_in_the_platform_trail_and_in_the_laboratory_trail()
+    {
+        // Validation 2026-10-11 C-17: SA-09 lists every change made in the Super Admin portal, the client creation included.
+        var (username, _, adminId) = await factory.SeedUserAsync(tenantId: TenantIds.Platform, permissions: [.. AdminPermissions, "audit.view"], displayName: "Trail Admin");
+        var admin = await SignedInClientAsync(username);
+        var place = await CreatePlaceAsync(admin);
+        var slug = "trail-" + Guid.CreateVersion7().ToString("N")[^8..];
+        var created = await ProvisionAsync(admin, place, slug, "trail.admin." + slug[^8..], NewMobile());
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var clientId = (await created.Content.ReadFromJsonAsync<ProvisionedClient>())!.Id;
+
+        var rows = await ProvisioningTrailAsync(clientId);
+        Assert.Equal(2, rows.Count);
+        var platform = Assert.Single(rows, row => row.Tenant == TenantIds.Platform);
+        var laboratory = Assert.Single(rows, row => row.Tenant == clientId);
+        Assert.Equal((adminId, place.PlanId.ToString("D")), (platform.Actor, platform.Plan));
+        Assert.Equal((adminId, platform.EventId), (laboratory.Actor, laboratory.EventId));
+
+        var chain = (await admin.GetFromJsonAsync<Platform.Contracts.Audit.ChainVerificationResult>("/api/v1/audit/verify-chain"))!;
+        Assert.True(chain.Ok, $"the platform chain breaks at {chain.FirstBrokenSequence}");
     }
 
     [DatabaseFact]
@@ -118,7 +143,7 @@ public sealed class PlatformAdminFlowTests(ApiFactory factory) : IClassFixture<A
         var managerMobile = NewMobile();
         var wrongLength = await anonymous.PostAsJsonAsync($"{Subscriptions}/start", Start(place, "012345"));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, wrongLength.StatusCode);
-        Assert.Equal("GEO-010", await AuthClient.CodeOf(wrongLength));
+        Assert.Equal("GEO-014", await AuthClient.CodeOf(wrongLength));   // C-03: the manager's mobile, by its own code
 
         var started = (await (await anonymous.PostAsJsonAsync($"{Subscriptions}/start", Start(place, managerMobile))).Content.ReadFromJsonAsync<SubscriptionStarted>())!;
         var e164 = Global(managerMobile);
@@ -152,6 +177,10 @@ public sealed class PlatformAdminFlowTests(ApiFactory factory) : IClassFixture<A
 
         var detail = await admin.GetFromJsonAsync<ClientDetail>($"{Clients}/{result.TenantId}");
         Assert.Equal(("Trial", "Subscription", username), (detail!.Status, detail.Source, detail.AdministratorUsername));
+        var trail = await ProvisioningTrailAsync(result.TenantId);   // C-17: the wizard's client is in the platform trail too
+        Assert.Equal(2, trail.Count);
+        Assert.Contains(trail, row => row.Tenant == TenantIds.Platform);
+        Assert.Contains(trail, row => row.Tenant == result.TenantId);
 
         var plaintext = await anonymous.PostAsJsonAsync($"{Subscriptions}/complete", new { subscriptionId = started.SubscriptionId, username, password = "plain text password" });
         Assert.Equal(HttpStatusCode.BadRequest, plaintext.StatusCode);
@@ -218,6 +247,27 @@ public sealed class PlatformAdminFlowTests(ApiFactory factory) : IClassFixture<A
         Assert.Equal(new CodeSystemImportResult(2, 0, 0, 2), await imported.Content.ReadFromJsonAsync<CodeSystemImportResult>());
         var items = (await admin.GetFromJsonAsync<Paged<CodeSystemItemView>>($"{CodeSystems}/{codeSystem.Id}/items?search=gluc"))!;
         Assert.Equal("2345-7", Assert.Single(items.Items).Code);
+    }
+
+    /// <summary>The <c>TenantProvisioned</c> entries of a client in every trail (read as the owner role, across tenants).</summary>
+    private static async Task<List<(Guid Tenant, Guid? Actor, string? Plan, Guid EventId)>> ProvisioningTrailAsync(Guid clientId)
+    {
+        await using var connection = new Npgsql.NpgsqlConnection(TestDatabase.OwnerConnection);
+        await connection.OpenAsync();
+        await using var command = new Npgsql.NpgsqlCommand(
+            """
+            SELECT tenant_id, actor_user_id, payload->>'planId', event_id FROM audit.audit_trail
+            WHERE aggregate_type = 'Tenant' AND aggregate_id = @client AND event_type LIKE '%.TenantProvisioned' ORDER BY tenant_id
+            """, connection);
+        command.Parameters.AddWithValue("client", clientId.ToString("D"));
+        var rows = new List<(Guid Tenant, Guid? Actor, string? Plan, Guid EventId)>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetGuid(1), reader.IsDBNull(2) ? null : reader.GetString(2), reader.GetGuid(3)));
+        }
+
+        return rows;
     }
 
     /// <summary>A fresh Egyptian mobile (011 + 8 digits): mobiles are unique among platform users.</summary>

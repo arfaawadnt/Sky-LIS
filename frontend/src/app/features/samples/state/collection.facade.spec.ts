@@ -43,6 +43,15 @@ describe('CollectionFacade (CP-14)', () => {
     await runEffects();
   }
 
+  it("re-reads today's list and the parameters when the page opens again (UAT D-14, A-01)", async () => {
+    await flushInitialLoads();
+    facade.refresh();
+    await runEffects();
+    backend.expectOne((request) => request.url === SAMPLES_API.samples).flush(page([]));
+    backend.expectOne(SAMPLES_API.settings).flush(settings);
+    backend.verify();
+  });
+
   it("loads today's samples of the session branch and narrows them by status", async () => {
     await runEffects();
     const first = backend.expectOne((request) => request.url === SAMPLES_API.samples);

@@ -41,6 +41,19 @@ public sealed class ReferenceDataTests
     }
 
     [Fact]
+    public void C_03_a_client_profile_names_the_mobile_it_refuses_GEO_010_and_GEO_014()
+    {
+        var egypt = Egypt();
+        var laboratory = Assert.Throws<DomainException>(() => ClientProfile.Create("Lab", "معمل", egypt, Guid.CreateVersion7(), "Street", "0233351111", null, "Dr. Mona", "01012345678", null));
+        Assert.Equal(PlatformAdminCodes.MobileInvalidForCountry, laboratory.Code);
+        Assert.StartsWith("The laboratory mobile", laboratory.Message, StringComparison.Ordinal);
+
+        var manager = Assert.Throws<DomainException>(() => ClientProfile.Create("Lab", "معمل", egypt, Guid.CreateVersion7(), "Street", "01012345678", null, "Dr. Mona", "+2010111100", null));
+        Assert.Equal(PlatformAdminCodes.ManagerMobileInvalidForCountry, manager.Code);
+        Assert.StartsWith("The manager's mobile", manager.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Kuwaiti_mobiles_have_eight_digits()
     {
         Assert.Equal("+96551234567", Kuwait().NormaliseMobile("51234567"));
@@ -58,6 +71,29 @@ public sealed class ReferenceDataTests
     {
         var refusal = Assert.Throws<DomainException>(() => Country.Create(new CountryData("Egypt", "مصر", iso, dial, "Pound", currencyCode, language, "Africa/Cairo", mobileLength, null, null)));
         Assert.Equal(code, refusal.Code);
+    }
+
+    [Theory]
+    [InlineData("Mars/Base")]               // validation 2026-10-11 C-08: was saved
+    [InlineData("Egypt Standard Time")]     // a Windows name, not IANA
+    [InlineData("Cairo")]
+    [InlineData("   ")]
+    public void C_08_a_time_zone_that_is_not_an_IANA_name_is_refused_GEO_007(string timeZone)
+    {
+        var refusal = Assert.Throws<DomainException>(() => Country.Create(new CountryData("Egypt", "مصر", "EG", "+20", "Pound", "EGP", "ar", timeZone, 10, null, null)));
+        Assert.Equal(PlatformAdminCodes.TimeZoneInvalid, refusal.Code);
+        Assert.Throws<DomainException>(() => Egypt().Update(new CountryData("Egypt", "مصر", "EG", "+20", "Pound", "EGP", "ar", timeZone, 10, null, null)));
+    }
+
+    [Theory]
+    [InlineData("Africa/Cairo", "Africa/Cairo")]
+    [InlineData("africa/cairo", "Africa/Cairo")]
+    [InlineData("Asia/Kuwait", "Asia/Kuwait")]
+    [InlineData("America/Argentina/Buenos_Aires", "America/Argentina/Buenos_Aires")]
+    [InlineData("UTC", "UTC")]
+    public void C_08_IANA_time_zones_are_accepted_in_their_canonical_spelling(string timeZone, string stored)
+    {
+        Assert.Equal(stored, Country.Create(new CountryData("Egypt", "مصر", "EG", "+20", "Pound", "EGP", "ar", timeZone, 10, null, null)).TimeZone);
     }
 
     [Fact]

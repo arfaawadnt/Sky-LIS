@@ -53,6 +53,20 @@ describe('filterNav (shell)', () => {
     expect(firstEntry(filterNav(groups, entries, 'client', () => true, label, 'nothing'))).toBeNull();
   });
 
+  it('hides out-of-scope and action-only entries from the menu (R1-01)', () => {
+    const withActionOnly: readonly NavEntry[] = [
+      ...entries,
+      { portal: 'client', group: 'shell.group.finance', path: '/finance/refunds', permission: null, i18nKey: 'shell.nav.refunds', release: 'R1', menu: false },
+      { portal: 'client', group: 'shell.group.finance', path: '/finance/later', permission: null, i18nKey: 'shell.nav.later', release: 'R1', menu: 'R2' },
+    ];
+
+    const r1 = filterNav(groups, withActionOnly, 'client', () => true, label).flatMap((group) => group.entries.map((entry) => entry.path));
+    expect(r1).toEqual(['/', '/treasury/treasuries', '/finance/payers']);
+
+    const r2 = filterNav(groups, withActionOnly, 'client', () => true, label, '', 'R2').flatMap((group) => group.entries.map((entry) => entry.path));
+    expect(r2).toEqual(['/', '/treasury/treasuries', '/finance/payers', '/finance/later', '/setup/branches']);
+  });
+
   it('keeps the registry consistent: every entry names a group of its portal, paths are unique', () => {
     const groupKeys = new Set(NAV_GROUPS.map((group) => `${group.portal}:${group.i18nKey}`));
     for (const entry of NAV_REGISTRY) {

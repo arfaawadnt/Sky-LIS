@@ -135,8 +135,12 @@ public sealed record BranchDashboardKpis(
 /// <summary>One bar of the 7-day registrations chart; <see cref="Date"/> is the local day <c>yyyy-MM-dd</c>.</summary>
 public sealed record DailyCount(string Date, int Count);
 
-/// <summary>A test past its expected result time (BR-13); filled by the Results module (wave 3).</summary>
-public sealed record DelayedTestItem(Guid VisitId, string Accession, string? PatientName, string TestName, DateTimeOffset ExpectedAtUtc, int DelayMinutes, string Status);
+/// <summary>
+/// A test past its turnaround threshold (BR-13), as counted by the "Delayed tests" tile: <see cref="DelayMinutes"/> is the
+/// time since the expected result time (0 while the threshold is reached but the expected time is not), <see cref="Status"/>
+/// the result status (Ordered, Complete, Reviewed) and <see cref="TestNameAr"/> the Arabic test name (UAT R1-02).
+/// </summary>
+public sealed record DelayedTestItem(Guid VisitId, string Accession, string? PatientName, string TestName, DateTimeOffset ExpectedAtUtc, int DelayMinutes, string Status, string? TestNameAr = null);
 
 public sealed record BranchDashboard(
     Guid BranchId,

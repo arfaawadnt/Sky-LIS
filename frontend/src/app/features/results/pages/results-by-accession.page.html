@@ -220,6 +220,7 @@
                 [drafts]="facade.drafts()"
                 [refusals]="facade.refusals()"
                 [canEdit]="canEnter(unit)"
+                [canAnnotate]="canAnnotate()"
                 [canAmend]="canAmend(unit)"
                 [canAcknowledge]="canAcknowledge(unit)"
                 (draftChange)="onDraft($event)"

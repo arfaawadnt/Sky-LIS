@@ -106,6 +106,28 @@ describe('RefundsFacade and BatchPaymentFacade (CP-24, CP-27)', () => {
     backend.verify();
   });
 
+  it('re-read the refunds register and the batch on screen when their pages open again (UAT D-14, A-01)', async () => {
+    const refunds = TestBed.inject(RefundsFacade);
+    const batches = TestBed.inject(BatchPaymentFacade);
+    await runEffects();
+    backend.expectOne((request) => request.url === BILLING_API.refunds).flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 0 });
+    for (const request of backend.match((candidate) => candidate.url === BILLING_API.refundReasons)) {
+      request.flush({ items: [], page: 1, pageSize: 200, totalCount: 0, totalPages: 0 });
+    }
+
+    batches.find('BTH-2026-00001');
+    await runEffects();
+    backend.expectOne(`${BILLING_API.batches}/by-number/BTH-2026-00001/account`).flush(batch);
+    await runEffects();
+
+    refunds.refresh();
+    batches.refresh();
+    await runEffects();
+    backend.expectOne((request) => request.url === BILLING_API.refunds).flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 0 });
+    backend.expectOne(`${BILLING_API.batches}/by-number/BTH-2026-00001/account`).flush(batch);
+    backend.expectNone((request) => request.url.startsWith(BILLING_API.visits));   // no visit looked up: stays idle
+  });
+
   it('reads the treasuries approved for this device and keeps the chosen one while it stays approved', async () => {
     const desk = TestBed.inject(CashDeskFacade);
     await runEffects(false);
@@ -115,12 +137,12 @@ describe('RefundsFacade and BatchPaymentFacade (CP-24, CP-27)', () => {
       { id: 't-1', code: 'A', nameEn: 'A', nameAr: 'أ', branchId: 'b-1', isActive: true },
       { id: 't-2', code: 'B', nameEn: 'B', nameAr: 'ب', branchId: 'b-1', isActive: true },
     ]);
-    backend.expectOne('/api/v1/settings').flush({ type: 'about:blank', title: 'Forbidden', status: 403, code: 'AUTHZ-001' }, { status: 403, statusText: 'Forbidden' });
+    backend.expectOne(BILLING_API.printSettings).flush({ type: 'about:blank', title: 'Forbidden', status: 403, code: 'AUTHZ-001' }, { status: 403, statusText: 'Forbidden' });
     await runEffects();
 
     expect(desk.treasuryId()).toBe('t-1');
     desk.treasuryId.set('t-2');
     expect(desk.hasStation()).toBe(true);
-    expect(desk.shouldAutoPrint()).toBe(true);   // no settings.view: the code default prints
+    expect(desk.shouldAutoPrint()).toBe(false);   // UAT A-05: an unknown parameter does not print (it used to print by default)
   });
 });

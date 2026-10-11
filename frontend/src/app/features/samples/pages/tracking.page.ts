@@ -53,6 +53,7 @@ export class TrackingPage {
 
   constructor() {
     void this.i18n.load('samples');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
     effect(() => {
       const number = this.sampleNumber();
       untracked(() => this.facade.track(number ?? null));

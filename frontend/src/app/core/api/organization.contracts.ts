@@ -190,6 +190,8 @@ export interface UserListItem {
   readonly passwordExpiresAtUtc: string | null;
   readonly isModified: boolean;
   readonly isPrimaryAdministrator: boolean;
+  /** Codes of the assigned branches (empty = every branch; UAT R1-06); absent from older servers. */
+  readonly branchCodes?: readonly string[] | null;
 }
 
 export interface UserOverrides {
@@ -409,6 +411,8 @@ export const ORGANIZATION_PERMISSIONS = {
   create: 'organization.create',
   edit: 'organization.edit',
   manage: 'organization.manage',
+  /** CSV export of the branches, roles and users registers (UAT R1-05). */
+  export: 'organization.export',
   usersView: 'identity.view',
   usersCreate: 'identity.create',
   usersEdit: 'identity.edit',

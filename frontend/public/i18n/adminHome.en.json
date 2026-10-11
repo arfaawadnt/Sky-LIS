@@ -5,7 +5,5 @@
   "welcome": "Signed in as",
   "placeholder": "The figures of the platform are on the dashboard (Overview › Dashboard): clients, activity and wallets per period.",
   "kpi.clients": "Clients",
-  "kpi.activeSubscriptions": "Active subscriptions",
-  "kpi.openTickets": "Open tickets",
-  "kpi.agentsOnline": "Agents online"
+  "kpi.activeSubscriptions": "Active subscriptions"
 }

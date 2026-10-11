@@ -181,6 +181,24 @@ export class ResultsCaseFacade {
     this.refusals.set({});
   }
 
+  /**
+   * Re-reads the query result and the open case when the page opens again, and drops what was typed or refused on the
+   * previous visit (the server's answer, the rights included, decides what the grid offers): the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's, with its result rights — must never stay on screen (UAT D-14, A-01). A load in flight is left alone.
+   */
+  refresh(): void {
+    this.drafts.set({});
+    this.refusals.set({});
+    this.historyRow.set(null);
+    for (const write of [this.save, this.review, this.verify, this.undo, this.amend, this.acknowledge, this.acknowledgeAndVerify, this.comment, this.note, this.report, this.preview, this.print]) {
+      write.reset();
+    }
+
+    this.visits.reload();
+    this.caseView.reload();
+    this.microbiology.reload();
+    this.commentTemplates.reload();
+  }
+
   reload(): void {
     this.caseView.reload();
     if (this.historyRow()) {

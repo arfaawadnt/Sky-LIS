@@ -186,7 +186,10 @@ export interface DelayedTestItem {
   readonly testName: string;
   readonly expectedAtUtc: string;
   readonly delayMinutes: number;
+  /** The result status: Ordered, Complete or Reviewed. */
   readonly status: string;
+  /** The Arabic test name (UAT R1-02); absent from older servers. */
+  readonly testNameAr?: string | null;
 }
 
 export interface BranchDashboard {

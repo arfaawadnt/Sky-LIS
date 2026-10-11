@@ -48,6 +48,20 @@ describe('RejectionsFacade (CP-16, BR-18)', () => {
     await runEffects();
   }
 
+  it('re-reads the list, the reasons and the parameters when the page opens again (UAT D-14, A-01)', async () => {
+    await flushInitialLoads(true);
+    expect(facade.reinstatementAllowed()).toBe(false);
+
+    facade.refresh();
+    await runEffects();
+    backend.expectOne((request) => request.url === SAMPLES_API.samples).flush(page([]));
+    backend.expectOne((request) => request.url === SAMPLES_API.rejectionReasons).flush(page([]));
+    backend.expectOne(SAMPLES_API.settings).flush({ autoCollect: true, autoReceive: true, newBarcodeOnReject: false, labelCopies: 1 });
+    await runEffects();
+    expect(facade.reinstatementAllowed()).toBe(true);
+    backend.verify();
+  });
+
   it('offers active rejection reasons only and follows the reinstatement policy', async () => {
     await flushInitialLoads(true);
 
@@ -69,7 +83,7 @@ describe('RejectionsFacade (CP-16, BR-18)', () => {
     const post = backend.expectOne(SAMPLES_API.reject('smp-1'));
     expect(post.request.body).toEqual({ reasonId: 'r1', note: 'clotted' });
     post.flush(null, { status: 204, statusText: 'No Content' });
-    await pending;
+    expect(await pending).toBeUndefined();   // a 204 is success, not the failure null
     await runEffects();
 
     backend.expectOne((request) => request.url === SAMPLES_API.samples).flush(page([]));

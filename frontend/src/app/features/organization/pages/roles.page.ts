@@ -18,7 +18,10 @@ import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.com
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
+import { allPages, csvFileName, downloadCsv, toCsv } from '../data/csv-export';
+import { OrganizationApi } from '../data/organization.api';
 import { RolesFacade } from '../state/roles.facade';
+import { OrganizationExportButtonComponent } from '../ui/export-button.component';
 
 /**
  * Roles & privileges (SRS CP-37; SA-06 under the platform tenant): the register of privilege groups with their
@@ -38,6 +41,7 @@ import { RolesFacade } from '../state/roles.facade';
     PaginatorComponent,
     BadgeComponent,
     IconComponent,
+    OrganizationExportButtonComponent,
   ],
   templateUrl: './roles.page.html',
   styleUrl: './organization-list.css',
@@ -50,6 +54,7 @@ export class RolesPage {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly api = inject(OrganizationApi);
 
   protected readonly permissions = ORGANIZATION_PERMISSIONS;
 
@@ -68,6 +73,24 @@ export class RolesPage {
     void this.i18n.load('organization');
     this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14)
   }
+
+  /** CSV of the roles of the current search and status filter, in the grid's formats (UAT B-10). */
+  protected readonly exportCsv = async (): Promise<void> => {
+    const filter = this.facade.filter();
+    const rows = await allPages((page, pageSize) => this.api.listRoles({ ...filter, page, pageSize }));
+    const t = (key: string): string => this.i18n.t(`organization.${key}`);
+    downloadCsv(
+      csvFileName('roles'),
+      toCsv(rows, [
+        { header: t('csv.nameEn'), value: (row) => row.nameEn },
+        { header: t('csv.nameAr'), value: (row) => row.nameAr },
+        { header: t('csv.description'), value: (row) => row.description },
+        { header: t('roles.column.permissions'), value: (row) => row.permissionCount },
+        { header: t('roles.column.members'), value: (row) => row.memberCount },
+        { header: t('csv.active'), value: (row) => this.i18n.t(row.isActive ? 'shared.yes' : 'shared.no') },
+      ]),
+    );
+  };
 
   protected name(row: RoleListItem): string {
     return localizedPick({ en: row.nameEn, ar: row.nameAr }, this.i18n.lang());

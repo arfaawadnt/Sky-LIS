@@ -92,11 +92,17 @@ public sealed class ReportingModuleTests(DatabaseFixture fixture)
 
         if (sources.Visits && sources.Results)
         {
-            var today = await InsertVisitAsync(lab, branch, Guid.CreateVersion7(), BranchDay.AddHours(1));
+            var patient = Guid.CreateVersion7();
+            var test = Guid.CreateVersion7();
+            await RawRows.InsertAsync("app.patients", new Dictionary<string, object?> { ["tenant_id"] = lab, ["id"] = patient, ["full_name"] = "Delayed Patient", ["status"] = "Active", ["date_of_birth"] = new DateOnly(1980, 1, 1) });
+            var clinicalGroup = Guid.CreateVersion7();
+            await RawRows.InsertAsync("app.clinical_groups", new Dictionary<string, object?> { ["tenant_id"] = lab, ["id"] = clinicalGroup, ["code"] = "DLY", ["unit_code"] = "D", ["name_en"] = "Delay group", ["name_ar"] = "مجموعة" });
+            await RawRows.InsertAsync("app.tests", new Dictionary<string, object?> { ["tenant_id"] = lab, ["id"] = test, ["clinical_group_id"] = clinicalGroup, ["code"] = "DLY", ["name_en"] = "Delay test", ["name_ar"] = "تحليل متأخر" });
+            var today = await InsertVisitAsync(lab, branch, patient, BranchDay.AddHours(1));
             var yesterday = await InsertVisitAsync(lab, branch, Guid.CreateVersion7(), BranchDay.AddHours(-20));
             var otherBranch = await InsertVisitAsync(lab, Guid.CreateVersion7(), Guid.CreateVersion7(), BranchDay.AddHours(2));
 
-            await InsertResultAsync(lab, today, branch, "Ordered", BranchDay.AddHours(3));      // pending, delayed (due before the day ended)
+            await InsertResultAsync(lab, today, branch, "Ordered", BranchDay.AddHours(3), test); // pending, delayed (due before the day ended)
             await InsertResultAsync(lab, today, branch, "Complete", BranchDay.AddDays(3));      // pending, backlog, on time
             await InsertResultAsync(lab, today, branch, "Reviewed", BranchDay.AddHours(23));    // pending, backlog, delayed
             await InsertResultAsync(lab, today, branch, "Verified", BranchDay.AddHours(2));     // done
@@ -113,10 +119,21 @@ public sealed class ReportingModuleTests(DatabaseFixture fixture)
             Assert.Null(figures.PendingResults);
             Assert.Null(figures.UnverifiedBacklog);
             Assert.Null(figures.DelayedTests);
+            Assert.Null(figures.DelayedList);
             return;
         }
 
         Assert.Equal((3, 3, 2), (figures.PendingResults, figures.UnverifiedBacklog, figures.DelayedTests));
+
+        // UAT R1-02: the table lists the tests the tile counts, most delayed first, judged at the end of the past day.
+        Assert.NotNull(figures.DelayedList);
+        Assert.Equal(figures.DelayedTests, figures.DelayedList.Count);
+        Assert.Equal(["Ordered", "Reviewed"], figures.DelayedList.Select(item => item.Status).ToArray());
+        Assert.Equal([21 * 60, 60], figures.DelayedList.Select(item => item.DelayMinutes).ToArray());
+        var first = figures.DelayedList[0];
+        Assert.Equal(("Delayed Patient", "Delay test", "تحليل متأخر"), (first.PatientName, first.TestName, first.TestNameAr));
+        Assert.StartsWith("ACC-IT-", first.Accession, StringComparison.Ordinal);
+        Assert.Equal(BranchDay.AddHours(3), first.ExpectedAtUtc);
     }
 
     // ---- sources and rows ---------------------------------------------------------------------------------------------
@@ -162,7 +179,7 @@ public sealed class ReportingModuleTests(DatabaseFixture fixture)
     }
 
     /// <summary>A result row of the visit; <paramref name="branch"/> null takes a fresh branch id.</summary>
-    private static Task InsertResultAsync(Guid tenant, Guid visitId, Guid? branch, string status, DateTimeOffset expectedAtUtc) =>
+    private static Task InsertResultAsync(Guid tenant, Guid visitId, Guid? branch, string status, DateTimeOffset expectedAtUtc, Guid? testId = null) =>
         RawRows.InsertAsync("app.results", new Dictionary<string, object?>
         {
             ["tenant_id"] = tenant,
@@ -174,6 +191,7 @@ public sealed class ReportingModuleTests(DatabaseFixture fixture)
             ["source"] = "Manual",
             ["expected_at_utc"] = expectedAtUtc,
             ["verified_at_utc"] = status == "Verified" ? expectedAtUtc : null,
+            ["test_id"] = testId ?? Guid.CreateVersion7(),
         });
 }
 

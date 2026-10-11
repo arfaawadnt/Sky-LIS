@@ -9,6 +9,17 @@ export interface ProblemDetails {
   readonly traceId: string | null;
   readonly correlationId: string | null;
   readonly errors: Readonly<Record<string, readonly string[]>> | null;
+  /**
+   * C-06: per field, the machine-readable rules that failed (`{ rule: 'MaximumLength', maxLength: 200 }`), so the SPA
+   * shows its own localized text; absent on older answers and on problems without field errors.
+   */
+  readonly rules?: Readonly<Record<string, readonly FieldRule[]>> | null;
+}
+
+/** One failed validation rule of a field (the server's FluentValidation code without "Validator", plus numeric arguments). */
+export interface FieldRule {
+  readonly rule: string;
+  readonly [argument: string]: string | number;
 }
 
 /** Codes the client reacts to (the server's `ProblemCodes`). */
@@ -72,6 +83,37 @@ function readErrors(value: unknown): Readonly<Record<string, readonly string[]>>
   return result;
 }
 
+function readRules(value: unknown): Readonly<Record<string, readonly FieldRule[]>> | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const result: Record<string, readonly FieldRule[]> = {};
+  for (const [key, rules] of Object.entries(value)) {
+    if (!Array.isArray(rules)) {
+      continue;
+    }
+
+    const read: FieldRule[] = [];
+    for (const entry of rules) {
+      if (isRecord(entry) && typeof entry['rule'] === 'string') {
+        const rule: Record<string, string | number> = { rule: entry['rule'] };
+        for (const [name, argument] of Object.entries(entry)) {
+          if (typeof argument === 'number' && Number.isFinite(argument)) {
+            rule[name] = argument;
+          }
+        }
+
+        read.push(rule as FieldRule);
+      }
+    }
+
+    result[key] = read;
+  }
+
+  return result;
+}
+
 /** Maps any HTTP failure to a `ProblemDetails`; a body that is not a problem document becomes a generic one. */
 export function toProblemDetails(error: HttpErrorResponse): ProblemDetails {
   const body: unknown = error.error;
@@ -84,6 +126,7 @@ export function toProblemDetails(error: HttpErrorResponse): ProblemDetails {
       traceId: stringOrNull(body['traceId']),
       correlationId: stringOrNull(body['correlationId']),
       errors: readErrors(body['errors']),
+      rules: readRules(body['rules']),
     };
   }
 

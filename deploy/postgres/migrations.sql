@@ -5921,5 +5921,44 @@ BEGIN
     VALUES ('20261010061253_ResultLogSequence', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261011124135_AppendOnlyTruncateGuard') THEN
+    CREATE OR REPLACE FUNCTION audit.refuse_truncate() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    BEGIN
+        RAISE EXCEPTION 'rows of %.% are append-only or never deleted: TRUNCATE is not allowed', TG_TABLE_SCHEMA, TG_TABLE_NAME
+            USING ERRCODE = '42501';
+    END
+    $fn$;
+    CREATE TRIGGER audit_trail_no_truncate BEFORE TRUNCATE ON audit.audit_trail FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER field_changes_no_truncate BEFORE TRUNCATE ON audit.field_changes FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER security_events_no_truncate BEFORE TRUNCATE ON audit.security_events FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER payments_no_truncate BEFORE TRUNCATE ON app.payments FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER refunds_no_truncate BEFORE TRUNCATE ON app.refunds FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER cash_closings_no_truncate BEFORE TRUNCATE ON app.cash_closings FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER agent_log_entries_no_truncate BEFORE TRUNCATE ON app.agent_log_entries FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER analyser_result_intake_no_truncate BEFORE TRUNCATE ON app.analyser_result_intake FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER patients_no_truncate BEFORE TRUNCATE ON app.patients FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER patient_documents_no_truncate BEFORE TRUNCATE ON app.patient_documents FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER visits_no_truncate BEFORE TRUNCATE ON app.visits FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER visit_lines_no_truncate BEFORE TRUNCATE ON app.visit_lines FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER visit_tubes_no_truncate BEFORE TRUNCATE ON app.visit_tubes FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER visit_preparation_answers_no_truncate BEFORE TRUNCATE ON app.visit_preparation_answers FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER visit_transfers_no_truncate BEFORE TRUNCATE ON app.visit_transfers FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER bookings_no_truncate BEFORE TRUNCATE ON app.bookings FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER batches_no_truncate BEFORE TRUNCATE ON app.batches FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER results_no_truncate BEFORE TRUNCATE ON app.results FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    CREATE TRIGGER result_log_entries_no_truncate BEFORE TRUNCATE ON app.result_log_entries FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261011124135_AppendOnlyTruncateGuard') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261011124135_AppendOnlyTruncateGuard', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

@@ -126,6 +126,7 @@ export class CashClosingPage {
 
   constructor() {
     void this.i18n.load('billing');
+    this.facade.refresh();   // the page's facade outlives the page too: re-read on open (UAT D-14, A-01)
   }
 
   protected onTreasuryChange(): void {
@@ -220,6 +221,7 @@ export class CashClosingPage {
     }
 
     saveFile(this.document, file);
+    this.toast.success(this.i18n.t('billing.exported'));
   }
 
   protected onRegisterTreasury(event: Event): void {

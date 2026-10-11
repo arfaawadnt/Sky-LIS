@@ -5,6 +5,7 @@ import type { PageRequest } from '../../../core/api/paging';
 import { type CopyBasePriceListRequest, PRICING_PERMISSIONS, type ServiceLabel } from '../../../core/api/pricing.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
+import { inReleaseScope } from '../../../core/release';
 import { localizedPick } from '../../../shared/forms/localized-text';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
@@ -70,6 +71,9 @@ export class PriceListEditorPage {
   readonly listId = input.required<string>();
 
   protected readonly permissions = PRICING_PERMISSIONS;
+
+  /** Derived contracts link to contract pricing (CP-34) only when that Release-2 page is in scope (UAT R1-03). */
+  protected readonly contractPricingOffered = inReleaseScope('R2');
   protected readonly page = signal<PageRequest>({ page: 1, pageSize: PAGE_SIZE });
   protected readonly copyOpen = signal(false);
 
@@ -242,8 +246,9 @@ export class PriceListEditorPage {
 
     const lang = this.i18n.lang();
     const header = [this.i18n.t('pricing.grid.code'), this.i18n.t('pricing.grid.service'), this.i18n.t('pricing.grid.price'), this.i18n.t('pricing.grid.activeAtOrdering')];
-    const rows = lines.map((line) => [this.facade.names.code(line.serviceId), this.facade.names.name(line.serviceId, lang), line.price, line.isActive]);
+    const rows = lines.map((line) => [this.facade.names.code(line.serviceId), this.facade.names.name(line.serviceId, lang), line.price, this.i18n.t(line.isActive ? 'shared.yes' : 'shared.no')]);
     downloadCsv(csvFileName(`${detail.code}-prices`, new Date()), toCsv(header, rows));
+    this.toast.success(this.i18n.t('pricing.exported'));
   }
 
   protected tierLabel(nameEn: string, nameAr: string): string {

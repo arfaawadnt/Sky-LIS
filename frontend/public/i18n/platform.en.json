@@ -22,7 +22,6 @@
   "validation.mismatch": "The passwords do not match.",
   "validation.containsUsername": "The password must not contain the username.",
   "validation.json": "Not valid JSON (an object or an array is expected). {detail}",
-
   "status.Trial": "Trial",
   "status.Active": "Active",
   "status.Inactive": "Inactive",
@@ -34,7 +33,6 @@
   "link.Serial": "Serial (RS-232)",
   "link.Tcp": "TCP/IP",
   "link.File": "File exchange",
-
   "error.CLI-001": "The portal address must be 3 to 40 characters of a-z, 0-9 and '-', and not a reserved name.",
   "error.CLI-002": "Check the laboratory details: name, address and manager are required.",
   "error.CLI-003": "The e-mail address is not valid.",
@@ -61,16 +59,17 @@
   "error.WAL-011": "The request was already settled or declined.",
   "error.WAL-404": "The client has no wallet.",
   "error.WAL-405": "The top-up request was not found.",
-  "error.GEO-010": "The mobile number does not have the length of the selected country.",
+  "error.GEO-010": "The laboratory mobile does not have the length of the selected country.",
   "error.GEO-011": "The country is inactive.",
   "error.GEO-012": "The governorate is inactive.",
   "error.GEO-013": "The governorate does not belong to the selected country.",
+  "error.GEO-014": "The manager's mobile does not have the length of the selected country.",
+  "error.GEO-007": "The time zone is not an IANA name such as Africa/Cairo.",
   "error.GEO-404": "The country was not found.",
   "error.GEO-405": "The governorate was not found.",
   "error.PLT-403": "Platform administration is available only in the Super Admin portal.",
   "error.PLT-010": "Sign out to end your own session.",
   "error.SES-404": "The session has already ended.",
-
   "dashboard.title": "Dashboard",
   "dashboard.subtitle": "Clients, activity and wallets across the platform.",
   "dashboard.periodLabel": "Period",
@@ -98,7 +97,6 @@
   "dashboard.noActivity": "No registrations in this period yet.",
   "dashboard.recentClients": "Recent clients",
   "dashboard.viewAll": "View all",
-
   "clients.title": "Clients",
   "clients.subtitle": "Laboratories on the platform: details, plan, portal, wallet and status.",
   "clients.add": "Add client",
@@ -146,6 +144,9 @@
   "clients.field.newPassword": "New password",
   "clients.hint.mobile": "As dialled in the country, e.g. 01012345678 or +20 101 234 5678.",
   "clients.hint.managerMobile": "Receives the portal address and the one-time codes.",
+  "clients.validation.mobileLength": "The laboratory mobile has {length} digits after {dial} in the selected country.",
+  "clients.validation.managerMobileLength": "The manager's mobile has {length} digits after {dial} in the selected country.",
+  "clients.planInactive": "inactive",
   "clients.hint.portalSlug": "Leave empty to derive it from the English name; it cannot be changed later.",
   "clients.hint.adminUsername": "The laboratory administrator signs in with this username.",
   "clients.editInfo": "Portal {url} · administrator {username}",
@@ -160,12 +161,10 @@
   "clients.reason": "Reason",
   "clients.activated": "The client is active.",
   "clients.deactivated": "The client is inactive; its users are blocked.",
-
   "subscriptions.title": "Subscriptions & wallets",
   "subscriptions.subtitle": "Plans and the prepaid wallets of the clients.",
   "subscriptions.tab.wallets": "Client wallets",
   "subscriptions.tab.plans": "Plans",
-
   "plans.title": "Plans",
   "plans.subtitle": "Monthly fee and the limits a client receives.",
   "plans.add": "Add plan",
@@ -189,7 +188,6 @@
   "plans.column.status": "Status",
   "plans.field.currencyCode": "Currency",
   "plans.hint.code": "Fixed once created, e.g. STANDARD.",
-
   "wallet.title": "Client wallet",
   "wallet.subtitle": "Prepaid credit: the monthly fee and metered usage debit it; metered services pause at zero.",
   "wallet.client": "Client",
@@ -221,7 +219,7 @@
   "wallet.kind.Subscription": "Subscription",
   "wallet.kind.Usage": "Usage",
   "wallet.hint.reference": "Invoice or transfer number.",
-
+  "wallet.validation.twoDecimals": "The amount has at most two decimals.",
   "sessions.title": "Sessions",
   "sessions.subtitle": "Active sessions of the platform administrators.",
   "sessions.searchPlaceholder": "Search by name or username",
@@ -239,7 +237,6 @@
   "sessions.column.status": "Status",
   "sessions.status.Active": "Active",
   "sessions.status.Idle": "Idle",
-
   "countries.title": "Countries",
   "countries.subtitle": "Countries served and the data that validates a laboratory's details.",
   "countries.add": "Add country",
@@ -271,7 +268,7 @@
   "countries.hint.isoCode": "Two letters (ISO 3166-1), e.g. EG.",
   "countries.hint.dialCode": "'+' and the country code, e.g. +20.",
   "countries.hint.currencyCode": "Three letters (ISO 4217), e.g. EGP.",
-  "countries.hint.timeZone": "IANA name, e.g. Africa/Cairo.",
+  "countries.hint.timeZone": "Choose the IANA zone, e.g. Africa/Cairo.",
   "countries.hint.mobileLength": "Digits of a national mobile number after the dial code (Egypt 10).",
   "countries.error.GEO-001": "The ISO code is two letters.",
   "countries.error.GEO-002": "The dial code is '+' followed by one to four digits, like +20.",
@@ -279,10 +276,10 @@
   "countries.error.GEO-004": "The mobile length is between 6 and 15 digits.",
   "countries.error.GEO-005": "The language is English or Arabic.",
   "countries.error.GEO-006": "Check the names, time zone, flag and remarks.",
+  "countries.error.GEO-007": "The time zone is not an IANA name such as Africa/Cairo.",
   "countries.error.GEO-100": "A country with this ISO code already exists.",
   "countries.error.GEO-110": "The country has governorates or clients; deactivate it instead.",
   "countries.error.GEO-404": "The country was not found.",
-
   "governorates.title": "Governorates",
   "governorates.subtitle": "Governorates and districts of each country.",
   "governorates.add": "Add governorate",
@@ -304,7 +301,6 @@
   "governorates.error.GEO-101": "A governorate with this name already exists in the country.",
   "governorates.error.GEO-404": "The country was not found.",
   "governorates.error.GEO-405": "The governorate was not found.",
-
   "templates.title": "Notification templates",
   "templates.subtitle": "SMS and e-mail texts in English and Arabic; an inactive template falls back to the built-in text.",
   "templates.add": "Add template",
@@ -351,7 +347,6 @@
   "templates.error.NTF-004": "An e-mail template needs a subject in both languages.",
   "templates.error.NTF-100": "A template with this code already exists.",
   "templates.error.NTF-404": "The template was not found.",
-
   "parameters.title": "Platform parameters",
   "parameters.subtitle": "Platform-wide defaults; every laboratory starts from them.",
   "parameters.scope": "These values are the defaults of the platform: a laboratory that never changed a parameter reads the value set here.",
@@ -394,6 +389,20 @@
   "parameters.key.newBarcodeOnReject": "New barcode for a replaced sample",
   "parameters.key.reviewBeforeVerify": "Review before verification",
   "parameters.hint.otpLength": "Digits of a one-time code (4–10).",
+  "parameters.hint.mandatoryMobile": "The patient mobile is required at registration.",
+  "parameters.hint.mandatoryDoctor": "The referring doctor is required at registration.",
+  "parameters.hint.mandatoryNationalId": "The national id is required at registration.",
+  "parameters.hint.similarNameWarning": "Warn when a patient with a similar name and mobile exists (BR-01).",
+  "parameters.hint.autoPrintLabels": "Print the sample labels when a visit is saved.",
+  "parameters.hint.autoPrintJobOrder": "Print the job order when a visit is saved.",
+  "parameters.hint.autoPrintReceipt": "Print the receipt when a payment is recorded.",
+  "parameters.hint.printUnverified": "Allow printing reports that contain unverified results (BR-09 exception).",
+  "parameters.hint.labelCopies": "Label copies per sample (1–10).",
+  "parameters.hint.resultLanguage": "The language of printed reports.",
+  "parameters.hint.autoCollect": "Samples are marked Collected when the visit is saved.",
+  "parameters.hint.autoReceive": "Samples are marked Received when collected (BR-03).",
+  "parameters.hint.newBarcodeOnReject": "A replacement sample carries a new barcode (BR-18).",
+  "parameters.hint.reviewBeforeVerify": "Results pass through Reviewed before Verified.",
   "parameters.hint.passwordMinLength": "8–64; no composition rules (architecture pack 02 §6.1).",
   "parameters.hint.sessionTimeoutMinutes": "Idle minutes before the screen locks (1–720).",
   "parameters.hint.trialDays": "0 starts a subscription active at once (0–365).",
@@ -413,7 +422,6 @@
   "parameters.option.masterDataUpdatePolicy.ignore": "Do not send changes",
   "parameters.error.SET-001": "One of the parameters is not known to the platform.",
   "parameters.error.SET-002": "One of the values is outside its allowed range.",
-
   "analyserModels.title": "Analyser models",
   "analyserModels.subtitle": "The vendor and model library laboratories choose from.",
   "analyserModels.add": "Add analyser model",
@@ -440,7 +448,6 @@
   "analyserModels.error.LIB-002": "At most 10 modes of 40 characters.",
   "analyserModels.error.LIB-100": "This vendor and model already exist.",
   "analyserModels.error.LIB-404": "The analyser model was not found.",
-
   "pcrKits.title": "PCR kits",
   "pcrKits.subtitle": "Kit interpretation templates: run-file layout, gene thresholds and verdict rules.",
   "pcrKits.add": "Add PCR kit",
@@ -470,7 +477,6 @@
   "pcrKits.error.LIB-101": "A PCR kit with this name already exists.",
   "pcrKits.error.LIB-404": "The analyser model was not found.",
   "pcrKits.error.LIB-405": "The PCR kit was not found.",
-
   "codeSystems.title": "Code systems",
   "codeSystems.subtitle": "LOINC, CPT, ICD-10 and SNOMED versions with their codes.",
   "codeSystems.add": "Add code system",
@@ -506,7 +512,6 @@
   "codeSystems.error.LIB-011": "The file is too large.",
   "codeSystems.error.LIB-102": "This code system version already exists.",
   "codeSystems.error.LIB-406": "The code system was not found.",
-
   "ruleTemplates.title": "Rule templates",
   "ruleTemplates.subtitle": "Reusable medical-rule patterns laboratories adapt.",
   "ruleTemplates.add": "Add rule template",
@@ -524,5 +529,6 @@
   "ruleTemplates.hint.formula": "Percentages as multiplications of the live range, e.g. R > 1.2 * HIGH; every boundary needs its complement (BR-21, BR-22).",
   "ruleTemplates.error.LIB-001": "Name and formula are required.",
   "ruleTemplates.error.LIB-103": "A rule template with this name already exists.",
-  "ruleTemplates.error.LIB-407": "The rule template was not found."
+  "ruleTemplates.error.LIB-407": "The rule template was not found.",
+  "templates.view": "Template"
 }

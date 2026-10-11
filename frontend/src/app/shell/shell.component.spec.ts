@@ -6,6 +6,7 @@ import { provideRouter } from '@angular/router';
 
 import { AUTH_API, type AuthResponse } from '../core/api/auth.contracts';
 import { AuthStore } from '../core/auth/auth.store';
+import { FakeBrowserNavigation, FakeSessionChannel, provideSessionTesting } from '../core/auth/session-testing';
 import { PLATFORM_TENANT_ID } from '../core/tenancy/tenant-ids';
 import { ShellComponent } from './shell.component';
 
@@ -29,11 +30,34 @@ function navLinks(host: HTMLElement): string[] {
 }
 
 describe('ShellComponent', () => {
+  let navigation: FakeBrowserNavigation;
+  let channel: FakeSessionChannel;
+
   beforeEach(async () => {
+    navigation = new FakeBrowserNavigation();
+    channel = new FakeSessionChannel();
     await TestBed.configureTestingModule({
       imports: [ShellComponent],
-      providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(), ...provideSessionTesting(navigation, channel)],
     }).compileComponents();
+  });
+
+  it('signs out with a full page load of the sign-in page, so no module keeps the user state (A-01, B-11)', async () => {
+    await signIn('11111111-1111-1111-1111-111111111111', ['treasury.view']);
+    const fixture = TestBed.createComponent(ShellComponent);
+    await fixture.whenStable();
+    const host = fixture.nativeElement as HTMLElement;
+
+    host.querySelector<HTMLButtonElement>('.profile')?.click();
+    await fixture.whenStable();
+    host.querySelector<HTMLButtonElement>('[role="menu"] .mi.danger')?.click();
+    TestBed.inject(HttpTestingController).expectOne(AUTH_API.signOut).flush(null, { status: 204, statusText: 'No Content' });
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(navigation.loads).toEqual(['/login']);
+    expect(channel.posted.at(-1)).toEqual({ kind: 'signed-out' });
+    expect(TestBed.inject(AuthStore).isAuthenticated()).toBe(false);
   });
 
   it('shows the client navigation filtered by permission, with the user name and initials', async () => {

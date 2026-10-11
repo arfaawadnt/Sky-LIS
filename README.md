@@ -234,7 +234,29 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **All 49 findings of the validation report fixed** (LIS-VR-001, 2 S1 · 5 S2 · 21 S3 · 21 S4), each with tests:
+  - **Sessions (S1)**: a tab never continues as another user after a refresh; sign-out reloads the page and is broadcast
+    to other tabs; every list re-reads on each visit.
+  - **Editors and saves (S2)**: the test editor keeps typed sections and shows each refusal; editors follow browser
+    back/forward; successful empty answers are confirmed (roles, users, tiers, results, samples, integration).
+  - **Guards and rights**: routes refuse pages outside the user's permissions or Release 1; `/account` closed to platform
+    sessions; result comment/note, patient documents and treasury branches follow the user's rights.
+  - **Data and rules**: governorate must belong to the branch country (`ORG-017`), field codes for branch phone and e-mail
+    (`ORG-015/016`), IANA time zones (`GEO-007`), manager mobile (`GEO-014`), top-ups refuse more than two decimals,
+    administrator lock has its own code (`AUTH-015`); `BEFORE TRUNCATE` guards on every append-only table (migration
+    `AppendOnlyTruncateGuard`).
+  - **Features**: patients list visit columns, worklist search by name, exports on branches/roles/users/payers/treasuries,
+    filtered and localized catalogue exports, billing print setting (`GET /api/v1/billing/print-settings`), audit Client
+    column and filter with client creation in the platform trail, laboratory settings show the effective value and source.
+  - **Wording**: localized field-level validation messages, Arabic parameter hints, letterheads per language, dashboard
+    wording and digits, distinct Home/Dashboard labels, Release-1 landing text.
+- **Fix verification** (report LIS-VR-001 v1.1): two browser re-test rounds with regression smoke of every page for every
+  persona; the findings they raised are fixed too: the refund action reachable again (action-only pages carry
+  `menu: false` in the navigation registry), sign-in and sign-out act only on a refresh cookie whose secret matches and a
+  sign-in ends the browser's previous session, other tabs follow a password change, delayed-tests table with due time,
+  read-only views for users without edit rights, refunds netted in the visit summary, local export file names.
+- **New permissions** `organization.export` and `treasury.export`: add them to existing laboratory roles in the role
+  editor (the platform administrator and newly provisioned laboratory administrators get them automatically).
 
 ### v0.3.9 — 2026-10-11
 

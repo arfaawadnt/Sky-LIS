@@ -58,6 +58,14 @@ export class CashClosingFacade {
 
   readonly exportCsv = mutation<void, DownloadedFile>(() => this.api.exportClosings(this.filter()));
 
+  /** Re-reads the treasuries, the preview, the cashiers and the register when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01). A load in flight is left alone; an idle read (nothing looked up) stays idle. */
+  refresh(): void {
+    this.treasuries.reload();
+    this.preview.reload();
+    this.cashiers.reload();
+    this.closings.reload();
+  }
+
   setFilter(change: Partial<Omit<CashClosingRegisterFilter, 'page' | 'pageSize'>>): void {
     this.filter.update((current) => ({ ...current, ...change, page: 1 }));
   }

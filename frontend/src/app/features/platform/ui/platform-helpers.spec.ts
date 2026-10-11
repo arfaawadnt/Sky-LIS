@@ -2,7 +2,18 @@ import { FormControl, FormGroup } from '@angular/forms';
 
 import { toCsv } from '../data/csv-export';
 import { statusTone } from './status';
-import { formatJson, jsonValidator, matchingPasswords, notContaining, SLUG_PATTERN } from './validators';
+import {
+  countryMobileValidator,
+  formatJson,
+  hasAtMostTwoDecimals,
+  ianaTimeZones,
+  jsonValidator,
+  matchingPasswords,
+  maxTwoDecimals,
+  normaliseCountryMobile,
+  notContaining,
+  SLUG_PATTERN,
+} from './validators';
 
 describe('Platform helpers', () => {
   it('writes RFC 4180 CSV with a BOM, quoting and formula neutralisation', () => {
@@ -55,6 +66,49 @@ describe('Platform helpers', () => {
   it('accepts portal slugs of the server rule', () => {
     expect(['al-noor', 'lab1', 'a1b'].every((slug) => SLUG_PATTERN.test(slug))).toBe(true);
     expect(['ab', '-lab', 'lab-', 'Al-Noor', 'al noor'].some((slug) => SLUG_PATTERN.test(slug))).toBe(false);
+  });
+
+  it('C-03: normalises a mobile by the country length and refuses landlines and short numbers', () => {
+    const egypt = { dialCode: '+20', mobileLength: 10 };
+    expect(normaliseCountryMobile('01012345678', egypt)).toBe('+201012345678');
+    expect(normaliseCountryMobile('+20 101 234 5678', egypt)).toBe('+201012345678');
+    expect(normaliseCountryMobile('0020-101-234-5678', egypt)).toBe('+201012345678');
+    expect(normaliseCountryMobile('0233351111', egypt)).toBeNull();
+    expect(normaliseCountryMobile('+2010111100', egypt)).toBeNull();
+    expect(normaliseCountryMobile('+966512345678', egypt)).toBeNull();
+    expect(normaliseCountryMobile('51234567', { dialCode: '+965', mobileLength: 8 })).toBe('+96551234567');
+  });
+
+  it('C-03: the country mobile validator reads the sibling country and names the rule', () => {
+    const form = new FormGroup({
+      countryId: new FormControl('eg', { nonNullable: true }),
+      mobile: new FormControl('', { nonNullable: true, validators: [countryMobileValidator('countryId', (id) => (id === 'eg' ? { dialCode: '+20', mobileLength: 10 } : null), (country) => `${country.mobileLength} digits`)] }),
+    });
+    form.controls.mobile.setValue('0233351111');
+    expect(form.controls.mobile.errors).toEqual({ server: '10 digits' });
+    form.controls.mobile.setValue('01012345678');
+    expect(form.controls.mobile.errors).toBeNull();
+    form.controls.countryId.setValue('unknown');
+    form.controls.mobile.setValue('123');
+    expect(form.controls.mobile.errors).toBeNull();   // unknown country: the server decides
+  });
+
+  it('C-19: a money amount has at most two decimals and is never rounded', () => {
+    expect([250.55, 250.5, 250, 0.01, 100000000].map(hasAtMostTwoDecimals)).toEqual([true, true, true, true, true]);
+    expect([250.555, 0.001, 10.0001].map(hasAtMostTwoDecimals)).toEqual([false, false, false]);
+    const amount = new FormControl<number | null>(250.555, { validators: [maxTwoDecimals(() => 'two decimals')] });
+    expect(amount.errors).toEqual({ server: 'two decimals' });
+    amount.setValue(250.56);
+    expect(amount.errors).toBeNull();
+  });
+
+  it('C-08: offers the IANA time zones, keeping UTC and the zones already stored', () => {
+    const zones = ianaTimeZones(['Asia/Calcutta']);
+    expect(zones).toContain('Africa/Cairo');
+    expect(zones).toContain('UTC');
+    expect(zones).toContain('Asia/Calcutta');
+    expect(zones).not.toContain('Mars/Base');
+    expect([...zones].sort((a, b) => a.localeCompare(b, 'en'))).toEqual(zones);
   });
 
   it('colours the platform statuses', () => {

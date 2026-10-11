@@ -357,7 +357,9 @@ export class MasterDataPageComponent<TItem, TDto> {
           validators.unshift(requiredText);
         }
 
-        return new FormControl<string>({ value: typeof initial === 'string' ? initial : '', disabled }, { nonNullable: true, validators });
+        // B-01: a new record starts at the field's default (a branch's currency starts at EGP), like every other kind
+        const value = typeof initial === 'string' ? initial : typeof field.defaultValue === 'string' ? field.defaultValue : '';
+        return new FormControl<string>({ value, disabled }, { nonNullable: true, validators });
       }
       default: {
         const validators = [Validators.maxLength(field.maxLength ?? (field.kind === 'textarea' ? 2000 : 200))];

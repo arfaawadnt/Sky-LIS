@@ -29,7 +29,7 @@ public sealed class CreateBranchValidator : AbstractValidator<CreateBranchComman
     }
 }
 
-public sealed class CreateBranchHandler(IBranchRepository branches, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<CreateBranchCommand, CreatedResource>
+public sealed class CreateBranchHandler(IBranchRepository branches, IBranchGeography geography, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<CreateBranchCommand, CreatedResource>
 {
     public async Task<CreatedResource> Handle(CreateBranchCommand command, CancellationToken cancellationToken)
     {
@@ -40,6 +40,7 @@ public sealed class CreateBranchHandler(IBranchRepository branches, IUnitOfWork 
         }
 
         var branch = Branch.Create(code, new LocalizedText(command.NameEn, command.NameAr), command.CountryId, command.GovernorateId, command.Phone, command.Email, command.Currency, clock.UtcNow);
+        await OrganizationGuards.EnsureGovernorateInCountryAsync(geography, branch.CountryId, branch.GovernorateId, cancellationToken);
         branches.Add(branch);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new CreatedResource(branch.Id);
@@ -62,7 +63,7 @@ public sealed class UpdateBranchValidator : AbstractValidator<UpdateBranchComman
     }
 }
 
-public sealed class UpdateBranchHandler(IBranchRepository branches, IUnitOfWork unitOfWork) : ICommandHandler<UpdateBranchCommand>
+public sealed class UpdateBranchHandler(IBranchRepository branches, IBranchGeography geography, IUnitOfWork unitOfWork) : ICommandHandler<UpdateBranchCommand>
 {
     public async Task Handle(UpdateBranchCommand command, CancellationToken cancellationToken)
     {
@@ -70,6 +71,7 @@ public sealed class UpdateBranchHandler(IBranchRepository branches, IUnitOfWork 
             ?? throw new DomainException(OrganizationCodes.BranchNotFound, "Branch not found.", DomainFault.NotFound);
 
         branch.Update(new LocalizedText(command.NameEn, command.NameAr), command.CountryId, command.GovernorateId, command.Phone, command.Email, command.Currency);
+        await OrganizationGuards.EnsureGovernorateInCountryAsync(geography, branch.CountryId, branch.GovernorateId, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

@@ -100,8 +100,8 @@ export const SUBSCRIPTION_PASSWORD_RULE = { minLength: 8, maxLength: 128 } as co
 
 /**
  * Refusal codes the wizard shows: SUB-001 expired (start again), SUB-002 not pending, SUB-003 not verified,
- * SUB-004 too many codes, SUB-010 wrong code, SUB-404 unknown request, GEO-010 mobile length, GEO-011/012/013
- * place, CLI-040 password too short, CLI-041 password contains the username, CLI-042 username shape,
+ * SUB-004 too many codes, SUB-010 wrong code, SUB-404 unknown request, GEO-010 laboratory mobile length, GEO-014 manager
+ * mobile length, GEO-011/012/013 place, CLI-040 password too short, CLI-041 password contains the username, CLI-042 username shape,
  * CLI-101 username taken, RATE-429 too many attempts.
  */
 export const SUBSCRIPTION_CODES = {
@@ -112,6 +112,7 @@ export const SUBSCRIPTION_CODES = {
   codeRejected: 'SUB-010',
   notFound: 'SUB-404',
   mobileInvalid: 'GEO-010',
+  managerMobileInvalid: 'GEO-014',
   passwordTooShort: 'CLI-040',
   passwordContainsUsername: 'CLI-041',
   usernameInvalid: 'CLI-042',

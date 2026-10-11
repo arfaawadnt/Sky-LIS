@@ -42,6 +42,15 @@ export class TreasuryAccessFacade {
 
   readonly cancel = mutation((input: { id: string; reason: string | null }) => this.api.cancel(input.id, input.reason), { then: () => this.requests.reload() });
 
+  /**
+   * Re-reads the requests and the treasury picker when the page opens again: the facade outlives the page (route
+   * provider), so a treasury reactivated since the last visit must be offered (UAT B-07, D-14). A load in flight is left alone.
+   */
+  refresh(): void {
+    this.requests.reload();
+    this.treasuries.reload();
+  }
+
   setStatus(status: TreasuryAccessStatus | null): void {
     this.filter.update((current) => ({ ...current, status, page: 1 }));
   }

@@ -1,5 +1,5 @@
 import type { Portal } from '../core/portal/portal';
-import type { NavEntry, NavGroup } from './nav.registry';
+import { NAV_GROUPS, NAV_REGISTRY, type NavEntry, type NavGroup, type Release, RELEASE_SCOPE, inMenu } from './nav.registry';
 
 export interface VisibleNavGroup {
   readonly group: NavGroup;
@@ -8,7 +8,8 @@ export interface VisibleNavGroup {
 
 /**
  * The sidebar as the signed-in user sees it: the groups of the current portal, in registry order, each with the
- * entries the user may open (`permission` null or held), dropping empty groups. `search` narrows by label text
+ * menu entries of the delivered release (`inMenu`: an action-only page such as the Release-1 refunds is left out,
+ * R1-01) the user may open (`permission` null or held), dropping empty groups. `search` narrows by label text
  * (the caller translates). Pure, so the shell spec can check it without rendering.
  */
 export function filterNav(
@@ -18,6 +19,7 @@ export function filterNav(
   can: (permission: string) => boolean,
   label: (entry: NavEntry) => string,
   search = '',
+  scope: Release = RELEASE_SCOPE,
 ): readonly VisibleNavGroup[] {
   const needle = search.trim().toLowerCase();
   return groups
@@ -25,7 +27,12 @@ export function filterNav(
     .map((group) => ({
       group,
       entries: entries.filter(
-        (entry) => entry.portal === portal && entry.group === group.i18nKey && (entry.permission === null || can(entry.permission)) && (needle === '' || label(entry).toLowerCase().includes(needle)),
+        (entry) =>
+          entry.portal === portal &&
+          entry.group === group.i18nKey &&
+          inMenu(entry, scope) &&
+          (entry.permission === null || can(entry.permission)) &&
+          (needle === '' || label(entry).toLowerCase().includes(needle)),
       ),
     }))
     .filter((visible) => visible.entries.length > 0);
@@ -34,6 +41,20 @@ export function filterNav(
 /** The first visible entry across the groups (Enter in the navigation search opens it). */
 export function firstEntry(groups: readonly VisibleNavGroup[]): NavEntry | null {
   return groups[0]?.entries[0] ?? null;
+}
+
+/**
+ * R1-04: where a signed-in user of the portal lands: the first menu entry they may open, in sidebar order (the client
+ * dashboard comes first for whoever holds `dashboard.view`); `null` when the menu is empty for them.
+ */
+export function landingEntry(
+  portal: Portal,
+  can: (permission: string) => boolean,
+  groups: readonly NavGroup[] = NAV_GROUPS,
+  entries: readonly NavEntry[] = NAV_REGISTRY,
+  scope: Release = RELEASE_SCOPE,
+): NavEntry | null {
+  return firstEntry(filterNav(groups, entries, portal, can, (entry) => entry.i18nKey, '', scope));
 }
 
 /** Whether `path` is the entry's route or below it (`/` matches only itself). */

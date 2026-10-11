@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import type { BillingReasonOption, BillingTreasuryItem } from '../../../core/api/billing.contracts';
@@ -20,6 +20,7 @@ class HostComponent {
   readonly treasuries = treasuries;
   readonly reasons = reasons;
   readonly submitted: MovementInput[] = [];
+  readonly form = viewChild.required(MovementFormComponent);
 }
 
 function field<T extends HTMLElement>(root: HTMLElement, selector: string): T {
@@ -85,5 +86,33 @@ describe('MovementFormComponent (pay and refund form)', () => {
     set(root, 'textarea', ' contract transfer ');
     await submit();
     expect(host.submitted).toEqual([{ treasuryId: 't-1', amount: 40, method: 'Cash', reference: null, reasonId: 'r-1', note: 'contract transfer' }]);
+  });
+
+  it('starts the next movement from a fresh form after a save: no previous note, reason, method or reference (UAT A-06)', async () => {
+    const { host, root, submit } = await render();
+    host.mode.set('refund');
+    host.due.set(400);
+    TestBed.tick();
+    set(root, 'select[formcontrolname=method]', 'Card');
+    set(root, 'input[formcontrolname=reference]', 'SLIP-7');
+    set(root, 'select[formcontrolname=reasonId]', 'r-1');
+    set(root, 'textarea', 'first refund note');
+    set(root, 'input[type=number]', '200');
+    await submit();
+    expect(host.submitted.length).toBe(1);
+
+    host.form().reset();   // what the page does once the save succeeded
+    TestBed.tick();
+    expect(field<HTMLTextAreaElement>(root, 'textarea').value).toBe('');
+    expect(field<HTMLInputElement>(root, 'input[formcontrolname=reference]').value).toBe('');
+    expect(field<HTMLSelectElement>(root, 'select[formcontrolname=method]').value).toBe('Cash');
+    expect(field<HTMLInputElement>(root, 'input[type=number]').value).toBe('400');
+
+    await submit();
+    expect(host.submitted.length).toBe(1);   // the reason must be chosen again
+
+    set(root, 'select[formcontrolname=reasonId]', 'r-1');
+    await submit();
+    expect(host.submitted[1]).toEqual({ treasuryId: 't-1', amount: 400, method: 'Cash', reference: null, reasonId: 'r-1', note: null });
   });
 });

@@ -46,6 +46,7 @@ export class SelectBranchPage {
 
   constructor() {
     void this.i18n.load('account');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01/C-13)
 
     // Nothing to choose: a session that already has its branch continues, unless the user asked to change it;
     // a single selectable branch is taken at once.
@@ -88,7 +89,7 @@ export class SelectBranchPage {
 
   protected async signOut(): Promise<void> {
     await this.auth.signOut();
-    await this.router.navigate(['/login']);
+    // AuthStore.signOut() ends in a full page load of /login itself: no navigation afterwards (UAT A-01/C-13)
   }
 
   protected problemText(): string {

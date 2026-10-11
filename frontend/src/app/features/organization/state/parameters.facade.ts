@@ -47,11 +47,11 @@ export class ParametersFacade {
     });
   }
 
-  /** Back to the platform default (saved with the next Save). */
+  /** Back to what the laboratory inherits: the platform value when the platform sets one, else the default (UAT C-09; saved with the next Save). */
   resetToDefault(key: string): void {
     const item = this.byKey().get(key);
     if (item) {
-      this.set(key, item.defaultValue);
+      this.set(key, item.inheritedValue ?? item.defaultValue);
     }
   }
 

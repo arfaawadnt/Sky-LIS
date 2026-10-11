@@ -5,9 +5,9 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
-import type { MasterDataConfig, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
+import type { MasterDataConfig, MasterDataFilter, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueAApi } from '../data-a/catalogue-a.api';
-import { csvFileName, downloadCsv, toCsv } from '../data-a/csv-export';
+import { csvFileName, downloadCsv, toCsv, yesNo } from '../data-a/csv-export';
 import { CatalogueExportButtonComponent } from '../ui-a/export-button.component';
 
 /**
@@ -31,6 +31,9 @@ export class ClinicalGroupsPage {
 
   protected readonly permissions = CATALOGUE_A_PERMISSIONS;
 
+  /** The filter of the list on screen: the export writes exactly these rows (UAT C-04 / B-09). */
+  private filter: MasterDataFilter = { search: '', active: true };
+
   protected readonly config: MasterDataConfig<ClinicalGroupListItem, ClinicalGroupRequest> = {
     i18nPrefix: 'catalogue-a.groups',
     columns: [
@@ -49,7 +52,10 @@ export class ClinicalGroupsPage {
       { name: 'displayOrder', kind: 'number', required: true, min: 0, max: 9999, defaultValue: 0 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.listClinicalGroups({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => {
+        this.filter = filter;
+        return this.api.listClinicalGroups({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+      },
       create: (dto) => this.api.createClinicalGroup(dto),
       update: (id, dto) => this.api.updateClinicalGroup(id, dto),
       setActive: (id, active) => this.api.setClinicalGroupActive(id, active),
@@ -58,7 +64,7 @@ export class ClinicalGroupsPage {
   };
 
   protected readonly exportCsv = async (): Promise<void> => {
-    const rows = await this.api.exportClinicalGroups();
+    const rows = await this.api.exportClinicalGroups({ search: this.filter.search, isActive: this.filter.active });
     const t = (key: string): string => this.i18n.t(`catalogue-a.groups.column.${key}`);
     downloadCsv(
       csvFileName('clinical-groups'),
@@ -69,7 +75,7 @@ export class ClinicalGroupsPage {
         { header: this.i18n.t('catalogue-a.csv.nameAr'), value: (row) => row.nameAr },
         { header: t('reportName'), value: (row) => row.reportName },
         { header: t('displayOrder'), value: (row) => row.displayOrder },
-        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => row.isActive },
+        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => yesNo((key) => this.i18n.t(key), row.isActive) },
       ]),
     );
   };

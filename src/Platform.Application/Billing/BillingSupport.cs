@@ -157,13 +157,17 @@ internal static class BillingCsv
     public const int MaxRows = 10_000;
     public const string ContentType = "text/csv; charset=utf-8";
 
-    public static BillingExportFile Build(string name, DateTimeOffset nowUtc, IReadOnlyList<string> header, IEnumerable<IReadOnlyList<object?>> rows)
+    /// <summary>
+    /// Builds the file. With <paramref name="zone"/> (the browser's IANA time zone) every date and time is written in that
+    /// zone, as the register shows it, and the headers name the zone instead of "UTC" (UAT R1-06); without it, UTC.
+    /// </summary>
+    public static BillingExportFile Build(string name, DateTimeOffset nowUtc, IReadOnlyList<string> header, IEnumerable<IReadOnlyList<object?>> rows, TimeZoneInfo? zone = null)
     {
         var csv = new StringBuilder();
-        AppendLine(csv, header.Cast<object?>().ToList());
+        AppendLine(csv, header.Select(text => (object?)(zone is null ? text : text.Replace("(UTC)", $"({zone.Id})", StringComparison.Ordinal))).ToList(), null);
         foreach (var row in rows)
         {
-            AppendLine(csv, row);
+            AppendLine(csv, row, zone);
         }
 
         var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray();
@@ -181,7 +185,13 @@ internal static class BillingCsv
 
     public static string Utc(DateTimeOffset value) => value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 
-    private static void AppendLine(StringBuilder csv, IReadOnlyList<object?> cells)
+    /// <summary>The export's time zone: <see langword="null"/> (UTC) when none is given; an unknown id is refused by the validators.</summary>
+    public static TimeZoneInfo? Zone(string? timeZone) =>
+        string.IsNullOrWhiteSpace(timeZone) ? null : TimeZoneInfo.TryFindSystemTimeZoneById(timeZone.Trim(), out var zone) ? zone : null;
+
+    public static bool IsKnownZone(string? timeZone) => string.IsNullOrWhiteSpace(timeZone) || (timeZone.Length <= 64 && Zone(timeZone) is not null);
+
+    private static void AppendLine(StringBuilder csv, IReadOnlyList<object?> cells, TimeZoneInfo? zone)
     {
         for (var index = 0; index < cells.Count; index++)
         {
@@ -190,14 +200,15 @@ internal static class BillingCsv
                 csv.Append(',');
             }
 
-            csv.Append(Cell(cells[index]));
+            csv.Append(Cell(cells[index], zone));
         }
 
         csv.Append("\r\n");
     }
 
-    private static string Cell(object? value) => value switch
+    private static string Cell(object? value, TimeZoneInfo? zone) => value switch
     {
+        DateTimeOffset instant when zone is not null => TimeZoneInfo.ConvertTime(instant, zone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
         null => string.Empty,
         decimal number => number.ToString("0.00", CultureInfo.InvariantCulture),
         int number => number.ToString(CultureInfo.InvariantCulture),

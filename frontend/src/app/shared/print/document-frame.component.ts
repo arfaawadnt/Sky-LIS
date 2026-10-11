@@ -1,12 +1,14 @@
-import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 
 import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
- * `<app-document-frame [labNameEn]="…" [labNameAr]="…" [branch]="…" [title]="…" [printedBy]="…" [printedAt]="…">
+ * `<app-document-frame [labNameEn]="…" [labNameAr]="…" [branchEn]="…" [branchAr]="…" [title]="…" [printedBy]="…" [printedAt]="…">
  *   <img documentLogo … /> …body… <span documentFooter>…</span></app-document-frame>`:
  * the bilingual header (laboratory name in both languages around the logo, branch, document title) and the footer
- * (printed by / at) shared by receipts, job orders, reports and sheets. Labels are passed already formatted.
+ * (printed by / at) shared by receipts, job orders, reports and sheets. Labels are passed already formatted. Each side
+ * of the header speaks its own language: the English side shows `branchEn`, the Arabic side `branchAr` (UAT A-10: the
+ * Arabic laboratory name was followed by the English branch name); either falls back to the other, then to `branch`.
  */
 @Component({
   selector: 'app-document-frame',
@@ -15,14 +17,14 @@ import { I18nService } from '../../core/i18n/i18n.service';
       <header class="doc-head">
         <div class="lab" dir="ltr" lang="en">
           <b>{{ labNameEn() }}</b>
-          @if (branch(); as branch) {
+          @if (branchLineEn(); as branch) {
             <span>{{ branch }}</span>
           }
         </div>
         <div class="logo"><ng-content select="[documentLogo]" /></div>
         <div class="lab" dir="rtl" lang="ar">
           <b>{{ labNameAr() }}</b>
-          @if (branch(); as branch) {
+          @if (branchLineAr(); as branch) {
             <span>{{ branch }}</span>
           }
         </div>
@@ -141,7 +143,15 @@ export class DocumentFrameComponent {
 
   readonly labNameEn = input.required<string>();
   readonly labNameAr = input.required<string>();
+  /** One branch line for both sides (documents that know a single name). */
   readonly branch = input<string | null>(null);
+  /** The branch name of the English side of the header. */
+  readonly branchEn = input<string | null>(null);
+  /** The branch name of the Arabic side of the header. */
+  readonly branchAr = input<string | null>(null);
+
+  protected readonly branchLineEn = computed(() => present(this.branchEn()) ?? present(this.branchAr()) ?? present(this.branch()));
+  protected readonly branchLineAr = computed(() => present(this.branchAr()) ?? present(this.branchEn()) ?? present(this.branch()));
   readonly title = input.required<string>();
   readonly subtitle = input<string | null>(null);
   /** The document's reference number (receipt, accession…), shown beside the title. */
@@ -149,4 +159,9 @@ export class DocumentFrameComponent {
   readonly printedBy = input<string | null>(null);
   /** Already formatted for the reader. */
   readonly printedAt = input<string | null>(null);
+}
+
+function present(value: string | null): string | null {
+  const text = value?.trim() ?? '';
+  return text === '' ? null : text;
 }

@@ -47,10 +47,23 @@ export class PriceQueryPage {
 
   protected readonly issues = computed<readonly OrderIssue[]>(() => this.facade.document()?.issues ?? []);
 
+  /** The quote's refusals by service, so a refused line says why on its own row (UAT A-11). */
+  private readonly issuesByService = computed(() => {
+    const map = new Map<string, OrderIssue[]>();
+    for (const issue of this.issues()) {
+      if (issue.serviceId !== null) {
+        map.set(issue.serviceId, [...(map.get(issue.serviceId) ?? []), issue]);
+      }
+    }
+
+    return map;
+  });
+
   protected readonly currency = computed(() => this.facade.document()?.currency ?? '');
 
   constructor() {
     void this.i18n.load('registration');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
 
     effect(() => {
       const options = this.facade.tierOptions();
@@ -72,6 +85,10 @@ export class PriceQueryPage {
 
   protected tierLabel(tier: { payerNameEn: string; payerNameAr: string; nameEn: string; nameAr: string }): string {
     return `${this.name(tier.payerNameEn, tier.payerNameAr)} — ${this.name(tier.nameEn, tier.nameAr)}`;
+  }
+
+  protected issuesOf(serviceId: string): readonly OrderIssue[] {
+    return this.issuesByService().get(serviceId) ?? [];
   }
 
   protected issueText(issue: OrderIssue): string {

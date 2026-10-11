@@ -16,7 +16,7 @@
   "editTitle": "Edit patient file {number}",
   "export": "Export CSV",
   "exporting": "Exporting…",
-  "exported": "The patient list was exported.",
+  "exported": "The CSV file was downloaded.",
   "open": "Open",
   "edit": "Edit",
   "save": "Save (Ctrl+S)",
@@ -187,5 +187,7 @@
   "error.PAT-050": "The export is limited to 10,000 rows; narrow the search.",
   "error.PAT-100": "The two files have different genders; confirm the merge to continue.",
   "error.PAT-404": "The patient file was not found.",
-  "error.PAT-405": "The document was not found."
+  "error.PAT-405": "The document was not found.",
+  "column.visits": "Visits",
+  "column.lastVisit": "Last visit"
 }

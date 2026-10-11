@@ -3,6 +3,7 @@ using Platform.Application.Abstractions.Settings;
 using Platform.Application.Account;
 using Platform.Application.Account.Queries;
 using Platform.Application.UnitTests.Support;
+using Platform.Contracts.Account;
 using Platform.Domain.Organization;
 using Platform.Domain.Settings;
 using Platform.Infrastructure.Persistence.Reporting;
@@ -32,6 +33,20 @@ public sealed class DashboardActivityTests
     }
 
     [Fact]
+    public async Task S_D1b_the_delayed_tests_of_the_reader_fill_the_dashboard_table()
+    {
+        // UAT R1-02: the tile counted the delayed tests while the table was always built empty.
+        var delayed = new DelayedTestItem(Guid.CreateVersion7(), "ACC-2026-00012", "Mona Adel", "Glucose", Now.AddHours(-2), 120, "Ordered", "جلوكوز");
+        var reader = new FixedReader(new BranchDayFigures(1, 0m, 0, 0, new Dictionary<string, int>(), 1, 0, 1, [delayed]));
+        var handler = new GetBranchDashboardHandler(reader, new DefaultSettings(), new NoPrivileges(), new SessionUser(Guid.CreateVersion7()), new NoTenant(), new FixedClock(Now));
+
+        var dashboard = await handler.Handle(new GetBranchDashboardQuery(null, null), CancellationToken.None);
+
+        Assert.Equal([delayed], dashboard.DelayedTests);
+        Assert.Equal(1, dashboard.Kpis.DelayedTests);
+    }
+
+    [Fact]
     public async Task S_D2_without_the_results_table_the_three_figures_stay_not_available()
     {
         var reader = new FixedReader(new BranchDayFigures(null, null, null, null, null));
@@ -42,6 +57,7 @@ public sealed class DashboardActivityTests
         Assert.Null(dashboard.Kpis.PendingResults);
         Assert.Null(dashboard.Kpis.UnverifiedBacklog);
         Assert.Null(dashboard.Kpis.DelayedTests);
+        Assert.Empty(dashboard.DelayedTests);
     }
 
     [Fact]

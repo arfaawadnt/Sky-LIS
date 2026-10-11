@@ -7,9 +7,10 @@ import { AuthStore } from '../core/auth/auth.store';
 import { I18nService } from '../core/i18n/i18n.service';
 import { PermissionsService } from '../core/permissions/permissions.service';
 import { PortalService } from '../core/portal/portal.service';
+import { followProfileChanges } from '../features/account/account.guards';
 import { SearchFocusService } from '../shared/ui/search-box/search-focus.service';
 import { type VisibleNavGroup, filterNav, firstEntry } from './nav.filter';
-import { NAV_GROUPS, NAV_REGISTRY, inReleaseScope } from './nav.registry';
+import { NAV_GROUPS, NAV_REGISTRY } from './nav.registry';
 import { ShellSidebarComponent } from './shell-sidebar.component';
 import { ShellTopbarComponent } from './shell-topbar.component';
 
@@ -20,9 +21,6 @@ import { ShellTopbarComponent } from './shell-topbar.component';
  * The navigation is the registry filtered by portal (`PortalService`: admin for the platform tenant) and
  * permission.
  */
-/** The registry entries of the delivered release (RELEASE_SCOPE). */
-const RELEASE_ENTRIES = NAV_REGISTRY.filter((entry) => inReleaseScope(entry.release));
-
 @Component({
   selector: 'app-shell',
   imports: [RouterOutlet, ShellSidebarComponent, ShellTopbarComponent],
@@ -57,7 +55,7 @@ export class ShellComponent {
   protected readonly groups = computed<readonly VisibleNavGroup[]>(() =>
     filterNav(
       NAV_GROUPS,
-      RELEASE_ENTRIES,
+      NAV_REGISTRY,
       this.portal.portal(),
       (permission) => this.permissions.can(permission),
       (entry) => this.i18n.t(entry.i18nKey),
@@ -68,6 +66,10 @@ export class ShellComponent {
   protected readonly portalLabel = computed(() => this.i18n.t(this.portal.portal() === 'admin' ? 'shell.portal.admin' : 'shell.portal.client'));
 
   protected readonly roleName = computed(() => this.auth.profile()?.roleName ?? null);
+
+  constructor() {
+    followProfileChanges(); // R2-01: a password changed in another tab ends this tab's forced change
+  }
 
   protected toggleCollapsed(): void {
     this.collapsed.update((value) => !value);
@@ -86,9 +88,9 @@ export class ShellComponent {
     this.i18n.setLanguage(this.i18n.lang() === 'en' ? 'ar' : 'en');
   }
 
+  /** The store ends with a full page load of the sign-in page (A-01): no module keeps this user's state. */
   protected async signOut(): Promise<void> {
     await this.auth.signOut();
-    await this.router.navigate(['/login']);
   }
 
   /** Enter in the navigation search opens the first match. */

@@ -114,4 +114,26 @@ describe('PriceQueryPage (CP-12, WF-10)', () => {
     expect(TestBed.inject(Router).url).toBe('/registration/new?services=s-cbc,s-x&tierId=tier-cash');
     backend.verify();
   });
+
+  it('shows on its own line why a service is refused (gender), not "not priced yet" (UAT A-11)', async () => {
+    harness = await RouterTestingHarness.create();
+    const page = (await harness.navigateByUrl('/registration/price-query', PriceQueryPage)) as unknown as PriceQueryPageInternals;
+    await tick();
+    backend.expectOne((request) => request.url === PRICING_API.tierOptions).flush([cashTier]);
+    await tick();
+
+    page.onAdded([{ serviceId: 's-cbc', code: 'CBC', nameEn: 'Complete blood count', nameAr: '' }, { serviceId: 's-hcg', code: 'HCG', nameEn: 'Pregnancy test', nameAr: '' }]);
+    await tick();
+    backend.expectOne(REGISTRATION_API.quote).flush({
+      ...quote,
+      lines: quote.lines.slice(0, 1),
+      issues: [{ code: 'REG-015', serviceId: 's-hcg', serviceCode: 'HCG', message: 'The service is not offered for this gender.' }],
+    } satisfies PriceQuoteDocument);
+    await tick();
+    harness.detectChanges();
+
+    const pending = harness.routeNativeElement!.querySelector('table.lines tbody tr.pending');
+    expect(pending?.textContent).toContain('HCG: ');
+    expect(pending?.textContent).not.toContain('registration.services.notPlanned');
+  });
 });

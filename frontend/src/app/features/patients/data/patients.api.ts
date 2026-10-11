@@ -47,7 +47,8 @@ export class PatientsApi {
   /** CSV of the register with the same filter (without paging); `patients.export`. */
   async export(filter: PatientListFilter): Promise<DownloadedFile> {
     const response = await firstValueFrom(this.http.get(`${PATIENTS_API.patients}/export`, { params: listParams(filter, false), observe: 'response', responseType: 'blob' }));
-    return downloaded(response, 'patients.csv');
+    // Named with the local date like every other export (UAT R3-05), not the server's UTC time stamp.
+    return { ...downloaded(response, 'patients.csv'), fileName: localCsvName('patients') };
   }
 
   documents(patientId: string, includeInactive: boolean, signal?: AbortSignal): Promise<readonly PatientDocumentItem[]> {
@@ -102,6 +103,11 @@ function listParams(filter: PatientListFilter, paged = true): HttpParams {
     page: paged ? filter.page : null,
     pageSize: paged ? filter.pageSize : null,
   });
+}
+
+function localCsvName(base: string, now: Date = new Date()): string {
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${base}-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.csv`;
 }
 
 function downloaded(response: HttpResponse<Blob>, fallback: string): DownloadedFile {

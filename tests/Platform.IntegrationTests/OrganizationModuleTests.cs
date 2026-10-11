@@ -10,6 +10,7 @@ using Platform.Application.Tenancy;
 using Platform.Contracts.Common;
 using Platform.Domain.Identity;
 using Platform.Domain.Organization;
+using Platform.Domain.PlatformAdmin;
 using Platform.Domain.Tenancy;
 using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Persistence.Organization;
@@ -245,6 +246,48 @@ public sealed class OrganizationModuleTests(DatabaseFixture fixture)
         scope.ServiceProvider.GetRequiredService<IPlatformUserRepository>().Add(user);
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
         return user.Id;
+    }
+
+    [DatabaseFact]
+    public async Task The_geography_port_reads_the_country_of_a_governorate_from_a_laboratory_scope()
+    {
+        var country = Country.Create(new CountryData("Branchland", "أرض الفروع", "ZB", "+20", "Pound", "EGP", "ar", "Africa/Cairo", 10, null, null));
+        var governorate = Governorate.Create(country, "Gov " + Unique(6), "محافظة", null, null);
+        using (var platform = fixture.AppScope(null))
+        {
+            platform.ServiceProvider.GetRequiredService<ICountryRepository>().Add(country);
+            platform.ServiceProvider.GetRequiredService<IGovernorateRepository>().Add(governorate);
+            await platform.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        }
+
+        // UAT B-02: saas.governorates is platform reference data, readable by lis_app without elevation
+        using var scope = fixture.AppScope(Guid.CreateVersion7());
+        var geography = scope.ServiceProvider.GetRequiredService<IBranchGeography>();
+        Assert.Equal(country.Id, await geography.CountryOfGovernorateAsync(governorate.Id, CancellationToken.None));
+        Assert.Null(await geography.CountryOfGovernorateAsync(Guid.CreateVersion7(), CancellationToken.None));
+    }
+
+    [DatabaseFact]
+    public async Task The_branch_port_names_the_branches_of_the_current_tenant_only_active_or_not()
+    {
+        var (tenantA, tenantB) = (Guid.CreateVersion7(), Guid.CreateVersion7());
+        var open = await CreateBranchAsync(tenantA, "OPEN");
+        var closed = await CreateBranchAsync(tenantA, "SHUT");
+        var foreign = await CreateBranchAsync(tenantB, "ALIEN");
+        using (var scope = fixture.AppScope(tenantA))
+        {
+            var branch = (await scope.ServiceProvider.GetRequiredService<IBranchRepository>().GetForUpdateAsync(closed, CancellationToken.None))!;
+            branch.Deactivate(Now);
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        }
+
+        // UAT A-04: the treasury list reads the names of its branches through this port
+        using var reader = fixture.AppScope(tenantA);
+        var names = await reader.ServiceProvider.GetRequiredService<IBranchLookup>().GetManyAsync([open, closed, foreign, open], CancellationToken.None);
+
+        Assert.Equal(new[] { closed, open }.Order(), names.Keys.Order());
+        Assert.StartsWith("OPEN", names[open].Code, StringComparison.Ordinal);
+        Assert.False(names[closed].IsActive);
     }
 
     private async Task<Guid> CreateBranchAsync(Guid tenantId, string code, bool exactCode = false)

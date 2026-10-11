@@ -17,6 +17,7 @@ import { VisitsPage } from './visits.page';
 
 /** The parts of the page the scenarios drive (protected in the page). */
 interface VisitsPageInternals {
+  export(): Promise<void>;
   openCancel(row: VisitListItem): void;
   cancelServices(input: { visitId: string; request: CancelLinesRequest }): Promise<void>;
   results(row: VisitListItem): void;
@@ -67,6 +68,28 @@ describe('VisitsPage (CP-10)', () => {
     harness.detectChanges();
     return page;
   }
+
+  it('exports the date as the local date and time shown in the grid, not raw UTC (UAT A-15)', async () => {
+    const page = await open();
+    const blobs: Blob[] = [];
+    const original = URL.createObjectURL;
+    URL.createObjectURL = (blob: Blob | MediaSource): string => {
+      blobs.push(blob as Blob);
+      return 'blob:spec';
+    };
+    try {
+      const done = page.export();
+      await tick();
+      backend.expectOne((request) => request.url === REGISTRATION_API.exportVisits).flush([visitRow({ registeredAtUtc: '2026-10-11T07:28:26.129944+00:00' })]);
+      await done;
+    } finally {
+      URL.createObjectURL = original;
+    }
+
+    const text = await blobs[0]!.text();
+    expect(text).not.toContain('2026-10-11T07:28:26');
+    expect(text).toContain(new Intl.DateTimeFormat('en-GB', { dateStyle: 'short', timeStyle: 'short' }).format(new Date('2026-10-11T07:28:26.129944+00:00')));
+  });
 
   it('lists the visits with the services styled by status, the balance and every row action for a full role', async () => {
     await open();

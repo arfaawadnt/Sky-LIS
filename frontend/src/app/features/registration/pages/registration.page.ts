@@ -89,6 +89,10 @@ export class RegistrationPage {
   readonly tierId = input<string>();
 
   protected readonly permissions = REGISTRATION_PERMISSIONS;
+
+  /** Read-only without the right the save needs (UAT R3-02); the server refuses anyway, the page no longer pretends. */
+  protected readonly readOnly = computed(() =>
+    !this.auth.hasPermission(this.facade.isEdit() ? REGISTRATION_PERMISSIONS.edit : REGISTRATION_PERMISSIONS.create));
   protected readonly methods = PAYMENT_METHODS;
   protected readonly discountKinds: readonly DiscountKind[] = ['Percent', 'Amount'];
   protected readonly saving = signal(false);
@@ -136,6 +140,7 @@ export class RegistrationPage {
 
   constructor() {
     void this.i18n.load('registration');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
 
     effect(() => {
       const id = this.visitId() ?? null;
@@ -325,7 +330,7 @@ export class RegistrationPage {
   }
 
   protected async save(): Promise<void> {
-    if (this.saving()) {
+    if (this.saving() || this.readOnly()) {
       return;
     }
 

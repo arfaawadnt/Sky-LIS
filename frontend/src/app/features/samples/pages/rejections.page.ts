@@ -102,6 +102,7 @@ export class RejectionsPage {
 
   constructor() {
     void this.i18n.load('samples');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
     effect(() => {
       const number = this.sampleNumber();
       if (number) {
@@ -178,7 +179,7 @@ export class RejectionsPage {
   protected async exportCsv(): Promise<void> {
     const count = await this.facade.exporting.execute(`samples-rejected-${new Date().toISOString().slice(0, 10)}.csv`);
     if (count !== null) {
-      this.toast.success(this.i18n.tf('samples.exported', { count }));
+      this.toast.success(this.i18n.t('samples.exported'));
     }
   }
 

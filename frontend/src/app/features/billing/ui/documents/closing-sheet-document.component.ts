@@ -16,6 +16,8 @@ import { branchOf } from './receipt-document.component';
       [labNameEn]="doc().letterhead.labNameEn"
       [labNameAr]="doc().letterhead.labNameAr"
       [branch]="branch()"
+      [branchEn]="doc().letterhead.branchNameEn"
+      [branchAr]="doc().letterhead.branchNameAr"
       [title]="i18n.t('billing.doc.closingTitle')"
       [reference]="doc().number"
       [printedBy]="doc().printedBy"

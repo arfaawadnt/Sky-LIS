@@ -3,36 +3,61 @@ using Platform.Application.Abstractions.Security;
 using Platform.Contracts.Settings;
 using Platform.Domain.Authorization;
 using Platform.Domain.Settings;
+using Platform.SharedKernel.MultiTenancy;
 
 namespace Platform.Application.Settings.Queries;
 
-/// <summary>SRS CP-57 Parameters: every catalogued key with its effective value; keys the tenant never set show the code default.</summary>
+/// <summary>
+/// SRS CP-57 / SA-19 Parameters: every catalogued key with its effective value and its source. A key the laboratory never
+/// set shows the platform value it inherits (D-16), and only then the code default (validation 2026-10-11, C-09).
+/// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Settings, PermissionAction.View)]
 public sealed record GetTenantSettingsQuery : IQuery<TenantSettingsResponse>;
 
-public sealed class GetTenantSettingsQueryHandler(ITenantSettingsStore store) : IQueryHandler<GetTenantSettingsQuery, TenantSettingsResponse>
+public sealed class GetTenantSettingsQueryHandler(ITenantSettingsStore store, ICurrentTenant currentTenant) : IQueryHandler<GetTenantSettingsQuery, TenantSettingsResponse>
 {
-    public async Task<TenantSettingsResponse> Handle(GetTenantSettingsQuery query, CancellationToken cancellationToken)
+    public Task<TenantSettingsResponse> Handle(GetTenantSettingsQuery query, CancellationToken cancellationToken) =>
+        DescribeAllAsync(store, currentTenant, cancellationToken);
+
+    /// <summary>The full, effective list for the current tenant (the query and the update command answer with it).</summary>
+    public static async Task<TenantSettingsResponse> DescribeAllAsync(ITenantSettingsStore store, ICurrentTenant currentTenant, CancellationToken cancellationToken)
     {
-        var stored = (await store.ListAsync(cancellationToken)).ToDictionary(setting => setting.Key, StringComparer.Ordinal);
-        return new TenantSettingsResponse(SettingKeys.All.Select(descriptor => Describe(descriptor, stored)).ToList());
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(currentTenant);
+        var own = (await store.ListAsync(cancellationToken)).ToDictionary(setting => setting.Key, StringComparer.Ordinal);
+        var inherited = (await store.ListInheritedAsync(cancellationToken)).ToDictionary(setting => setting.Key, StringComparer.Ordinal);
+        var isPlatform = currentTenant.TenantId is { } tenantId && TenantIds.IsPlatform(tenantId);
+        return new TenantSettingsResponse(SettingKeys.All.Select(descriptor => Describe(descriptor, own, inherited, isPlatform)).ToList());
     }
 
-    /// <summary>A stored value that no longer validates (the catalogue tightened) is shown as the default, exactly as modules read it.</summary>
-    public static TenantSettingItem Describe(SettingDescriptor descriptor, IReadOnlyDictionary<string, StoredSetting> stored)
+    /// <summary>
+    /// The tenant's own valid value, else the inherited platform value, else the code default, exactly as modules read it
+    /// (<c>ITenantSettings</c>). A stored value that no longer validates (the catalogue tightened) is skipped at both levels.
+    /// </summary>
+    public static TenantSettingItem Describe(SettingDescriptor descriptor, IReadOnlyDictionary<string, StoredSetting> own, IReadOnlyDictionary<string, StoredSetting> inherited, bool isPlatformTenant)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        ArgumentNullException.ThrowIfNull(stored);
-        var row = stored.GetValueOrDefault(descriptor.Key);
-        var effective = row is not null && descriptor.IsValid(row.Value) ? row.Value.Trim() : descriptor.DefaultValue;
+        ArgumentNullException.ThrowIfNull(own);
+        ArgumentNullException.ThrowIfNull(inherited);
+        var row = own.GetValueOrDefault(descriptor.Key);
+        var ownValid = row is not null && descriptor.IsValid(row.Value);
+        var platformRow = inherited.GetValueOrDefault(descriptor.Key);
+        var platformValid = platformRow is not null && descriptor.IsValid(platformRow.Value);
+        var inheritedValue = platformValid ? platformRow!.Value.Trim() : descriptor.DefaultValue;
+
+        var (effective, source) = ownValid
+            ? (row!.Value.Trim(), isPlatformTenant ? TenantSettingSources.Platform : TenantSettingSources.Laboratory)
+            : (inheritedValue, platformValid ? TenantSettingSources.Platform : TenantSettingSources.Default);
         return new TenantSettingItem(
             descriptor.Key,
             descriptor.Type.ToString(),
             effective,
             descriptor.DefaultValue,
             descriptor.Description,
-            row is null || !descriptor.IsValid(row.Value),
+            !ownValid,
             row?.UpdatedAtUtc,
-            row?.UpdatedByUserId);
+            row?.UpdatedByUserId,
+            source,
+            inheritedValue);
     }
 }

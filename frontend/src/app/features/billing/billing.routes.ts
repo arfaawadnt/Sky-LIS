@@ -1,4 +1,7 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { type CanActivateFn, Routes } from '@angular/router';
+
+import { I18nService } from '../../core/i18n/i18n.service';
 
 import { BatchPaymentFacade } from './state/batch-payment.facade';
 import { CashClosingFacade } from './state/cash-closing.facade';
@@ -11,9 +14,13 @@ import { RefundsFacade } from './state/refunds.facade';
  * integrator. The cash desk (device, approved treasuries, auto-print) is shared by the pages; each page has its facade.
  * `/billing/payments?visitId=…` (or `?accession=…`) opens a visit directly (BR-26: the registration page links here).
  */
+/** The module's dictionary is loaded before its first page renders, so no raw key (`billing.loading`) shows on the first visit (UAT A-07). */
+export const billingDictionary: CanActivateFn = () => inject(I18nService).load('billing').then(() => true);
+
 export const BILLING_ROUTES: Routes = [
   {
     path: '',
+    canActivate: [billingDictionary],
     providers: [CashDeskFacade],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'payments' },

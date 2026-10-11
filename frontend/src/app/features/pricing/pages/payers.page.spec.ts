@@ -86,6 +86,9 @@ describe('PayersPage (CP-32)', () => {
 
     const drawer = host.querySelector<HTMLElement>('app-drawer [role="dialog"]');
     expect(drawer?.textContent).toContain('Gold');
+    // Contract pricing (CP-34) is Release 2: no row action and no tier action under the R1 scope (UAT R1-03).
+    expect(host.querySelector('button[aria-label="pricing.payers.action.contractPricing"]')).toBeNull();
+    expect(drawer?.querySelector('button[aria-label="pricing.payers.action.contractPricing"]')).toBeNull();
     backend.verify();
   });
 
@@ -106,5 +109,75 @@ describe('PayersPage (CP-32)', () => {
     expect(nextCode('PL26', 2026, 2027)).toBe('PL27');
     expect(nextCode('MAIN-2026', 2026, 2027)).toBe('MAIN-2027');
     expect(nextCode('INSTITUTIONAL', 2026, 2027)).toBe('INSTITUTION-COPY');
+  });
+
+  /** The page's parts the scenarios drive (kept protected by the page). */
+  interface PayersInternals {
+    readonly config: { readonly adapter: { list(filter: { search: string; active: boolean | null }, page: { page: number; pageSize: number }): Promise<unknown> } };
+    readonly tierProblem: () => { readonly code: string } | null;
+    readonly tierForm: { setValue(value: { en: string; ar: string }): void };
+    exportCsv(): Promise<void>;
+    saveTier(): Promise<void>;
+    editTier(tier: PayerListItem['tiers'][number]): void;
+  }
+
+  async function open(): Promise<PayersInternals> {
+    const fixture = TestBed.createComponent(PayersPage);
+    await flush();
+    backend.expectOne({ method: 'POST', url: PRICING_API.defaultPayer }).flush({ payerId: 'p-cash', contractTierId: 't-default', created: true });
+    await flush();
+    backend.expectOne((request) => request.url === PRICING_API.payers).flush({ items: [cash, axa], page: 1, pageSize: 50, totalCount: 2, totalPages: 1 });
+    await flush();
+    return fixture.componentInstance as unknown as PayersInternals;
+  }
+
+  it('exports exactly the payers of the current search and status filter (UAT B-10)', async () => {
+    const page = await open();
+    const listed = page.config.adapter.list({ search: 'ax', active: null }, { page: 1, pageSize: 50 });
+    await flush();
+    backend.expectOne((request) => request.url === PRICING_API.payers).flush({ items: [axa], page: 1, pageSize: 50, totalCount: 1, totalPages: 1 });
+    await listed;
+
+    const exporting = page.exportCsv();
+    await flush();
+    const request = backend.expectOne((candidate) => candidate.url === PRICING_API.payers);
+    expect(request.request.params.get('search')).toBe('ax');
+    expect(request.request.params.has('isActive')).toBe(false);
+    expect(request.request.params.get('pageSize')).toBe('200');
+    request.flush({ items: [axa], page: 1, pageSize: 200, totalCount: 1, totalPages: 1 });
+    await exporting;
+    backend.verify();
+  });
+
+  it('a successful tier rename clears the stale refusal of an earlier add (UAT B-06)', async () => {
+    const page = await open();
+    TestBed.inject(PayersFacade).openTiers('p-axa');
+    await flush();
+    backend.expectOne(`${PRICING_API.payers}/p-axa`).flush(axa);
+    await flush();
+
+    page.tierForm.setValue({ en: 'Gold', ar: 'ذهبي' });
+    const adding = page.saveTier();
+    await flush();
+    backend
+      .expectOne({ method: 'POST', url: `${PRICING_API.payers}/p-axa/tiers` })
+      .flush({ type: 'about:blank', title: 'Exists', status: 409, code: 'PRC-100', traceId: null, correlationId: null, errors: null }, { status: 409, statusText: 'Conflict' });
+    await adding;
+    expect(page.tierProblem()).not.toBeNull();
+
+    const gold = axa.tiers[0];
+    if (gold === undefined) {
+      throw new Error('fixture');
+    }
+
+    page.editTier(gold);
+    expect(page.tierProblem()).toBeNull();
+    page.tierForm.setValue({ en: 'Gold plus', ar: 'ذهبي بلس' });
+    const renaming = page.saveTier();
+    await flush();
+    backend.expectOne({ method: 'PUT', url: `${PRICING_API.payers}/p-axa/tiers/t-gold` }).flush(null, { status: 204, statusText: 'No Content' });
+    await renaming;
+    await flush();
+    expect(page.tierProblem()).toBeNull();
   });
 });

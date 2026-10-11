@@ -35,7 +35,9 @@ export class WalletFacade {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
   }
 
+  /** Re-reads the wallet and its movements (Refresh, and when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01/C-13). A load in flight is left alone.) */
   refresh(): void {
+    this.requestTopUp.reset();
     this.wallet.reload();
     this.transactions.reload();
   }

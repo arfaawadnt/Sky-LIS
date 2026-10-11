@@ -89,6 +89,7 @@ export class TreasuryAccessPage {
 
   constructor() {
     void this.i18n.load('treasury');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT B-07, D-14)
   }
 
   protected treasuryName(item: TreasuryAccessRequestListItem): string {

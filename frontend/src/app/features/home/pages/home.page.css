@@ -4,21 +4,6 @@ h1 {
   font-size: 1.4rem;
 }
 
-.session {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.4rem 1.25rem;
-  margin: 1rem 0 0;
-}
-
-.session dt {
-  color: var(--muted);
-}
-
-.session dd {
-  margin: 0;
-}
-
 .muted {
   color: var(--muted);
 }

@@ -86,6 +86,7 @@ export class VisitsPage {
 
   constructor() {
     void this.i18n.load('registration');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
   }
 
   protected name(en: string | null, ar: string | null): string {
@@ -208,7 +209,7 @@ export class VisitsPage {
         [t('accession'), t('date'), t('patientNumber'), t('patient'), t('mobile'), t('branch'), t('payer'), t('tier'), t('services'), t('total'), t('discount'), t('patientShare'), t('payerShare'), t('paid'), t('remaining'), t('status')],
         rows.map((row) => [
           row.accession,
-          row.registeredAtUtc,
+          dateTime(row.registeredAtUtc, this.i18n.lang()),   // local date and time as in the grid, not raw UTC (UAT A-15)
           row.patientNumber,
           row.patientMasked ? this.i18n.t('registration.vipMasked') : row.patientName,
           row.mobile,
@@ -226,7 +227,7 @@ export class VisitsPage {
         ]),
       );
       downloadCsv(`registrations-${isoDay(new Date())}.csv`, text);
-      this.toast.success(this.i18n.tf('registration.exported', { count: rows.length }));
+      this.toast.success(this.i18n.t('registration.exported'));
     } catch {
       this.toast.error(this.i18n.t('registration.exportError'));
     } finally {

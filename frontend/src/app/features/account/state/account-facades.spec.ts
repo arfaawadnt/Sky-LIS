@@ -219,8 +219,9 @@ describe('Account facades (CP-05, CP-65, CP-66, CP-67, CP-68)', () => {
     await runEffects();
     backend.expectOne((r) => r.url === AUDIT_API.entries).flush(page([]));
     backend.expectOne(ACCOUNT_API.auditActors).flush([{ userId: 'u1', displayName: 'Mona', username: 'mona', isActive: true }]);
+    backend.expectOne(AUDIT_API.clients).flush([]);
 
-    facade.apply({ fromDay: '2026-10-01', toDay: '2026-10-09', userId: 'u1', entityType: ' Treasury ', entityId: '' });
+    facade.apply({ fromDay: '2026-10-01', toDay: '2026-10-09', userId: 'u1', entityType: ' Treasury ', entityId: '', clientTenantId: '' });
     await runEffects();
     const filtered = backend.expectOne((r) => r.url === AUDIT_API.entries);
     expect(filtered.request.params.get('from')).toBe(dayToInstant('2026-10-01', false));
@@ -242,6 +243,79 @@ describe('Account facades (CP-05, CP-65, CP-66, CP-67, CP-68)', () => {
     backend.expectOne(AUDIT_API.verifyChain).flush({ ok: false, checked: 41, firstBrokenSequence: 42 });
     await verified;
     expect(facade.verification()).toEqual({ ok: false, checked: 41, firstBrokenSequence: 42 });
+  });
+
+  it('audit: filters the platform log by client and sends the client to the export (SA-09, UAT C-18)', async () => {
+    const facade = TestBed.inject(AuditLogFacade);
+    await runEffects();
+    backend.expectOne((r) => r.url === AUDIT_API.entries).flush(page([]));
+    backend.expectOne(ACCOUNT_API.auditActors).flush([]);
+    backend.expectOne(AUDIT_API.clients).flush([{ tenantId: 'lab-a', nameEn: 'Lab A', nameAr: 'مختبر أ', portalSlug: 'laba' }]);
+    await runEffects();
+    expect(facade.clients.value()?.map((client) => client.nameEn)).toEqual(['Lab A']);
+
+    facade.apply({ fromDay: '', toDay: '', userId: '', entityType: '', entityId: '', clientTenantId: 'lab-a' });
+    await runEffects();
+    const filtered = backend.expectOne((r) => r.url === AUDIT_API.entries);
+    expect(filtered.request.params.get('clientTenantId')).toBe('lab-a');
+    filtered.flush(page([]));
+
+    const exported = facade.export.execute(undefined);
+    await settle();
+    const csv = backend.expectOne((r) => r.url === ACCOUNT_API.auditExport);
+    expect(csv.request.params.get('clientTenantId')).toBe('lab-a');
+    csv.flush(new Blob(['x']));
+    await exported;
+  });
+
+  it('audit: re-reads on every visit and forgets the chain check and open entry (UAT D-14, C-13)', async () => {
+    const facade = TestBed.inject(AuditLogFacade);
+    await runEffects();
+    backend.expectOne((r) => r.url === AUDIT_API.entries).flush(page([]));
+    backend.expectOne(ACCOUNT_API.auditActors).flush([]);
+    backend.expectOne(AUDIT_API.clients).flush([]);
+    const verified = facade.verify.execute(undefined);
+    await settle();
+    backend.expectOne(AUDIT_API.verifyChain).flush({ ok: true, checked: 59, firstBrokenSequence: null });
+    await verified;
+    expect(facade.verification()).not.toBeNull();
+
+    facade.refresh();
+    await runEffects();
+    expect(facade.verification()).toBeNull();
+    expect(facade.selected()).toBeNull();
+    backend.expectOne((r) => r.url === AUDIT_API.entries).flush({ type: 'about:blank', title: 'Forbidden', status: 403, code: 'AUTHZ-001' }, { status: 403, statusText: 'Forbidden' });
+    backend.expectOne(ACCOUNT_API.auditActors).flush([]);
+    backend.expectOne(AUDIT_API.clients).flush([]);
+    await runEffects();
+    expect(facade.entries.hasValue()).toBe(false);
+    backend.verify();
+  });
+
+  it('re-read every route-provided account facade when its page opens again (UAT D-14, A-01/C-13)', async () => {
+    await signIn(['dashboard.view', 'wallet.view', 'support.view']);
+    const profile = TestBed.inject(ProfileFacade);
+    const wallet = TestBed.inject(WalletFacade);
+    const support = TestBed.inject(SupportFacade);
+    const desk = TestBed.inject(SupportDeskFacade);
+    await runEffects();
+    const flushAll = (): void => {
+      backend.expectOne(ACCOUNT_API.profile).flush({});
+      backend.expectOne(PLATFORM_API.myWallet).flush({});
+      backend.expectOne((r) => r.url === `${PLATFORM_API.myWallet}/transactions`).flush(page([]));
+      backend.expectOne((r) => r.url === ACCOUNT_API.tickets).flush(page([]));
+      backend.expectOne((r) => r.url === ACCOUNT_API.deskTickets).flush(page([]));
+    };
+    flushAll();
+    await runEffects();
+
+    profile.refresh();
+    wallet.refresh();
+    support.refresh();
+    desk.refresh();
+    await runEffects();
+    flushAll();
+    backend.verify();
   });
 
   it('reads file names from Content-Disposition and rejects invalid days', () => {

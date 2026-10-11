@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { CATALOGUE_A_API, type ServiceSequenceRow } from '../../../core/api/catalogue-a.contracts';
+import { CATALOGUE_A_API, CATALOGUE_A_PERMISSIONS, type ServiceSequenceRow } from '../../../core/api/catalogue-a.contracts';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { ServiceSequenceFacade } from '../state-a/service-sequence.facade';
 import { ServiceSequencePage } from './service-sequence.page';
@@ -16,8 +16,10 @@ function row(id: string, code: string, sequence: number): ServiceSequenceRow {
 
 describe('ServiceSequencePage (CP-42)', () => {
   let backend: HttpTestingController;
+  let allowed: (key: string) => boolean = () => true;
 
   beforeEach(async () => {
+    allowed = () => true;
     await TestBed.configureTestingModule({
       imports: [ServiceSequencePage],
       providers: [
@@ -25,7 +27,7 @@ describe('ServiceSequencePage (CP-42)', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         ServiceSequenceFacade,
-        { provide: PermissionsService, useValue: { can: () => true } satisfies Pick<PermissionsService, 'can'> },
+        { provide: PermissionsService, useValue: { can: (key: string) => allowed(key) } satisfies Pick<PermissionsService, 'can'> },
       ],
     }).compileComponents();
     backend = TestBed.inject(HttpTestingController);
@@ -98,5 +100,16 @@ describe('ServiceSequencePage (CP-42)', () => {
 
     expect(inputs(host).map((input) => input.value)).toEqual(['1', '2', '3']);
     backend.verify();
+  });
+
+  it('is read-only for a viewer without the edit right (UAT B-12)', async () => {
+    allowed = (key) => key !== CATALOGUE_A_PERMISSIONS.edit;
+    const { fixture, host } = await render();
+
+    expect(inputs(host).every((input) => input.disabled)).toBe(true);
+    type(inputs(host)[0], '9');
+    await fixture.whenStable();
+    expect(host.textContent).not.toContain('catalogue-a.sequence.discard');
+    expect(host.querySelector('.changed')).toBeNull();
   });
 });

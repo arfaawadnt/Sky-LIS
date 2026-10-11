@@ -103,9 +103,12 @@ export class PriceListEditorFacade {
 
   readonly copy = mutation((input: { listId: string; request: Parameters<PricingApi['copyBasePriceList']>[1] }) => this.api.copyBasePriceList(input.listId, input.request));
 
+  /** Opens a list; the same list is re-read, because the facade outlives the page (route provider, UAT D-14). */
   load(listId: string): void {
-    if (this.listId() !== listId) {
-      this.discard();
+    this.discard();
+    if (this.listId() === listId) {
+      this.reload();
+    } else {
       this.listId.set(listId);
     }
   }

@@ -90,6 +90,15 @@ export class ContractPricingFacade {
     }
   }
 
+  /** Re-reads the tiers, the price lists and the open tier when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). */
+  refresh(): void {
+    this.tierOptions.reload();
+    this.baseLists.reload();
+    if (this.tierId() !== null) {
+      this.detail.reload();
+    }
+  }
+
   review(tierId: string): Promise<ContractPricingReviewDocument> {
     return this.api.getReview(tierId);
   }

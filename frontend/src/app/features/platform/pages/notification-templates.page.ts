@@ -7,6 +7,7 @@ import type { PageRequest } from '../../../core/api/paging';
 import { type NotificationTemplateListItem, PLATFORM_PERMISSIONS, TEMPLATE_CHANNELS, type TemplateChannel } from '../../../core/api/platform.contracts';
 import type { ProblemDetails } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
@@ -89,6 +90,10 @@ export class NotificationTemplatesPage {
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly csv = inject(CsvExportService);
+  private readonly access = inject(PermissionsService);
+
+  /** Without notifications.manage the dialog only shows a template (UAT R4-02): read-only fields, no token chips, no Save. */
+  protected readonly canManage = computed(() => this.access.can(PLATFORM_PERMISSIONS.notificationsManage));
 
   protected readonly permissions = PLATFORM_PERMISSIONS;
   protected readonly channels = TEMPLATE_CHANNELS;
@@ -172,7 +177,12 @@ export class NotificationTemplatesPage {
     this.editing.set(template);
     this.saveProblem.set(null);
     this.lastFocused = null;
-    this.form.set(this.buildForm(template));
+    const form = this.buildForm(template);
+    if (!this.canManage()) {
+      form.disable();
+    }
+
+    this.form.set(form);
     this.drawerOpen.set(true);
   }
 

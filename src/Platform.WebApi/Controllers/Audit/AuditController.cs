@@ -20,8 +20,14 @@ public sealed class AuditController(ISender sender) : ControllerBase
         [FromQuery] string? entityId,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
+        [FromQuery] Guid? clientTenantId,
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListAuditEntriesQuery(from, to, userId, entityType, entityId, page, pageSize), cancellationToken));
+        Ok(await sender.Send(new ListAuditEntriesQuery(from, to, userId, entityType, entityId, page, pageSize, clientTenantId), cancellationToken));
+
+    /// <summary>The clients the platform log can be filtered by (SA-09; empty in a laboratory).</summary>
+    [HttpGet("clients")]
+    public async Task<ActionResult<IReadOnlyList<AuditClientItem>>> ListClients(CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListAuditClientsQuery(), cancellationToken));
 
     [HttpGet("verify-chain")]
     public async Task<ActionResult<ChainVerificationResult>> VerifyChain(CancellationToken cancellationToken) =>

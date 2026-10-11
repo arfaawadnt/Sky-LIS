@@ -139,8 +139,9 @@ export class RegistrationApi {
   }
 
   /** Catalogue A's picker (F2): active services; needs `catalogue.view`. */
+  /** Orderable active services of the catalogue; an empty `search` is the first page (the F2 browse, UAT A-13). */
   lookupServices(search: string, signal?: AbortSignal): Promise<Paged<ServiceLookupItem>> {
-    const params = new HttpParams({ fromObject: { search, orderable: true, page: 1, pageSize: 50 } });
+    const params = new HttpParams({ fromObject: search.trim() === '' ? { orderable: true, page: 1, pageSize: 50 } : { search, orderable: true, page: 1, pageSize: 50 } });
     return firstValueFrom(this.http.get<Paged<ServiceLookupItem>>(CATALOGUE_A_API.lookupServices, { params }), { defaultValue: emptyPage<ServiceLookupItem>() }).then(abortable(signal));
   }
 

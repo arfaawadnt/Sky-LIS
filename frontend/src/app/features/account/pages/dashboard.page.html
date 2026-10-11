@@ -12,14 +12,14 @@
 
 <section class="kpis" [attr.aria-busy]="facade.dashboard.isLoading()" [attr.aria-label]="i18n.t('account.dashboard.kpis')">
   @for (kpi of kpis(); track kpi.key) {
-    <app-stat-card [label]="i18n.t('account.dashboard.kpi.' + kpi.key)" [value]="kpi.value" [hint]="kpi.hint" [icon]="kpi.icon" [tone]="kpi.tone" />
+    <app-stat-card [label]="i18n.t(kpi.label)" [value]="kpi.value" [hint]="kpi.hint" [icon]="kpi.icon" [tone]="kpi.tone" />
   }
 </section>
 
 <div class="grid">
-  <app-section-card [title]="i18n.t('account.dashboard.last7')">
+  <app-section-card [title]="chartTitle()">
     @if (chart().length > 0) {
-      <app-bar-chart [data]="chart()" [label]="i18n.t('account.dashboard.last7')" [rtl]="i18n.dir() === 'rtl'" />
+      <app-bar-chart [data]="chart()" [label]="chartTitle()" [rtl]="i18n.dir() === 'rtl'" />
     } @else {
       <p class="muted">{{ i18n.t('account.dashboard.noChart') }}</p>
     }
@@ -63,14 +63,16 @@
           <li>
             <span class="aico" aria-hidden="true"><app-icon name="layers" [size]="14" /></span>
             <div>
-              <b>{{ entry.action }}</b>
-              <p class="muted small">{{ entry.entityType }} · {{ entry.actorName ?? i18n.t('account.audit.system') }}</p>
+              <b>{{ actionName(entry) }}</b>
+              <p class="muted small">{{ entityName(entry) }} · {{ entry.actorName ?? i18n.t('account.audit.system') }}</p>
             </div>
             <time [attr.datetime]="entry.atUtc" [attr.title]="when(entry.atUtc)">{{ time(entry.atUtc) }}</time>
           </li>
         }
       </ul>
-      <a class="small" routerLink="/account/audit" *appCan="'audit.view'">{{ i18n.t('account.dashboard.openAudit') }}</a>
+      @if (auditPageOffered) {
+        <a class="small" routerLink="/account/audit" *appCan="'audit.view'">{{ i18n.t('account.dashboard.openAudit') }}</a>
+      }
     }
   </app-section-card>
 </div>

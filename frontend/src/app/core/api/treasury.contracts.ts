@@ -18,6 +18,10 @@ export interface TreasuryListItem {
   readonly nameAr: string;
   readonly branchId: string;
   readonly isActive: boolean;
+  /** The branch code and names, read by the server from the Organization module (null when the branch is unknown; UAT A-04). */
+  readonly branchCode: string | null;
+  readonly branchNameEn: string | null;
+  readonly branchNameAr: string | null;
 }
 
 export interface CreateTreasuryRequest {
@@ -81,4 +85,6 @@ export const TREASURY_PERMISSIONS = {
   approve: 'treasury.approve',
   cancel: 'treasury.cancel',
   manage: 'treasury.manage',
+  /** CSV export of the treasuries register (UAT R1-05). */
+  export: 'treasury.export',
 } as const;

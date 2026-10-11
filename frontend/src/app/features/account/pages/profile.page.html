@@ -12,11 +12,8 @@
       @if (p.laboratory; as lab) {
         <app-section-card [title]="i18n.t('account.profile.laboratory')" [subtitle]="i18n.t('account.profile.laboratorySub')">
           @if (lab.nameEn === null && lab.nameAr === null) {
+            <!-- UAT R3-04: no internal identifier on a production screen; the platform team owns the missing record. -->
             <p class="info-strip">{{ i18n.t('account.profile.laboratoryUnavailable') }}</p>
-            <dl class="kv">
-              <dt>{{ i18n.t('account.profile.tenantId') }}</dt>
-              <dd class="mono">{{ lab.tenantId }}</dd>
-            </dl>
           } @else {
             <dl class="kv">
               <dt>{{ i18n.t('account.profile.labName') }}</dt>

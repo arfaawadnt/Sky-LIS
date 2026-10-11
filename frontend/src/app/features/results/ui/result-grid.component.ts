@@ -146,8 +146,12 @@ export interface DraftChange {
                 </td>
                 <td class="actions">
                   <button type="button" class="icon-btn" [title]="i18n.t('results.grid.history')" [attr.aria-label]="i18n.t('results.grid.history')" (click)="history.emit(row)"><app-icon name="clipboard" [size]="15" /></button>
-                  <button type="button" class="icon-btn" [class.flagged]="!!row.reportComment" [title]="i18n.t('results.grid.comment')" [attr.aria-label]="i18n.t('results.grid.comment')" (click)="comment.emit(row)"><app-icon name="edit" [size]="15" /></button>
-                  <button type="button" class="icon-btn" [class.flagged]="!!row.internalNote" [title]="i18n.t('results.grid.note')" [attr.aria-label]="i18n.t('results.grid.note')" (click)="note.emit(row)"><app-icon name="inbox" [size]="15" /></button>
+                  @if (canEdit()) {
+                    <button type="button" class="icon-btn" [class.flagged]="!!row.reportComment" [title]="i18n.t('results.grid.comment')" [attr.aria-label]="i18n.t('results.grid.comment')" (click)="comment.emit(row)"><app-icon name="edit" [size]="15" /></button>
+                  }
+                  @if (canAnnotate()) {
+                    <button type="button" class="icon-btn" [class.flagged]="!!row.internalNote" [title]="i18n.t('results.grid.note')" [attr.aria-label]="i18n.t('results.grid.note')" (click)="note.emit(row)"><app-icon name="inbox" [size]="15" /></button>
+                  }
                   @if (canAmend() && isSigned(row.status) && row.testType !== 'Formula') {
                     <button type="button" class="btn sm" (click)="amend.emit(row)">{{ i18n.t('results.grid.amend') }}</button>
                   }
@@ -194,6 +198,12 @@ export class ResultGridComponent {
   readonly refusals = input<Readonly<Record<string, string>>>({});
   /** The user may enter values (results.create and the unit's edit right). */
   readonly canEdit = input(false);
+  /**
+   * The user may write internal notes (results.create; the server also needs the "see" right, which showing the unit
+   * implies). The report comment follows `canEdit` (results.create and the unit's edit right), as the server requires
+   * (UAT A-02: a view-only user was offered both dialogs and the save was refused).
+   */
+  readonly canAnnotate = input(false);
   /** The user may amend signed results (results.edit and the special right). */
   readonly canAmend = input(false);
   readonly canAcknowledge = input(false);

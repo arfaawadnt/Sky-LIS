@@ -78,6 +78,7 @@ export class VisitSamplesPage {
 
   constructor() {
     void this.i18n.load('samples');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
     effect(() => this.facade.show({ accession: this.accession() ?? null, visitId: this.visitId() ?? null }));
   }
 
@@ -124,7 +125,7 @@ export class VisitSamplesPage {
     const visit = this.facade.visit();
     const count = await this.facade.exporting.execute(`samples-${visit?.accession ?? 'visit'}.csv`);
     if (count !== null) {
-      this.toast.success(this.i18n.tf('samples.exported', { count }));
+      this.toast.success(this.i18n.t('samples.exported'));
     }
   }
 

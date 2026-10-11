@@ -6,7 +6,7 @@ import type { FormControl, FormGroup } from '@angular/forms';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
-import { CATALOGUE_A_API, type ClinicalGroupListItem, type Paged, type SampleTypeListItem, type ServiceDetail, type TestLookupItem } from '../../../core/api/catalogue-a.contracts';
+import { CATALOGUE_A_API, CATALOGUE_A_PERMISSIONS, type ClinicalGroupListItem, type SampleConditionView, type Paged, type SampleTypeListItem, type ServiceDetail, type TestLookupItem } from '../../../core/api/catalogue-a.contracts';
 import type { ProblemDetails } from '../../../core/api/problem-details';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
@@ -26,6 +26,8 @@ interface ServiceEditorInternals {
     sampleTypeId: FormControl<string | null>;
   }>;
   readonly members: () => readonly MemberRow[];
+  readonly detail: () => ServiceDetail | null;
+  readonly conditionChoices: () => readonly SampleConditionView[];
   readonly candidates: () => readonly MemberCandidate[];
   readonly activeTab: () => string | null;
   readonly membersProblem: () => ProblemDetails | null;
@@ -48,6 +50,7 @@ function test(id: string, code: string): TestLookupItem {
 }
 
 describe('ServiceEditorPage (CP-40)', () => {
+  let allowed: (key: string) => boolean = () => true;
   let backend: HttpTestingController;
   let harness: RouterTestingHarness;
 
@@ -57,7 +60,7 @@ describe('ServiceEditorPage (CP-40)', () => {
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
-        { provide: PermissionsService, useValue: { can: () => true } satisfies Pick<PermissionsService, 'can'> },
+        { provide: PermissionsService, useValue: { can: (key: string) => allowed(key) } satisfies Pick<PermissionsService, 'can'> },
         provideRouter([
           {
             path: 'catalogue/services',
@@ -69,6 +72,7 @@ describe('ServiceEditorPage (CP-40)', () => {
         ]),
       ],
     });
+    allowed = () => true;
     backend = TestBed.inject(HttpTestingController);
     harness = await RouterTestingHarness.create();
   });
@@ -193,5 +197,79 @@ describe('ServiceEditorPage (CP-40)', () => {
 
     expect(editor.activeTab()).toBe('members');
     expect(editor.membersProblem()?.code).toBe('CAT-021');
+  });
+
+  function service(id: string, code: string): ServiceDetail {
+    return {
+      id,
+      code,
+      type: 'Test',
+      shortName: code,
+      shortcutNo: null,
+      nameEn: code,
+      nameAr: code,
+      reportName: null,
+      loinc: null,
+      cpt: null,
+      clinicalGroupId: 'g1',
+      sampleTypeId: 's1',
+      sampleConditionId: null,
+      header: null,
+      aliases: [],
+      precaution: null,
+      gender: 'Any',
+      turnaroundHours: 24,
+      labelCount: 1,
+      printAlone: false,
+      isOrderable: true,
+      showOnWeb: false,
+      profileSum: null,
+      sequence: 1,
+      isActive: true,
+      members: [{ kind: 'Test', memberId: 't1', code: 'CHOL', nameEn: 'CHOL', nameAr: 'CHOL', memberType: 'Numeric', isActive: true, order: 1, inSum: false, visible: true }],
+    };
+  }
+
+  it('follows the id of the address bar when the router reuses the page (UAT B-05)', async () => {
+    const first = await open('/catalogue/services/svc-1', service('svc-1', 'GLUP'));
+    backend.match(`${CATALOGUE_A_API.sampleTypes}/s1`).forEach((request) => request.flush({ ...serum, conditions: [] }));
+    const second = (await harness.navigateByUrl('/catalogue/services/svc-2', ServiceEditorPage)) as unknown as ServiceEditorInternals;
+    expect(second).toBe(first);
+    TestBed.tick();
+    await settle();
+    expect(second.detail()).toBeNull();
+
+    backend.expectOne(`${CATALOGUE_A_API.services}/svc-2`).flush(service('svc-2', 'PKG'));
+    backend.match((request) => request.url === CATALOGUE_A_API.lookupTests).forEach((request) => request.flush(page([])));
+    await settle();
+    TestBed.tick();
+    expect(second.detail()?.code).toBe('PKG');
+    expect(second.form.controls.code.value).toBe('PKG');
+
+    second.form.controls.shortName.setValue('PKG2');
+    second.form.markAsDirty();
+    const saving = second.save();
+    await settle();
+    backend.expectNone((request) => request.method === 'PUT' && request.url === `${CATALOGUE_A_API.services}/svc-1`);
+    backend.expectOne((request) => request.method === 'PUT' && request.url === `${CATALOGUE_A_API.services}/svc-2`).flush(null, { status: 204, statusText: 'No Content' });
+    await saving;
+  });
+
+  it('is read-only without the edit right and offers only active sample conditions (UAT B-12, B-08)', async () => {
+    allowed = (key) => key !== CATALOGUE_A_PERMISSIONS.edit;
+    const editor = await open('/catalogue/services/svc-1', service('svc-1', 'GLU'));
+    backend.expectOne(`${CATALOGUE_A_API.sampleTypes}/s1`).flush({
+      ...serum,
+      conditions: [
+        { id: 'c1', code: 'FAST', nameEn: 'Fasting', nameAr: 'صائم', isActive: true },
+        { id: 'c2', code: 'REFR', nameEn: 'Refrigerated', nameAr: 'مبرد', isActive: false },
+      ],
+    });
+    await settle();
+
+    expect(editor.form.disabled).toBe(true);
+    expect(editor.conditionChoices().map((condition) => condition.code)).toEqual(['FAST']);
+    await editor.save();
+    backend.expectNone((request) => request.method === 'PUT');
   });
 });

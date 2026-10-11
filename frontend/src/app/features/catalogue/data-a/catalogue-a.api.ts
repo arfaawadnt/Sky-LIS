@@ -68,8 +68,9 @@ export class CatalogueAApi {
     return this.page<ClinicalGroupListItem>(CATALOGUE_A_API.clinicalGroups, listParams(filter), signal);
   }
 
-  exportClinicalGroups(): Promise<readonly ClinicalGroupListItem[]> {
-    return this.all<ClinicalGroupListItem>(`${CATALOGUE_A_API.clinicalGroups}/export`);
+  /** The rows of the list's current search and status filter (UAT C-04: the export is the grid). */
+  exportClinicalGroups(filter: CatalogueExportFilter): Promise<readonly ClinicalGroupListItem[]> {
+    return this.all<ClinicalGroupListItem>(`${CATALOGUE_A_API.clinicalGroups}/export`, exportParams(filter));
   }
 
   createClinicalGroup(request: ClinicalGroupRequest): Promise<CreatedResource> {
@@ -90,8 +91,8 @@ export class CatalogueAApi {
     return this.page<SampleTypeListItem>(CATALOGUE_A_API.sampleTypes, listParams(filter), signal);
   }
 
-  exportSampleTypes(): Promise<readonly SampleTypeListItem[]> {
-    return this.all<SampleTypeListItem>(`${CATALOGUE_A_API.sampleTypes}/export`);
+  exportSampleTypes(filter: CatalogueExportFilter): Promise<readonly SampleTypeListItem[]> {
+    return this.all<SampleTypeListItem>(`${CATALOGUE_A_API.sampleTypes}/export`, exportParams(filter));
   }
 
   getSampleType(id: string): Promise<SampleTypeDetail> {
@@ -120,8 +121,8 @@ export class CatalogueAApi {
     return this.page<MeasurementUnitListItem>(CATALOGUE_A_API.units, listParams(filter), signal);
   }
 
-  exportUnits(): Promise<readonly MeasurementUnitListItem[]> {
-    return this.all<MeasurementUnitListItem>(`${CATALOGUE_A_API.units}/export`);
+  exportUnits(filter: CatalogueExportFilter): Promise<readonly MeasurementUnitListItem[]> {
+    return this.all<MeasurementUnitListItem>(`${CATALOGUE_A_API.units}/export`, exportParams(filter));
   }
 
   createUnit(request: MeasurementUnitRequest): Promise<CreatedResource> {
@@ -140,8 +141,8 @@ export class CatalogueAApi {
     return this.page<PatientConditionListItem>(CATALOGUE_A_API.patientConditions, listParams(filter), signal);
   }
 
-  exportPatientConditions(): Promise<readonly PatientConditionListItem[]> {
-    return this.all<PatientConditionListItem>(`${CATALOGUE_A_API.patientConditions}/export`);
+  exportPatientConditions(filter: CatalogueExportFilter): Promise<readonly PatientConditionListItem[]> {
+    return this.all<PatientConditionListItem>(`${CATALOGUE_A_API.patientConditions}/export`, exportParams(filter));
   }
 
   createPatientCondition(request: PatientConditionRequest): Promise<CreatedResource> {
@@ -162,8 +163,8 @@ export class CatalogueAApi {
     return this.page<ServiceListItem>(CATALOGUE_A_API.services, { ...listParams(filter), type: filter.type, clinicalGroupId: filter.clinicalGroupId }, signal);
   }
 
-  exportServices(type: ServiceType | null = null): Promise<readonly ServiceListItem[]> {
-    return this.all<ServiceListItem>(`${CATALOGUE_A_API.services}/export`, { type });
+  exportServices(filter: CatalogueExportFilter, type: ServiceType | null, clinicalGroupId: string | null): Promise<readonly ServiceListItem[]> {
+    return this.all<ServiceListItem>(`${CATALOGUE_A_API.services}/export`, { ...exportParams(filter), type, clinicalGroupId });
   }
 
   getService(id: string): Promise<ServiceDetail> {
@@ -204,8 +205,8 @@ export class CatalogueAApi {
     return this.page<LabTestListItem>(CATALOGUE_A_API.tests, { ...listParams(filter), type: filter.type, clinicalGroupId: filter.clinicalGroupId }, signal);
   }
 
-  exportTests(): Promise<readonly LabTestListItem[]> {
-    return this.all<LabTestListItem>(`${CATALOGUE_A_API.tests}/export`);
+  exportTests(filter: CatalogueExportFilter, type: LabTestType | null, clinicalGroupId: string | null): Promise<readonly LabTestListItem[]> {
+    return this.all<LabTestListItem>(`${CATALOGUE_A_API.tests}/export`, { ...exportParams(filter), type, clinicalGroupId });
   }
 
   getTest(id: string): Promise<LabTestDetail> {
@@ -278,6 +279,16 @@ export class CatalogueAApi {
   private activation(url: string, id: string, active: boolean): Promise<void> {
     return firstValueFrom(this.http.post<void>(`${url}/${encodeURIComponent(id)}/${active ? 'reactivate' : 'deactivate'}`, null), { defaultValue: undefined }).then(() => undefined);
   }
+}
+
+/** What an export is narrowed by: the list's search text and status (`null` = all). */
+export interface CatalogueExportFilter {
+  readonly search: string;
+  readonly isActive: boolean | null;
+}
+
+function exportParams(filter: CatalogueExportFilter): Record<string, string | boolean | null> {
+  return { search: filter.search.trim() === '' ? null : filter.search.trim(), isActive: filter.isActive };
 }
 
 function listParams(filter: CatalogueListFilter): Record<string, string | number | boolean | null> {

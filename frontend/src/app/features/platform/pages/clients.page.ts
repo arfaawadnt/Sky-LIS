@@ -10,13 +10,14 @@ import {
   type ClientDetailsRequest,
   type ClientListItem,
   PLATFORM_PERMISSIONS,
+  type PlanListItem,
 } from '../../../core/api/platform.contracts';
 import { ProblemError } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedTextGroup } from '../../../shared/forms/localized-text';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
-import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
+import { problemToFormErrors, SERVER_ERROR_KEY } from '../../../shared/forms/problem-to-form-errors';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
 import { mobileValidator, requiredText } from '../../../shared/forms/validators';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
@@ -41,7 +42,16 @@ import { PlatformApi } from '../data/platform.api';
 import { ClientsFacade } from '../state/clients.facade';
 import { fileStamp, formatDate, formatMoney, pick } from '../ui/format';
 import { statusTone } from '../ui/status';
-import { matchingPasswords, notContaining, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, SLUG_PATTERN, USERNAME_PATTERN } from '../ui/validators';
+import {
+  countryMobileValidator,
+  matchingPasswords,
+  type MobileCountry,
+  notContaining,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  SLUG_PATTERN,
+  USERNAME_PATTERN,
+} from '../ui/validators';
 
 type ClientForm = ReturnType<ClientsPage['buildForm']>;
 
@@ -110,6 +120,15 @@ export class ClientsPage {
   protected readonly saveProblem = signal<ProblemError['problem'] | null>(null);
   protected readonly saving = computed(() => this.facade.provision.pending() || this.facade.update.pending());
   protected readonly governorateOptions = computed(() => this.facade.governorates.value()?.items ?? []);
+
+  /**
+   * Validation 2026-10-11 C-07: the drawer offers active plans only (the server refuses an inactive one, PLN-010); on edit the
+   * client's current plan stays listed, marked inactive, so the form still shows what the client has.
+   */
+  protected readonly planOptions = computed<readonly PlanListItem[]>(() => {
+    const current = this.editing()?.planId ?? null;
+    return (this.facade.plans.value()?.items ?? []).filter((plan) => plan.isActive || plan.id === current);
+  });
 
   // reset-password dialog
   protected readonly resetTarget = signal<ClientListItem | null>(null);
@@ -277,6 +296,9 @@ export class ClientsPage {
   protected onCountryChange(form: ClientForm): void {
     this.facade.drawerCountryId.set(form.controls.countryId.value === '' ? null : form.controls.countryId.value);
     form.controls.governorateId.setValue('');
+    // C-03: the mobiles are checked against the chosen country's length
+    form.controls.mobile.updateValueAndValidity();
+    form.controls.managerMobile.updateValueAndValidity();
   }
 
   protected async save(): Promise<void> {
@@ -338,10 +360,30 @@ export class ClientsPage {
       return;
     }
 
+    // C-03: a mobile refused for the country's length is shown under its own field (GEO-010 laboratory, GEO-014 manager)
+    const mobileControl = problem.code === 'GEO-010' ? form.controls.mobile : problem.code === 'GEO-014' ? form.controls.managerMobile : null;
+    if (mobileControl !== null) {
+      mobileControl.setErrors({ ...(mobileControl.errors ?? {}), [SERVER_ERROR_KEY]: this.problemText(problem) });
+      mobileControl.markAsTouched();
+      return;
+    }
+
     const unmatched = problemToFormErrors(problem, form);
     if (problem.code !== 'VALIDATION-400' || Object.keys(unmatched).length > 0 || !problem.errors) {
       this.saveProblem.set(problem);
     }
+  }
+
+  private countryMobile(messageKey: string) {
+    return countryMobileValidator(
+      'countryId',
+      (id) => this.countryById(id),
+      (country) => this.i18n.tf(messageKey, { length: country.mobileLength, dial: country.dialCode }),
+    );
+  }
+
+  private countryById(id: string): MobileCountry | null {
+    return this.facade.countries.value()?.items.find((country) => country.id === id) ?? null;
   }
 
   private buildForm(detail: ClientDetail | null) {
@@ -352,10 +394,10 @@ export class ClientsPage {
         countryId: new FormControl(detail?.countryId ?? '', { nonNullable: true, validators: [Validators.required] }),
         governorateId: new FormControl(detail?.governorateId ?? '', { nonNullable: true, validators: [Validators.required] }),
         address: new FormControl(detail?.address ?? '', { nonNullable: true, validators: [requiredText, Validators.maxLength(300)] }),
-        mobile: new FormControl(detail?.mobile ?? '', { nonNullable: true, validators: [requiredText, mobileValidator] }),
+        mobile: new FormControl(detail?.mobile ?? '', { nonNullable: true, validators: [requiredText, mobileValidator, this.countryMobile('platform.clients.validation.mobileLength')] }),
         licenceNo: new FormControl(detail?.licenceNo ?? '', { nonNullable: true, validators: [Validators.maxLength(64)] }),
         managerName: new FormControl(detail?.managerName ?? '', { nonNullable: true, validators: [requiredText, Validators.maxLength(200)] }),
-        managerMobile: new FormControl(detail?.managerMobile ?? '', { nonNullable: true, validators: [requiredText, mobileValidator] }),
+        managerMobile: new FormControl(detail?.managerMobile ?? '', { nonNullable: true, validators: [requiredText, mobileValidator, this.countryMobile('platform.clients.validation.managerMobileLength')] }),
         email: new FormControl(detail?.email ?? '', { nonNullable: true, validators: [Validators.email, Validators.maxLength(254)] }),
         planId: new FormControl(detail?.planId ?? '', { nonNullable: true, validators: [Validators.required] }),
         language: new FormControl(detail?.language ?? 'en', { nonNullable: true }),

@@ -32,7 +32,8 @@ public sealed class ListPatientsValidator : AbstractValidator<ListPatientsQuery>
     }
 }
 
-public sealed class ListPatientsHandler(IPatientRepository patients, IUserPrivileges privileges, IClock clock) : IQueryHandler<ListPatientsQuery, Paged<PatientListItem>>
+/// <summary>The register page with each file's visit count and last visit from Registration (CP-11; UAT A-09).</summary>
+public sealed class ListPatientsHandler(IPatientRepository patients, IPatientVisitStatistics visits, IUserPrivileges privileges, IClock clock) : IQueryHandler<ListPatientsQuery, Paged<PatientListItem>>
 {
     public async Task<Paged<PatientListItem>> Handle(ListPatientsQuery query, CancellationToken cancellationToken)
     {
@@ -40,7 +41,12 @@ public sealed class ListPatientsHandler(IPatientRepository patients, IUserPrivil
         var filter = PatientFilters.From(query.Q, query.Gender, query.Vip, query.Status, confidential);
         var page = await patients.SearchAsync(filter, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
         var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
-        return new Paged<PatientListItem>(page.Items.Select(row => PatientProjections.ToListItem(row, today, confidential)).ToList(), page.Page, page.PageSize, page.TotalCount);
+        var figures = await visits.ForPatientsAsync([.. page.Items.Select(row => row.Id)], cancellationToken);
+        return new Paged<PatientListItem>(
+            page.Items.Select(row => PatientProjections.ToListItem(row, today, confidential, figures.GetValueOrDefault(row.Id))).ToList(),
+            page.Page,
+            page.PageSize,
+            page.TotalCount);
     }
 }
 

@@ -20,7 +20,7 @@ import type { TableColumn } from '../../../shared/ui/data-table/data-table.types
 import { DialogComponent } from '../../../shared/ui/dialog/dialog.component';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
-import type { FormValue, MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
+import type { FormValue, MasterDataConfig, MasterDataFilter } from '../../../shared/ui/master-data-page/master-data.types';
 import { PaginatorComponent } from '../../../shared/ui/paginator/paginator.component';
 import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
@@ -87,6 +87,10 @@ export class CodeSystemsPage {
   private readonly api = inject(PlatformApi);
   private readonly toast = inject(ToastService);
   private readonly csv = inject(CsvExportService);
+
+  /** The filter of the list on screen: the export writes exactly these rows (UAT R2-02, as C-04 elsewhere). */
+  private filter: MasterDataFilter = { search: '', active: true };
+
   private readonly page = viewChild.required(MasterDataPageComponent);
 
   protected readonly config: MasterDataConfig<CodeSystemListItem, CodeSystemRequest> = {
@@ -104,7 +108,10 @@ export class CodeSystemsPage {
       { name: 'use', kind: 'textarea', maxLength: 300, hint: 'platform.codeSystems.hint.use' },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.listCodeSystems({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => {
+        this.filter = filter;
+        return this.api.listCodeSystems({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+      },
       create: (dto) => this.api.saveCodeSystem(null, dto),
       update: (id, dto) => this.api.saveCodeSystem(id, dto),
       setActive: (id, active) => this.api.setLibraryActive(PLATFORM_API.codeSystems, id, active),
@@ -202,7 +209,7 @@ export class CodeSystemsPage {
   }
 
   protected async exportCsv(): Promise<void> {
-    const rows = await this.api.all((page) => this.api.listCodeSystems({ search: null, isActive: null, ...page }));
+    const rows = await this.api.all((page) => this.api.listCodeSystems({ search: this.filter.search || null, isActive: this.filter.active, ...page }));
     this.csv.download(`code-systems-${fileStamp()}`, [
       { header: this.i18n.t('platform.codeSystems.column.name'), value: (row: CodeSystemListItem) => this.label(row.name) },
       { header: this.i18n.t('platform.codeSystems.column.version'), value: (row) => row.version },

@@ -70,6 +70,7 @@ export class ProfilePage {
 
   constructor() {
     void this.i18n.load('account');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01/C-13)
     effect(() => {
       const profile = this.profile();
       if (profile && (profile.language === 'en' || profile.language === 'ar') && !this.language.dirty) {
@@ -97,6 +98,9 @@ export class ProfilePage {
 
     if ((await this.facade.saveLanguage.execute(this.language.value)) !== null) {
       this.language.markAsPristine();
+      // The interface has just switched language: wait for this page's dictionary in that language, otherwise the toast
+      // is built from the raw key (UAT A-07 / C-10).
+      await this.i18n.load('account');
       this.toast.success(this.i18n.t('account.profile.languageSaved'));
     }
   }

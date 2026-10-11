@@ -43,6 +43,7 @@ import {
   type ValidateTestRuleRequest,
 } from '../../../core/api/catalogue-b.contracts';
 import { emptyPage } from '../../../core/api/paging';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { type FilterValue, toHttpParams } from '../../../shared/forms/paging';
 
 /** A register query: search, active flag, page and the list's own filters (`kind`, `type`, `branchId` …); empty values are dropped. */
@@ -64,6 +65,7 @@ export interface CatalogueBResource<TItem, TCreate, TUpdate> {
 export class CatalogueBApi {
   private readonly http = inject(HttpClient);
   private readonly document = inject(DOCUMENT);
+  private readonly i18n = inject(I18nService);
 
   readonly preparations = this.resource<PreparationListItem, CreatePreparationRequest, UpdatePreparationRequest>(CATALOGUE_B_API.preparations);
   readonly commentTemplates = this.resource<CommentTemplateListItem, CommentTemplateRequest, CommentTemplateRequest>(CATALOGUE_B_API.commentTemplates);
@@ -96,7 +98,9 @@ export class CatalogueBApi {
       update: (id, request) => firstValueFrom(this.http.put<void>(item(id), request), { defaultValue: undefined }).then(() => undefined),
       setActive: (id, active) => firstValueFrom(this.http.post<void>(`${item(id)}/${active ? 'reactivate' : 'deactivate'}`, null), { defaultValue: undefined }).then(() => undefined),
       exportCsv: async (query) => {
-        const response = await firstValueFrom(this.http.get(`${url}/export`, { params: toHttpParams(query), observe: 'response', responseType: 'blob' }));
+        // the file speaks the user's language: headers, labels and Yes / No as the grid shows them (UAT B-09)
+        const params = toHttpParams({ ...query, lang: this.i18n.lang() });
+        const response = await firstValueFrom(this.http.get(`${url}/export`, { params, observe: 'response', responseType: 'blob' }));
         this.save(response, url);
       },
     };
@@ -113,13 +117,23 @@ export class CatalogueBApi {
     const href = view.URL.createObjectURL(body);
     const link = this.document.createElement('a');
     link.href = href;
-    link.download = fileNameOf(response.headers.get('Content-Disposition')) ?? `${url.split('/').pop() ?? 'export'}.csv`;
+    link.download = localFileName(fileNameOf(response.headers.get('Content-Disposition')), url.split('/').pop() ?? 'export');
     link.rel = 'noopener';
     this.document.body.appendChild(link);
     link.click();
     link.remove();
     view.setTimeout(() => view.URL.revokeObjectURL(href), 0);
   }
+}
+
+/**
+ * The server names the file after its UTC clock (`doctors-20261010-2215.csv`); the download carries the user's own
+ * date instead, like every other export (`doctors-2026-10-11.csv`, UAT B-09).
+ */
+export function localFileName(serverName: string | null, fallbackStem: string, now: Date = new Date()): string {
+  const stem = (serverName ?? '').replace(/(-\d{8}-\d{4})?\.csv$/i, '') || fallbackStem;
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${stem}-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.csv`;
 }
 
 /** `attachment; filename=reasons-20261009-0830.csv; filename*=UTF-8''…` → the file name. */

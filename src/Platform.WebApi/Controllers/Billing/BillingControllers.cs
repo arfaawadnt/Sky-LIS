@@ -40,9 +40,10 @@ public sealed class BillingPaymentsController(ISender sender) : ControllerBase
         [FromQuery] Guid? cashierUserId,
         [FromQuery] string? method,
         [FromQuery] string? status,
+        [FromQuery] string? timeZone,
         CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportPaymentsQuery(visitId, accession, from, to, treasuryId, cashierUserId, method, status), cancellationToken);
+        var file = await sender.Send(new ExportPaymentsQuery(visitId, accession, from, to, treasuryId, cashierUserId, method, status, timeZone), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -95,9 +96,10 @@ public sealed class BillingRefundsController(ISender sender) : ControllerBase
         [FromQuery] Guid? treasuryId,
         [FromQuery] Guid? cashierUserId,
         [FromQuery] string? method,
+        [FromQuery] string? timeZone,
         CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportRefundsQuery(visitId, accession, from, to, treasuryId, cashierUserId, method), cancellationToken);
+        var file = await sender.Send(new ExportRefundsQuery(visitId, accession, from, to, treasuryId, cashierUserId, method, timeZone), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -195,9 +197,9 @@ public sealed class BillingCashClosingsController(ISender sender) : ControllerBa
         Ok(await sender.Send(new ListCashClosingsQuery(treasuryId, cashierUserId, from, to, page, pageSize), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] Guid? treasuryId, [FromQuery] Guid? cashierUserId, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] Guid? treasuryId, [FromQuery] Guid? cashierUserId, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] string? timeZone, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportCashClosingsQuery(treasuryId, cashierUserId, from, to), cancellationToken);
+        var file = await sender.Send(new ExportCashClosingsQuery(treasuryId, cashierUserId, from, to, timeZone), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -218,4 +220,9 @@ public sealed class BillingTreasuriesController(ISender sender) : ControllerBase
     [HttpGet("treasuries")]
     public async Task<ActionResult<IReadOnlyList<BillingTreasuryItem>>> OfBranch(CancellationToken cancellationToken) =>
         Ok(await sender.Send(new ListBillingTreasuriesQuery(), cancellationToken));
+
+    /// <summary>The cash desk's print parameters (<c>autoPrintReceipt</c>) under <c>billing.view</c> (UAT A-05).</summary>
+    [HttpGet("print-settings")]
+    public async Task<ActionResult<BillingPrintSettings>> PrintSettings(CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new GetBillingPrintSettingsQuery(), cancellationToken));
 }

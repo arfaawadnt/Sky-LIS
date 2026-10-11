@@ -5,11 +5,12 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
-import type { MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
+import type { MasterDataConfig, MasterDataFilter, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { fileStamp, pick } from '../ui/format';
+import { ianaTimeZones } from '../ui/validators';
 
 /**
  * SA-10 Countries: the validation data of a laboratory's details (dial code, currency, language, time zone, mobile
@@ -32,6 +33,10 @@ export class CountriesPage {
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly csv = inject(CsvExportService);
+
+  /** The filter of the list on screen: the export writes exactly these rows (UAT R2-02, as C-04 elsewhere). */
+  private filter: MasterDataFilter = { search: '', active: true };
+
   private readonly page = viewChild.required(MasterDataPageComponent);
 
   protected readonly config: MasterDataConfig<CountryListItem, CountryRequest> = {
@@ -52,13 +57,17 @@ export class CountriesPage {
       { name: 'currency', kind: 'text', required: true, maxLength: 60 },
       { name: 'currencyCode', kind: 'code', required: true, maxLength: 3, immutable: false, hint: 'platform.countries.hint.currencyCode' },
       { name: 'language', kind: 'select', required: true, defaultValue: 'ar', options: [{ value: 'ar', label: 'Arabic', labelAr: 'العربية' }, { value: 'en', label: 'English', labelAr: 'الإنجليزية' }] },
-      { name: 'timeZone', kind: 'text', required: true, maxLength: 64, hint: 'platform.countries.hint.timeZone' },
+      // C-08: the zone is picked from the IANA names, never typed (the server refuses anything else with GEO-007)
+      { name: 'timeZone', kind: 'select', required: true, hint: 'platform.countries.hint.timeZone', options: () => this.timeZoneOptions() },
       { name: 'mobileLength', kind: 'number', required: true, min: 6, max: 15, step: 1, defaultValue: 10, hint: 'platform.countries.hint.mobileLength' },
       { name: 'flag', kind: 'text', maxLength: 16 },
       { name: 'remarks', kind: 'textarea', maxLength: 500 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.listCountries({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => {
+        this.filter = filter;
+        return this.api.listCountries({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+      },
       create: (dto) => this.api.createCountry(dto),
       update: (id, dto) => this.api.updateCountry(id, dto),
       setActive: (id, active) => this.api.setCountryActive(id, active),
@@ -76,6 +85,18 @@ export class CountriesPage {
       },
     ],
   };
+
+  /** The IANA zones of the browser plus the zones the countries already store, so an existing value is always offered. */
+  protected async timeZoneOptions(): Promise<readonly SelectOption[]> {
+    let stored: readonly string[] = [];
+    try {
+      stored = (await this.api.listCountries({ search: null, isActive: null, page: 1, pageSize: 200 })).items.map((country) => country.timeZone);
+    } catch {
+      // the browser's list alone still lets a country be saved
+    }
+
+    return ianaTimeZones(stored).map((zone) => ({ value: zone, label: zone }));
+  }
 
   constructor() {
     void this.i18n.load('platform');
@@ -97,7 +118,7 @@ export class CountriesPage {
   }
 
   protected async exportCsv(): Promise<void> {
-    const rows = await this.api.all((page) => this.api.listCountries({ search: null, isActive: null, ...page }));
+    const rows = await this.api.all((page) => this.api.listCountries({ search: this.filter.search || null, isActive: this.filter.active, ...page }));
     this.csv.download(`countries-${fileStamp()}`, [
       { header: this.i18n.t('platform.countries.field.nameEn'), value: (row: CountryListItem) => row.nameEn },
       { header: this.i18n.t('platform.countries.field.nameAr'), value: (row) => row.nameAr },

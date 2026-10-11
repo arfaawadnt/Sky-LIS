@@ -60,7 +60,7 @@ internal sealed class TenantSettingConfiguration : IEntityTypeConfiguration<Tena
 }
 
 /// <summary>Write side of the Parameters page; the handler commits (InfrastructureHardeningTests: adapters never save).</summary>
-internal sealed class TenantSettingsStore(AppDbContext context) : ITenantSettingsStore
+internal sealed class TenantSettingsStore(AppDbContext context, ITenantContextAccessor tenant, ICurrentTenantSetter tenantScope) : ITenantSettingsStore
 {
     public async Task<IReadOnlyList<StoredSetting>> ListAsync(CancellationToken cancellationToken) =>
         await context.Set<TenantSetting>().AsNoTracking()
@@ -68,6 +68,20 @@ internal sealed class TenantSettingsStore(AppDbContext context) : ITenantSetting
             .Select(setting => new StoredSetting(setting.Key, setting.Value, setting.UpdatedAtUtc, setting.UpdatedByUserId))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+    /// <summary>Read as <see cref="TenantSettings"/> reads them: under <c>ForTenant(platform)</c>, without elevation.</summary>
+    public async Task<IReadOnlyList<StoredSetting>> ListInheritedAsync(CancellationToken cancellationToken)
+    {
+        if (tenant.CurrentTenantId is not { } current || TenantIds.IsPlatform(current))
+        {
+            return [];
+        }
+
+        using (tenantScope.ForTenant(TenantIds.Platform))
+        {
+            return await ListAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     public async Task UpsertAsync(string key, string value, Guid? actorUserId, DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {

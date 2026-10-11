@@ -17,7 +17,8 @@ namespace Platform.Infrastructure.Persistence.Interceptors;
 /// number the new ones after it and chain their SHA-256 hashes. When the save runs outside a transaction this
 /// interceptor opens one so the lock spans the read and the insert, and commits it after the save. Events of
 /// global aggregates (users, sessions) are not ledgered here; the security events are. Runs after the field-change
-/// interceptor and before the outbox interceptor, which drains the events (InterceptorOrderTests).
+/// interceptor and before the outbox interceptor, which drains the events (InterceptorOrderTests). An
+/// <see cref="Domain.PlatformAdmin.IPlatformTrailEvent"/> raised in a client's scope is filed in the platform trail as well.
 /// </summary>
 public sealed class AuditTrailInterceptor(ICurrentUser currentUser, ITenantContextAccessor tenant, IRequestContext request) : SaveChangesInterceptor
 {
@@ -99,7 +100,13 @@ public sealed class AuditTrailInterceptor(ICurrentUser currentUser, ITenantConte
             foreach (var domainEvent in ((IDomainEventSource)entry.Entity).DomainEvents)
             {
                 var type = domainEvent.GetType();
-                pending.Add(new Pending(tenantId.Value, domainEvent, type.FullName ?? type.Name, entry.Metadata.ClrType.Name, aggregateId, JsonSerializer.Serialize(domainEvent, type, OutboxEvent.SerializerOptions)));
+                var payload = JsonSerializer.Serialize(domainEvent, type, OutboxEvent.SerializerOptions);
+                pending.Add(new Pending(tenantId.Value, domainEvent, type.FullName ?? type.Name, entry.Metadata.ClrType.Name, aggregateId, payload, IsPlatformCopy: false));
+                if (domainEvent is Domain.PlatformAdmin.IPlatformTrailEvent && !TenantIds.IsPlatform(tenantId.Value))
+                {
+                    // C-17: a client's provisioning runs in the new tenant's scope; the platform trail records it too (same event id).
+                    pending.Add(new Pending(TenantIds.Platform, domainEvent, type.FullName ?? type.Name, entry.Metadata.ClrType.Name, aggregateId, payload, IsPlatformCopy: true));
+                }
             }
         }
 
@@ -113,6 +120,14 @@ public sealed class AuditTrailInterceptor(ICurrentUser currentUser, ITenantConte
             _ownedTransaction = async
                 ? await context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)
                 : context.Database.BeginTransaction();
+        }
+
+        if (pending.Any(item => item.IsPlatformCopy) && !await ConnectionBypassesRowSecurityAsync(context, async, cancellationToken).ConfigureAwait(false))
+        {
+            // The platform copy can only be written by the provisioning transaction (ITenantProvisioningScope opens its
+            // connection elevated); a save without it keeps the client's own entry and nothing else (row-level security would
+            // refuse the whole save otherwise). PlatformAdminFlowTests proves both doors write the platform entry.
+            pending.RemoveAll(item => item.IsPlatformCopy);
         }
 
         // jsonb normalises key order and whitespace; hash the form the column will return, computed by the engine itself.
@@ -135,7 +150,10 @@ public sealed class AuditTrailInterceptor(ICurrentUser currentUser, ITenantConte
                 context.Database.ExecuteSqlInterpolated($"SELECT pg_advisory_xact_lock(hashtext({lockKey}))");
             }
 
-            var lastQuery = context.Set<AuditTrailEntry>().AsNoTracking()
+            // The chain of another tenant than the scope's (the platform copy of C-17) is outside the query filter; the explicit
+            // predicate names the tenant and row-level security still decides what the connection may read and write.
+            var trail = tenantId == tenant.CurrentTenantId ? context.Set<AuditTrailEntry>() : context.Set<AuditTrailEntry>().IgnoreQueryFilters();
+            var lastQuery = trail.AsNoTracking()
                 .Where(entry => entry.TenantId == tenantId)
                 .OrderByDescending(entry => entry.Sequence)
                 .Select(entry => new { entry.Sequence, entry.EntryHash });
@@ -156,5 +174,13 @@ public sealed class AuditTrailInterceptor(ICurrentUser currentUser, ITenantConte
         context.Set<AuditTrailEntry>().AddRange(entries);
     }
 
-    private sealed record Pending(Guid TenantId, IDomainEvent Event, string EventType, string AggregateType, string AggregateId, string Payload);
+    private static async Task<bool> ConnectionBypassesRowSecurityAsync(DbContext context, bool async, CancellationToken cancellationToken)
+    {
+        const string Sql = """SELECT coalesce(current_setting('app.bypass_rls', true), '') = 'on' AS "Value" """;
+        return async
+            ? await context.Database.SqlQueryRaw<bool>(Sql).SingleAsync(cancellationToken).ConfigureAwait(false)
+            : context.Database.SqlQueryRaw<bool>(Sql).Single();
+    }
+
+    private sealed record Pending(Guid TenantId, IDomainEvent Event, string EventType, string AggregateType, string AggregateId, string Payload, bool IsPlatformCopy);
 }

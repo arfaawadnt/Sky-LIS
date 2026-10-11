@@ -1,4 +1,6 @@
+using System.Globalization;
 using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.AspNetCore.Diagnostics;
 using Platform.Contracts.Common;
 using Platform.Infrastructure.Security;
@@ -8,8 +10,10 @@ namespace Platform.WebApi.Middleware;
 
 /// <summary>
 /// Maps refusals to status codes by their fault kind (01 §5.1): Validation 422, Conflict 409, NotFound 404,
-/// Refused 403, Unauthenticated 401, Unclassified 400; FluentValidation failures 400 with <c>errors</c>. Anything
-/// else is a 500 with a code and no detail.
+/// Refused 403, Unauthenticated 401, Unclassified 400; FluentValidation failures 400 with <c>errors</c> (the messages,
+/// unchanged) and <c>rules</c> (per field, the machine-readable rule that failed and its numeric arguments, e.g.
+/// <c>{ "rule": "ExactLength", "minLength": 3, "maxLength": 3 }</c>), so a client can show its own localized text
+/// instead of the validator's English (C-06). Anything else is a 500 with a code and no detail.
 /// </summary>
 public sealed partial class DomainExceptionHandler(ILogger<DomainExceptionHandler> logger) : IExceptionHandler
 {
@@ -27,7 +31,10 @@ public sealed partial class DomainExceptionHandler(ILogger<DomainExceptionHandle
                 var errors = validation.Errors
                     .GroupBy(failure => failure.PropertyName, StringComparer.Ordinal)
                     .ToDictionary(group => CamelCase(group.Key), group => group.Select(failure => failure.ErrorMessage).ToArray(), StringComparer.Ordinal);
-                await ProblemResponse.WriteAsync(httpContext, StatusCodes.Status400BadRequest, "The request is not valid.", ProblemCodes.ValidationFailed, errors);
+                var rules = validation.Errors
+                    .GroupBy(failure => failure.PropertyName, StringComparer.Ordinal)
+                    .ToDictionary(group => CamelCase(group.Key), group => group.Select(RuleOf).ToArray(), StringComparer.Ordinal);
+                await ProblemResponse.WriteAsync(httpContext, StatusCodes.Status400BadRequest, "The request is not valid.", ProblemCodes.ValidationFailed, errors, rules);
                 return true;
 
             case OperationCanceledException when httpContext.RequestAborted.IsCancellationRequested:
@@ -48,6 +55,52 @@ public sealed partial class DomainExceptionHandler(ILogger<DomainExceptionHandle
         DomainFault.Refused => StatusCodes.Status403Forbidden,
         DomainFault.Unauthenticated => StatusCodes.Status401Unauthorized,
         _ => StatusCodes.Status400BadRequest,
+    };
+
+    /// <summary>The validator's arguments a message may quote; only numbers, never a value taken from the request.</summary>
+    private static readonly (string Placeholder, string Name)[] RuleArguments =
+    [
+        ("MinLength", "minLength"),
+        ("MaxLength", "maxLength"),
+        ("ComparisonValue", "comparisonValue"),
+        ("From", "from"),
+        ("To", "to"),
+        ("ExpectedPrecision", "precision"),
+        ("ExpectedScale", "scale"),
+    ];
+
+    /// <summary>
+    /// <c>NotEmptyValidator</c> → <c>{ "rule": "NotEmpty" }</c>; a code set with <c>WithErrorCode</c> is kept as it is.
+    /// </summary>
+    private static IReadOnlyDictionary<string, object> RuleOf(ValidationFailure failure)
+    {
+        ArgumentNullException.ThrowIfNull(failure);
+        var code = string.IsNullOrWhiteSpace(failure.ErrorCode) ? "Invalid" : failure.ErrorCode;
+        var rule = new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            ["rule"] = code.EndsWith("Validator", StringComparison.Ordinal) && code.Length > "Validator".Length ? code[..^"Validator".Length] : code,
+        };
+
+        if (failure.FormattedMessagePlaceholderValues is { } values)
+        {
+            foreach (var (placeholder, name) in RuleArguments)
+            {
+                if (values.TryGetValue(placeholder, out var value) && IsFiniteNumber(value))
+                {
+                    rule[name] = Convert.ToDecimal(value, CultureInfo.InvariantCulture);
+                }
+            }
+        }
+
+        return rule;
+    }
+
+    private static bool IsFiniteNumber(object? value) => value switch
+    {
+        byte or short or int or long or decimal => true,
+        float single => float.IsFinite(single),
+        double number => double.IsFinite(number),
+        _ => false,
     };
 
     private static string CamelCase(string name) => string.IsNullOrEmpty(name) ? name : char.ToLowerInvariant(name[0]) + name[1..];

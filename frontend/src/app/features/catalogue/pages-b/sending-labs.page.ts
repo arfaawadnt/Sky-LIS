@@ -6,6 +6,7 @@ import { type LocalizedText, localizedPick, localizedToDto } from '../../../shar
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { FormValue, MasterDataConfig, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueBApi } from '../data-b/catalogue-b.api';
+import { ListedFilter } from '../data-b/listed-filter';
 import { CatalogueBLookups, type CatalogueBTierOption, toSelectOption } from '../data-b/catalogue-b-lookups';
 import { CatalogueBExportButtonComponent } from '../ui-b/catalogue-b-export-button.component';
 
@@ -31,7 +32,9 @@ export class SendingLabsPage {
   private readonly tiers = signal<readonly CatalogueBTierOption[]>([]);
   private readonly tierById = computed(() => new Map(this.tiers().map((tier) => [tier.id, tier])));
 
-  protected readonly exportCsv = (): Promise<void> => this.api.sendingLabs.exportCsv({});
+  private readonly listed = new ListedFilter();
+
+  protected readonly exportCsv = (): Promise<void> => this.api.sendingLabs.exportCsv(this.listed.query());
 
   protected readonly config: MasterDataConfig<SendingLabListItem, SendingLabRequest> = {
     i18nPrefix: 'catalogue-b.sendingLabs',
@@ -50,7 +53,7 @@ export class SendingLabsPage {
       { name: 'doctorId', kind: 'select', options: async () => (await this.lookups.doctors()).map(toSelectOption) },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.sendingLabs.list({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.sendingLabs.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.sendingLabs.create(dto),
       update: (id, dto) => this.api.sendingLabs.update(id, dto),
       setActive: (id, active) => this.api.sendingLabs.setActive(id, active),

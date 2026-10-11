@@ -1,4 +1,7 @@
 <app-master-data-page [config]="config">
+  <button pageActions ngProjectAs="[pageActions]" type="button" class="btn ghost" *appCan="permissions.export" [disabled]="exporting()" (click)="exportCsv()">
+    <app-icon name="arrow-down" [size]="15" />{{ exporting() ? i18n.t('pricing.exporting') : i18n.t('pricing.exportCsv') }}
+  </button>
   <ng-template appCell="name" [appCellOf]="config" let-row>
     <span class="payer-name">{{ i18n.lang() === 'ar' ? row.nameAr : row.nameEn }}</span>
     @if (row.isDefault) {
@@ -70,9 +73,11 @@
                   <app-icon name="power" [size]="15" />
                 </button>
               }
-              <button type="button" class="row-btn" (click)="openTierPricing(tier)" [attr.aria-label]="i18n.t('pricing.payers.action.contractPricing')" [title]="i18n.t('pricing.payers.action.contractPricing')">
-                <app-icon name="coins" [size]="15" />
-              </button>
+              @if (contractPricingOffered) {
+                <button type="button" class="row-btn" (click)="openTierPricing(tier)" [attr.aria-label]="i18n.t('pricing.payers.action.contractPricing')" [title]="i18n.t('pricing.payers.action.contractPricing')">
+                  <app-icon name="coins" [size]="15" />
+                </button>
+              }
             </td>
           </tr>
         }

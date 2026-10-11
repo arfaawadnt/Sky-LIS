@@ -14,9 +14,14 @@ using Platform.SharedKernel.Primitives;
 
 namespace Platform.Application.Identity.Commands;
 
-/// <summary>Browser sign-in (02 §4.1). The password arrives in plaintext here because the WebApi edge already opened its envelope (D-03).</summary>
+/// <summary>
+/// Browser sign-in (02 §4.1). The password arrives in plaintext here because the WebApi edge already opened its envelope (D-03).
+/// <paramref name="PresentedRefreshToken"/> is the refresh cookie the browser sent with the sign-in, if any (R2-04): the new
+/// cookie overwrites it, so the session it identifies — whoever it belonged to — is revoked in the same commit instead of
+/// staying active and unreachable on the server.
+/// </summary>
 [AllowUnauthenticated]
-public sealed record SignInCommand(Guid? Tenant, string Username, string Password, string? ClientIp, string? UserAgent) : ICommand<SignInResult>;
+public sealed record SignInCommand(Guid? Tenant, string Username, string Password, string? ClientIp, string? UserAgent, string? PresentedRefreshToken = null) : ICommand<SignInResult>;
 
 public sealed record SignInResult(
     string Step,
@@ -72,8 +77,12 @@ public sealed class SignInCommandHandler(
 
         if (user.IsLockedOutAt(now))
         {
-            await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInFailed, SecurityEvent.Warning, ActorUserId: user.Id, Detail: "locked_out"), cancellationToken);
-            throw new DomainException(ProblemCodes.AccountLocked, "The account is locked; try again later.", DomainFault.Unauthenticated);
+            // B-11: an administrator's lock has no end date and only an administrator lifts it; the automatic lockout ends by itself.
+            var byAdministrator = user.IsLockedByAdministrator;
+            await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInFailed, SecurityEvent.Warning, ActorUserId: user.Id, Detail: byAdministrator ? "locked_by_administrator" : "locked_out"), cancellationToken);
+            throw byAdministrator
+                ? new DomainException(ProblemCodes.AccountLockedByAdministrator, "The account was locked by an administrator; contact your administrator.", DomainFault.Unauthenticated)
+                : new DomainException(ProblemCodes.AccountLocked, "The account is locked; try again later.", DomainFault.Unauthenticated);
         }
 
         if (!hasher.Verify(user.PasswordHash, command.Password))
@@ -146,8 +155,14 @@ public sealed class SignInCommandHandler(
         }
 
         sessions.Add(session);
+        var superseded = await SupersedePresentedSessionAsync(command.PresentedRefreshToken, now, cancellationToken);
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);   // one commit: counters, rehash, session
+        await unitOfWork.SaveChangesAsync(cancellationToken);   // one commit: counters, rehash, superseded session, new session
+
+        if (superseded is not null)
+        {
+            await events.WriteAsync(new SecurityEvent(SecurityEvents.SessionRevoked, SecurityEvent.Info, superseded.TenantId, superseded.PlatformUserId, "superseded_by_sign_in"), cancellationToken);
+        }
 
         await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInSucceeded, SecurityEvent.Info, membership.TenantId, user.Id), cancellationToken);
         await events.WriteAsync(new SecurityEvent(SecurityEvents.SessionCreated, SecurityEvent.Info, membership.TenantId, user.Id, session.Id.ToString()), cancellationToken);
@@ -160,6 +175,34 @@ public sealed class SignInCommandHandler(
         var profile = Profiles.ToProfile(principal, session.Scope);
 
         return new SignInResult(AuthResponse.StepSignedIn, accessToken, refreshTokens.Format(session.Id, secret.Secret), session.Kind, profile, null);
+    }
+
+    /// <summary>
+    /// R2-04: the browser's previous session ends when a new one replaces its cookie. Only a token whose secret matches is
+    /// honoured (`PresentedRefreshToken.Matches`: a forged or stale cookie naming someone else's session id revokes nothing); its whole family ends, like a sign-out.
+    /// </summary>
+    private async Task<RefreshSession?> SupersedePresentedSessionAsync(string? presented, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (!refreshTokens.TryParse(presented, out var sessionId, out var presentedHash))
+        {
+            return null;
+        }
+
+        var previous = await sessions.GetForUpdateAsync(sessionId, cancellationToken);
+        if (previous is null || previous.Kind != SessionKind.Browser || !PresentedRefreshToken.Matches(previous, presentedHash))
+        {
+            return null;
+        }
+
+        var revoked = false;
+        foreach (var member in await sessions.ListFamilyAsync(previous.FamilyId, cancellationToken))
+        {
+            revoked |= !member.IsRevoked;
+            member.Revoke(RevocationReason.Logout, now);
+            principals.Evict(member.Id);
+        }
+
+        return revoked ? previous : null;
     }
 
     private static MembershipSummary? SelectMembership(IReadOnlyList<MembershipSummary> active, Guid? requested)

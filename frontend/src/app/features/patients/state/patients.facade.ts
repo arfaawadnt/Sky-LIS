@@ -100,4 +100,15 @@ export class PatientsFacade {
   onTyped(identity: TypedIdentity): void {
     this.typed.set(identity);
   }
+
+  /** Re-reads the register and the form's lookups when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01). A load in flight is left alone. */
+  refresh(): void {
+    this.exportCsv.reset();
+    this.list.reload();
+    this.settings.reload();
+    this.countries.reload();
+    this.governorates.reload();
+    this.conditions.reload();
+    this.editing.reload();
+  }
 }

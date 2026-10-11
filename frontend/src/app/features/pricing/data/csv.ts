@@ -1,3 +1,8 @@
+import { MAX_PAGE_SIZE, type Paged } from '../../../core/api/paging';
+
+/** The most rows one export reads (the server's own export limit). */
+const MAX_EXPORT_ROWS = 10_000;
+
 /** A CSV cell: text, a number (written with the invariant `.` decimal separator) or empty. */
 export type CsvCell = string | number | boolean | null | undefined;
 
@@ -45,8 +50,23 @@ export function downloadCsv(fileName: string, content: string, doc: Document = d
   }
 }
 
-/** `pl26-prices-2026-10-09.csv`: a safe file name from a code and today's date. */
+/** `pl26-prices-2026-10-09.csv`: a safe file name from a code and today's date in the user's own calendar (not UTC, UAT B-09). */
 export function csvFileName(stem: string, today: Date): string {
   const safe = stem.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'export';
-  return `${safe}-${today.toISOString().slice(0, 10)}.csv`;
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${safe}-${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}.csv`;
+}
+
+/** Every row of a filtered register, page after page (largest page the server allows), up to 10 000 rows (UAT B-10). */
+export async function allPages<T>(load: (page: number, pageSize: number) => Promise<Paged<T>>): Promise<readonly T[]> {
+  const rows: T[] = [];
+  for (let page = 1; rows.length < MAX_EXPORT_ROWS; page++) {
+    const current = await load(page, MAX_PAGE_SIZE);
+    rows.push(...current.items.slice(0, MAX_EXPORT_ROWS - rows.length));
+    if (current.items.length < MAX_PAGE_SIZE || page >= current.totalPages) {
+      break;
+    }
+  }
+
+  return rows;
 }

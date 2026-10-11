@@ -17,6 +17,15 @@ public static class OrganizationCodes
     public const string RoleHasMembers = "ORG-011";
     public const string BranchNotUsable = "ORG-012";
     public const string PrimaryAdministratorRoleProtected = "ORG-014";
+
+    /// <summary>The branch phone number is malformed (field <c>phone</c>; UAT B-03: one code per field).</summary>
+    public const string BranchPhoneInvalid = "ORG-015";
+
+    /// <summary>The branch e-mail address is malformed (field <c>email</c>).</summary>
+    public const string BranchEmailInvalid = "ORG-016";
+
+    /// <summary>The governorate is unknown or belongs to another country than the branch's (field <c>governorateId</c>; UAT B-02).</summary>
+    public const string GovernorateNotInCountry = "ORG-017";
     public const string PasswordLength = "ORG-020";
     public const string PasswordContainsUsername = "ORG-021";
     public const string PasswordExpiryInvalid = "ORG-022";

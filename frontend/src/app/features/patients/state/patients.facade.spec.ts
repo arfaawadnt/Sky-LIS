@@ -74,6 +74,19 @@ describe('PatientsFacade (01 §6.3)', () => {
     await runEffects();
   }
 
+  it('re-reads the register and the form lookups when the page opens again, keeping the filter (UAT D-14, A-01)', async () => {
+    await initialLoad();
+    facade.setSearch('mona');
+    await runEffects();
+    backend.expectOne((r) => r.url === PATIENTS_API.patients).flush(page([]));
+    await runEffects();
+
+    facade.refresh();
+    await runEffects();
+    expect(backend.expectOne((r) => r.url === PATIENTS_API.patients).request.params.get('q')).toBe('mona');
+    backend.expectOne(`${PATIENTS_API.patients}/form-settings`).flush({ mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true });
+  });
+
   it('loads active files first and filters on search, gender and VIP with the page reset', async () => {
     await runEffects();
     const first = backend.expectOne((r) => r.url === PATIENTS_API.patients);

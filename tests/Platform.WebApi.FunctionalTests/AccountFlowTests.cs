@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using Platform.Contracts.Account;
+using Platform.Contracts.Audit;
 using Platform.Contracts.Common;
 using Platform.Contracts.Identity;
 using Platform.SharedKernel.MultiTenancy;
@@ -267,6 +268,26 @@ public sealed class AccountFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
         Assert.Equal(ProblemCodes.Forbidden, await AuthClient.CodeOf(refused));
         Assert.Equal(HttpStatusCode.BadRequest, (await exporterClient.GetAsync($"{AuditExport}?language=fr")).StatusCode);
+
+        // SA-09 client column (UAT C-18): a laboratory's log has no clients; the client filter is accepted and ignored there.
+        Assert.Empty((await viewerClient.GetFromJsonAsync<List<AuditClientItem>>("/api/v1/audit/clients"))!);
+        var entries = (await viewerClient.GetFromJsonAsync<Paged<AuditEntryItem>>($"/api/v1/audit/entries?clientTenantId={Guid.CreateVersion7()}"))!;
+        Assert.NotEmpty(entries.Items);
+        Assert.All(entries.Items, item => Assert.Null(item.ClientTenantId));
+        var (outsider, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["support.create"], displayName: "No Audit");
+        var outsiderClient = await SignedInClientAsync(outsider);
+        Assert.Equal(HttpStatusCode.Forbidden, (await outsiderClient.GetAsync("/api/v1/audit/clients")).StatusCode);
+    }
+
+    [DatabaseFact]
+    public async Task The_platform_audit_log_offers_the_clients_of_the_platform()
+    {
+        var (auditor, _, _) = await factory.SeedUserAsync(tenantId: TenantIds.Platform, permissions: ["audit.view"], displayName: "Platform Auditor");
+        var client = await SignedInClientAsync(auditor);
+        var clients = await client.GetFromJsonAsync<List<AuditClientItem>>("/api/v1/audit/clients");
+        Assert.NotNull(clients);
+        Assert.DoesNotContain(clients, item => item.TenantId == TenantIds.Platform);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/v1/audit/entries?clientTenantId={Guid.CreateVersion7()}")).StatusCode);
     }
 
     /// <summary>Seals both fields under one challenge, as the SPA's interceptor does (02 §3.3: one challenge per request, the same nonce on every field).</summary>

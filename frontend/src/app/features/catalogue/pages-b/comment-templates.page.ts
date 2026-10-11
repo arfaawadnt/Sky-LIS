@@ -7,6 +7,7 @@ import { localizedPick } from '../../../shared/forms/localized-text';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueBApi } from '../data-b/catalogue-b.api';
+import { ListedFilter } from '../data-b/listed-filter';
 import { CatalogueBLookups, toSelectOption } from '../data-b/catalogue-b-lookups';
 import { CatalogueBExportButtonComponent } from '../ui-b/catalogue-b-export-button.component';
 
@@ -29,7 +30,9 @@ export class CommentTemplatesPage {
   private readonly api = inject(CatalogueBApi);
   private readonly lookups = inject(CatalogueBLookups);
 
-  protected readonly exportCsv = (): Promise<void> => this.api.commentTemplates.exportCsv({});
+  private readonly listed = new ListedFilter();
+
+  protected readonly exportCsv = (): Promise<void> => this.api.commentTemplates.exportCsv(this.listed.query());
 
   protected readonly config: MasterDataConfig<CommentTemplateListItem, CommentTemplateRequest> = {
     i18nPrefix: 'catalogue-b.comments',
@@ -49,7 +52,7 @@ export class CommentTemplatesPage {
       { name: 'text', kind: 'localizedText', required: true, maxLength: 400 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.commentTemplates.list({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.commentTemplates.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.commentTemplates.create(dto),
       update: (id, dto) => this.api.commentTemplates.update(id, dto),
       setActive: (id, active) => this.api.commentTemplates.setActive(id, active),

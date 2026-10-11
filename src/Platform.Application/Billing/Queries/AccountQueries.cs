@@ -267,6 +267,20 @@ public sealed class ListBillingTreasuriesHandler(ITreasuryStationLookup stations
         stations.OfBranchAsync(BranchScope.Require(user), cancellationToken);
 }
 
+/// <summary>
+/// The cash desk's print parameters (CP-23 "receipt auto-printed per parameter", CP-57 <c>autoPrintReceipt</c>). The pages
+/// of the module read them here under <c>billing.view</c>: a cashier holds no <c>settings.view</c>, so reading
+/// <c>/api/v1/settings</c> was refused and the page fell back to printing (UAT A-05).
+/// </summary>
+[RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.View)]
+public sealed record GetBillingPrintSettingsQuery : IQuery<BillingPrintSettings>;
+
+public sealed class GetBillingPrintSettingsHandler(ITenantSettings settings) : IQueryHandler<GetBillingPrintSettingsQuery, BillingPrintSettings>
+{
+    public async Task<BillingPrintSettings> Handle(GetBillingPrintSettingsQuery query, CancellationToken cancellationToken) =>
+        new(await settings.GetAsync(SettingKeys.AutoPrintReceipt, cancellationToken));
+}
+
 /// <summary>Limits shared by the module's queries.</summary>
 internal static class BillingLimits
 {

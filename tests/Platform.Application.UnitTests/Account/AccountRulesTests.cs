@@ -69,6 +69,30 @@ public sealed class AccountRulesTests
     }
 
     [Fact]
+    public void The_platform_export_names_the_client_of_each_entry_in_the_export_language()
+    {
+        var aboutClient = new AuditEntryItem(
+            Guid.CreateVersion7(), AuditEntryItem.KindFieldChange, new DateTimeOffset(2026, 10, 11, 16, 40, 0, TimeSpan.Zero), null, "Platform Admin",
+            "Tenant", "c-1", "Modified", null, [new FieldChangeItem("Address", "12 V12 Street", "14 V12 Street")], null, null, null,
+            Guid.CreateVersion7(), "V12 Retest Lab", "مختبر إعادة الاختبار");
+        var platformOwn = new AuditEntryItem(
+            Guid.CreateVersion7(), AuditEntryItem.KindFieldChange, new DateTimeOffset(2026, 10, 11, 16, 41, 0, TimeSpan.Zero), null, "Platform Admin",
+            "Plan", "p-1", "Modified", null, [], null, null, null);
+
+        var english = Encoding.UTF8.GetString(AuditCsv.Write([aboutClient, platformOwn], arabic: false, includeClient: true)[3..]).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        Assert.StartsWith("Time (UTC),User,Client,Action,Entity", english[0], StringComparison.Ordinal);
+        Assert.StartsWith("2026-10-11 16:40:00,Platform Admin,V12 Retest Lab,Modified,Tenant,c-1,", english[1], StringComparison.Ordinal);
+        Assert.StartsWith("2026-10-11 16:41:00,Platform Admin,,Modified,Plan,p-1,", english[2], StringComparison.Ordinal);
+
+        var arabic = Encoding.UTF8.GetString(AuditCsv.Write([aboutClient], arabic: true, includeClient: true)[3..]).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        Assert.StartsWith("الوقت (UTC),المستخدم,العميل,الإجراء", arabic[0], StringComparison.Ordinal);
+        Assert.Contains(",مختبر إعادة الاختبار,", arabic[1], StringComparison.Ordinal);
+
+        // A laboratory's log has no client column.
+        Assert.StartsWith("Time (UTC),User,Action", Encoding.UTF8.GetString(AuditCsv.Write([], arabic: false)[3..]), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_dashboard_day_is_the_local_day_of_the_offset()
     {
         var window = DashboardDays.Window(new DateOnly(2026, 10, 9), 180);   // Cairo summer time, UTC+3

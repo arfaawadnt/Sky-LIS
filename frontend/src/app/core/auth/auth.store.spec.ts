@@ -5,17 +5,20 @@ import { TestBed } from '@angular/core/testing';
 
 import { AUTH_API, type AuthResponse } from '../api/auth.contracts';
 import { AuthStore } from './auth.store';
+import { broadcastSessionChannel, readSessionMessage } from './session-channel';
+import { meaningfulReturnUrl, signInUrl } from './session-navigation';
+import { FakeBrowserNavigation, FakeSessionChannel, provideSessionTesting } from './session-testing';
 
-function signedIn(token: string, branchId: string | null = null): AuthResponse {
+function signedIn(token: string, branchId: string | null = null, userId = 'u1', tenantId = 't1'): AuthResponse {
   return {
     step: 'signed-in',
     accessToken: token,
     expiresAtUtc: '2026-10-09T12:15:00Z',
     refreshToken: null,
     profile: {
-      userId: 'u1',
+      userId,
       displayName: 'Mona Adel',
-      tenantId: 't1',
+      tenantId,
       roleName: null,
       permissions: ['audit.view'],
       language: 'ar',
@@ -30,9 +33,15 @@ function signedIn(token: string, branchId: string | null = null): AuthResponse {
 describe('AuthStore (D-01, P-61)', () => {
   let store: AuthStore;
   let http: HttpTestingController;
+  let navigation: FakeBrowserNavigation;
+  let channel: FakeSessionChannel;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting()] });
+    navigation = new FakeBrowserNavigation();
+    channel = new FakeSessionChannel();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), ...provideSessionTesting(navigation, channel)],
+    });
     store = TestBed.inject(AuthStore);
     http = TestBed.inject(HttpTestingController);
     window.localStorage.clear();
@@ -84,6 +93,7 @@ describe('AuthStore (D-01, P-61)', () => {
     expect(store.isHydrated()).toBe(true);
     expect(store.isAuthenticated()).toBe(false);
     expect(store.token()).toBeNull();
+    expect(navigation.loads).toEqual([]); // no session to end: no reload loop at start-up
   });
 
   it('a select-tenant answer leaves the store signed out until the choice is posted', async () => {
@@ -154,5 +164,182 @@ describe('AuthStore (D-01, P-61)', () => {
 
     expect(store.token()).toBeNull();
     expect(store.isAuthenticated()).toBe(false);
+    // A-01 / B-11: a full page load of the sign-in page without a return URL, and the other tabs are told
+    expect(navigation.loads).toEqual(['/login']);
+    expect(channel.posted).toEqual([{ kind: 'signed-in', userId: 'u1', tenantId: 't1' }, { kind: 'signed-out' }]);
+  });
+
+  describe('identity of the tab (C-01)', () => {
+    async function signInAsMona(): Promise<void> {
+      const pending = store.signIn('mona', 'secret', null);
+      http.expectOne(AUTH_API.signIn).flush(signedIn('token-1'));
+      await pending;
+    }
+
+    it('refuses a refresh that returns another user: no token, state cleared, sign-in page reloaded', async () => {
+      await signInAsMona();
+      navigation.url = '/results/worklist';
+
+      const pending = store.refresh();
+      http.expectOne(AUTH_API.refresh).flush(signedIn('token-of-y', null, 'u2', 't1'));
+
+      expect(await pending).toBeNull();
+      expect(store.token()).toBeNull();
+      expect(store.profile()).toBeNull();
+      expect(navigation.loads).toEqual(['/login']); // the page belonged to the previous user: no return URL
+    });
+
+    it('refuses a refresh that returns the same user in another tenant', async () => {
+      await signInAsMona();
+
+      const pending = store.refresh();
+      http.expectOne(AUTH_API.refresh).flush(signedIn('token-lab-c', null, 'u1', 't2'));
+
+      expect(await pending).toBeNull();
+      expect(store.isAuthenticated()).toBe(false);
+      expect(navigation.loads).toEqual(['/login']);
+    });
+
+    it('accepts a refresh of the same user and tenant', async () => {
+      await signInAsMona();
+
+      const pending = store.refresh();
+      http.expectOne(AUTH_API.refresh).flush(signedIn('token-2', 'b1'));
+
+      expect(await pending).toBe('token-2');
+      expect(store.currentBranch()).toBe('b1');
+      expect(navigation.loads).toEqual([]);
+    });
+
+    it('a lost session reloads the sign-in page with the page the user was on', async () => {
+      await signInAsMona();
+      navigation.url = '/results/worklist?unit=CHEM';
+
+      const pending = store.refresh();
+      http.expectOne(AUTH_API.refresh).flush({ code: 'AUTH-012', title: 'rejected', status: 401 }, { status: 401, statusText: 'Unauthorized' });
+
+      expect(await pending).toBeNull();
+      expect(store.isAuthenticated()).toBe(false);
+      expect(navigation.loads).toEqual(['/login?returnUrl=%2Fresults%2Fworklist%3Funit%3DCHEM']);
+    });
+
+    it('another tab signing out reloads this one', async () => {
+      await signInAsMona();
+
+      channel.deliver({ kind: 'signed-out' });
+
+      expect(store.isAuthenticated()).toBe(false);
+      expect(navigation.loads).toEqual(['/login']);
+    });
+
+    it('another tab signing in as someone else reloads this one; the same identity does not', async () => {
+      await signInAsMona();
+
+      channel.deliver({ kind: 'signed-in', userId: 'u1', tenantId: 't1' });
+      expect(store.isAuthenticated()).toBe(true);
+      expect(navigation.loads).toEqual([]);
+
+      channel.deliver({ kind: 'signed-in', userId: 'u2', tenantId: 't1' });
+      expect(store.isAuthenticated()).toBe(false);
+      expect(navigation.loads).toEqual(['/login']);
+    });
+
+    it('a tab without a session ignores the other tabs', () => {
+      channel.deliver({ kind: 'signed-out' });
+      channel.deliver({ kind: 'signed-in', userId: 'u2', tenantId: 't1' });
+      channel.deliver({ kind: 'profile-changed', userId: 'u1', tenantId: 't1' });
+      expect(navigation.loads).toEqual([]);
+      expect(store.profileRevision()).toBe(0);
+    });
+
+    it('a profile change in another tab of the same identity keeps the session and moves the profile revision (R2-01)', async () => {
+      await signInAsMona();
+
+      channel.deliver({ kind: 'profile-changed', userId: 'u1', tenantId: 't1' });
+      expect(store.profileRevision()).toBe(1);
+      expect(store.isAuthenticated()).toBe(true);
+      expect(navigation.loads).toEqual([]);
+
+      // another user's or tenant's profile is none of this tab's business (their sign-in already reloaded it)
+      channel.deliver({ kind: 'profile-changed', userId: 'u2', tenantId: 't1' });
+      channel.deliver({ kind: 'profile-changed', userId: 'u1', tenantId: 't2' });
+      expect(store.profileRevision()).toBe(1);
+      expect(store.isAuthenticated()).toBe(true);
+    });
+
+    it('announces its own profile change to the other tabs, and nothing when signed out (R2-01)', async () => {
+      store.announceProfileChange();
+      expect(channel.posted).toEqual([]);
+
+      await signInAsMona();
+      store.announceProfileChange();
+      expect(channel.posted.at(-1)).toEqual({ kind: 'profile-changed', userId: 'u1', tenantId: 't1' });
+      expect(store.profileRevision()).toBe(0); // this tab refreshes its own caches
+    });
+  });
+});
+
+class FakeBroadcastChannel {
+  static readonly instances: FakeBroadcastChannel[] = [];
+  readonly sent: unknown[] = [];
+  private listener: ((event: MessageEvent<unknown>) => void) | null = null;
+
+  constructor(readonly name: string) {
+    FakeBroadcastChannel.instances.push(this);
+  }
+
+  postMessage(message: unknown): void {
+    this.sent.push(message);
+  }
+
+  addEventListener(_type: string, listener: (event: MessageEvent<unknown>) => void): void {
+    this.listener = listener;
+  }
+
+  removeEventListener(): void {
+    this.listener = null;
+  }
+
+  emit(data: unknown): void {
+    this.listener?.({ data } as MessageEvent<unknown>);
+  }
+}
+
+describe('session channel and sign-in URL helpers', () => {
+  it('accepts only the known message shapes from another tab', () => {
+    expect(readSessionMessage({ kind: 'profile-changed', userId: 'u', tenantId: null })).toEqual({ kind: 'profile-changed', userId: 'u', tenantId: null });
+    expect(readSessionMessage({ kind: 'profile-changed', userId: 'u' })).toBeNull();
+    expect(readSessionMessage({ kind: 'signed-out' })).toEqual({ kind: 'signed-out' });
+    expect(readSessionMessage({ kind: 'signed-in', userId: 'u', tenantId: 't', extra: 1 })).toEqual({ kind: 'signed-in', userId: 'u', tenantId: 't' });
+    expect(readSessionMessage({ kind: 'signed-in', userId: 1 })).toBeNull();
+    expect(readSessionMessage('signed-out')).toBeNull();
+    expect(readSessionMessage(null)).toBeNull();
+  });
+
+  it('posts and receives through the browser channel of the window', () => {
+    const channel = broadcastSessionChannel({ BroadcastChannel: FakeBroadcastChannel } as unknown as Window & typeof globalThis);
+    const browser = FakeBroadcastChannel.instances.at(-1);
+    const received: unknown[] = [];
+    const stop = channel.listen((message) => received.push(message));
+    channel.post({ kind: 'signed-out' });
+    browser?.emit({ kind: 'signed-in', userId: 'u2', tenantId: 't' });
+    browser?.emit({ kind: 'junk' });
+    stop();
+    browser?.emit({ kind: 'signed-out' });
+
+    expect(browser?.name).toBe('platform-session');
+    expect(browser?.sent).toEqual([{ kind: 'signed-out' }]);
+    expect(received).toEqual([{ kind: 'signed-in', userId: 'u2', tenantId: 't' }]);
+    expect(() => broadcastSessionChannel(null).post({ kind: 'signed-out' })).not.toThrow();
+  });
+
+  it('carries a return URL only when it is meaningful (B-11)', () => {
+    expect(signInUrl('/login')).toBe('/login');
+    expect(signInUrl('/login?returnUrl=%2Fx')).toBe('/login');
+    expect(signInUrl('/')).toBe('/login');
+    expect(signInUrl('//evil.example')).toBe('/login');
+    expect(signInUrl(null)).toBe('/login');
+    expect(signInUrl('/billing/payments')).toBe('/login?returnUrl=%2Fbilling%2Fpayments');
+    expect(meaningfulReturnUrl('/login/recover')).toBeNull();
   });
 });

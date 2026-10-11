@@ -41,6 +41,24 @@ describe('PaymentsFacade (CP-23)', () => {
     flushCashDesk(backend);
   }
 
+  it('re-reads the visit on screen when the page opens again, and stays idle without one (UAT D-14, A-01)', async () => {
+    facade.refresh();
+    await runEffects();
+    backend.expectNone((request) => request.url.startsWith(BILLING_API.visits));
+
+    facade.open('v-1');
+    await runEffects();
+    backend.expectOne(`${BILLING_API.visits}/v-1/account`).flush(account());
+    await runEffects();
+
+    facade.refresh();
+    await runEffects();
+    backend.expectOne(`${BILLING_API.visits}/v-1/account`).flush(account({ remaining: 0 }));
+    await runEffects();
+    expect(facade.current()?.remaining).toBe(0);
+    backend.verify();
+  });
+
   it('stays idle until a visit is looked up, then reads the account by accession (encoded)', async () => {
     await runEffects();
     backend.expectNone((request) => request.url.startsWith(BILLING_API.visits));

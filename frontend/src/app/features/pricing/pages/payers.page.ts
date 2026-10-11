@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 
 import { PAYER_TYPES, PRICING_PERMISSIONS, type ContractTierItem, type PayerListItem, type PayerRequest, type PayerType } from '../../../core/api/pricing.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { type Release, inReleaseScope } from '../../../core/release';
 import { localizedPick, localizedTextGroup } from '../../../shared/forms/localized-text';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
@@ -17,8 +18,10 @@ import { EmptyStateComponent } from '../../../shared/ui/empty-state/empty-state.
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { LocalizedTextInputComponent } from '../../../shared/ui/localized-text-input/localized-text-input.component';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
-import type { FormValue, MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
+import type { FormValue, MasterDataConfig, MasterDataFilter, RowAction } from '../../../shared/ui/master-data-page/master-data.types';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
+import { allPages, csvFileName, downloadCsv, toCsv } from '../data/csv';
+import { PricingApi } from '../data/pricing.api';
 import { PayersFacade } from '../state/payers.facade';
 
 /**
@@ -27,6 +30,9 @@ import { PayersFacade } from '../state/payers.facade';
  * "Contract pricing" row action opens CP-34 for the payer's first tier. The tenant's cash payer is provisioned when
  * the page opens (intake Q1) and cannot be deactivated (PRC-020).
  */
+
+/** Contract pricing (CP-34) belongs to Release 2: its row and tier actions show only when the release is in scope (UAT R1-03). */
+const CONTRACT_PRICING_RELEASE: Release = 'R2';
 @Component({
   selector: 'app-payers-page',
   imports: [
@@ -52,8 +58,22 @@ export class PayersPage {
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly register = viewChild.required(MasterDataPageComponent);
+  private readonly api = inject(PricingApi);
 
   protected readonly permissions = PRICING_PERMISSIONS;
+
+  /** Whether the Contract pricing actions (CP-34) are offered: only when contract pricing is in the release scope (UAT R1-03). */
+  protected readonly contractPricingOffered = inReleaseScope(CONTRACT_PRICING_RELEASE);
+
+  private readonly rowActions: readonly RowAction<PayerListItem>[] = [
+    { id: 'tiers', label: 'pricing.payers.action.tiers', icon: 'layers', run: (payer) => this.facade.openTiers(payer.id) },
+    { id: 'pricing', label: 'pricing.payers.action.contractPricing', icon: 'coins', run: (payer) => this.openPricing(payer) },
+  ];
+
+  /** The filter of the list on screen: the export writes exactly these rows (UAT B-10). */
+  private filter: MasterDataFilter = { search: '', active: true };
+
+  protected readonly exporting = signal(false);
 
   protected readonly config: MasterDataConfig<PayerListItem, PayerRequest> = {
     i18nPrefix: 'pricing.payers',
@@ -78,17 +98,17 @@ export class PayersPage {
       { name: 'webUsername', kind: 'text', maxLength: 64, hint: 'pricing.payers.hint.webUsername' },
     ],
     adapter: {
-      list: (filter, page, signal) => this.facade.list(filter, page, signal),
+      list: (filter, page, signal) => {
+        this.filter = filter;
+        return this.facade.list(filter, page, signal);
+      },
       create: (dto) => this.facade.create(dto),
       update: (id, dto) => this.facade.update(id, dto),
       setActive: (id, active) => this.facade.setActive(id, active),
     },
     toDto: (value) => toPayerRequest(value),
     permissions: { create: PRICING_PERMISSIONS.create, update: PRICING_PERMISSIONS.edit, activate: PRICING_PERMISSIONS.manage },
-    rowActions: [
-      { id: 'tiers', label: 'pricing.payers.action.tiers', icon: 'layers', run: (payer) => this.facade.openTiers(payer.id) },
-      { id: 'pricing', label: 'pricing.payers.action.contractPricing', icon: 'coins', run: (payer) => this.openPricing(payer) },
-    ],
+    rowActions: this.rowActions.filter((action) => action.id !== 'pricing' || this.contractPricingOffered),
   };
 
   // ---- tiers drawer ----
@@ -105,16 +125,61 @@ export class PayersPage {
     return payer ? this.i18n.tf('pricing.tiers.title', { payer: localizedPick({ en: payer.nameEn, ar: payer.nameAr }, this.i18n.lang()) }) : this.i18n.t('pricing.tiers.titleLoading');
   });
 
+  /** The refusal of the last tier action only: every action clears the others, so a stale "already exists" never stays (UAT B-06). */
   protected readonly tierProblem = computed(() => this.facade.addTier.problem() ?? this.facade.renameTier.problem() ?? this.facade.setTierActive.problem());
 
   constructor() {
     void this.i18n.load('pricing');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14)
     // a tier change alters the register's "tiers" column
     effect(() => {
       if (this.facade.changes() > 0) {
         untracked(() => this.register().reload());
       }
     });
+  }
+
+  /** CSV of the payers of the current search and status filter, in the grid's formats (UAT B-10). */
+  protected async exportCsv(): Promise<void> {
+    if (this.exporting()) {
+      return;
+    }
+
+    this.exporting.set(true);
+    try {
+      const filter = this.filter;
+      const rows = await allPages((page, pageSize) => this.api.listPayers({ search: filter.search, type: null, isActive: filter.active, page, pageSize }));
+      const t = (key: string): string => this.i18n.t(key);
+      const yesNo = (value: boolean): string => t(value ? 'shared.yes' : 'shared.no');
+      const header = [
+        t('pricing.csv.nameEn'),
+        t('pricing.csv.nameAr'),
+        t('pricing.payers.column.searchKey'),
+        t('pricing.payers.column.type'),
+        t('pricing.payers.column.tiers'),
+        t('pricing.csv.webPortal'),
+        t('pricing.csv.webUsername'),
+        t('pricing.csv.default'),
+        t('pricing.csv.active'),
+      ];
+      const lines = rows.map((payer) => [
+        payer.nameEn,
+        payer.nameAr,
+        payer.searchKey,
+        this.typeLabel(payer.type),
+        payer.tiers.map((tier) => this.tierName(tier) + (tier.isActive ? '' : ` (${t('pricing.csv.inactive')})`)).join(' | '),
+        yesNo(payer.webPortalEnabled),
+        payer.webUsername,
+        yesNo(payer.isDefault),
+        yesNo(payer.isActive),
+      ]);
+      downloadCsv(csvFileName('payers', new Date()), toCsv(header, lines));
+      this.toast.success(t('pricing.exported'));
+    } catch {
+      this.toast.error(this.i18n.t('pricing.exportError'));
+    } finally {
+      this.exporting.set(false);
+    }
   }
 
   protected typeLabel(type: PayerType): string {
@@ -137,6 +202,7 @@ export class PayersPage {
   }
 
   protected editTier(tier: ContractTierItem): void {
+    this.clearTierProblems();
     this.editingTierId.set(tier.id);
     this.tierForm.setValue({ en: tier.nameEn, ar: tier.nameAr });
     this.tierForm.markAsPristine();
@@ -147,6 +213,7 @@ export class PayersPage {
   }
 
   protected cancelTierEdit(): void {
+    this.clearTierProblems();
     this.editingTierId.set(null);
     this.tierForm.reset({ en: '', ar: '' });
   }
@@ -160,6 +227,7 @@ export class PayersPage {
     const { en, ar } = this.tierForm.getRawValue();
     const request = { nameEn: en.trim(), nameAr: ar.trim() };
     const tierId = this.editingTierId();
+    this.clearTierProblems();
     const done = tierId === null ? await this.facade.addTier.execute({ payerId, request }) : await this.facade.renameTier.execute({ payerId, tierId, request });
     if (done !== null) {
       this.toast.success(this.i18n.t(tierId === null ? 'pricing.tiers.added' : 'pricing.tiers.renamed'));
@@ -185,9 +253,16 @@ export class PayersPage {
       }
     }
 
+    this.clearTierProblems();
     if ((await this.facade.setTierActive.execute({ payerId, tierId: tier.id, active: !tier.isActive })) !== null) {
       this.toast.success(this.i18n.t(tier.isActive ? 'pricing.tiers.deactivated' : 'pricing.tiers.activated'));
     }
+  }
+
+  private clearTierProblems(): void {
+    this.facade.addTier.reset();
+    this.facade.renameTier.reset();
+    this.facade.setTierActive.reset();
   }
 
   protected openTierPricing(tier: ContractTierItem): void {

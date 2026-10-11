@@ -1,4 +1,5 @@
 <app-page-header [title]="i18n.t('organization.roles.title')" [subtitle]="i18n.t('organization.roles.subtitle')">
+  <app-organization-export-button pageActions ngProjectAs="[pageActions]" *appCan="permissions.export" [exporter]="exportCsv" />
   <button pageActions type="button" class="btn primary" *appCan="permissions.create" (click)="add()"><app-icon name="plus" [size]="15" />{{ i18n.t('organization.roles.add') }}</button>
 </app-page-header>
 

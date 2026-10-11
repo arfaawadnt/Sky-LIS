@@ -14,7 +14,7 @@ function item(key: string, type: TenantSettingItem['type'], value: string, defau
 }
 
 const stored: TenantSettingsResponse = {
-  settings: [item('autoCollect', 'Bool', 'true', 'true'), item('labelCopies', 'Int', '2', '1'), item('resultLanguage', 'String', 'en', 'en')],
+  settings: [item('autoCollect', 'Bool', 'true', 'true'), item('labelCopies', 'Int', '2', '1'), item('resultLanguage', 'String', 'en', 'en'), { ...item('receiptCopies', 'Int', '5', '1'), source: 'Laboratory', inheritedValue: '2' }],
 };
 
 describe('ParametersFacade (CP-57)', () => {
@@ -59,5 +59,11 @@ describe('ParametersFacade (CP-57)', () => {
     expect(facade.dirty()).toBe(false);
     expect(facade.valueOf('resultLanguage')).toBe('ar');
     backend.verify();
+  });
+
+  it('returns a value to what the laboratory inherits from the platform, not the built-in default (UAT C-09)', () => {
+    facade.resetToDefault('receiptCopies');
+
+    expect(facade.changes()).toEqual([{ key: 'receiptCopies', value: '2' }]);
   });
 });

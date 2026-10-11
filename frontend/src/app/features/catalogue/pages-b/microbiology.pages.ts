@@ -18,6 +18,7 @@ import { localizedPick } from '../../../shared/forms/localized-text';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { MasterDataConfig, MasterDataPermissions } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueBApi } from '../data-b/catalogue-b.api';
+import { ListedFilter } from '../data-b/listed-filter';
 import { CatalogueBLookups, toSelectOption } from '../data-b/catalogue-b-lookups';
 import { CatalogueBExportButtonComponent } from '../ui-b/catalogue-b-export-button.component';
 
@@ -42,14 +43,16 @@ export class DrugTypesPage {
   private readonly i18n = inject(I18nService);
   private readonly api = inject(CatalogueBApi);
 
-  protected readonly exportCsv = (): Promise<void> => this.api.drugTypes.exportCsv({});
+  private readonly listed = new ListedFilter();
+
+  protected readonly exportCsv = (): Promise<void> => this.api.drugTypes.exportCsv(this.listed.query());
 
   protected readonly config: MasterDataConfig<DrugTypeListItem, DrugTypeRequest> = {
     i18nPrefix: 'catalogue-b.drugTypes',
     columns: [{ key: 'name', header: 'catalogue-b.drugTypes.column.name', sortable: true, value: (item) => localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang()) }],
     fields: [{ name: 'name', kind: 'localizedText', required: true, maxLength: 200 }],
     adapter: {
-      list: (filter, page, signal) => this.api.drugTypes.list({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.drugTypes.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.drugTypes.create(dto),
       update: (id, dto) => this.api.drugTypes.update(id, dto),
       setActive: (id, active) => this.api.drugTypes.setActive(id, active),
@@ -73,7 +76,9 @@ export class CommercialNamesPage {
   private readonly api = inject(CatalogueBApi);
   private readonly lookups = inject(CatalogueBLookups);
 
-  protected readonly exportCsv = (): Promise<void> => this.api.commercialNames.exportCsv({});
+  private readonly listed = new ListedFilter();
+
+  protected readonly exportCsv = (): Promise<void> => this.api.commercialNames.exportCsv(this.listed.query());
 
   protected readonly config: MasterDataConfig<CommercialNameListItem, CommercialNameRequest> = {
     i18nPrefix: 'catalogue-b.commercialNames',
@@ -86,7 +91,7 @@ export class CommercialNamesPage {
       { name: 'name', kind: 'localizedText', required: true, maxLength: 200 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.commercialNames.list({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.commercialNames.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.commercialNames.create(dto),
       update: (id, dto) => this.api.commercialNames.update(id, dto),
       setActive: (id, active) => this.api.commercialNames.setActive(id, active),
@@ -110,7 +115,9 @@ export class AntibioticsPage {
   private readonly api = inject(CatalogueBApi);
   private readonly lookups = inject(CatalogueBLookups);
 
-  protected readonly exportCsv = (): Promise<void> => this.api.antibiotics.exportCsv({});
+  private readonly listed = new ListedFilter();
+
+  protected readonly exportCsv = (): Promise<void> => this.api.antibiotics.exportCsv(this.listed.query());
 
   protected readonly config: MasterDataConfig<AntibioticListItem, AntibioticRequest> = {
     i18nPrefix: 'catalogue-b.antibiotics',
@@ -132,7 +139,7 @@ export class AntibioticsPage {
       { name: 'commercialNameId', kind: 'select', full: true, options: async () => (await this.lookups.commercialNames()).map(toSelectOption) },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.antibiotics.list({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.antibiotics.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.antibiotics.create(dto),
       update: (id, dto) => this.api.antibiotics.update(id, dto),
       setActive: (id, active) => this.api.antibiotics.setActive(id, active),
@@ -155,7 +162,9 @@ export class OrganismsPage {
   private readonly i18n = inject(I18nService);
   private readonly api = inject(CatalogueBApi);
 
-  protected readonly exportCsv = (): Promise<void> => this.api.organisms.exportCsv({});
+  private readonly listed = new ListedFilter();
+
+  protected readonly exportCsv = (): Promise<void> => this.api.organisms.exportCsv(this.listed.query());
 
   protected readonly config: MasterDataConfig<OrganismListItem, OrganismRequest> = {
     i18nPrefix: 'catalogue-b.organisms',
@@ -168,7 +177,7 @@ export class OrganismsPage {
       { name: 'name', kind: 'localizedText', required: true, maxLength: 200 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.organisms.list({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.organisms.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.organisms.create(dto),
       update: (id, dto) => this.api.organisms.update(id, dto),
       setActive: (id, active) => this.api.organisms.setActive(id, active),
@@ -191,7 +200,9 @@ export class SensitivityValuesPage {
   private readonly i18n = inject(I18nService);
   private readonly api = inject(CatalogueBApi);
 
-  protected readonly exportCsv = (): Promise<void> => this.api.sensitivityValues.exportCsv({});
+  private readonly listed = new ListedFilter();
+
+  protected readonly exportCsv = (): Promise<void> => this.api.sensitivityValues.exportCsv(this.listed.query());
 
   protected readonly config: MasterDataConfig<SensitivityValueListItem, SensitivityValueRequest> = {
     i18nPrefix: 'catalogue-b.sensitivityValues',
@@ -206,7 +217,7 @@ export class SensitivityValuesPage {
       { name: 'name', kind: 'localizedText', required: true, maxLength: 200 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.sensitivityValues.list({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.sensitivityValues.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.sensitivityValues.create(dto),
       update: (id, dto) => this.api.sensitivityValues.update(id, dto),
       setActive: (id, active) => this.api.sensitivityValues.setActive(id, active),

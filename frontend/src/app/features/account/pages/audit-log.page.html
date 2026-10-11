@@ -35,6 +35,16 @@
           }
         </select>
       </app-form-field>
+      @if (isPlatform()) {
+        <app-form-field [label]="i18n.t('account.audit.client')">
+          <select formControlName="clientTenantId">
+            <option value="">{{ i18n.t('account.audit.allClients') }}</option>
+            @for (client of clients(); track client.tenantId) {
+              <option [value]="client.tenantId">{{ clientName(client) }}</option>
+            }
+          </select>
+        </app-form-field>
+      }
       <app-form-field [label]="i18n.t('account.audit.entity')" [hint]="i18n.t('account.audit.entityHint')">
         <input type="text" formControlName="entityType" list="audit-entity-types" maxlength="200" autocomplete="off" />
       </app-form-field>
@@ -58,7 +68,7 @@
   @if (facade.entries.error()) {
     <p class="problem list-problem" role="alert">{{ i18n.t('account.audit.loadError') }}</p>
   }
-  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.entries.isLoading()" [emptyTitle]="i18n.t('account.audit.empty')" [caption]="i18n.t('account.audit.title')" (rowActivate)="open($event)">
+  <app-data-table [columns]="columns()" [rows]="rows()" [loading]="facade.entries.isLoading()" [emptyTitle]="i18n.t('account.audit.empty')" [caption]="i18n.t('account.audit.title')" (rowActivate)="open($event)">
     <ng-template appCell="action" [appCellOf]="rows()" let-row>
       <span class="action">
         <app-badge [tone]="row.kind === 'Event' ? 'violet' : 'info'">{{ kindLabel(row.kind) }}</app-badge>
@@ -77,6 +87,10 @@
       <dd>{{ when(entry.atUtc) }}</dd>
       <dt>{{ i18n.t('account.audit.user') }}</dt>
       <dd>{{ entry.actorName ?? i18n.t('account.audit.system') }}</dd>
+      @if (isPlatform() && entry.clientTenantId) {
+        <dt>{{ i18n.t('account.audit.client') }}</dt>
+        <dd>{{ client(entry) }}</dd>
+      }
       <dt>{{ i18n.t('account.audit.action') }}</dt>
       <dd><app-badge [tone]="entry.kind === 'Event' ? 'violet' : 'info'">{{ kindLabel(entry.kind) }}</app-badge> {{ entry.action }}</dd>
       <dt>{{ i18n.t('account.audit.entity') }}</dt>

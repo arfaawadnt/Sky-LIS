@@ -68,7 +68,8 @@ public sealed class RequestWalletTopUpValidator : AbstractValidator<RequestWalle
 {
     public RequestWalletTopUpValidator()
     {
-        RuleFor(command => command.Amount).GreaterThan(0).LessThanOrEqualTo(100_000_000m);
+        RuleFor(command => command.Amount).GreaterThan(0).LessThanOrEqualTo(100_000_000m)
+            .Must(amount => decimal.Round(amount, 2) == amount).WithMessage("The amount has at most two decimals.");   // C-19: refused, never rounded
         RuleFor(command => command.Note).MaximumLength(Wallet.MaxNoteLength);
     }
 }

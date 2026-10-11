@@ -50,7 +50,8 @@ public sealed class PatientsFlowTests : IClassFixture<ApiFactory>
 
         // Search by name (Arabic), number and mobile; the similar query answers with the tenant's warning flag.
         Assert.Equal(patient.Id, Assert.Single((await clerk.GetFromJsonAsync<Paged<PatientListItem>>($"{Patients}?q=%D9%85%D9%86%D9%89"))!.Items).Id);
-        Assert.Equal(patient.Id, Assert.Single((await clerk.GetFromJsonAsync<Paged<PatientListItem>>($"{Patients}?q={patient.Number}"))!.Items).Id);
+        var listed = Assert.Single((await clerk.GetFromJsonAsync<Paged<PatientListItem>>($"{Patients}?q={patient.Number}"))!.Items);
+        Assert.Equal((patient.Id, 0, (DateTimeOffset?)null), (listed.Id, listed.VisitCount, listed.LastVisitAtUtc));   // CP-11 figures (UAT A-09): no visit yet
         var similar = (await clerk.GetFromJsonAsync<SimilarPatientsResponse>($"{Patients}/similar?name=mona%20hassan&mobile=01001234567"))!;
         Assert.True(similar.WarningEnabled);
         Assert.Equal(("Exact", patient.Id), (Assert.Single(similar.Candidates).Match, similar.Candidates[0].Id));

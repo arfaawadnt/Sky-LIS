@@ -30,6 +30,30 @@ describe('WorklistFacade (CP-18)', () => {
     }
   }
 
+  it('re-reads the rows and the filter lists when the page opens again, keeping the filter (UAT D-14, A-01)', async () => {
+    await runEffects();
+    backend.expectOne((request) => request.url === RESULTS_API.worklist).flush(worklistPage([worklistItem()]));
+    flushLookups();
+    await runEffects();
+    facade.setSearch('mona');
+
+    await runEffects();
+    backend.expectOne((request) => request.url === RESULTS_API.worklist).flush(worklistPage([worklistItem()]));
+    await runEffects();
+
+    facade.refresh();
+    await runEffects();
+    const again = backend.expectOne((request) => request.url === RESULTS_API.worklist);
+    expect(again.request.params.get('search')).toBe('MONA');
+    again.flush(worklistPage([]));
+    for (const url of [RESULTS_API.clinicalGroups, RESULTS_API.tests, RESULTS_API.payers, RESULTS_API.analysers]) {
+      expect(backend.match((request) => request.url === url).length).toBe(1);
+    }
+
+    await runEffects();
+    expect(facade.rows()).toEqual([]);
+  });
+
   it("loads today's collection window of the branch with the counters and the delay thresholds", async () => {
     await runEffects();
     const first = backend.expectOne((request) => request.url === RESULTS_API.worklist);

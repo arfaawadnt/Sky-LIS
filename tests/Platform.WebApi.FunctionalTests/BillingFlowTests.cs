@@ -7,6 +7,7 @@ using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Contracts.Billing;
 using Platform.Contracts.Common;
+using Platform.Contracts.Settings;
 using Platform.Contracts.Treasury;
 using Platform.Domain.Catalogue;
 using Platform.Domain.Organization;
@@ -139,6 +140,26 @@ public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.Equal((60m, 55m, -5m, "5 short, reported", 2), (sheet!.Totals.ExpectedCash, sheet.CountedCash, sheet.Difference, sheet.Note, sheet.Movements.Count));
         var list = await desk.Supervisor.GetFromJsonAsync<Paged<CashClosingListItem>>($"{Closings}?treasuryId={desk.TreasuryId}");
         Assert.Equal(closing.Number, Assert.Single(list!.Items).Number);
+    }
+
+    [DatabaseFact]
+    public async Task The_cash_desk_reads_the_receipt_print_parameter_without_settings_rights()
+    {
+        // UAT A-05: a cashier holds billing.view but not settings.view; the desk reads autoPrintReceipt through billing.
+        var desk = await DeskAsync();
+        await ExpectAsync(desk.Cashier.GetAsync("/api/v1/settings"), HttpStatusCode.Forbidden, ProblemCodes.Forbidden);
+
+        var defaults = await desk.Cashier.GetFromJsonAsync<BillingPrintSettings>("/api/v1/billing/print-settings");
+        Assert.True(defaults!.AutoPrintReceipt);   // the code default of CP-57
+
+        var (adminName, _, _) = await factory.SeedUserAsync(tenantId: desk.Tenant, permissions: ["settings.view", "settings.manage"], displayName: "Lab Admin", branchIds: [desk.Branch]);
+        var admin = await SignedInClientAsync(adminName);
+        var saved = await admin.PutAsJsonAsync("/api/v1/settings", new UpdateTenantSettingsRequest([new SettingValueItem("autoPrintReceipt", "false")]));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+
+        var off = await desk.Cashier.GetFromJsonAsync<BillingPrintSettings>("/api/v1/billing/print-settings");
+        Assert.False(off!.AutoPrintReceipt);
+        await ExpectAsync(desk.Outsider.GetAsync("/api/v1/billing/print-settings"), HttpStatusCode.Forbidden, ProblemCodes.Forbidden);
     }
 
     // ---- desk -------------------------------------------------------------------------------------------------

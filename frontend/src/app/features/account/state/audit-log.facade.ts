@@ -1,7 +1,7 @@
 import { Injectable, inject, resource, signal } from '@angular/core';
 
 import type { AuditActorItem } from '../../../core/api/account.contracts';
-import type { AuditEntryFilter, AuditEntryItem, ChainVerificationResult } from '../../../core/api/audit.contracts';
+import type { AuditClientItem, AuditEntryFilter, AuditEntryItem, ChainVerificationResult } from '../../../core/api/audit.contracts';
 import type { PageRequest } from '../../../core/api/paging';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { mutation } from '../../../core/state/mutation';
@@ -14,9 +14,11 @@ export interface AuditFilterInput {
   readonly userId: string;
   readonly entityType: string;
   readonly entityId: string;
+  /** SA-09 client (platform log only; UAT C-18). */
+  readonly clientTenantId: string;
 }
 
-export const EMPTY_AUDIT_FILTER: AuditFilterInput = { fromDay: '', toDay: '', userId: '', entityType: '', entityId: '' };
+export const EMPTY_AUDIT_FILTER: AuditFilterInput = { fromDay: '', toDay: '', userId: '', entityType: '', entityId: '', clientTenantId: '' };
 
 /** A local day's first instant, or the last one with `endOfDay`, as ISO-8601 UTC; `null` for an empty or invalid day. */
 export function dayToInstant(day: string, endOfDay: boolean): string | null {
@@ -44,7 +46,7 @@ export class AuditLogFacade {
   private readonly i18n = inject(I18nService);
 
   readonly input = signal<AuditFilterInput>(EMPTY_AUDIT_FILTER);
-  readonly filter = signal<AuditEntryFilter>({ from: null, to: null, userId: null, entityType: null, entityId: null, page: 1, pageSize: 50 });
+  readonly filter = signal<AuditEntryFilter>({ from: null, to: null, userId: null, entityType: null, entityId: null, clientTenantId: null, page: 1, pageSize: 50 });
   readonly selected = signal<AuditEntryItem | null>(null);
   readonly verification = signal<ChainVerificationResult | null>(null);
 
@@ -52,11 +54,14 @@ export class AuditLogFacade {
 
   readonly actors = resource({ loader: (): Promise<readonly AuditActorItem[]> => this.api.auditActors().catch(() => []) });
 
+  /** SA-09 client filter (UAT C-18): the platform's clients; empty in a laboratory (the server answers none). */
+  readonly clients = resource({ loader: (): Promise<readonly AuditClientItem[]> => this.api.auditClients().catch(() => []) });
+
   readonly verify = mutation(() => this.api.verifyChain(), { then: (result) => this.verification.set(result) });
 
   readonly export = mutation((): Promise<DownloadedFile> => {
-    const { from, to, userId, entityType, entityId } = this.filter();
-    return this.api.exportAudit({ from, to, userId, entityType, entityId }, this.i18n.lang());
+    const { from, to, userId, entityType, entityId, clientTenantId } = this.filter();
+    return this.api.exportAudit({ from, to, userId, entityType, entityId, clientTenantId: clientTenantId ?? null }, this.i18n.lang());
   });
 
   /** Applies the edited filter (back to the first page). */
@@ -69,6 +74,7 @@ export class AuditLogFacade {
       userId: blank(input.userId),
       entityType: blank(input.entityType),
       entityId: blank(input.entityId),
+      clientTenantId: blank(input.clientTenantId),
       page: 1,
     }));
   }
@@ -85,5 +91,19 @@ export class AuditLogFacade {
 
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
+  }
+
+  /**
+   * Re-reads the entries and the filter lists when the page opens again, and forgets the previous visit's chain check
+   * and open entry: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01/C-13). A load in flight is left alone.
+   */
+  refresh(): void {
+    this.verification.set(null);
+    this.selected.set(null);
+    this.verify.reset();
+    this.export.reset();
+    this.entries.reload();
+    this.actors.reload();
+    this.clients.reload();
   }
 }

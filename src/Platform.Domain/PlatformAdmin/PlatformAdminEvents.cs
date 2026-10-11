@@ -5,8 +5,15 @@ namespace Platform.Domain.PlatformAdmin;
 // Past-tense facts of platform administration (intake §11). Platform rows carry no tenant; the outbox records them
 // with the tenant of the scope that raised them (or none for the anonymous wizard).
 
+/// <summary>
+/// An event raised while a client's own scope is current (provisioning runs in the new tenant's scope) that the platform
+/// trail (SA-09 "every change made in the Super Admin portal") must record as well: the audit ledger files it in the
+/// client's trail and, with the same event id, in the platform tenant's trail (validation 2026-10-11, C-17).
+/// </summary>
+public interface IPlatformTrailEvent;
+
 /// <summary>A laboratory became a tenant (SA-04 manual create or CP-02 wizard); its master data was copied in the same transaction (BR-25).</summary>
-public sealed record TenantProvisioned(Guid TenantId, string PortalSlug, string Source, Guid PlanId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+public sealed record TenantProvisioned(Guid TenantId, string PortalSlug, string Source, Guid PlanId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc), IPlatformTrailEvent;
 
 public sealed record TenantActivated(Guid TenantId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 

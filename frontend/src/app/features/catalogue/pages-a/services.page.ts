@@ -17,7 +17,7 @@ import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.com
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
 import { CatalogueAApi } from '../data-a/catalogue-a.api';
-import { csvFileName, downloadCsv, toCsv } from '../data-a/csv-export';
+import { csvFileName, downloadCsv, toCsv, yesNo } from '../data-a/csv-export';
 import { CatalogueAOptions, optionLabel } from '../state-a/catalogue-a-options';
 import { ServicesListFacade } from '../state-a/catalogue-lists.facade';
 import { CatalogueExportButtonComponent } from '../ui-a/export-button.component';
@@ -73,7 +73,8 @@ export class ServicesPage {
   protected readonly groups = computed(() => (this.options.groups.hasValue() ? this.options.groups.value() : []));
 
   protected readonly exportCsv = async (): Promise<void> => {
-    const rows = await this.api.exportServices(this.facade.filter().type);
+    const filter = this.facade.filter();   // the export is the grid: search, status, type and group (UAT C-04)
+    const rows = await this.api.exportServices({ search: filter.search, isActive: filter.isActive }, filter.type, filter.clinicalGroupId);
     const t = (key: string): string => this.i18n.t(`catalogue-a.services.column.${key}`);
     downloadCsv(
       csvFileName('services'),
@@ -89,8 +90,8 @@ export class ServicesPage {
         { header: t('sample'), value: (row) => this.pick(row.sampleTypeNameEn, row.sampleTypeNameAr) },
         { header: this.i18n.t('catalogue-a.services.field.gender'), value: (row) => this.i18n.t(`catalogue-a.gender.${row.gender}`) },
         { header: t('members'), value: (row) => row.memberCount },
-        { header: this.i18n.t('catalogue-a.services.field.isOrderable'), value: (row) => row.isOrderable },
-        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => row.isActive },
+        { header: this.i18n.t('catalogue-a.services.field.isOrderable'), value: (row) => yesNo((key) => this.i18n.t(key), row.isOrderable) },
+        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => yesNo((key) => this.i18n.t(key), row.isActive) },
       ]),
     );
   };

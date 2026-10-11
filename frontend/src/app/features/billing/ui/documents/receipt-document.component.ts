@@ -16,6 +16,8 @@ import { formatDateTime, formatMoney } from '../billing-format';
       [labNameEn]="doc().letterhead.labNameEn"
       [labNameAr]="doc().letterhead.labNameAr"
       [branch]="branch()"
+      [branchEn]="doc().letterhead.branchNameEn"
+      [branchAr]="doc().letterhead.branchNameAr"
       [title]="i18n.t('billing.doc.receiptTitle')"
       [reference]="doc().receiptNumber"
       [printedBy]="doc().printedBy"

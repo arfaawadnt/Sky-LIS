@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Security;
 using Platform.Application.Audit;
 using Platform.Contracts.Audit;
 using Platform.Contracts.Common;
@@ -11,7 +12,7 @@ namespace Platform.Infrastructure.Persistence.Audit;
 /// separately (each returns at most <c>skip + take</c> rows, newest first) and merged, so the page is exact and no
 /// SQL union of differently shaped rows is needed. Chain verification walks the trail in sequence order in batches.
 /// </summary>
-internal sealed class AuditReader(AppDbContext context) : IAuditReader
+internal sealed class AuditReader(AppDbContext context, ICurrentTenant tenant) : IAuditReader
 {
     private const int VerifyBatch = 1000;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -55,6 +56,12 @@ internal sealed class AuditReader(AppDbContext context) : IAuditReader
             trail = trail.Where(entry => entry.AggregateId == entityId);
         }
 
+        var platformLog = AuditClients.IsPlatformLog(tenant.TenantId);
+        if (platformLog && filter.ClientTenantId is { } client)
+        {
+            (changes, trail) = await AuditClients.NarrowAsync(context, changes, trail, client, cancellationToken).ConfigureAwait(false);
+        }
+
         var total = await changes.LongCountAsync(cancellationToken).ConfigureAwait(false) + await trail.LongCountAsync(cancellationToken).ConfigureAwait(false);
 
         var changeRows = await changes.OrderByDescending(change => change.AtUtc).ThenByDescending(change => change.Id).Take(window).ToListAsync(cancellationToken).ConfigureAwait(false);
@@ -73,8 +80,12 @@ internal sealed class AuditReader(AppDbContext context) : IAuditReader
             .Take(page.PageSize)
             .ToList();
 
-        return new Paged<AuditEntryItem>(merged, page.Page, page.PageSize, total);
+        var items = platformLog ? await AuditClients.FillAsync(context, merged, cancellationToken).ConfigureAwait(false) : merged;
+        return new Paged<AuditEntryItem>(items, page.Page, page.PageSize, total);
     }
+
+    public async Task<IReadOnlyList<AuditClientItem>> ClientsAsync(CancellationToken cancellationToken) =>
+        AuditClients.IsPlatformLog(tenant.TenantId) ? await AuditClients.ListAsync(context, cancellationToken).ConfigureAwait(false) : [];
 
     public async Task<ChainVerificationResult> VerifyChainAsync(CancellationToken cancellationToken)
     {

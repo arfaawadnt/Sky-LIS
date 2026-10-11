@@ -97,6 +97,7 @@ export class WorklistPage {
 
   constructor() {
     void this.i18n.load('results');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
   }
 
   protected readonly rowId = (row: WorklistItem): string => row.resultId;
@@ -138,7 +139,7 @@ export class WorklistPage {
   protected async exportCsv(): Promise<void> {
     const count = await this.facade.exportCsv.execute(undefined);
     if (count !== null) {
-      this.toast.success(this.i18n.tf('results.worklist.exported', { count }));
+      this.toast.success(this.i18n.t('results.worklist.exported'));
     } else {
       this.toast.error(problemMessage(this.i18n, 'results', this.facade.exportCsv.problem()));
     }

@@ -256,3 +256,16 @@
   justify-content: center;
   margin-block-start: var(--sp-3);
 }
+
+/* UAT R3-02: the fieldset only disables the controls of a read-only view; it adds no box of its own. */
+.layout-fieldset {
+  display: contents;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.read-only-note {
+  margin: 0 0 12px;
+}

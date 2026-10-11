@@ -111,13 +111,16 @@ public sealed class ListCashClosingsHandler(ICashClosingRepository closings) : I
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Export)]
-public sealed record ExportCashClosingsQuery(Guid? TreasuryId, Guid? CashierUserId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc) : IQuery<BillingExportFile>;
+public sealed record ExportCashClosingsQuery(Guid? TreasuryId, Guid? CashierUserId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, string? TimeZone = null) : IQuery<BillingExportFile>;
 
 public sealed class ExportCashClosingsValidator : AbstractValidator<ExportCashClosingsQuery>
 {
-    public ExportCashClosingsValidator() =>
+    public ExportCashClosingsValidator()
+    {
         RuleFor(query => query).Must(query => query.FromUtc is not { } start || query.ToUtc is not { } end || start < end)
             .OverridePropertyName("toUtc").WithMessage("The end of the period must follow its start.");
+        RuleFor(query => query.TimeZone).Must(BillingCsv.IsKnownZone).WithMessage("The time zone must be an IANA time zone name.");
+    }
 }
 
 public sealed class ExportCashClosingsHandler(ICashClosingRepository closings, IClock clock) : IQueryHandler<ExportCashClosingsQuery, BillingExportFile>
@@ -133,7 +136,7 @@ public sealed class ExportCashClosingsHandler(ICashClosingRepository closings, I
         [
             row.Number, row.TreasuryCode, row.CashierName ?? "*", row.PeriodFromUtc, row.PeriodToUtc, row.TotalPayments, row.TotalRefunds, row.ExpectedCash, row.CountedCash, row.Difference,
             row.ClosedByName, row.ClosedAtUtc,
-        ]));
+        ]), BillingCsv.Zone(query.TimeZone));
     }
 }
 

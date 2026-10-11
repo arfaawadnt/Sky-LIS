@@ -99,15 +99,19 @@ a.btn {
   display: grid;
 }
 
-.avatar {
+.avatar,
+.dot {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
   border-radius: 50%;
   background: var(--grad);
   color: #fff;
   font-weight: 700;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
 }
 
 .demo-tag {
@@ -265,14 +269,8 @@ a.btn {
 }
 
 .dot {
-  display: grid;
-  place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 50%;
-  background: var(--grad);
-  color: #fff;
-  font-weight: 700;
 }
 
 .public-footer {

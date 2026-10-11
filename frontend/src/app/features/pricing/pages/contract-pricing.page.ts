@@ -204,6 +204,7 @@ export class ContractPricingPage {
 
   constructor() {
     void this.i18n.load('pricing');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14)
 
     effect(() => {
       const tierId = this.tierId() ?? null;
@@ -452,7 +453,7 @@ export class ContractPricingPage {
       price.listPrice,
       price.patientShare,
       price.payerShare,
-      price.isExcluded,
+      t(price.isExcluded ? 'shared.yes' : 'shared.no'),
       price.alertCondition,
     ]);
     downloadCsv(csvFileName(`${detail.payerNameEn}-${detail.tierNameEn}-prices`, new Date()), toCsv(header, rows));

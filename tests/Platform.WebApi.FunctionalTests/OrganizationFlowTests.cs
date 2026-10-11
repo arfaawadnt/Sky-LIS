@@ -4,6 +4,8 @@ using System.Net.Http.Json;
 using Platform.Contracts.Common;
 using Platform.Contracts.Identity;
 using Platform.Contracts.Organization;
+using Platform.Contracts.PlatformAdmin;
+using Platform.SharedKernel.MultiTenancy;
 using Platform.WebApi.FunctionalTests.Support;
 
 namespace Platform.WebApi.FunctionalTests;
@@ -119,7 +121,7 @@ public sealed class OrganizationFlowTests(ApiFactory factory) : IClassFixture<Ap
 
         Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsync($"{Users}/{userId}/lock", null)).StatusCode);
         var lockedOut = await new AuthClient(factory.CreateClient()).SignInAsync(username, password);
-        Assert.Equal(ProblemCodes.AccountLocked, await AuthClient.CodeOf(lockedOut));
+        Assert.Equal(ProblemCodes.AccountLockedByAdministrator, await AuthClient.CodeOf(lockedOut));   // B-11: an administrator's lock has its own code
         Assert.Equal("Locked", (await admin.GetFromJsonAsync<UserDetail>($"{Users}/{userId}"))!.Status);
 
         Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsync($"{Users}/{userId}/unlock", null)).StatusCode);
@@ -162,6 +164,26 @@ public sealed class OrganizationFlowTests(ApiFactory factory) : IClassFixture<Ap
     }
 
     [DatabaseFact]
+    public async Task The_users_list_names_the_assigned_branches_by_code_for_the_export()
+    {
+        // UAT R1-06: the users CSV wrote the branch count ("2") where the codes belong.
+        var tenant = Guid.CreateVersion7();
+        var admin = await AdministratorAsync(tenant);
+        var north = await CreateBranchAsync(admin, "NORTH");
+        var main = await CreateBranchAsync(admin, "MAIN");
+        var roleId = await CreateRoleAsync(admin, "Clerk", ["registration.view"]);
+        var (restricted, _) = await CreateUserAsync(admin, roleId);
+        var (unrestricted, _) = await CreateUserAsync(admin, roleId);
+        var userId = (await admin.GetFromJsonAsync<Paged<UserListItem>>($"{Users}?search={restricted}"))!.Items.Single().UserId;
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"{Users}/{userId}/branches", new AssignUserBranchesRequest([north, main]))).StatusCode);
+
+        var listed = (await admin.GetFromJsonAsync<Paged<UserListItem>>($"{Users}?search={restricted}"))!.Items.Single();
+        Assert.Equal(2, listed.BranchCount);
+        Assert.Equal(["MAIN", "NORTH"], listed.BranchCodes);
+        Assert.Empty((await admin.GetFromJsonAsync<Paged<UserListItem>>($"{Users}?search={unrestricted}"))!.Items.Single().BranchCodes!);
+    }
+
+    [DatabaseFact]
     public async Task An_unrestricted_member_selects_any_active_branch_and_a_single_active_branch_is_selected_at_sign_in()
     {
         var tenant = Guid.CreateVersion7();
@@ -190,6 +212,38 @@ public sealed class OrganizationFlowTests(ApiFactory factory) : IClassFixture<Ap
     }
 
     [DatabaseFact]
+    public async Task A_branch_refuses_a_governorate_of_another_country_and_names_the_field_of_a_bad_contact()
+    {
+        var platform = await PlatformAdministratorAsync();
+        var (egypt, alexandria) = await CreatePlaceAsync(platform, "Alexandria");
+        var (elsewhere, _) = await CreatePlaceAsync(platform, "Capital");
+        var admin = await AdministratorAsync(Guid.CreateVersion7());
+
+        // UAT B-02: the pair is checked on the server, on create and on update (ORG-017, a field refusal: 422)
+        var wrongPair = await admin.PostAsJsonAsync(Branches, new CreateBranchRequest("NORTH", "North", "الشمال", elsewhere, alexandria, null, null, "EGP"));
+        Assert.Equal(("ORG-017", HttpStatusCode.UnprocessableEntity), (await AuthClient.CodeOf(wrongPair), wrongPair.StatusCode));
+        var unknown = await admin.PostAsJsonAsync(Branches, new CreateBranchRequest("NORTH", "North", "الشمال", egypt, Guid.CreateVersion7(), null, null, "EGP"));
+        Assert.Equal("ORG-017", await AuthClient.CodeOf(unknown));
+        var withoutCountry = await admin.PostAsJsonAsync(Branches, new CreateBranchRequest("NORTH", "North", "الشمال", null, alexandria, null, null, "EGP"));
+        Assert.Equal("ORG-008", await AuthClient.CodeOf(withoutCountry));
+
+        var created = await admin.PostAsJsonAsync(Branches, new CreateBranchRequest("NORTH", "North", "الشمال", egypt, alexandria, null, null, "EGP"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var north = (await created.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+
+        var moved = await admin.PutAsJsonAsync($"{Branches}/{north}", new UpdateBranchRequest("North", "الشمال", elsewhere, alexandria, null, null, "EGP"));
+        Assert.Equal(("ORG-017", HttpStatusCode.UnprocessableEntity), (await AuthClient.CodeOf(moved), moved.StatusCode));
+        var stored = await admin.GetFromJsonAsync<BranchListItem>($"{Branches}/{north}");
+        Assert.Equal((egypt, alexandria), (stored!.CountryId, stored.GovernorateId));
+
+        // UAT B-03: one code per field, so the page marks the field
+        var email = await admin.PutAsJsonAsync($"{Branches}/{north}", new UpdateBranchRequest("North", "الشمال", egypt, alexandria, null, "not-an-email", "EGP"));
+        Assert.Equal(("ORG-016", HttpStatusCode.UnprocessableEntity), (await AuthClient.CodeOf(email), email.StatusCode));
+        var phone = await admin.PutAsJsonAsync($"{Branches}/{north}", new UpdateBranchRequest("North", "الشمال", egypt, alexandria, "phone!", null, "EGP"));
+        Assert.Equal("ORG-015", await AuthClient.CodeOf(phone));
+    }
+
+    [DatabaseFact]
     public async Task The_permission_catalogue_of_a_laboratory_offers_no_platform_module()
     {
         var admin = await AdministratorAsync(Guid.CreateVersion7());
@@ -199,6 +253,27 @@ public sealed class OrganizationFlowTests(ApiFactory factory) : IClassFixture<Ap
         Assert.DoesNotContain(catalogue!.Modules, module => module.Key is "platform" or "tenancy");
         Assert.Contains(catalogue.Modules, module => module.Key == "registration" && module.Actions.Contains("create"));
         Assert.Contains("viewConfidential", catalogue.Actions);
+    }
+
+    private static int _isoCounter;
+
+    private async Task<HttpClient> PlatformAdministratorAsync()
+    {
+        var (username, _, _) = await factory.SeedUserAsync(tenantId: TenantIds.Platform, permissions: ["tenancy.view", "tenancy.manage"], displayName: "Geography Admin");
+        return await SignedInClientAsync(username);
+    }
+
+    /// <summary>A country with one governorate, through the platform API (ISO codes "Q?" and "W?" are this class's own).</summary>
+    private static async Task<(Guid Country, Guid Governorate)> CreatePlaceAsync(HttpClient platform, string governorate)
+    {
+        var n = Interlocked.Increment(ref _isoCounter);
+        var iso = $"{(n % 2 == 0 ? 'Q' : 'W')}{(char)('A' + (n / 2 % 26))}";
+        var country = await platform.PostAsJsonAsync("/api/v1/platform/countries", new CountryRequest("Branchland " + iso, "أرض الفروع", iso, "+20", "Pound", "EGP", "ar", "Africa/Cairo", 10, null, null));
+        Assert.Equal(HttpStatusCode.Created, country.StatusCode);
+        var countryId = (await country.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+        var created = await platform.PostAsJsonAsync("/api/v1/platform/governorates", new GovernorateRequest(countryId, governorate, "محافظة", null, null));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        return (countryId, (await created.Content.ReadFromJsonAsync<CreatedResource>())!.Id);
     }
 
     /// <summary>The random tail of a version-7 UUID: its leading characters are the millisecond clock and repeat for about a minute.</summary>

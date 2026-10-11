@@ -163,6 +163,16 @@ export class MovementFormComponent {
     });
   }
 
+  /**
+   * A fresh form for the next movement, called by the page after a successful save (UAT A-06: a second refund was stored
+   * with the first one's note). The treasury in use stays; the amount is what is due again; method, reference, reason and
+   * note go back to their defaults.
+   */
+  reset(): void {
+    const due = roundMoney(Math.max(this.dueAmount(), 0));
+    this.form.reset({ treasuryId: this.treasuryId(), amount: due > 0 ? due : null, method: 'Cash', reference: '', reasonId: '', note: '' });
+  }
+
   protected name(treasury: BillingTreasuryItem): string {
     return localizedPick({ en: treasury.nameEn, ar: treasury.nameAr }, this.i18n.lang());
   }

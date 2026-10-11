@@ -81,7 +81,7 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     await runEffects();
 
     expect(facade.plannedLines().map((item) => item.code)).toEqual(['CBC']);
-    expect(facade.totals()).toEqual({ list: 100, payer: 0, patient: 100, discount: 0, due: 100, paid: 0, remaining: 100 });
+    expect(facade.totals()).toEqual({ list: 100, payer: 0, patient: 100, discount: 0, due: 100, paid: 0, refunded: 0, remaining: 100 });
     expect(facade.paymentAmount()).toBe(100);
     expect(facade.blockers()).toEqual([]);
     backend.verify();
@@ -245,6 +245,21 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     expect(facade.discount().value).toBeNull();
     expect(facade.header().tierId).toBe('tier-cash');
     expect(facade.payment()).toEqual({ method: 'Cash', amount: null, reference: '', treasuryId: 't-1' });
+  });
+
+  it('nets refunds out of the remaining balance of a saved visit (UAT R3-01)', async () => {
+    facade.open('v-1');
+    await runEffects();
+    const base = visitDetail();
+    backend.expectOne(`${REGISTRATION_API.visits}/v-1`).flush(visitDetail({
+      lines: [{ ...base.lines[0]!, patientShare: 90 }],
+      patientShareTotal: 90,
+      balance: { patientShareTotal: 90, paid: 180, refunded: 90, remaining: 0, refundable: 0 },
+    }));
+    flushReferenceLists(backend, { tiers: [insurerTier] });
+    await runEffects();
+
+    expect(facade.totals()).toEqual(expect.objectContaining({ due: 90, paid: 180, refunded: 90, remaining: 0 }));
   });
 
   it('opens a saved visit in edit mode: the visit loads, the contract is the saved one, and only added services, details and discount are sent', async () => {

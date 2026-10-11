@@ -324,10 +324,10 @@ public sealed record ClientProfile
             country.Id,
             governorateId,
             DomainText.Required(address, Tenant.MaxAddressLength, PlatformAdminCodes.ClientDetailsInvalid, "The address"),
-            country.NormaliseMobile(mobile),
+            country.NormaliseMobile(mobile, PlatformAdminCodes.MobileInvalidForCountry, "The laboratory mobile"),
             DomainText.Optional(licenceNo, Tenant.MaxLicenceLength, PlatformAdminCodes.ClientDetailsInvalid, "The medical licence"),
             DomainText.Required(managerName, Tenant.MaxManagerNameLength, PlatformAdminCodes.ClientDetailsInvalid, "The manager name"),
-            country.NormaliseMobile(managerMobile),
+            country.NormaliseMobile(managerMobile, PlatformAdminCodes.ManagerMobileInvalidForCountry, "The manager's mobile"),
             DomainText.Email(email, PlatformAdminCodes.EmailInvalid));
     }
 }

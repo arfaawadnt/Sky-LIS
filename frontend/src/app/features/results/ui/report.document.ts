@@ -23,6 +23,8 @@ import { ageText, flagSymbol, formatDateTime, pickName } from './result-format';
         [labNameEn]="doc().letterhead.labNameEn"
         [labNameAr]="doc().letterhead.labNameAr"
         [branch]="branch()"
+        [branchEn]="doc().letterhead.branchNameEn"
+        [branchAr]="doc().letterhead.branchNameAr"
         [title]="title()"
         [reference]="doc().visit.accession"
         [subtitle]="subtitle()"

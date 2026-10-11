@@ -9,6 +9,7 @@ using Platform.Contracts.Account;
 using Platform.Contracts.Audit;
 using Platform.Domain.Authorization;
 using Platform.SharedKernel.Abstractions;
+using Platform.SharedKernel.MultiTenancy;
 
 namespace Platform.Application.Account.Queries;
 
@@ -32,7 +33,7 @@ public sealed record AuditExportFile(string FileName, byte[] Content, int Rows, 
 /// language. Generated per request and never stored; the export itself is a security event (<c>AUDIT_EXPORTED</c>).
 /// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Audit, PermissionAction.Export)]
-public sealed record ExportAuditEntriesQuery(DateTimeOffset? From, DateTimeOffset? To, Guid? UserId, string? EntityType, string? EntityId, string? Language) : IQuery<AuditExportFile>;
+public sealed record ExportAuditEntriesQuery(DateTimeOffset? From, DateTimeOffset? To, Guid? UserId, string? EntityType, string? EntityId, string? Language, Guid? ClientTenantId = null) : IQuery<AuditExportFile>;
 
 public sealed class ExportAuditEntriesValidator : AbstractValidator<ExportAuditEntriesQuery>
 {
@@ -50,12 +51,14 @@ public sealed class ExportAuditEntriesHandler(IAuditExportReader reader, ISecuri
 {
     public async Task<AuditExportFile> Handle(ExportAuditEntriesQuery query, CancellationToken cancellationToken)
     {
-        var filter = new AuditEntryFilter(query.From, query.To, query.UserId, query.EntityType, query.EntityId);
+        var filter = new AuditEntryFilter(query.From, query.To, query.UserId, query.EntityType, query.EntityId, query.ClientTenantId);
         var rows = await reader.ReadAsync(filter, AuditCsv.MaxRows + 1, cancellationToken);
         var truncated = rows.Count > AuditCsv.MaxRows;
         var exported = truncated ? rows.Take(AuditCsv.MaxRows).ToList() : rows;
 
-        var content = AuditCsv.Write(exported, query.Language == "ar");
+        // The platform's log (SA-09) concerns the clients: its CSV carries the Client column the page shows (UAT C-18).
+        var platformLog = tenant.TenantId is { } current && TenantIds.IsPlatform(current);
+        var content = AuditCsv.Write(exported, query.Language == "ar", platformLog);
         await events.WriteAsync(new SecurityEvent(AccountSecurityEvents.AuditExported, SecurityEvent.Info, tenant.TenantId, user.UserId, $"rows:{exported.Count}"), cancellationToken);
 
         var fileName = $"audit-log-{clock.UtcNow.ToString("yyyy-MM-dd-HHmm", CultureInfo.InvariantCulture)}.csv";
@@ -74,17 +77,39 @@ public static class AuditCsv
     private static readonly string[] HeadersEn = ["Time (UTC)", "User", "Action", "Entity", "Entity id", "Details", "Reason", "Kind", "Sequence", "Correlation id"];
     private static readonly string[] HeadersAr = ["الوقت (UTC)", "المستخدم", "الإجراء", "الكيان", "معرّف الكيان", "التفاصيل", "السبب", "النوع", "التسلسل", "معرّف الارتباط"];
 
-    public static byte[] Write(IReadOnlyList<AuditEntryItem> entries, bool arabic)
+    private const string ClientHeaderEn = "Client";
+    private const string ClientHeaderAr = "العميل";
+
+    /// <summary>
+    /// Writes the CSV. <paramref name="includeClient"/> (the platform's log, SA-09) adds a Client column after the user:
+    /// the client's name in the export's language, empty for the platform's own records.
+    /// </summary>
+    public static byte[] Write(IReadOnlyList<AuditEntryItem> entries, bool arabic, bool includeClient = false)
     {
         ArgumentNullException.ThrowIfNull(entries);
         var builder = new StringBuilder();
-        AppendRow(builder, arabic ? HeadersAr : HeadersEn);
+        var headers = (arabic ? HeadersAr : HeadersEn).ToList();
+        if (includeClient)
+        {
+            headers.Insert(2, arabic ? ClientHeaderAr : ClientHeaderEn);
+        }
+
+        AppendRow(builder, headers);
         foreach (var entry in entries)
         {
-            AppendRow(builder,
-            [
+            var cells = new List<string>
+            {
                 entry.AtUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
                 entry.ActorName ?? entry.ActorUserId?.ToString() ?? string.Empty,
+            };
+            if (includeClient)
+            {
+                cells.Add((arabic ? entry.ClientNameAr ?? entry.ClientNameEn : entry.ClientNameEn ?? entry.ClientNameAr) ?? string.Empty);
+            }
+
+            AppendRow(builder,
+            [
+                .. cells,
                 entry.Action,
                 entry.EntityType,
                 entry.EntityId,

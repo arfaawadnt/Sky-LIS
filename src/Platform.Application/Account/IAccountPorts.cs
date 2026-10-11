@@ -68,7 +68,8 @@ public interface ILaboratoryProfileLookup
 /// intake LIS-INT-REP-001 §14) come from <c>app.results</c>: <paramref name="PendingResults"/> = results of the visits
 /// registered in the day not yet verified, <paramref name="UnverifiedBacklog"/> = results with a value awaiting
 /// verification (any day), <paramref name="DelayedTests"/> = open results whose consumed turnaround share reached the
-/// tenant's <c>delayLatePercent</c> (BR-13).
+/// tenant's <c>delayLatePercent</c> (BR-13). <paramref name="DelayedList"/> lists those delayed tests (the same predicate),
+/// most delayed first and at most <see cref="BranchDashboardLimits.DelayedRows"/> rows (UAT R1-02).
 /// </summary>
 public sealed record BranchDayFigures(
     int? Registrations,
@@ -78,7 +79,15 @@ public sealed record BranchDayFigures(
     IReadOnlyDictionary<string, int>? RegistrationsByLocalDay,
     int? PendingResults = null,
     int? UnverifiedBacklog = null,
-    int? DelayedTests = null);
+    int? DelayedTests = null,
+    IReadOnlyList<DelayedTestItem>? DelayedList = null);
+
+/// <summary>Bounds of the dashboard's lists.</summary>
+public static class BranchDashboardLimits
+{
+    /// <summary>Rows of the "Delayed tests" table; the tile carries the full count.</summary>
+    public const int DelayedRows = 20;
+}
 
 /// <summary>A window of the dashboard: the local day <c>[FromUtc, ToUtc)</c> and the 7-day chart window <c>[ChartFromUtc, ToUtc)</c>, with the offset that turns UTC into local days.</summary>
 public sealed record DashboardWindow(DateTimeOffset FromUtc, DateTimeOffset ToUtc, DateTimeOffset ChartFromUtc, int UtcOffsetMinutes);

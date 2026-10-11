@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, untracked, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
@@ -61,6 +61,7 @@ export class RefundsPage {
   protected readonly i18n = inject(I18nService);
   protected readonly facade = inject(RefundsFacade);
   protected readonly desk = inject(CashDeskFacade);
+  private readonly form = viewChild(MovementFormComponent);
   private readonly printer = inject(BillingPrinter);
   private readonly toast = inject(ToastService);
   private readonly document = inject(DOCUMENT);
@@ -98,6 +99,7 @@ export class RefundsPage {
     // (and the refund reasons) each time a page opens so an approval or a role change since the last read shows at once.
     this.desk.refresh();
     this.facade.refreshReasons();
+    this.facade.refresh();   // the page's facade outlives the page too: re-read on open (UAT D-14, A-01)
 
     effect(() => {
       const visitId = this.visitId();
@@ -133,6 +135,8 @@ export class RefundsPage {
     }
 
     this.toast.success(this.i18n.tf('billing.refund.done', { number: created.number }));
+    this.form()?.reset();   // UAT A-06: the next refund starts from a fresh form
+    // CP-24 "print receipt for signature": the refund receipt always prints, whatever autoPrintReceipt says.
     await this.run(() => this.printer.refundReceipt(created.id));
   }
 
@@ -148,6 +152,7 @@ export class RefundsPage {
     }
 
     saveFile(this.document, file);
+    this.toast.success(this.i18n.t('billing.exported'));
   }
 
   protected onAccessionFilter(value: string): void {

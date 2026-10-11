@@ -14,12 +14,14 @@ import { IconComponent, type IconName } from '../../../shared/ui/icon/icon.compo
 import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { StatCardComponent, type StatTone } from '../../../shared/ui/stat-card/stat-card.component';
-import { formatDateTime, formatMoney, formatNumber, formatTime, pick, weekday } from '../data/account-format';
+import { formatDateTime, formatDay, formatMoney, formatNumber, formatTime, humanize, localDay, pick, weekday } from '../data/account-format';
 import { DashboardFacade } from '../state/dashboard.facade';
 import { type BarDatum, BarChartComponent } from '../ui/bar-chart.component';
 
 interface Kpi {
   readonly key: string;
+  /** The tile's caption key (`collectedToday` reads "Collected" on a past day). */
+  readonly label: string;
   readonly value: string;
   readonly hint: string;
   readonly icon: IconName;
@@ -67,13 +69,21 @@ export class DashboardPage {
   /** The quick actions of the delivered release (the R1 prototype: registration, search, results, worklist, payments, price query). */
   protected readonly quickActions: readonly QuickAction[] = QUICK_ACTIONS.filter((action) => inReleaseScope(action.release));
 
+  /** The client audit log page (CP-68) is Release 2: the "Open audit" link shows only when it is in scope. */
+  protected readonly auditPageOffered = inReleaseScope('R2');
+
   protected readonly delayedColumns: readonly TableColumn<DelayedTestItem>[] = [
     { key: 'accession', header: 'account.dashboard.accession', mono: true, width: '150px' },
     { key: 'patientName', header: 'account.dashboard.patient' },
-    { key: 'testName', header: 'account.dashboard.test' },
+    { key: 'testName', header: 'account.dashboard.test', value: (row) => pick(row.testName, row.testNameAr, this.i18n.lang()) },
+    // UAT R3-03: when the result was due (expected time, local), beside how late it is.
+    { key: 'expectedAtUtc', header: 'account.dashboard.due', width: '160px', value: (row) => this.when(row.expectedAtUtc) },
     { key: 'delay', header: 'account.dashboard.delay', width: '110px', value: (row) => this.delay(row.delayMinutes) },
-    { key: 'status', header: 'account.dashboard.status', width: '120px', secondary: true },
+    { key: 'status', header: 'account.dashboard.status', width: '120px', secondary: true, value: (row) => this.resultStatus(row.status) },
   ];
+
+  /** The chart's caption with the day count in the interface's digits (UAT R1-06: "آخر 7 أيام" kept a Latin 7). */
+  protected readonly chartTitle = computed(() => this.i18n.tf('account.dashboard.last7', { days: formatNumber(7, this.i18n.lang()) }));
 
   protected readonly delayedRowId = (row: DelayedTestItem): string => `${row.visitId}:${row.testName}`;
 
@@ -84,10 +94,15 @@ export class DashboardPage {
     return branch ? `${branch.code} · ${pick(branch.nameEn, branch.nameAr, this.i18n.lang())}` : '';
   });
 
+  /** The day shown is today (the captions say "today"), or a past day picked in the date box (UAT A-12). */
+  protected readonly isToday = computed(() => this.facade.query().date === localDay());
+
+  /** The day in the user's language and digits, as the tiles print their figures (UAT A-12). */
+  protected readonly day = computed(() => formatDay(this.facade.query().date, this.i18n.lang()));
+
   protected readonly subtitle = computed(() => {
-    const date = this.facade.query().date;
     const branch = this.branchName();
-    return branch ? `${branch} · ${date}` : date;
+    return branch ? `${branch} · ${this.day()}` : this.day();
   });
 
   protected readonly kpis = computed<readonly Kpi[]>(() => {
@@ -95,30 +110,33 @@ export class DashboardPage {
     const lang = this.i18n.lang();
     const kpis = data?.kpis;
     const notYet = this.i18n.t('account.dashboard.notAvailable');
-    const today = this.i18n.t('account.dashboard.today');
+    const today = this.isToday() ? this.i18n.t('account.dashboard.today') : this.i18n.tf('account.dashboard.onDay', { date: this.day() });
+    const label = (key: string): string => `account.dashboard.kpi.${key}`;
     const count = (value: number | null | undefined, hint: string): { value: string; hint: string } =>
       value === null || value === undefined ? { value: '—', hint: notYet } : { value: formatNumber(value, lang), hint };
 
     const all: Kpi[] = [
-      { key: 'registrations', icon: 'clipboard', tone: 'brand', ...count(kpis?.registrations, today) },
+      { key: 'registrations', label: label('registrations'), icon: 'clipboard', tone: 'brand', ...count(kpis?.registrations, today) },
       {
         key: 'collectedToday',
+        label: label(this.isToday() ? 'collectedToday' : 'collected'),
         icon: 'coins',
         tone: 'ok',
         value: formatMoney(kpis?.collectedToday, data?.currencyCode, lang),
         hint: kpis?.collectedToday === null || kpis?.collectedToday === undefined ? notYet : today,
       },
-      { key: 'samplesReceived', icon: 'barcode', tone: 'info', release: 'R2', ...count(kpis?.samplesReceived, today) },
-      { key: 'pendingResults', icon: 'flask', tone: 'warn', ...count(kpis?.pendingResults, this.i18n.t('account.dashboard.awaitingEntry')) },
-      { key: 'unverifiedBacklog', icon: 'check', tone: 'warn', ...count(kpis?.unverifiedBacklog, this.i18n.t('account.dashboard.awaitingSignOff')) },
-      { key: 'delayedTests', icon: 'alert', tone: (kpis?.delayedTests ?? 0) > 0 ? 'bad' : 'ok', ...count(kpis?.delayedTests, this.i18n.t('account.dashboard.pastTurnaround')) },
-      { key: 'rejectedSamples', icon: 'x', tone: (kpis?.rejectedSamples ?? 0) > 0 ? 'bad' : 'ok', release: 'R2', ...count(kpis?.rejectedSamples, today) },
+      { key: 'samplesReceived', label: label('samplesReceived'), icon: 'barcode', tone: 'info', release: 'R2', ...count(kpis?.samplesReceived, today) },
+      { key: 'pendingResults', label: label('pendingResults'), icon: 'flask', tone: 'warn', ...count(kpis?.pendingResults, this.i18n.t('account.dashboard.awaitingEntry')) },
+      { key: 'unverifiedBacklog', label: label('unverifiedBacklog'), icon: 'check', tone: 'warn', ...count(kpis?.unverifiedBacklog, this.i18n.t('account.dashboard.awaitingSignOff')) },
+      { key: 'delayedTests', label: label('delayedTests'), icon: 'alert', tone: (kpis?.delayedTests ?? 0) > 0 ? 'bad' : 'ok', ...count(kpis?.delayedTests, this.i18n.t('account.dashboard.pastTurnaround')) },
+      { key: 'rejectedSamples', label: label('rejectedSamples'), icon: 'x', tone: (kpis?.rejectedSamples ?? 0) > 0 ? 'bad' : 'ok', release: 'R2', ...count(kpis?.rejectedSamples, today) },
     ];
     const list = all.filter((kpi) => inReleaseScope(kpi.release ?? 'R1'));
 
     if (this.auth.hasPermission(ACCOUNT_PERMISSIONS.walletView)) {
       list.push({
         key: 'walletBalance',
+        label: label('walletBalance'),
         icon: 'vault',
         tone: (kpis?.walletBalance ?? 1) <= 0 ? 'bad' : 'brand',
         value: formatMoney(kpis?.walletBalance, kpis?.walletCurrency, lang),
@@ -130,11 +148,11 @@ export class DashboardPage {
   });
 
   protected readonly chart = computed<readonly BarDatum[]>(() =>
-    (this.data()?.registrationsByDay ?? []).map((bar) => ({
-      label: weekday(bar.date, this.i18n.lang()),
-      value: bar.count,
-      description: this.i18n.tf('account.dashboard.chartBar', { date: bar.date, count: bar.count }),
-    })),
+    (this.data()?.registrationsByDay ?? []).map((bar) => {
+      const lang = this.i18n.lang();
+      const count = formatNumber(bar.count, lang);
+      return { label: weekday(bar.date, lang), value: bar.count, display: count, description: this.i18n.tf('account.dashboard.chartBar', { date: formatDay(bar.date, lang), count }) };
+    }),
   );
 
   protected readonly delayedRows = computed<readonly DelayedTestItem[]>(() => this.data()?.delayedTests ?? []);
@@ -145,6 +163,7 @@ export class DashboardPage {
 
   constructor() {
     void this.i18n.load('account');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01/C-13)
   }
 
   protected onDate(event: Event): void {
@@ -159,8 +178,28 @@ export class DashboardPage {
     return formatDateTime(value, this.i18n.lang());
   }
 
+  /** A result status in words (Ordered, Complete, Reviewed), else the status split into words. */
+  protected resultStatus(status: string): string {
+    const key = `account.dashboard.resultStatus.${status}`;
+    return this.i18n.has(key) ? this.i18n.t(key) : humanize(status);
+  }
+
   protected delay(minutes: number): string {
+    const lang = this.i18n.lang();
     const hours = Math.floor(minutes / 60);
-    return hours > 0 ? this.i18n.tf('account.dashboard.delayHours', { hours, minutes: minutes % 60 }) : this.i18n.tf('account.dashboard.delayMinutes', { minutes });
+    return hours > 0
+      ? this.i18n.tf('account.dashboard.delayHours', { hours: formatNumber(hours, lang), minutes: formatNumber(minutes % 60, lang) })
+      : this.i18n.tf('account.dashboard.delayMinutes', { minutes: formatNumber(minutes, lang) });
+  }
+
+  /** Recent activity in words, not type names (UAT A-12): the dictionary's label, else the name split into words. */
+  protected actionName(entry: AuditEntryItem): string {
+    const key = `account.audit.actionName.${entry.action}`;
+    return this.i18n.has(key) ? this.i18n.t(key) : humanize(entry.action);
+  }
+
+  protected entityName(entry: AuditEntryItem): string {
+    const key = `account.audit.entityName.${entry.entityType}`;
+    return this.i18n.has(key) ? this.i18n.t(key) : humanize(entry.entityType);
   }
 }

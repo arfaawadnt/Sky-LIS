@@ -25,6 +25,15 @@ export class AnalysersFacade {
 
   readonly models = resource({ loader: ({ abortSignal }) => this.api.analyserModels(null, abortSignal) });
 
+  /** Re-reads the list and the lookups when the page opens again: the facade outlives the page (route provider), so the previous visit's answer must never stay on screen (UAT D-14). A load in flight is left alone. */
+  refresh(): void {
+    this.list.reload();
+    this.agents.reload();
+    this.clinicalGroups.reload();
+    this.sampleTypes.reload();
+    this.models.reload();
+  }
+
   readonly save = mutation(
     (input: { id: string | null; request: SaveAnalyserRequest }) =>
       input.id === null ? this.api.createAnalyser(input.request).then((created) => created.id) : this.api.updateAnalyser(input.id, input.request).then(() => input.id ?? ''),

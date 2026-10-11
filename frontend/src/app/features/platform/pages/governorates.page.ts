@@ -4,7 +4,7 @@ import { type GovernorateListItem, type GovernorateRequest, PLATFORM_PERMISSIONS
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
-import type { MasterDataConfig, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
+import type { MasterDataConfig, MasterDataFilter, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
 import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { fileStamp, pick } from '../ui/format';
@@ -34,6 +34,10 @@ export class GovernoratesPage {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(PlatformApi);
   private readonly csv = inject(CsvExportService);
+
+  /** The filter of the list on screen: the export writes exactly these rows (UAT R2-02, as C-04 elsewhere). */
+  private filter: MasterDataFilter = { search: '', active: true };
+
   private readonly page = viewChild.required(MasterDataPageComponent);
 
   protected readonly countryFilter = signal<string | null>(null);
@@ -70,8 +74,10 @@ export class GovernoratesPage {
       { name: 'remarks', kind: 'textarea', maxLength: 500 },
     ],
     adapter: {
-      list: (filter, page, signal) =>
-        this.api.listGovernorates({ countryId: this.countryFilter(), search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => {
+        this.filter = filter;
+        return this.api.listGovernorates({ countryId: this.countryFilter(), search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+      },
       create: (dto) => this.api.createGovernorate(dto),
       update: (id, dto) => this.api.updateGovernorate(id, dto),
       setActive: (id, active) => this.api.setGovernorateActive(id, active),
@@ -91,7 +97,7 @@ export class GovernoratesPage {
 
   protected async exportCsv(): Promise<void> {
     const countryId = this.countryFilter();
-    const rows = await this.api.all((page) => this.api.listGovernorates({ countryId, search: null, isActive: null, ...page }));
+    const rows = await this.api.all((page) => this.api.listGovernorates({ countryId, search: this.filter.search || null, isActive: this.filter.active, ...page }));
     this.csv.download(`governorates-${fileStamp()}`, [
       { header: this.i18n.t('platform.governorates.column.country'), value: (row: GovernorateListItem) => pick(row.countryNameEn, row.countryNameAr, this.i18n.lang()) },
       { header: this.i18n.t('platform.governorates.field.nameEn'), value: (row) => row.nameEn },

@@ -105,6 +105,7 @@ export class SupportPage {
 
   constructor() {
     void this.i18n.load('account');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01/C-13)
   }
 
   protected onStatus(event: Event): void {

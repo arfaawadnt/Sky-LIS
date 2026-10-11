@@ -88,12 +88,12 @@ describe('PaymentsPage (CP-23)', () => {
 
   let harness: RouterTestingHarness;
 
-  async function open(url: string): Promise<PaymentsPageInternals> {
+  async function open(url: string, autoPrintReceipt = true): Promise<PaymentsPageInternals> {
     harness = await RouterTestingHarness.create();
     const page = (await harness.navigateByUrl(url, PaymentsPage)) as unknown as PaymentsPageInternals;
     TestBed.tick();
     await settle();
-    flushCashDesk(backend);
+    flushCashDesk(backend, autoPrintReceipt);
     TestBed.tick();
     await settle();
     return page;
@@ -119,6 +119,23 @@ describe('PaymentsPage (CP-23)', () => {
     TestBed.tick();
     await settle();
     backend.expectOne(`${BILLING_API.visits}/v-1/account`).flush(account({ paid: 300, remaining: 0, balanceStatus: 'Paid' }));
+  });
+
+  it('does not print the receipt when the laboratory turned autoPrintReceipt off (UAT A-05)', async () => {
+    const page = await open('/billing/payments?visitId=v-1', false);
+    backend.expectOne(`${BILLING_API.visits}/v-1/account`).flush(account({ payments: [posted] }));
+    TestBed.tick();
+    await settle();
+
+    await Promise.all([
+      page.pay(account(), { treasuryId: 't-1', amount: 200, method: 'Cash', reference: null, reasonId: null, note: null }),
+      (async () => {
+        await settle();
+        backend.expectOne(BILLING_API.payments).flush({ id: 'pay-3', receiptNumber: 'RCT-2026-00003' }, { status: 201, statusText: 'Created' });
+      })(),
+    ]);
+
+    expect(printer.printed).toEqual([]);
   });
 
   it('voids a posted payment with the reason of the prompt and never offers a frozen one', async () => {

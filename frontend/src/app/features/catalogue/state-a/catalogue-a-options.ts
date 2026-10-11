@@ -63,6 +63,7 @@ export class CatalogueAOptions {
 
   /** Re-reads the lookups when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
   refresh(): void {
+    this.conditionCache.clear();   // a condition deactivated since must not stay on offer (UAT B-08)
     this.groups.reload();
     this.sampleTypes.reload();
     this.units.reload();

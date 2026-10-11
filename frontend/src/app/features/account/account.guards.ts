@@ -1,4 +1,4 @@
-import { inject } from '@angular/core';
+import { effect, inject, untracked } from '@angular/core';
 import { type ActivatedRouteSnapshot, type CanActivateChildFn, type CanActivateFn, Router, type RouterStateSnapshot, type UrlTree } from '@angular/router';
 
 import { AuthStore } from '../../core/auth/auth.store';
@@ -13,6 +13,8 @@ export const ACCOUNT_PATHS = {
   wallet: '/account/wallet',
   support: '/account/support',
   audit: '/account/audit',
+  /** SA-21: the Super Admin portal's own profile page. */
+  adminProfile: '/admin/profile',
 } as const;
 
 /**
@@ -44,7 +46,8 @@ export const branchGuard = ((_route: ActivatedRouteSnapshot, state: RouterStateS
 
 /**
  * CP-38 "must change at next sign-in" (organization module sets the flag; this module enforces it): while the flag is
- * set, every page but the profile (where the password is changed) sends the user to the profile. Place it like
+ * set, every page but the profile (where the password is changed) sends the user to the profile of the session's portal
+ * (C-14: `/admin/profile` for a platform session, `/account/profile` for a laboratory one). Place it like
  * `branchGuard`. One profile call per session (cached by `AccountSession`); an unreadable profile lets the user pass.
  */
 export const passwordChangeGuard = (async (_route: ActivatedRouteSnapshot, state: RouterStateSnapshot): Promise<true | UrlTree> => {
@@ -55,11 +58,45 @@ export const passwordChangeGuard = (async (_route: ActivatedRouteSnapshot, state
     return true;
   }
 
+  const profilePath = inject(PortalService).isPlatform() ? ACCOUNT_PATHS.adminProfile : ACCOUNT_PATHS.profile;
   const path = state.url.split('?')[0] ?? state.url;
-  if (path === ACCOUNT_PATHS.profile) {
+  if (path === profilePath) {
     return true;
   }
 
   const profile = await session.ensure();
-  return profile?.mustChangePassword ? router.createUrlTree([ACCOUNT_PATHS.profile], { queryParams: { mustChange: 1 } }) : true;
+  return profile?.mustChangePassword ? router.createUrlTree([profilePath], { queryParams: { mustChange: 1 } }) : true;
 }) satisfies CanActivateFn & CanActivateChildFn;
+
+/** True when the URL is the forced password change the guard above sends to (`?mustChange=1`). */
+export function isForcedPasswordChange(router: Router, url: string): boolean {
+  return router.parseUrl(url).queryParamMap.has('mustChange');
+}
+
+/**
+ * R2-01: another tab of the same session changed the user's own profile (`AuthStore.profileRevision` moved): the cached
+ * profile is dropped, and a tab held on the forced password change goes to its portal's home, through the guards again
+ * (`passwordChangeGuard` re-reads the profile and sends it back only if the change is still due). Call once, in an
+ * injection context that lives as long as the signed-in layout (the shell's constructor).
+ */
+export function followProfileChanges(): void {
+  const auth = inject(AuthStore);
+  const session = inject(AccountSession);
+  const router = inject(Router);
+  const portal = inject(PortalService);
+  let seen = untracked(auth.profileRevision);
+  effect(() => {
+    const revision = auth.profileRevision();
+    if (revision === seen) {
+      return;
+    }
+
+    seen = revision;
+    untracked(() => {
+      session.invalidate();
+      if (isForcedPasswordChange(router, router.url)) {
+        void router.navigateByUrl(portal.homePath());
+      }
+    });
+  });
+}

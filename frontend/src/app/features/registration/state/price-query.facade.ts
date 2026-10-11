@@ -92,4 +92,10 @@ export class PriceQueryFacade {
     this.lines.set([]);
     this.gender.set(null);
   }
+
+  /** Re-reads the tiers and the quote of the typed services when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01). A load in flight is left alone. */
+  refresh(): void {
+    this.tiers.reload();
+    this.quote.reload();
+  }
 }

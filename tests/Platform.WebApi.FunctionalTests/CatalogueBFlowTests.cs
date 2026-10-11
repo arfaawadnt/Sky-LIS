@@ -220,6 +220,37 @@ public sealed class CatalogueBFlowTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Contains("خصم الموظفين", text, StringComparison.Ordinal);
     }
 
+    [DatabaseFact]
+    public async Task Export_reads_like_the_grid_in_the_language_of_the_page()
+    {
+        var tenant = Guid.CreateVersion7();
+        var editor = await ClientAsync(tenant, Editor);
+        var exporter = await ClientAsync(tenant, Exporter);
+        var organizer = await ClientAsync(tenant, ["organization.view", "organization.create"]);
+        Assert.Equal(HttpStatusCode.Created, (await editor.PostAsJsonAsync($"{Base}/reasons", new CreateReasonRequest("Rejection", "Haemolysed", "انحلال الدم"))).StatusCode);
+        var branch = await organizer.PostAsJsonAsync("/api/v1/organization/branches", new Platform.Contracts.Organization.CreateBranchRequest("NORTH", "North", "الشمال", null, null, null, null, "EGP"));
+        var branchId = await IdOf(branch);
+        Assert.Equal(HttpStatusCode.Created, (await editor.PostAsJsonAsync($"{Base}/doctors", new CreateDoctorRequest("D7", "Dr. Amal", "د. أمل", null, null, [branchId], 10m, null))).StatusCode);
+
+        // UAT B-09: labels instead of enum names, Yes / No, and the user's language
+        var english = await TextOf(await exporter.GetAsync($"{Base}/reasons/export"));
+        Assert.Contains("Kind,Name (EN),Name (AR),Active", english, StringComparison.Ordinal);
+        Assert.Contains("Sample rejection,Haemolysed,انحلال الدم,Yes", english, StringComparison.Ordinal);
+        var arabic = await TextOf(await exporter.GetAsync($"{Base}/reasons/export?lang=ar"));
+        Assert.Contains("النوع,الاسم (إنجليزي),الاسم (عربي),نشط", arabic, StringComparison.Ordinal);
+        Assert.Contains("رفض العينة,Haemolysed,انحلال الدم,نعم", arabic, StringComparison.Ordinal);
+
+        // the doctor's branches by their codes, not their count
+        var doctors = await TextOf(await exporter.GetAsync($"{Base}/doctors/export"));
+        Assert.Contains("D7,Dr. Amal,د. أمل,,,NORTH,10,,Yes", doctors, StringComparison.Ordinal);
+    }
+
+    private static async Task<string> TextOf(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return Encoding.UTF8.GetString(await response.Content.ReadAsByteArrayAsync()).TrimStart('﻿');
+    }
+
     private async Task<HttpClient> ClientAsync(Guid tenant, IReadOnlyList<string> permissions)
     {
         var (username, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: permissions);

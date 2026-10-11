@@ -42,4 +42,24 @@ describe('TrackingFacade (CP-17)', () => {
     expect(facade.sampleNumber()).toBeNull();
     backend.verify();
   });
+
+  it('re-reads the tracked sample when the page opens again, and stays idle without one (UAT D-14, A-01)', async () => {
+    facade.refresh();
+    await runEffects();
+    backend.expectNone(() => true);
+
+    facade.track('SMP-2026-00001');
+    await runEffects();
+    backend.expectOne(SAMPLES_API.byNumber('SMP-2026-00001')).flush(sampleDetail('Received'));
+    await settle();
+    backend.expectOne(SAMPLES_API.timeline('smp-1')).flush(timeline());
+    await runEffects();
+
+    facade.refresh();
+    await runEffects();
+    backend.expectOne(SAMPLES_API.byNumber('SMP-2026-00001')).flush(sampleDetail('Rejected'));
+    await settle();
+    backend.expectOne(SAMPLES_API.timeline('smp-1')).flush(timeline());
+    backend.verify();
+  });
 });

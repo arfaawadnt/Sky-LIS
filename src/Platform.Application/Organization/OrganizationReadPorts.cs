@@ -19,6 +19,19 @@ public interface IBranchLookup
     Task<IReadOnlyList<BranchSummary>> ListActiveAsync(CancellationToken cancellationToken);
 
     Task<bool> IsActiveAsync(Guid branchId, CancellationToken cancellationToken);
+
+    /// <summary>The branches of the given ids in the current tenant, active or not (registers that show a branch code and name).</summary>
+    Task<IReadOnlyDictionary<Guid, BranchSummary>> GetManyAsync(IReadOnlyCollection<Guid> branchIds, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// The platform geography as the Organization module reads it (countries and governorates are platform-wide <c>saas</c>
+/// tables with no tenant, readable by the runtime role; no elevation is needed).
+/// </summary>
+public interface IBranchGeography
+{
+    /// <summary>The country of a governorate, or null when the governorate does not exist.</summary>
+    Task<Guid?> CountryOfGovernorateAsync(Guid governorateId, CancellationToken cancellationToken);
 }
 
 /// <summary>Display names of users for registers ("requested by", "verified by"): the membership's bilingual name in the current tenant, else the platform display name.</summary>

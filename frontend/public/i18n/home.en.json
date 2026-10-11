@@ -1,1 +1,1 @@
-{ "title": "Dashboard", "welcome": "Welcome,", "loadingSession": "Loading your session…", "tenant": "Tenant", "scope": "Scope", "sessionExpires": "Session expires", "permissions": "Permissions", "noPermissions": "none yet (roles arrive with the authorization package)", "sessionError": "The session could not be loaded." }
+{"title":"Welcome","welcome":"Welcome,","noPages":"No page of the laboratory portal is assigned to your account yet. Ask your administrator for a role.","openProfile":"Open my profile"}

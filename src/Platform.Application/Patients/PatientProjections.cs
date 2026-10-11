@@ -32,9 +32,11 @@ public static class PatientProjections
 
     public static PatientAgeView View(PatientAge age) => new(age.Years, age.Months, age.Days);
 
-    public static PatientListItem ToListItem(PatientRow row, DateOnly today, bool includeConfidential)
+    /// <param name="visits">The file's visit figures from Registration (CP-11; UAT A-09); none when absent.</param>
+    public static PatientListItem ToListItem(PatientRow row, DateOnly today, bool includeConfidential, PatientVisitFigures? visits = null)
     {
         ArgumentNullException.ThrowIfNull(row);
+        var figures = visits ?? PatientVisitFigures.None;
         return new PatientListItem(
             row.Id,
             row.Number,
@@ -52,7 +54,9 @@ public static class PatientProjections
             row.Status.ToString(),
             row.MergedIntoPatientId,
             row.MergedIntoNumber,
-            row.RegisteredOn);
+            row.RegisteredOn,
+            figures.VisitCount,
+            figures.LastVisitAtUtc);
     }
 
     public static PatientDetail ToDetail(PatientRow row, DateOnly today, bool includeConfidential, string? mergedByName, IReadOnlyList<MergedPatientReference> mergedFiles)

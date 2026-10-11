@@ -85,7 +85,7 @@ public sealed class ListPaymentsHandler(IVisitAccountRepository accounts, IBilla
 
 /// <summary>CSV of the payments register (<c>billing.export</c>, at most 10,000 rows: BIL-050).</summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Export)]
-public sealed record ExportPaymentsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? TreasuryId, Guid? CashierUserId, string? Method, string? Status)
+public sealed record ExportPaymentsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? TreasuryId, Guid? CashierUserId, string? Method, string? Status, string? TimeZone = null)
     : IQuery<BillingExportFile>;
 
 public sealed class ExportPaymentsValidator : AbstractValidator<ExportPaymentsQuery>
@@ -94,6 +94,7 @@ public sealed class ExportPaymentsValidator : AbstractValidator<ExportPaymentsQu
     {
         RegisterRules.Apply(this, query => query.Accession, query => query.FromUtc, query => query.ToUtc, query => query.Method);
         RuleFor(query => query.Status).IsEnumName(typeof(PaymentStatus), caseSensitive: false).When(query => !string.IsNullOrEmpty(query.Status));
+        RuleFor(query => query.TimeZone).Must(BillingCsv.IsKnownZone).WithMessage("The time zone must be an IANA time zone name.");
     }
 }
 
@@ -117,7 +118,7 @@ public sealed class ExportPaymentsHandler(IVisitAccountRepository accounts, IBil
         [
             row.ReceiptNumber, row.PaidAtUtc, row.Accession, row.Amount, row.Method, row.Reference, row.TreasuryCode, row.CashierName, row.DeviceId, row.Status,
             row.VoidReason, row.VoidedByName, row.VoidedAtUtc,
-        ]));
+        ]), BillingCsv.Zone(query.TimeZone));
     }
 }
 
@@ -209,12 +210,16 @@ public sealed class ListRefundsHandler(IVisitAccountRepository accounts, IBillab
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Export)]
-public sealed record ExportRefundsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? TreasuryId, Guid? CashierUserId, string? Method)
+public sealed record ExportRefundsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? TreasuryId, Guid? CashierUserId, string? Method, string? TimeZone = null)
     : IQuery<BillingExportFile>;
 
 public sealed class ExportRefundsValidator : AbstractValidator<ExportRefundsQuery>
 {
-    public ExportRefundsValidator() => RegisterRules.Apply(this, query => query.Accession, query => query.FromUtc, query => query.ToUtc, query => query.Method);
+    public ExportRefundsValidator()
+    {
+        RegisterRules.Apply(this, query => query.Accession, query => query.FromUtc, query => query.ToUtc, query => query.Method);
+        RuleFor(query => query.TimeZone).Must(BillingCsv.IsKnownZone).WithMessage("The time zone must be an IANA time zone name.");
+    }
 }
 
 public sealed class ExportRefundsHandler(IVisitAccountRepository accounts, IBillableVisitLookup visits, IRefundReasonLookup reasons, IClock clock) : IQueryHandler<ExportRefundsQuery, BillingExportFile>
@@ -236,7 +241,7 @@ public sealed class ExportRefundsHandler(IVisitAccountRepository accounts, IBill
         return BillingCsv.Build("refunds", clock.UtcNow, Header, rows.Select(row => (IReadOnlyList<object?>)
         [
             row.Number, row.RefundedAtUtc, row.Accession, row.Amount, row.Method, row.Reference, row.ReasonNameEn, row.ReasonNameAr, row.Note, row.TreasuryCode, row.CashierName, row.DeviceId,
-        ]));
+        ]), BillingCsv.Zone(query.TimeZone));
     }
 }
 

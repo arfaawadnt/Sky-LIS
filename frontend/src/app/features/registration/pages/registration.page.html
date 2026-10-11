@@ -1,14 +1,21 @@
 <app-page-header [title]="title()" [subtitle]="i18n.t(facade.isEdit() ? 'registration.editSubtitle' : 'registration.subtitle')">
-  <button pageActions type="button" class="btn ghost" (click)="clear()">{{ i18n.t(facade.isEdit() ? 'registration.newRegistration' : 'registration.clear') }}</button>
+  <button pageActions type="button" class="btn ghost" *appCan="permissions.create" (click)="clear()">{{ i18n.t(facade.isEdit() ? 'registration.newRegistration' : 'registration.clear') }}</button>
   @if (facade.isEdit()) {
     <a pageActions class="btn" [routerLink]="['/registration/visits', facade.visitId(), 'job-order']"><app-icon name="printer" [size]="15" />{{ i18n.t('registration.jobOrder.title') }}</a>
   }
-  <button pageActions type="button" class="btn primary" [disabled]="saving()" (click)="save()">
-    <app-icon name="check" [size]="15" />{{ saving() ? i18n.t('registration.saving') : i18n.t(facade.isEdit() ? 'registration.saveChanges' : 'registration.save') }}
-    <span class="kbd">Ctrl+S</span>
-  </button>
+  @if (!readOnly()) {
+    <button pageActions type="button" class="btn primary" [disabled]="saving()" (click)="save()">
+      <app-icon name="check" [size]="15" />{{ saving() ? i18n.t('registration.saving') : i18n.t(facade.isEdit() ? 'registration.saveChanges' : 'registration.save') }}
+      <span class="kbd">Ctrl+S</span>
+    </button>
+  }
 </app-page-header>
 
+@if (readOnly()) {
+  <p class="read-only-note muted" role="note">{{ i18n.t('registration.readOnly') }}</p>
+}
+
+<fieldset class="layout-fieldset" [disabled]="readOnly()">
 <div class="layout" appSaveShortcut (appSaveShortcut)="save()">
   <div class="main">
     @if (facade.isEdit() && facade.visit.error()) {
@@ -337,6 +344,9 @@
         <div class="due"><dt>{{ i18n.t('registration.summary.due') }}</dt><dd class="num">{{ amount(facade.totals().due) }} {{ currency() }}</dd></div>
         @if (facade.isEdit()) {
           <div><dt>{{ i18n.t('registration.summary.paid') }}</dt><dd class="num">{{ amount(facade.totals().paid) }}</dd></div>
+          @if (facade.totals().refunded > 0) {
+            <div><dt>{{ i18n.t('registration.summary.refunded') }}</dt><dd class="num">− {{ amount(facade.totals().refunded) }}</dd></div>
+          }
           <div class="due"><dt>{{ i18n.t('registration.summary.remaining') }}</dt><dd class="num">{{ amount(facade.totals().remaining) }}</dd></div>
         } @else if (facade.canPay()) {
           <div><dt>{{ i18n.t('registration.summary.paidNow') }}</dt><dd class="num">{{ amount(facade.paymentAmount()) }}</dd></div>
@@ -350,10 +360,11 @@
           }
         </ul>
       }
-      <button type="button" class="btn primary wide" [disabled]="saving()" (click)="save()">{{ saving() ? i18n.t('registration.saving') : i18n.t(facade.isEdit() ? 'registration.saveChanges' : 'registration.save') }}</button>
+      <button type="button" class="btn primary wide" [hidden]="readOnly()" [disabled]="saving()" (click)="save()">{{ saving() ? i18n.t('registration.saving') : i18n.t(facade.isEdit() ? 'registration.saveChanges' : 'registration.save') }}</button>
     </app-section-card>
   </aside>
 </div>
+</fieldset>
 
 <app-dialog [(open)]="successOpen" [title]="i18n.t('registration.success.title')" size="md">
   @if (success(); as done) {

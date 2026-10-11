@@ -11,6 +11,12 @@ public interface ITenantSettingsStore
 {
     Task<IReadOnlyList<StoredSetting>> ListAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The platform tenant's rows (SA-19), which a laboratory inherits for every key it never set; empty when the current
+    /// tenant is the platform itself (its own rows are <see cref="ListAsync"/>).
+    /// </summary>
+    Task<IReadOnlyList<StoredSetting>> ListInheritedAsync(CancellationToken cancellationToken);
+
     /// <summary>Stages a value for the key: a new row or an update of the existing one, stamped with the actor and the time.</summary>
     Task UpsertAsync(string key, string value, Guid? actorUserId, DateTimeOffset nowUtc, CancellationToken cancellationToken);
 }

@@ -3,21 +3,6 @@
   @if (auth.currentUser(); as user) {
     <p>{{ i18n.t('home.welcome') }} <strong>{{ user.displayName }}</strong></p>
   }
-
-  @if (session.isLoading()) {
-    <p class="muted">{{ i18n.t('home.loadingSession') }}</p>
-  } @else if (session.hasValue()) {
-    <dl class="session">
-      <dt>{{ i18n.t('home.tenant') }}</dt>
-      <dd>{{ session.value().tenantId ?? '—' }}</dd>
-      <dt>{{ i18n.t('home.scope') }}</dt>
-      <dd>{{ session.value().scope }}</dd>
-      <dt>{{ i18n.t('home.sessionExpires') }}</dt>
-      <dd>{{ session.value().expiresAtUtc }}</dd>
-      <dt>{{ i18n.t('home.permissions') }}</dt>
-      <dd>{{ session.value().permissions.length === 0 ? i18n.t('home.noPermissions') : session.value().permissions.join(', ') }}</dd>
-    </dl>
-  } @else if (session.error()) {
-    <p class="problem" role="alert">{{ i18n.t('home.sessionError') }}</p>
-  }
+  <p class="muted">{{ i18n.t('home.noPages') }}</p>
+  <a class="btn" [routerLink]="profilePath">{{ i18n.t('home.openProfile') }}</a>
 </section>

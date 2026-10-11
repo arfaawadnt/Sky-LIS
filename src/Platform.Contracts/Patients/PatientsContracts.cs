@@ -58,7 +58,8 @@ public sealed record MergePatientsRequest(Guid MergedPatientId, string Reason, b
 /// <summary>
 /// A row of the patient register. <see cref="DateOfBirth"/> is the known or the estimated date (see
 /// <see cref="DateOfBirthIsEstimated"/>); <see cref="Age"/> is computed for today. <see cref="IsVip"/> is
-/// <see langword="null"/> for users without <c>patients.viewConfidential</c>.
+/// <see langword="null"/> for users without <c>patients.viewConfidential</c>. <see cref="VisitCount"/> and
+/// <see cref="LastVisitAtUtc"/> come from Registration (CP-11 "visit count, last visit"; UAT A-09).
 /// </summary>
 public sealed record PatientListItem(
     Guid Id,
@@ -77,7 +78,9 @@ public sealed record PatientListItem(
     string Status,
     Guid? MergedIntoPatientId,
     string? MergedIntoNumber,
-    DateOnly RegisteredOn);
+    DateOnly RegisteredOn,
+    int VisitCount,
+    DateTimeOffset? LastVisitAtUtc);
 
 public sealed record PatientMergeView(Guid SurvivorId, string SurvivorNumber, DateTimeOffset MergedAtUtc, Guid MergedByUserId, string? MergedByName, string Reason);
 

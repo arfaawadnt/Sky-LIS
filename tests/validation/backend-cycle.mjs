@@ -345,20 +345,26 @@ async function verifyAuditAndOutbox(s, corr, tenant, { fieldChanges = [], events
   for (const expected of fieldChanges) s.dbCheck(fcKeys.includes(expected), `field_changes ${expected}`, fcKeys);
   for (const expected of events) s.dbCheck(eventKeys.includes(expected), `audit_trail ${expected}`, eventKeys);
   if (fc.length > 0) s.dbCheck(fc.every((row) => row.tenant_id === tenant), `field_changes tenant_id = ${tenant.slice(0, 8)}…`, [...new Set(fc.map((row) => row.tenant_id))]);
-  if (trail.length > 0) s.dbCheck(trail.every((row) => row.tenant_id === tenant), 'audit_trail tenant_id', [...new Set(trail.map((row) => row.tenant_id))]);
+  // Since validation fix C-17 a platform-trail event (TenantProvisioned) is filed twice with the same event id: in the
+  // client's trail and in the platform trail. Every other row belongs to the acting tenant.
+  const PLATFORM_TENANT = '00000000-0000-0000-0000-000000000001';
+  const platformCopies = trail.filter((row) => row.tenant_id === PLATFORM_TENANT && tenant !== PLATFORM_TENANT);
+  if (trail.length > 0) s.dbCheck(trail.every((row) => row.tenant_id === tenant || (row.tenant_id === PLATFORM_TENANT && row.event_type.endsWith('TenantProvisioned'))), 'audit_trail tenant_id (platform copy only for TenantProvisioned)', [...new Set(trail.map((row) => row.tenant_id))]);
+  for (const copy of platformCopies) s.dbCheck(trail.some((row) => row.event_id === copy.event_id && row.tenant_id === tenant), `platform trail copy of ${copy.event_type.split('.').pop()} shares its event id with the client's row`);
   if (actor !== undefined && fc.length > 0) s.dbCheck(fc.every((row) => row.actor_user_id === actor), 'field_changes actor_user_id = acting user', [...new Set(fc.map((row) => row.actor_user_id))]);
   if (actor !== undefined && trail.length > 0) s.dbCheck(rows(`select actor_user_id from audit.audit_trail where correlation_id = ${lit(corr)}`).every((row) => row.actor_user_id === actor), 'audit_trail actor_user_id = acting user');
   if (reason !== undefined) s.dbCheck(fc.some((row) => row.reason === reason), `field_changes reason "${reason}"`, fc.map((row) => row.reason));
   s.db.push(`audit: ${fc.length} field change(s) [${fcKeys.join(', ')}], ${trail.length} trail event(s) [${eventKeys.join(', ')}]`);
 
   if (trail.length === 0) return;
-  const ids = trail.map((row) => lit(row.event_id)).join(',');
+  const eventIds = [...new Set(trail.map((row) => row.event_id))];
+  const ids = eventIds.map((id) => lit(id)).join(',');
   const result = await poll(
     () => rows(`select id, type, tenant_id, processed_at_utc, dead_lettered_at_utc, attempts, last_error from ops.outbox_events where id in (${ids})`),
-    (list) => list.length === trail.length && list.every((row) => row.processed_at_utc !== null || row.dead_lettered_at_utc !== null),
+    (list) => list.length === eventIds.length && list.every((row) => row.processed_at_utc !== null || row.dead_lettered_at_utc !== null),
   );
   const list = result.value;
-  s.dbCheck(list.length === trail.length, `outbox holds the ${trail.length} event(s) of the transaction`, list.length);
+  s.dbCheck(list.length === eventIds.length, `outbox holds the ${eventIds.length} event(s) of the transaction`, list.length);
   // Events of aggregates that are not ITenantScoped (saas: Tenant, Wallet) are enqueued with tenant_id NULL by design
   // (OutboxInterceptor) while AuditTrailInterceptor files them under the ambient tenant; every other event carries the tenant.
   const platformLevel = (row) => row.tenant_id === null && row.type.startsWith('Platform.Domain.PlatformAdmin.');
@@ -367,7 +373,7 @@ async function verifyAuditAndOutbox(s, corr, tenant, { fieldChanges = [], events
   if (nulls.length > 0) s.db.push(`note: outbox tenant_id NULL for platform-level ${nulls.join(', ')} (audit_trail files it under the tenant)`);
   const processed = list.filter((row) => row.processed_at_utc !== null).length;
   const dead = list.filter((row) => row.dead_lettered_at_utc !== null);
-  s.dbCheck(processed === trail.length && dead.length === 0, `outbox processed ${processed}/${trail.length} within ${(result.ms / 1000).toFixed(1)} s`, dead.map((row) => `${row.type}: ${row.last_error}`));
+  s.dbCheck(processed === eventIds.length && dead.length === 0, `outbox processed ${processed}/${eventIds.length} within ${(result.ms / 1000).toFixed(1)} s`, dead.map((row) => `${row.type}: ${row.last_error}`));
 }
 
 /**
@@ -1089,17 +1095,22 @@ async function fullCycle(api) {
 
   await step('N-08', 'Append-only audit tables (definitions read, no write attempted)', async (s) => {
     s.req('pg_trigger / pg_proc / has_table_privilege');
-    s.expect('BEFORE UPDATE OR DELETE trigger → audit.refuse_change() raising, enabled, on the three tables; lis_app has INSERT only');
+    s.expect('BEFORE UPDATE OR DELETE trigger → audit.refuse_change() and BEFORE TRUNCATE trigger → audit.refuse_truncate(), both raising and enabled, on the three tables; lis_app has INSERT only');
     for (const table of ['audit.audit_trail', 'audit.field_changes', 'audit.security_events']) {
-      const trigger = one(`select tgname, tgenabled, pg_get_triggerdef(t.oid) as def from pg_trigger t where tgrelid = ${lit(table)}::regclass and not tgisinternal`);
-      s.dbCheck(trigger !== null && /BEFORE DELETE OR UPDATE/.test(trigger.def) && /audit\.refuse_change\(\)/.test(trigger.def) && trigger.tgenabled === 'O', `${table}: ${trigger?.tgname} BEFORE DELETE OR UPDATE, enabled`, trigger);
+      // Since migration AppendOnlyTruncateGuard (validation fix D-01) each append-only table carries two triggers: the row
+      // trigger refusing UPDATE/DELETE and a statement trigger refusing TRUNCATE.
+      const triggers = rows(`select tgname, tgenabled, pg_get_triggerdef(t.oid) as def from pg_trigger t where tgrelid = ${lit(table)}::regclass and not tgisinternal order by tgname`);
+      const rowTrigger = triggers.find((t) => /BEFORE DELETE OR UPDATE/.test(t.def)) ?? null;
+      s.dbCheck(rowTrigger !== null && /audit\.refuse_change\(\)/.test(rowTrigger.def) && rowTrigger.tgenabled === 'O', `${table}: ${rowTrigger?.tgname} BEFORE DELETE OR UPDATE, enabled`, triggers);
+      const truncateTrigger = triggers.find((t) => /BEFORE TRUNCATE/.test(t.def)) ?? null;
+      s.dbCheck(truncateTrigger !== null && /refuse_truncate\(\)/.test(truncateTrigger.def) && truncateTrigger.tgenabled === 'O', `${table}: ${truncateTrigger?.tgname} BEFORE TRUNCATE, enabled`, triggers);
       const grants = one(`select has_table_privilege('lis_app', ${lit(table)}, 'INSERT') as ins, has_table_privilege('lis_app', ${lit(table)}, 'UPDATE') as upd, has_table_privilege('lis_app', ${lit(table)}, 'DELETE') as del, has_table_privilege('lis_app', ${lit(table)}, 'TRUNCATE') as trunc`);
       s.dbCheck(grants?.ins === true && grants?.upd === false && grants?.del === false && grants?.trunc === false, `${table}: lis_app INSERT only`, grants);
     }
     const body = scalar(`select prosrc from pg_proc where oid = 'audit.refuse_change'::regproc`);
     s.dbCheck(/RAISE EXCEPTION/i.test(body ?? ''), 'refuse_change() raises an exception', body);
-    const truncateTriggers = scalar(`select count(*) as n from pg_trigger where tgrelid in ('audit.audit_trail'::regclass, 'audit.field_changes'::regclass, 'audit.security_events'::regclass) and (tgtype & 32) <> 0`);
-    s.saw(`TRUNCATE triggers: ${truncateTriggers} (TRUNCATE is covered by the missing privilege only)`);
+    const truncateBody = scalar(`select prosrc from pg_proc where oid = 'audit.refuse_truncate'::regproc`);
+    s.dbCheck(/RAISE EXCEPTION/i.test(truncateBody ?? ''), 'refuse_truncate() raises an exception', truncateBody);
   });
 
   await step('N-09', 'Tenant tables without row-level security (inventory)', async (s) => {

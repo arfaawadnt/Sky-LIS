@@ -6,12 +6,10 @@
   "exportCsv": "تصدير CSV",
   "reprint": "إعادة الطباعة",
   "openVisit": "فتح الزيارة",
-
   "lookup.find": "بحث",
   "lookup.hint": "اكتب رقم الزيارة أو امسحه ثم اضغط Enter.",
   "lookup.emptyTitle": "ابحث عن زيارة",
   "lookup.emptyMessage": "أدخل رقم الزيارة لعرض حسابها وتحصيل المدفوعات.",
-
   "field.accession": "رقم الزيارة",
   "field.patient": "المريض",
   "field.payer": "الجهة",
@@ -23,24 +21,19 @@
   "field.reason": "السبب",
   "field.note": "ملاحظة",
   "field.cashier": "أمين الخزينة",
-
   "filter.all": "الكل",
   "filter.from": "من",
   "filter.to": "إلى",
-
   "method.Cash": "نقدي",
   "method.Card": "بطاقة",
   "method.Pos": "نقاط بيع",
   "method.Transfer": "تحويل",
-
   "status.Posted": "مسجّل",
   "status.Voided": "ملغى",
-
   "balance.Paid": "مسدد",
   "balance.Unpaid": "غير مسدد",
   "balance.Partial": "مسدد جزئياً",
   "balance.RefundDue": "مستحق للاسترداد",
-
   "column.receipt": "الإيصال",
   "column.number": "الرقم",
   "column.date": "التاريخ",
@@ -65,7 +58,6 @@
   "column.countedCash": "النقدية المعدودة",
   "column.difference": "الفرق",
   "column.closedBy": "أُقفلت بواسطة",
-
   "account.title": "حساب الزيارة",
   "account.unknownPatient": "المريض",
   "account.totalListPrice": "الإجمالي",
@@ -81,13 +73,11 @@
   "account.printInvoice": "طباعة الفاتورة",
   "account.refundDue": "رد الرصيد",
   "account.billedThroughClaims": "هذه الزيارة ضمن دفعة معمل لمعمل: تُحاسب على المعمل المرسل من خلال المطالبات.",
-
   "payments.title": "المدفوعات",
   "payments.subtitle": "حصّل نصيب المريض من الزيارة كاملاً أو جزئياً على خزينة معتمدة لهذا الجهاز.",
   "payments.tabCollect": "تحصيل",
   "payments.tabRegister": "السجل",
   "payments.empty": "لا توجد مدفوعات مطابقة للتصفية.",
-
   "pay.title": "تحصيل دفعة",
   "pay.device": "الجهاز",
   "pay.chooseTreasury": "اختر خزينة…",
@@ -98,18 +88,15 @@
   "pay.noTreasury": "لا توجد خزينة معتمدة لك على هذا الجهاز.",
   "pay.requestAccess": "طلب صلاحية الخزينة",
   "pay.nothingDue": "لا يوجد مبلغ مستحق على هذه الزيارة.",
-
   "void.action": "إلغاء",
   "void.title": "إلغاء الدفعة",
   "void.message": "هل تريد إلغاء الإيصال {number} بمبلغ {amount}؟ يعود المبلغ إلى الرصيد. السبب مطلوب.",
   "void.done": "تم إلغاء الإيصال {number}.",
-
   "refunds.title": "الاستردادات",
   "refunds.subtitle": "رد الرصيد السالب (بعد تحويل التعاقد أو إلغاء خدمة) دون تجاوز المبلغ القابل للاسترداد.",
   "refunds.register": "الاستردادات",
   "refunds.empty": "لا توجد استردادات مطابقة للتصفية.",
   "refunds.emptyMessage": "أدخل رقم الزيارة لعرض المبلغ القابل للاسترداد.",
-
   "refund.title": "استرداد",
   "refund.refundable": "القابل للاسترداد",
   "refund.chooseReason": "اختر السبب…",
@@ -117,7 +104,6 @@
   "refund.done": "تم تسجيل الاسترداد {number}؛ اطبع الإيصال لتوقيع المريض.",
   "refund.nothingRefundable": "لا يوجد مبلغ قابل للاسترداد على هذه الزيارة.",
   "refund.reasonsError": "تعذّر تحميل أسباب الاسترداد.",
-
   "batch.title": "سداد الدفعات",
   "batch.subtitle": "سدّد أعضاء الدفعة الجماعية واحداً تلو الآخر أو دفعة واحدة.",
   "batch.lookupHint": "اكتب رقم الدفعة ثم اضغط Enter.",
@@ -134,7 +120,6 @@
   "batch.payAllSubmit": "سداد الكل",
   "batch.payMember": "سداد",
   "batch.paidAll": "تم تسجيل {count} إيصالات بمبلغ {amount}.",
-
   "closing.title": "تقفيل الخزينة",
   "closing.subtitle": "مطابقة درج الخزينة لأمين خزينة وفترة: النقدية المتوقعة = المدفوعات النقدية − الاستردادات النقدية.",
   "closing.scopeTitle": "الدرج",
@@ -178,7 +163,6 @@
   "closing.printSheet": "الورقة",
   "closing.handedOverBy": "سلّمه (أمين الخزينة)",
   "closing.receivedBy": "استلمه",
-
   "doc.receiptTitle": "إيصال سداد",
   "doc.receiptsTitle": "إيصالات سداد",
   "doc.invoiceTitle": "فاتورة",
@@ -202,7 +186,6 @@
   "doc.refundAcknowledgement": "استلمت المبلغ المذكور أعلاه.",
   "doc.patientSignature": "توقيع المريض",
   "doc.cashierSignature": "توقيع أمين الخزينة",
-
   "error.BIL-001": "يجب أن يكون المبلغ أكبر من صفر.",
   "error.BIL-002": "يسمح للمبلغ بخانتين عشريتين على الأكثر.",
   "error.BIL-003": "المرجع مطلوب لكل طرق الدفع عدا النقدي.",
@@ -240,5 +223,6 @@
   "error.BIL-409": "لم يتم العثور على الخزينة.",
   "error.TENANT-004": "اختر فرعاً قبل تحصيل الأموال.",
   "error.CONCURRENCY-409": "قام أمين خزينة آخر بتعديل حساب هذه الزيارة للتو؛ أعد التحميل وحاول مرة أخرى.",
-  "error.UNIQUE-409": "سجّل أمين خزينة آخر حركة على هذه الزيارة للتو؛ أعد التحميل وحاول مرة أخرى."
+  "error.UNIQUE-409": "سجّل أمين خزينة آخر حركة على هذه الزيارة للتو؛ أعد التحميل وحاول مرة أخرى.",
+  "exported": "تم تنزيل ملف CSV."
 }

@@ -4,6 +4,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { PATIENTS_API, type PatientDocumentItem } from '../../../core/api/patients.contracts';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { PatientFileFacade } from './patient-file.facade';
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -28,9 +29,19 @@ const document: PatientDocumentItem = {
 describe('PatientFileFacade (01 §6.3)', () => {
   let facade: PatientFileFacade;
   let backend: HttpTestingController;
+  let granted: Set<string>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), PatientFileFacade] });
+    granted = new Set(['patients.view', 'files.view']);
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+        PatientFileFacade,
+      ],
+    });
     facade = TestBed.inject(PatientFileFacade);
     backend = TestBed.inject(HttpTestingController);
   });
@@ -46,11 +57,31 @@ describe('PatientFileFacade (01 §6.3)', () => {
     await runEffects();
     backend.expectOne(`${PATIENTS_API.patients}/p-1`).flush({ id: 'p-1', number: 'PAT-2026-00001', status: 'Active', rowVersion: 7 });
     const documents = backend.expectOne((r) => r.url === `${PATIENTS_API.patients}/p-1/documents`);
-    expect(documents.request.params.get('includeInactive')).toBe('true');
+    expect(documents.request.params.get('includeInactive')).toBe('false');   // active documents first (UAT A-03 note)
     documents.flush([document]);
     backend.match(() => true).forEach((call) => call.flush({}, { status: 404, statusText: 'Not Found' }));
     await runEffects();
   }
+
+  it('never asks for the documents without files.view (UAT A-03: the list answered 403)', async () => {
+    granted = new Set(['patients.view']);
+    facade.load('p-1');
+    await runEffects();
+    backend.expectOne(`${PATIENTS_API.patients}/p-1`).flush({ id: 'p-1', number: 'PAT-2026-00001', status: 'Active', rowVersion: 7 });
+    backend.expectNone((r) => r.url === `${PATIENTS_API.patients}/p-1/documents`);
+    expect(facade.canSeeDocuments()).toBe(false);
+  });
+
+  it('re-reads the file and its documents when the page opens again (UAT D-14, A-01)', async () => {
+    await open();
+    facade.refresh();
+    await runEffects();
+    backend.expectOne(`${PATIENTS_API.patients}/p-1`).flush({ id: 'p-1', number: 'PAT-2026-00001', status: 'Active', rowVersion: 8 });
+    backend.expectOne((r) => r.url === `${PATIENTS_API.patients}/p-1/documents`).flush([]);
+    backend.match(() => true).forEach((call) => call.flush({}, { status: 404, statusText: 'Not Found' }));
+    await runEffects();
+    expect(facade.documents.value()).toEqual([]);
+  });
 
   it('loads the file and its documents but not the visits until their tab is opened', async () => {
     await open();
@@ -104,7 +135,7 @@ describe('PatientFileFacade (01 §6.3)', () => {
     const merge = backend.expectOne(`${PATIENTS_API.patients}/p-1/merge`);
     expect(merge.request.body).toEqual({ mergedPatientId: 'p-2', reason: 'registered twice', confirmGenderMismatch: false });
     merge.flush(null, { status: 204, statusText: 'No Content' });
-    await merged;
+    expect(await merged).toBeUndefined();   // a 204 is success, not the failure null
     await runEffects();
     backend.expectOne(`${PATIENTS_API.patients}/p-1`).flush({ id: 'p-1', number: 'PAT-2026-00001', status: 'Active', rowVersion: 8, mergedFiles: [] });
     backend.expectOne((r) => r.url === `${PATIENTS_API.patients}/p-1/documents`).flush([]);

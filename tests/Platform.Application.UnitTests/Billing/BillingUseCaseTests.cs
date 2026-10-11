@@ -243,6 +243,29 @@ public sealed class BillingUseCaseTests
     }
 
     [Fact]
+    public async Task The_payments_export_writes_local_times_in_the_browser_time_zone()
+    {
+        // UAT R1-06: the register shows local times; its CSV was still in UTC.
+        var world = new BillingWorld();
+        var visit = world.AddVisit(300m, "ACC-2026-00041");
+        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Cash", null, world.TreasuryId, Device), CancellationToken.None);
+        var paidAt = world.Clock.UtcNow;
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Africa/Cairo");
+
+        var file = await new ExportPaymentsHandler(world.Accounts, world.Visits, world.Clock).Handle(
+            new ExportPaymentsQuery(null, null, null, null, null, null, null, null, "Africa/Cairo"), CancellationToken.None);
+
+        var text = Encoding.UTF8.GetString(file.Content);
+        Assert.StartsWith("﻿Receipt,Paid at (Africa/Cairo),Accession", text, StringComparison.Ordinal);
+        Assert.Contains("Voided at (Africa/Cairo)", text, StringComparison.Ordinal);
+        Assert.Contains(TimeZoneInfo.ConvertTime(paidAt, zone).ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture), text, StringComparison.Ordinal);
+        Assert.DoesNotContain(paidAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture), text, StringComparison.Ordinal);
+
+        Assert.True(new ExportPaymentsValidator().Validate(new ExportPaymentsQuery(null, null, null, null, null, null, null, null, "Africa/Cairo")).IsValid);
+        Assert.False(new ExportPaymentsValidator().Validate(new ExportPaymentsQuery(null, null, null, null, null, null, null, null, "Mars/Olympus")).IsValid);
+    }
+
+    [Fact]
     public async Task The_receipt_carries_the_letterhead_and_the_figures_as_of_printing()
     {
         var world = new BillingWorld();

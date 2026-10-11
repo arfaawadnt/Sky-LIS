@@ -79,6 +79,17 @@ describe('CashClosingFacade (CP-30)', () => {
     backend.verify();
   });
 
+  it('re-reads the treasuries and the register when the page opens again (UAT D-14, A-01)', async () => {
+    await initialLoads();
+    facade.refresh();
+    await runEffects();
+    backend.expectOne(BILLING_API.treasuries).flush([]);
+    backend.expectOne((request) => request.url === BILLING_API.cashClosings).flush(page<CashClosingListItem>([]));
+    await runEffects();
+    expect(facade.treasuryList()).toEqual([]);
+    backend.verify();
+  });
+
   it('asks for the cashiers of a treasury and period', async () => {
     await initialLoads();
     facade.cashierQuery.set({ treasuryId: 't-1', fromUtc: '2026-10-09T00:00:00.000Z', toUtc: '2026-10-09T16:00:00.000Z' });

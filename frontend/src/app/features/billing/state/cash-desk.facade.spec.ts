@@ -55,6 +55,27 @@ describe('CashDeskFacade (BR-27, UAT D-08)', () => {
     expect(desk.treasuryId()).toBe('t-1');
   });
 
+  it('reads autoPrintReceipt through billing (no settings.view needed) and prints only when it is on (UAT A-05)', async () => {
+    await tick();
+    expect(desk.shouldAutoPrint()).toBe(false);   // not known yet: no print
+    backend.expectNone('/api/v1/settings');
+    backend.expectOne(BILLING_API.printSettings).flush({ autoPrintReceipt: false });
+    await tick();
+    expect(desk.shouldAutoPrint()).toBe(false);
+
+    desk.refresh();   // the page opens again: a parameter changed since is read again
+    await tick();
+    backend.expectOne(BILLING_API.printSettings).flush({ autoPrintReceipt: true });
+    await tick();
+    expect(desk.shouldAutoPrint()).toBe(true);
+
+    desk.refresh();
+    await tick();
+    backend.expectOne(BILLING_API.printSettings).flush({ type: 'about:blank', title: 'Forbidden', status: 403, code: 'AUTHZ-001' }, { status: 403, statusText: 'Forbidden' });
+    await tick();
+    expect(desk.shouldAutoPrint()).toBe(false);   // refused: no print
+  });
+
   it('re-reads after a refused read, so a right granted since (BR-17) is not hidden behind the old refusal', async () => {
     await tick();
     backend.expectOne((request) => request.url === BILLING_API.myTreasuries).flush({ type: 'about:blank', title: 'Forbidden', status: 403, code: 'AUTHZ-001' }, { status: 403, statusText: 'Forbidden' });

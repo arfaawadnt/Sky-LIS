@@ -54,8 +54,9 @@ public sealed class ReportingGateTests
     [Fact]
     public void The_result_figures_read_only_the_agreed_results_columns_and_the_turnaround_threshold()
     {
-        string[] agreed = ["r.branch_id", "r.status", "r.visit_id", "r.tenant_id", "r.tube_id", "r.expected_at_utc"];
-        foreach (var sql in new[] { BranchDashboardReader.PendingResultsSql, BranchDashboardReader.UnverifiedBacklogSql, BranchDashboardReader.DelayedTestsSql })
+        // MODULES.md §5 app.results columns; the delayed list (UAT R1-02) adds the row's id and test.
+        string[] agreed = ["r.id", "r.branch_id", "r.status", "r.visit_id", "r.tenant_id", "r.tube_id", "r.expected_at_utc", "r.test_id"];
+        foreach (var sql in new[] { BranchDashboardReader.PendingResultsSql, BranchDashboardReader.UnverifiedBacklogSql, BranchDashboardReader.DelayedTestsSql, BranchDashboardReader.DelayedListSql })
         {
             var used = System.Text.RegularExpressions.Regex.Matches(sql, @"\br\.[a-z_]+").Select(match => match.Value).Distinct().ToList();
             Assert.All(used, column => Assert.Contains(column, agreed));
@@ -65,5 +66,10 @@ public sealed class ReportingGateTests
 
         Assert.Contains("@late_factor", BranchDashboardReader.DelayedTestsSql, StringComparison.Ordinal);
         Assert.Contains("@as_of", BranchDashboardReader.DelayedTestsSql, StringComparison.Ordinal);
+
+        // The table lists exactly what the tile counts: the list repeats the count's predicate (UAT R1-02).
+        var count = BranchDashboardReader.DelayedTestsSql;
+        Assert.Contains(count[count.IndexOf("WHERE r.branch_id", StringComparison.Ordinal)..].Trim(), BranchDashboardReader.DelayedListSql, StringComparison.Ordinal);
+        Assert.Contains("LIMIT @limit", BranchDashboardReader.DelayedListSql, StringComparison.Ordinal);
     }
 }

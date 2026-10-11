@@ -106,7 +106,13 @@ public sealed class Country : AggregateRoot
     /// CP-02 / SA-04 "mobile validated by country length": accepts <c>+20 101 234 5678</c>, <c>0020…</c>, <c>01012345678</c>
     /// or <c>1012345678</c> and returns the E.164 form (<c>+201012345678</c>); anything else is <c>GEO-010</c>.
     /// </summary>
-    public string NormaliseMobile(string? input)
+    public string NormaliseMobile(string? input) => NormaliseMobile(input, PlatformAdminCodes.MobileInvalidForCountry, "A mobile number");
+
+    /// <summary>
+    /// <see cref="NormaliseMobile(string?)"/> for one named field: the refusal carries <paramref name="code"/> and names the
+    /// field (<c>GEO-010</c> the laboratory mobile, <c>GEO-014</c> the manager's mobile; validation 2026-10-11, C-03).
+    /// </summary>
+    public string NormaliseMobile(string? input, string code, string field)
     {
         var raw = (input ?? string.Empty).Trim();
         var digits = new string(raw.Where(char.IsAsciiDigit).ToArray());
@@ -126,8 +132,8 @@ public sealed class Country : AggregateRoot
         }
 
         var shapeOk = raw.Length > 0 && raw.All(c => char.IsAsciiDigit(c) || c is '+' or ' ' or '-' or '(' or ')');
-        Require(shapeOk && national.Length == MobileLength && national[0] != '0', PlatformAdminCodes.MobileInvalidForCountry,
-            $"A mobile number in {IsoCode} has {MobileLength} digits after {DialCode}.", DomainFault.Validation);
+        Require(shapeOk && national.Length == MobileLength && national[0] != '0', code,
+            $"{field} in {IsoCode} has {MobileLength} digits after {DialCode}.", DomainFault.Validation);
         return DialCode + national;
     }
 }
@@ -184,10 +190,26 @@ public sealed record CountryData(
             DomainText.Required(Currency, Country.MaxCurrencyNameLength, PlatformAdminCodes.CurrencyInvalid, "The currency"),
             currencyCode,
             language,
-            DomainText.Required(TimeZone, Country.MaxTimeZoneLength, PlatformAdminCodes.GeographyTextInvalid, "The time zone"),
+            IanaTimeZone(DomainText.Required(TimeZone, Country.MaxTimeZoneLength, PlatformAdminCodes.TimeZoneInvalid, "The time zone")),
             MobileLength,
             DomainText.Optional(Flag, Country.MaxFlagLength, PlatformAdminCodes.GeographyTextInvalid, "The flag"),
             DomainText.Optional(Remarks, Country.MaxRemarksLength, PlatformAdminCodes.GeographyTextInvalid, "The remarks"));
+    }
+
+    /// <summary>
+    /// SA-10: the time zone is an IANA name (<c>Africa/Cairo</c>), validated against the zones the runtime knows (ICU on
+    /// Windows, tzdata elsewhere); Windows names (<c>Egypt Standard Time</c>) and unknown names (<c>Mars/Base</c>) are
+    /// <c>GEO-007</c>. The canonical spelling is kept (<c>africa/cairo</c> is stored as <c>Africa/Cairo</c>). Validation
+    /// 2026-10-11, C-08.
+    /// </summary>
+    internal static string IanaTimeZone(string name)
+    {
+        if (!TimeZoneInfo.TryFindSystemTimeZoneById(name, out var zone) || !zone.HasIanaId)
+        {
+            throw new DomainException(PlatformAdminCodes.TimeZoneInvalid, $"'{name}' is not an IANA time zone name such as Africa/Cairo.", DomainFault.Validation);
+        }
+
+        return zone.Id;
     }
 }
 

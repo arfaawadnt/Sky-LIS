@@ -47,17 +47,27 @@ export class SiteAgentsFacade {
     loader: ({ params, abortSignal }) => this.api.intake(params, abortSignal),
   });
 
+  /** Re-reads the agents, the lookups, the open agent and the logs when the page opens again (the facade outlives the page; UAT D-14). */
+  refresh(): void {
+    this.list.reload();
+    this.branches.reload();
+    this.analysers.reload();
+    this.detail.reload();
+    this.logs.reload();
+    this.intake.reload();
+  }
+
   readonly create = mutation((request: CreateSiteAgentRequest) => this.api.createAgent(request), { then: () => this.list.reload() });
 
-  readonly update = mutation((input: { id: string; request: UpdateSiteAgentRequest }) => this.api.updateAgent(input.id, input.request), { then: () => this.refresh() });
+  readonly update = mutation((input: { id: string; request: UpdateSiteAgentRequest }) => this.api.updateAgent(input.id, input.request), { then: () => this.reloadAgent() });
 
-  readonly rotate = mutation((id: string) => this.api.rotateAgentSecret(id), { then: () => this.refresh() });
+  readonly rotate = mutation((id: string) => this.api.rotateAgentSecret(id), { then: () => this.reloadAgent() });
 
-  readonly push = mutation((id: string) => this.api.pushAgentConfig(id), { then: () => this.refresh() });
+  readonly push = mutation((id: string) => this.api.pushAgentConfig(id), { then: () => this.reloadAgent() });
 
-  readonly deactivate = mutation((id: string) => this.api.deactivateAgent(id), { then: () => this.refresh() });
+  readonly deactivate = mutation((id: string) => this.api.deactivateAgent(id), { then: () => this.reloadAgent() });
 
-  readonly reactivate = mutation((id: string) => this.api.reactivateAgent(id), { then: () => this.refresh() });
+  readonly reactivate = mutation((id: string) => this.api.reactivateAgent(id), { then: () => this.reloadAgent() });
 
   getAgent(id: string): Promise<SiteAgentDetail> {
     return this.api.getAgent(id);
@@ -88,7 +98,7 @@ export class SiteAgentsFacade {
     this.intakeFilter.update((current) => ({ ...current, ...change, page: change.page ?? 1 }));
   }
 
-  private refresh(): void {
+  private reloadAgent(): void {
     this.list.reload();
     this.detail.reload();
   }

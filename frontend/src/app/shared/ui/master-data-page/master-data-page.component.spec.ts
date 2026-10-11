@@ -1,8 +1,10 @@
 import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
+import sharedEn from '../../../../../public/i18n/shared.en.json';
 import type { Paged } from '../../../core/api/paging';
 import { ProblemCodes, ProblemError } from '../../../core/api/problem-details';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { CellTemplateDirective } from '../data-table/cell-template.directive';
 import { ConfirmService } from '../dialog/confirm.service';
 import { ToastService } from '../toast/toast.service';
@@ -89,6 +91,24 @@ class HostComponent {
   };
 }
 
+/** A branch-like page: the currency is a code field that starts at EGP (B-01). */
+@Component({
+  imports: [MasterDataPageComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<app-master-data-page [config]="config" />`,
+})
+class DefaultsHostComponent {
+  readonly config: MasterDataConfig<Item, ItemDto> = {
+    i18nPrefix: 'test.branches',
+    columns: [{ key: 'code', header: 'test.branches.column.code' }],
+    fields: [
+      { name: 'code', kind: 'code', required: true },
+      { name: 'currency', kind: 'code', required: true, maxLength: 3, defaultValue: 'EGP' },
+    ],
+    adapter: new FakeAdapter(),
+  };
+}
+
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 function setValue(input: HTMLInputElement | null, value: string): void {
@@ -102,7 +122,7 @@ function setValue(input: HTMLInputElement | null, value: string): void {
 
 describe('MasterDataPageComponent (shared/ui)', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [HostComponent], providers: [provideZonelessChangeDetection()] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [HostComponent, DefaultsHostComponent], providers: [provideZonelessChangeDetection()] }).compileComponents();
   });
 
   async function render(): Promise<{ fixture: ReturnType<typeof TestBed.createComponent<HostComponent>>; host: HTMLElement; adapter: FakeAdapter }> {
@@ -244,6 +264,51 @@ describe('MasterDataPageComponent (shared/ui)', () => {
     expect(host.querySelector('[role="dialog"]')).not.toBeNull();
     const errors = [...(dialog?.querySelectorAll('app-form-field .error') ?? [])].map((element) => element.textContent?.trim());
     expect(errors).toEqual(['Arabic name is too long.']);
+  });
+
+  it('shows a server rule in the user language instead of the validator English (C-06)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) =>
+      new Response(JSON.stringify(String(input) === '/i18n/shared.en.json' ? sharedEn : {}), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+    await TestBed.inject(I18nService).load('shared');
+    const { fixture, host, adapter } = await render();
+    adapter.createError = new ProblemError(
+      {
+        type: 'about:blank',
+        title: 'The request is not valid.',
+        status: 400,
+        code: ProblemCodes.validationFailed,
+        traceId: null,
+        correlationId: null,
+        errors: { code: ["'Code' must be 3 characters in length. You entered 2 characters."] },
+        rules: { code: [{ rule: 'ExactLength', minLength: 3, maxLength: 3 }] },
+      },
+      400,
+    );
+
+    host.querySelector<HTMLButtonElement>('app-page-header .btn.primary')?.click();
+    await fixture.whenStable();
+    const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+    setValue(dialog?.querySelector<HTMLInputElement>('input.code') ?? null, 'C3');
+    setValue(dialog?.querySelector<HTMLInputElement>('input[lang="en"]') ?? null, 'Gamma');
+    setValue(dialog?.querySelector<HTMLInputElement>('input[lang="ar"]') ?? null, 'جاما');
+    dialog?.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
+    await flush(fixture);
+
+    const errors = [...(dialog?.querySelectorAll('app-form-field .error') ?? [])].map((element) => element.textContent?.trim());
+    expect(errors).toEqual(['Exactly 3 characters.']);
+    vi.restoreAllMocks();
+  });
+
+  it('starts a new record of a code field at its default value (B-01)', async () => {
+    const fixture = TestBed.createComponent(DefaultsHostComponent);
+    await fixture.whenStable();
+    const host = fixture.nativeElement as HTMLElement;
+
+    host.querySelector<HTMLButtonElement>('app-page-header .btn.primary')?.click();
+    await fixture.whenStable();
+    const inputs = [...(host.querySelectorAll<HTMLInputElement>('[role="dialog"] input.code') ?? [])].map((input) => input.value);
+    expect(inputs).toEqual(['', 'EGP']);
   });
 
   it('deactivates a record after confirmation', async () => {

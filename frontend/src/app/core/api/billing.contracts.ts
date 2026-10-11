@@ -471,6 +471,11 @@ export interface BillingReasonOption {
   readonly isActive: boolean;
 }
 
+/** The cash desk's print parameters (CP-57 `autoPrintReceipt`), readable with `billing.view` (UAT A-05). */
+export interface BillingPrintSettings {
+  readonly autoPrintReceipt: boolean;
+}
+
 export const BILLING_API = {
   payments: '/api/v1/billing/payments',
   refunds: '/api/v1/billing/refunds',
@@ -479,6 +484,7 @@ export const BILLING_API = {
   cashClosings: '/api/v1/billing/cash-closings',
   myTreasuries: '/api/v1/billing/my-treasuries',
   treasuries: '/api/v1/billing/treasuries',
+  printSettings: '/api/v1/billing/print-settings',
   refundReasons: '/api/v1/catalogue/reasons',
 } as const;
 

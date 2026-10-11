@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Platform.Application.Patients;
 using Platform.Application.Registration;
 using Platform.Contracts.Registration;
 using Platform.Domain.Catalogue;
@@ -240,5 +241,31 @@ internal sealed class RegistrationDirectory(AppDbContext context) : IRegistratio
         public string? NameEn { get; set; }
 
         public string? NameAr { get; set; }
+    }
+}
+
+/// <summary>
+/// The visit figures of the patient register (CP-11; UAT A-09): one grouped query over <c>app.visits</c> of the current
+/// tenant for the files of a register page, counted on the file each visit belongs to now (merges re-point visits).
+/// </summary>
+internal sealed class PatientVisitStatistics(AppDbContext context) : IPatientVisitStatistics
+{
+    public async Task<IReadOnlyDictionary<Guid, PatientVisitFigures>> ForPatientsAsync(IReadOnlyCollection<Guid> patientIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(patientIds);
+        var ids = patientIds.Where(id => id != Guid.Empty).Distinct().ToArray();
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(ids.Length, IPatientVisitStatistics.MaxIds, nameof(patientIds));
+        if (ids.Length == 0)
+        {
+            return new Dictionary<Guid, PatientVisitFigures>();
+        }
+
+        var rows = await context.Set<Visit>().AsNoTracking()
+            .Where(visit => ids.Contains(visit.PatientId))
+            .GroupBy(visit => visit.PatientId)
+            .Select(group => new { PatientId = group.Key, Count = group.Count(), Last = group.Max(visit => visit.RegisteredAtUtc) })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return rows.ToDictionary(row => row.PatientId, row => new PatientVisitFigures(row.Count, row.Last));
     }
 }

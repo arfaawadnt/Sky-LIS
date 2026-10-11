@@ -36,6 +36,13 @@ export class ProfileFacade {
     },
   });
 
+  /** Re-reads the own profile when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01/C-13). A load in flight is left alone. */
+  refresh(): void {
+    this.profile.reload();
+    this.saveLanguage.reset();
+    this.changePassword.reset();
+  }
+
   readonly changePassword = mutation((input: { currentPassword: string; newPassword: string }) => this.api.changePassword(input.currentPassword, input.newPassword), {
     then: () => {
       this.session.invalidate();

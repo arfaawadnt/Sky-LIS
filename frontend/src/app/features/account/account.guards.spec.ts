@@ -69,4 +69,18 @@ describe('Account guards (CP-04 branch, CP-38 must-change)', () => {
     expect(await run(passwordChangeGuard, '/samples')).toBeInstanceOf(UrlTree);   // cached: no second call
     backend.verify();
   });
+
+  it('passwordChangeGuard keeps a must-change platform user on the Super Admin profile (C-14)', async () => {
+    await signInAs({ tenantId: PLATFORM_TENANT_ID, branchId: null });
+    const backend = TestBed.inject(HttpTestingController);
+
+    const pending = run(passwordChangeGuard, '/admin/clients');
+    backend.expectOne(ACCOUNT_API.profile).flush({ userId: 'u1', tenantId: PLATFORM_TENANT_ID, mustChangePassword: true });
+    const result = await pending;
+    expect((result as UrlTree).toString()).toBe(`${ACCOUNT_PATHS.adminProfile}?mustChange=1`);
+
+    expect(await run(passwordChangeGuard, ACCOUNT_PATHS.adminProfile)).toBe(true);
+    expect(((await run(passwordChangeGuard, ACCOUNT_PATHS.profile)) as UrlTree).toString()).toBe(`${ACCOUNT_PATHS.adminProfile}?mustChange=1`);
+    backend.verify();
+  });
 });

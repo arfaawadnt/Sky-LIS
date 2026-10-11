@@ -2,7 +2,20 @@
 
 export type SettingType = 'Bool' | 'Int' | 'String';
 
-/** One parameter with its effective text value (stored or default) and the descriptor the Parameters page renders. */
+/**
+ * Where an effective value comes from (`Platform.Contracts.Settings.TenantSettingSources`): the laboratory stored it, the
+ * platform parameters (SA-19) store it (the platform's own row, or the value a laboratory inherits), or nobody did and the
+ * code default applies.
+ */
+export type TenantSettingSource = 'Laboratory' | 'Platform' | 'Default';
+
+/**
+ * One parameter and the descriptor the Parameters page renders. `value` is the effective value, exactly as the modules
+ * read it: the tenant's own value, else the platform's, else the code default (validation 2026-10-11 C-09); `isDefault`
+ * is true when the tenant holds no value of its own; `inheritedValue` is what the tenant reads without one (the value a
+ * "use the default" action returns to). The server always sends `source` and `inheritedValue`; they are optional here only
+ * so the fixtures written before them still compile.
+ */
 export interface TenantSettingItem {
   readonly key: string;
   readonly type: SettingType;
@@ -12,6 +25,8 @@ export interface TenantSettingItem {
   readonly isDefault: boolean;
   readonly updatedAtUtc: string | null;
   readonly updatedByUserId: string | null;
+  readonly source?: TenantSettingSource;
+  readonly inheritedValue?: string;
 }
 
 export interface TenantSettingsResponse {

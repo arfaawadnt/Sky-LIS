@@ -24,7 +24,7 @@ public sealed class WalletTests
     public void W1_top_up_credits_and_records_the_balance_after()
     {
         var wallet = NewWallet();
-        var transaction = wallet.TopUp(500.005m, " INV-1 ", "bank transfer", Operator, Now);
+        var transaction = wallet.TopUp(500.01m, " INV-1 ", "bank transfer", Operator, Now);
 
         Assert.Equal(500.01m, wallet.Balance);
         Assert.Equal((WalletTransactionKind.TopUp, 500.01m, 500.01m, "INV-1", Operator), (transaction.Kind, transaction.Amount, transaction.BalanceAfter, transaction.Reference, transaction.ByUserId));
@@ -38,6 +38,20 @@ public sealed class WalletTests
     public void W1_a_non_positive_amount_is_refused_WAL_001(decimal amount)
     {
         Assert.Equal(PlatformAdminCodes.AmountInvalid, Assert.Throws<DomainException>(() => NewWallet().TopUp(amount, "INV", null, Operator, Now)).Code);
+    }
+
+    [Theory]
+    [InlineData("250.555")]
+    [InlineData("0.001")]
+    [InlineData("10.0001")]
+    public void C_19_an_amount_with_more_than_two_decimals_is_refused_never_rounded_WAL_001(string text)
+    {
+        var amount = decimal.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+        var wallet = NewWallet();
+        Assert.Equal(PlatformAdminCodes.AmountInvalid, Assert.Throws<DomainException>(() => wallet.TopUp(amount, "INV", null, Operator, Now)).Code);
+        Assert.Equal(PlatformAdminCodes.AmountInvalid, Assert.Throws<DomainException>(() => wallet.RequestTopUp(amount, null, LabUser, Now)).Code);
+        Assert.Equal(0m, wallet.Balance);
+        Assert.Equal(250.50m, wallet.TopUp(250.500m, "INV", null, Operator, Now).Amount);   // trailing zeros are two decimals
     }
 
     [Fact]

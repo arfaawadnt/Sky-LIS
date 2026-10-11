@@ -142,8 +142,9 @@ public sealed class Branch : AggregateRoot, ITenantScoped
         var digits = value.Count(char.IsAsciiDigit);
         Require(
             value.Length <= MaxPhoneLength && digits >= 5 && value.All(c => char.IsAsciiDigit(c) || c is '+' or ' ' or '-' or '(' or ')'),
-            OrganizationCodes.BranchContactInvalid,
-            $"The phone number must be at most {MaxPhoneLength} characters of digits, spaces, '+', '-' or parentheses.",
+            OrganizationCodes.BranchPhoneInvalid,
+            // One wording with the page's ORG-015 text (UAT R1-06).
+            $"The phone number must have at least 5 digits and at most {MaxPhoneLength} characters: digits, spaces, '+', '-' or parentheses.",
             DomainFault.Validation);
         return value;
     }
@@ -159,7 +160,7 @@ public sealed class Branch : AggregateRoot, ITenantScoped
         var at = value.IndexOf('@', StringComparison.Ordinal);
         Require(
             value.Length <= MaxEmailLength && at > 0 && at < value.Length - 1 && value.IndexOf('@', at + 1) < 0 && !value.Any(char.IsWhiteSpace),
-            OrganizationCodes.BranchContactInvalid,
+            OrganizationCodes.BranchEmailInvalid,
             "The e-mail address is not valid.",
             DomainFault.Validation);
         return value;

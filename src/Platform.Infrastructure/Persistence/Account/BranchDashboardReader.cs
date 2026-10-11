@@ -4,6 +4,7 @@ using Npgsql;
 using NpgsqlTypes;
 using Platform.Application.Abstractions.Settings;
 using Platform.Application.Account;
+using Platform.Contracts.Account;
 using Platform.Domain.PlatformAdmin;
 using Platform.Domain.Settings;
 using Platform.SharedKernel.Abstractions;
@@ -95,6 +96,28 @@ internal sealed class BranchDashboardReader(AppDbContext context, ITenantSetting
                         + (r.expected_at_utc - COALESCE(c.collected_at_utc, v.registered_at_utc)) * @late_factor
         """;
 
+    /// <summary>
+    /// The rows behind <see cref="DelayedTestsSql"/> (same tables, same predicate), most delayed first, at most
+    /// <c>@limit</c>: the "Delayed tests" table of the dashboard (UAT R1-02). Names come from the patient and test records.
+    /// </summary>
+    internal const string DelayedListSql = """
+        SELECT r.visit_id, v.accession, p.full_name, t.name_en, t.name_ar, r.expected_at_utc, r.status
+        FROM app.results r
+        JOIN app.visits v ON v.tenant_id = r.tenant_id AND v.id = r.visit_id
+        LEFT JOIN app.patients p ON p.tenant_id = v.tenant_id AND p.id = v.patient_id
+        LEFT JOIN app.tests t ON t.tenant_id = r.tenant_id AND t.id = r.test_id
+        LEFT JOIN LATERAL (
+            SELECT max(s.collected_at_utc) AS collected_at_utc FROM app.samples s
+            WHERE s.tenant_id = r.tenant_id AND s.tube_id = r.tube_id AND s.status NOT IN ('Replaced', 'Cancelled')
+        ) c ON true
+        WHERE r.branch_id = @branch AND r.status IN ('Ordered', 'Complete', 'Reviewed') AND r.expected_at_utc IS NOT NULL
+          AND v.registered_at_utc < @to
+          AND @as_of >= COALESCE(c.collected_at_utc, v.registered_at_utc)
+                        + (r.expected_at_utc - COALESCE(c.collected_at_utc, v.registered_at_utc)) * @late_factor
+        ORDER BY r.expected_at_utc, v.accession, r.id
+        LIMIT @limit
+        """;
+
     public async Task<BranchDayFigures> ReadAsync(Guid branchId, DashboardWindow window, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(window);
@@ -121,8 +144,9 @@ internal sealed class BranchDashboardReader(AppDbContext context, ITenantSetting
             var pending = await ScalarAsync<int>(connection, PendingResultsSql, branchId, window, cancellationToken, timing).ConfigureAwait(false);
             var backlog = pending is null ? null : await ScalarAsync<int>(connection, UnverifiedBacklogSql, branchId, window, cancellationToken, timing).ConfigureAwait(false);
             var delayed = pending is null ? null : await ScalarAsync<int>(connection, DelayedTestsSql, branchId, window, cancellationToken, timing).ConfigureAwait(false);
+            var delayedList = delayed is > 0 ? await DelayedListAsync(connection, branchId, window, timing, cancellationToken).ConfigureAwait(false) : null;
 
-            return new BranchDayFigures(registrations, collected, received, rejected, byDay, pending, backlog, delayed);
+            return new BranchDayFigures(registrations, collected, received, rejected, byDay, pending, backlog, delayed, delayedList);
         }
         finally
         {
@@ -159,6 +183,37 @@ internal sealed class BranchDashboardReader(AppDbContext context, ITenantSetting
             await using var command = Command(connection, sql, branchId, window, timing);
             var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
             return value is null or DBNull ? default(T) : (T)Convert.ChangeType(value, typeof(T), System.Globalization.CultureInfo.InvariantCulture);
+        }
+        catch (PostgresException exception) when (IsMissingSource(exception))
+        {
+            return null;
+        }
+    }
+
+    private static async Task<IReadOnlyList<DelayedTestItem>?> DelayedListAsync(DbConnection connection, Guid branchId, DashboardWindow window, ResultTiming timing, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var command = Command(connection, DelayedListSql, branchId, window, timing);
+            command.Parameters.Add(new NpgsqlParameter("limit", NpgsqlDbType.Integer) { Value = BranchDashboardLimits.DelayedRows });
+            var rows = new List<DelayedTestItem>();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var expected = new DateTimeOffset(DateTime.SpecifyKind(reader.GetDateTime(5), DateTimeKind.Utc));
+                var late = timing.AsOfUtc - expected;
+                rows.Add(new DelayedTestItem(
+                    reader.GetGuid(0),
+                    reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    expected,
+                    late > TimeSpan.Zero ? (int)Math.Min(late.TotalMinutes, int.MaxValue) : 0,
+                    reader.GetString(6),
+                    reader.IsDBNull(4) ? null : reader.GetString(4)));
+            }
+
+            return rows;
         }
         catch (PostgresException exception) when (IsMissingSource(exception))
         {

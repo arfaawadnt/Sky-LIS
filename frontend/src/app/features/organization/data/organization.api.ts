@@ -59,7 +59,7 @@ export class OrganizationApi {
   }
 
   updateBranch(id: string, request: UpdateBranchRequest): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.branches}/${encodeURIComponent(id)}`, request), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.branches}/${encodeURIComponent(id)}`, request), { defaultValue: undefined }).then(noContent);
   }
 
   setBranchActive(id: string, active: boolean): Promise<void> {
@@ -92,19 +92,19 @@ export class OrganizationApi {
   }
 
   updateRole(id: string, request: UpdateRoleRequest): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.roles}/${encodeURIComponent(id)}`, request), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.roles}/${encodeURIComponent(id)}`, request), { defaultValue: undefined }).then(noContent);
   }
 
   setRolePermissions(id: string, permissionKeys: readonly string[]): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.roles}/${encodeURIComponent(id)}/permissions`, { permissionKeys }), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.roles}/${encodeURIComponent(id)}/permissions`, { permissionKeys }), { defaultValue: undefined }).then(noContent);
   }
 
   setRoleSpecialRights(id: string, rights: SpecialRights): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.roles}/${encodeURIComponent(id)}/special-rights`, rights), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.roles}/${encodeURIComponent(id)}/special-rights`, rights), { defaultValue: undefined }).then(noContent);
   }
 
   setRoleResultRights(id: string, rights: readonly ResultRight[]): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.roles}/${encodeURIComponent(id)}/result-rights`, { rights }), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.roles}/${encodeURIComponent(id)}/result-rights`, { rights }), { defaultValue: undefined }).then(noContent);
   }
 
   setRoleActive(id: string, active: boolean): Promise<void> {
@@ -131,19 +131,19 @@ export class OrganizationApi {
   }
 
   updateUser(id: string, request: UpdateUserRequest): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.users}/${encodeURIComponent(id)}`, request), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${ORGANIZATION_API.users}/${encodeURIComponent(id)}`, request), { defaultValue: undefined }).then(noContent);
   }
 
   assignUserRole(id: string, roleId: string): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${this.user(id)}/role`, { roleId }), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${this.user(id)}/role`, { roleId }), { defaultValue: undefined }).then(noContent);
   }
 
   assignUserBranches(id: string, branchIds: readonly string[]): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${this.user(id)}/branches`, { branchIds }), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${this.user(id)}/branches`, { branchIds }), { defaultValue: undefined }).then(noContent);
   }
 
   setUserOverrides(id: string, request: SetUserOverridesRequest): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${this.user(id)}/overrides`, request), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${this.user(id)}/overrides`, request), { defaultValue: undefined }).then(noContent);
   }
 
   restoreUser(id: string): Promise<void> {
@@ -155,7 +155,7 @@ export class OrganizationApi {
   }
 
   resetUserPassword(id: string, request: ResetUserPasswordRequest): Promise<void> {
-    return firstValueFrom(this.http.post<void>(`${this.user(id)}/reset-password`, request), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(`${this.user(id)}/reset-password`, request), { defaultValue: undefined }).then(noContent);
   }
 
   setUserActive(id: string, active: boolean): Promise<void> {
@@ -200,7 +200,7 @@ export class OrganizationApi {
   }
 
   private post(url: string): Promise<void> {
-    return firstValueFrom(this.http.post<void>(url, null), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(url, null), { defaultValue: undefined }).then(noContent);
   }
 
   private lookup(url: string, extra: Readonly<Record<string, string | number | boolean>>): Promise<readonly LookupOption[]> {
@@ -209,6 +209,11 @@ export class OrganizationApi {
       .then((body) => itemsOf(body).map(toLookup).filter((item): item is LookupOption => item !== null))
       .catch((): readonly LookupOption[] => []);
   }
+}
+
+/** A 204 body is `null`, and `mutation()` reads `null` as failure: every empty answer resolves `undefined` (UAT B-06 / C-02). */
+function noContent(): void {
+  return undefined;
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {

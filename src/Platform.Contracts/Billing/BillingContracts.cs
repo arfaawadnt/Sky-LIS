@@ -127,6 +127,9 @@ public sealed record DrawerCashier(Guid UserId, string Name);
 /// <summary>A treasury of the session branch as the billing pages offer it.</summary>
 public sealed record BillingTreasuryItem(Guid Id, string Code, string NameEn, string NameAr, Guid BranchId, bool IsActive);
 
+/// <summary>The print parameters the cash desk needs (CP-57 <c>autoPrintReceipt</c>), readable with <c>billing.view</c> (UAT A-05: a cashier holds no <c>settings.view</c>).</summary>
+public sealed record BillingPrintSettings(bool AutoPrintReceipt);
+
 // ---- visit and batch accounts -------------------------------------------------------------------------------------
 
 public sealed record VisitAccountView(

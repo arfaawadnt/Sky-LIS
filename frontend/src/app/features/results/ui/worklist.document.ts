@@ -19,6 +19,8 @@ import { formatDateTime, patientLabel, pickName, testLabel } from './result-form
         [labNameEn]="doc().letterhead.labNameEn"
         [labNameAr]="doc().letterhead.labNameAr"
         [branch]="branch()"
+        [branchEn]="doc().letterhead.branchNameEn"
+        [branchAr]="doc().letterhead.branchNameAr"
         [title]="i18n.t('results.worklist.documentTitle')"
         [subtitle]="subtitle()"
         [printedBy]="doc().generatedBy"

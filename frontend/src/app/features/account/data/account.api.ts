@@ -15,7 +15,7 @@ import {
   type SupportTicketFilter,
   type SupportTicketListItem,
 } from '../../../core/api/account.contracts';
-import { AUDIT_API, type AuditEntriesPage, type AuditEntryFilter, type ChainVerificationResult } from '../../../core/api/audit.contracts';
+import { AUDIT_API, type AuditClientItem, type AuditEntriesPage, type AuditEntryFilter, type ChainVerificationResult } from '../../../core/api/audit.contracts';
 import { ORGANIZATION_API, type SelectableBranch, type SelectableBranchesResponse } from '../../../core/api/organization.contracts';
 import type { Paged } from '../../../core/api/paging';
 import { PLATFORM_API, type CreateTopUpRequest, type WalletDetail, type WalletTransactionItem, type WalletTransactionKind } from '../../../core/api/platform.contracts';
@@ -142,8 +142,22 @@ export class AccountApi {
   // ---- audit log (CP-68 / SA-09) ----
 
   auditEntries(filter: AuditEntryFilter): Promise<AuditEntriesPage> {
-    const params = toHttpParams({ from: filter.from, to: filter.to, userId: filter.userId, entityType: filter.entityType, entityId: filter.entityId, page: filter.page, pageSize: filter.pageSize });
+    const params = toHttpParams({
+      from: filter.from,
+      to: filter.to,
+      userId: filter.userId,
+      entityType: filter.entityType,
+      entityId: filter.entityId,
+      clientTenantId: filter.clientTenantId ?? null,
+      page: filter.page,
+      pageSize: filter.pageSize,
+    });
     return firstValueFrom(this.http.get<AuditEntriesPage>(AUDIT_API.entries, { params }));
+  }
+
+  /** The platform's clients for the SA-09 client filter (UAT C-18); a laboratory gets none. */
+  auditClients(): Promise<readonly AuditClientItem[]> {
+    return firstValueFrom(this.http.get<readonly AuditClientItem[]>(AUDIT_API.clients), { defaultValue: [] });
   }
 
   verifyChain(): Promise<ChainVerificationResult> {
@@ -155,7 +169,7 @@ export class AccountApi {
   }
 
   async exportAudit(filter: AuditExportFilter, language: string): Promise<DownloadedFile> {
-    const params = toHttpParams({ from: filter.from, to: filter.to, userId: filter.userId, entityType: filter.entityType, entityId: filter.entityId, language });
+    const params = toHttpParams({ from: filter.from, to: filter.to, userId: filter.userId, entityType: filter.entityType, entityId: filter.entityId, clientTenantId: filter.clientTenantId ?? null, language });
     const response = await firstValueFrom(this.http.get(ACCOUNT_API.auditExport, { params, responseType: 'blob', observe: 'response' }));
     return { blob: response.body ?? new Blob([], { type: 'text/csv' }), fileName: fileNameOf(response.headers.get('Content-Disposition')) ?? 'audit-log.csv' };
   }

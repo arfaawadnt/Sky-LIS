@@ -113,6 +113,24 @@ public sealed partial class MigrationScriptTests
         Assert.Contains("CREATE POLICY tenant_isolation ON app.tenant_memberships", script, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Every_table_that_refuses_row_deletion_also_refuses_truncate()
+    {
+        // Validation 2026-10-11 D-01: a BEFORE DELETE row trigger never fires on TRUNCATE, so a table whose rows are never
+        // deleted (append-only ledgers, money records, patient files, visits, results) needs a statement-level BEFORE TRUNCATE
+        // refusal as well, or the owner role could empty it.
+        var refusingDelete = Migrations
+            .SelectMany(migration => RowDeleteTrigger().Matches(migration.Source).Select(match => match.Groups["table"].Value))
+            .ToHashSet(StringComparer.Ordinal);
+        var refusingTruncate = Migrations
+            .SelectMany(migration => StatementTruncateTrigger().Matches(migration.Source).Select(match => match.Groups["table"].Value))
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.NotEmpty(refusingDelete);
+        var unguarded = refusingDelete.Where(table => !refusingTruncate.Contains(table)).Order(StringComparer.Ordinal).ToList();
+        Assert.True(unguarded.Count == 0, "Tables that refuse DELETE but not TRUNCATE (add a BEFORE TRUNCATE … FOR EACH STATEMENT trigger in a migration): " + string.Join(", ", unguarded));
+    }
+
     private static bool HasTenantColumn(string source, int createTableIndex)
     {
         var end = source.IndexOf("constraints:", createTableIndex, StringComparison.Ordinal);
@@ -125,6 +143,12 @@ public sealed partial class MigrationScriptTests
 
     [GeneratedRegex("set_config\\(\\s*'app\\.bypass_rls'|SET\\s+(LOCAL\\s+)?app\\.bypass_rls", RegexOptions.IgnoreCase)]
     private static partial Regex BypassIncantation();
+
+    [GeneratedRegex(@"CREATE\s+TRIGGER\s+\w+\s+BEFORE\s+(?:UPDATE\s+OR\s+)?DELETE(?:\s+OR\s+UPDATE)?\s+ON\s+(?<table>[a-z]+\.[a-z_]+)\s+FOR\s+EACH\s+ROW", RegexOptions.IgnoreCase)]
+    private static partial Regex RowDeleteTrigger();
+
+    [GeneratedRegex(@"CREATE\s+TRIGGER\s+\w+\s+BEFORE\s+TRUNCATE\s+ON\s+(?<table>[a-z]+\.[a-z_]+)\s+FOR\s+EACH\s+STATEMENT", RegexOptions.IgnoreCase)]
+    private static partial Regex StatementTruncateTrigger();
 
     [GeneratedRegex("CREATE POLICY tenant_isolation ON (?<schema>[a-z]+)\\.[a-z_]+(?<body>[\\s\\S]*?);", RegexOptions.IgnoreCase)]
     private static partial Regex TenantPolicy();

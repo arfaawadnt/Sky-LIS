@@ -63,7 +63,7 @@ public sealed class Wallet : AggregateRoot
     /// <summary>W1 Top up (<c>tenancy.manage</c>): credits the amount with a payment reference; completes the laboratory's pending request when one is given.</summary>
     public WalletTransaction TopUp(decimal amount, string reference, string? note, Guid? actorUserId, DateTimeOffset nowUtc, WalletTopUpRequest? fulfils = null)
     {
-        var credited = DomainText.Money(amount, PlatformAdminCodes.AmountInvalid, "The top-up amount", allowZero: false);
+        var credited = DomainText.EnteredMoney(amount, PlatformAdminCodes.AmountInvalid, "The top-up amount");
         var cleanedReference = DomainText.Required(reference, MaxReferenceLength, PlatformAdminCodes.ReferenceRequired, "The payment reference");
         if (fulfils is not null)
         {
@@ -105,7 +105,7 @@ public sealed class Wallet : AggregateRoot
     /// <summary>W4 Request a top-up (<c>wallet.create</c>, CP-66): the laboratory asks for credit; the platform tops up against it.</summary>
     public WalletTopUpRequest RequestTopUp(decimal amount, string? note, Guid requestedByUserId, DateTimeOffset nowUtc)
     {
-        var requested = DomainText.Money(amount, PlatformAdminCodes.AmountInvalid, "The requested amount", allowZero: false);
+        var requested = DomainText.EnteredMoney(amount, PlatformAdminCodes.AmountInvalid, "The requested amount");
         var request = WalletTopUpRequest.Create(Id, requested, Note(note), requestedByUserId, nowUtc);
         _topUpRequests.Add(request);
         Raise(new WalletTopUpRequested(Id, TenantId, request.Id, requested, nowUtc));

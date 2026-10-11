@@ -5,10 +5,10 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
-import type { FormValue, MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
+import type { FormValue, MasterDataConfig, MasterDataFilter } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueAApi } from '../data-a/catalogue-a.api';
 import { serviceGeneralOf } from '../data-a/catalogue-a.mapping';
-import { csvFileName, downloadCsv, toCsv } from '../data-a/csv-export';
+import { csvFileName, downloadCsv, toCsv, yesNo } from '../data-a/csv-export';
 import { CatalogueExportButtonComponent } from '../ui-a/export-button.component';
 
 /** The reduced form of an additional service (CP-55): code, short name, names, shortcut number and orderability. */
@@ -42,6 +42,9 @@ export class AdditionalServicesPage {
 
   protected readonly permissions = CATALOGUE_A_PERMISSIONS;
 
+  /** The filter of the list on screen: the export writes exactly these rows (UAT C-04 / B-09). */
+  private filter: MasterDataFilter = { search: '', active: true };
+
   protected readonly config: MasterDataConfig<ServiceListItem, AdditionalServiceForm> = {
     i18nPrefix: 'catalogue-a.additional',
     columns: [
@@ -60,8 +63,10 @@ export class AdditionalServicesPage {
     ],
     toDto: (value) => toForm(value),
     adapter: {
-      list: (filter, page, signal) =>
-        this.api.listServices({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize, type: 'Additional', clinicalGroupId: null }, signal),
+      list: (filter, page, signal) => {
+        this.filter = filter;
+        return this.api.listServices({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize, type: 'Additional', clinicalGroupId: null }, signal);
+      },
       create: (form) => this.api.createService(createRequest(form)),
       update: async (id, form) => {
         const detail = await this.api.getService(id);
@@ -73,7 +78,7 @@ export class AdditionalServicesPage {
   };
 
   protected readonly exportCsv = async (): Promise<void> => {
-    const rows = await this.api.exportServices('Additional');
+    const rows = await this.api.exportServices({ search: this.filter.search, isActive: this.filter.active }, 'Additional', null);
     const t = (key: string): string => this.i18n.t(`catalogue-a.additional.column.${key}`);
     downloadCsv(
       csvFileName('additional-services'),
@@ -83,8 +88,8 @@ export class AdditionalServicesPage {
         { header: this.i18n.t('catalogue-a.csv.nameEn'), value: (row) => row.nameEn },
         { header: this.i18n.t('catalogue-a.csv.nameAr'), value: (row) => row.nameAr },
         { header: t('shortcutNo'), value: (row) => row.shortcutNo },
-        { header: t('isOrderable'), value: (row) => row.isOrderable },
-        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => row.isActive },
+        { header: t('isOrderable'), value: (row) => yesNo((key) => this.i18n.t(key), row.isOrderable) },
+        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => yesNo((key) => this.i18n.t(key), row.isActive) },
       ]),
     );
   };

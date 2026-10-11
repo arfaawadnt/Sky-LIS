@@ -6,13 +6,19 @@ import { Router, provideRouter } from '@angular/router';
 
 import { ACCOUNT_API, type BranchDashboard, type MyAccountProfile, type SupportTicketDetail } from '../../../core/api/account.contracts';
 import { AUTH_API, type AuthProfile, type AuthResponse } from '../../../core/api/auth.contracts';
+import { AUDIT_API } from '../../../core/api/audit.contracts';
 import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
+import { PLATFORM_TENANT_ID } from '../../../core/tenancy/tenant-ids';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
+import { AuditLogFacade } from '../state/audit-log.facade';
 import { BranchSelectionFacade } from '../state/branch-selection.facade';
 import { DashboardFacade } from '../state/dashboard.facade';
 import { ProfileFacade } from '../state/profile.facade';
 import { SupportFacade } from '../state/support.facade';
+import { AuditLogPage } from './audit-log.page';
 import { DashboardPage } from './dashboard.page';
 import { ProfilePage } from './profile.page';
 import { SelectBranchPage } from './select-branch.page';
@@ -51,6 +57,7 @@ describe('Account pages', () => {
         provideRouter([]),
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
+        AuditLogFacade,
         BranchSelectionFacade,
         DashboardFacade,
         ProfileFacade,
@@ -133,6 +140,172 @@ describe('Account pages', () => {
     expect(root.textContent).toContain('MAIN');
   });
 
+  it('CP-05 on a past day: no "today" captions, the day and every figure in Arabic-Indic digits, activity in words (UAT A-12)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) =>
+      new Response(
+        JSON.stringify(
+          String(input) === '/i18n/account.ar.json'
+            ? {
+                'dashboard.today': 'اليوم',
+                'dashboard.onDay': 'في {date}',
+                'dashboard.kpi.collected': 'المحصّل',
+                'dashboard.kpi.collectedToday': 'المحصّل اليوم',
+                'dashboard.chartBar': '{date}: {count} تسجيلات',
+                'dashboard.last7': 'التسجيلات — آخر {days} أيام',
+                'audit.actionName.ResultVerified': 'اعتماد نتيجة',
+              }
+            : {},
+        ),
+        { status: 200 },
+      ),
+    );
+    await signIn({ permissions: ['dashboard.view', 'audit.view'] });
+    const i18n = TestBed.inject(I18nService);
+    i18n.setLanguage('ar');
+    await i18n.load('account');
+    TestBed.inject(DashboardFacade).setDate('2020-01-05');
+    const fixture = TestBed.createComponent(DashboardPage);
+    await render(fixture);
+    backend.expectOne((r) => r.url === ACCOUNT_API.dashboard).flush({
+      branchId: 'b1',
+      date: '2020-01-05',
+      fromUtc: '2020-01-04T22:00:00Z',
+      toUtc: '2020-01-05T22:00:00Z',
+      currencyCode: 'EGP',
+      kpis: { registrations: 16, collectedToday: 2436, samplesReceived: null, pendingResults: 14, unverifiedBacklog: 2, delayedTests: 0, rejectedSamples: null, walletBalance: null, walletCurrency: null },
+      registrationsByDay: [{ date: '2020-01-05', count: 16 }],
+      delayedTests: [],
+    } satisfies BranchDashboard);
+    backend.expectOne(ORGANIZATION_API.selectableBranches).flush({ currentBranchId: 'b1', branches: [{ id: 'b1', code: 'MAIN', nameEn: 'Main', nameAr: 'الرئيسي' }] });
+    backend.expectOne((r) => r.url === '/api/v1/audit/entries').flush({
+      items: [{ id: 'e1', kind: 'Event', atUtc: '2020-01-05T08:00:00Z', actorUserId: 'u1', actorName: 'Mona', entityType: 'ResultLogEntry', entityId: 'r1', action: 'ResultVerified', correlationId: null, changes: null, reason: null, sequence: 1, payload: '{}' }],
+      page: 1,
+      pageSize: 8,
+      totalCount: 1,
+      totalPages: 1,
+    });
+    await render(fixture);
+
+    const root = fixture.nativeElement as HTMLElement;
+    const tiles = [...root.querySelectorAll('app-stat-card')].map((tile) => tile.textContent ?? '');
+    expect(tiles.join(' ')).not.toContain('اليوم');
+    expect(tiles.join(' ')).toContain('المحصّل');
+    expect(tiles.join(' ')).not.toContain('المحصّل اليوم');
+    expect(tiles[0]).toContain('١٦');
+    const chart = root.querySelector('app-bar-chart')?.textContent ?? '';
+    expect(chart).toContain('١٦');
+    expect(chart).not.toMatch(/[0-9]/);   // values and descriptions: no Latin digits next to Arabic-Indic tiles
+    expect(root.textContent).toContain('آخر ٧ أيام');   // the caption's day count in the interface digits (UAT R1-06)
+    const header = root.querySelector('app-page-header')?.textContent ?? '';
+    expect(header).not.toContain('2020-01-05');
+    expect(header).toContain('٢٠٢٠');
+    const activity = root.querySelector('.activity')?.textContent ?? '';
+    expect(activity).toContain('اعتماد نتيجة');
+    expect(activity).toContain('Result log entry');   // no dictionary entry here: words, not the type name
+    expect(activity).not.toContain('ResultVerified');
+    expect(activity).not.toContain('ResultLogEntry');
+    expect(root.querySelector('a[href="/account/audit"]')).toBeNull();
+    expect(root.textContent).not.toContain('account.dashboard.openAudit');   // CP-68 is Release 2: no "Open audit" link
+  });
+
+  it('CP-05 lists the delayed tests the tile counts: accession, patient, test, delay and status (UAT R1-02)', async () => {
+    await signIn({ permissions: ['dashboard.view'] });
+    const fixture = TestBed.createComponent(DashboardPage);
+    await render(fixture);
+    backend.expectOne((r) => r.url === ACCOUNT_API.dashboard).flush({
+      branchId: 'b1',
+      date: '2026-10-11',
+      fromUtc: '2026-10-10T21:00:00Z',
+      toUtc: '2026-10-11T21:00:00Z',
+      currencyCode: 'EGP',
+      kpis: { registrations: 3, collectedToday: 0, samplesReceived: null, pendingResults: 2, unverifiedBacklog: 0, delayedTests: 2, rejectedSamples: null, walletBalance: null, walletCurrency: null },
+      registrationsByDay: [{ date: '2026-10-11', count: 3 }],
+      delayedTests: [
+        { visitId: 'v1', accession: 'ACC-2026-00012', patientName: 'Mona Adel', testName: 'Glucose', testNameAr: 'جلوكوز', expectedAtUtc: '2026-10-11T12:00:00Z', delayMinutes: 125, status: 'Ordered' },
+        { visitId: 'v2', accession: 'ACC-2026-00013', patientName: null, testName: 'Urea', expectedAtUtc: '2026-10-11T13:40:00Z', delayMinutes: 25, status: 'Reviewed' },
+      ],
+    } satisfies BranchDashboard);
+    backend.expectOne(ORGANIZATION_API.selectableBranches).flush({ currentBranchId: 'b1', branches: [{ id: 'b1', code: 'MAIN', nameEn: 'Main', nameAr: 'الرئيسي' }] });
+    await render(fixture);
+
+    const rows = [...(fixture.nativeElement as HTMLElement).querySelectorAll('app-data-table tbody tr')].map((row) => row.textContent ?? '');
+    expect(rows.length).toBe(2);
+    expect(rows[0]).toContain('ACC-2026-00012');
+    expect(rows[0]).toContain('Mona Adel');
+    expect(rows[0]).toContain('Glucose');
+    expect(rows[0]).toContain('Ordered');
+    expect(rows[1]).toContain('ACC-2026-00013');
+    expect(rows[1]).toContain('Urea');
+    expect(rows[1]).toContain('Reviewed');
+    // UAT R3-03: the due time is shown (local date-time of expectedAtUtc), beside the delay.
+    const headers = [...(fixture.nativeElement as HTMLElement).querySelectorAll('app-data-table thead th')].map((cell) => cell.textContent ?? '');
+    expect(headers.some((text) => /dashboard.due|Due/.test(text))).toBe(true);
+    expect(rows[0]).toMatch(/2026|11/);
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('account.dashboard.noDelays');
+  });
+
+  it('CP-65 announces the saved language in the new language, once its dictionary is loaded (UAT A-07 / C-10)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) =>
+      new Response(JSON.stringify(String(input) === '/i18n/account.ar.json' ? { 'profile.languageSaved': 'تم حفظ اللغة.' } : {}), { status: 200 }),
+    );
+    const toast = vi.spyOn(TestBed.inject(ToastService), 'success');
+    await signIn({});
+    const fixture = TestBed.createComponent(ProfilePage);
+    await render(fixture);
+    backend.expectOne(ACCOUNT_API.profile).flush({ userId: 'u1', language: 'en', tenantId: 't1', passwordPolicy: { minLength: 8, maxLength: 128 } });
+    await render(fixture);
+
+    const page = fixture.componentInstance as unknown as { language: { setValue(value: string): void }; saveLanguage(): Promise<void> };
+    page.language.setValue('ar');
+    const saving = page.saveLanguage();
+    await settle();
+    backend.expectOne(ACCOUNT_API.preferences).flush(null, { status: 204, statusText: 'No Content' });
+    await saving;
+
+    expect(TestBed.inject(I18nService).lang()).toBe('ar');
+    expect(toast).toHaveBeenCalledWith('تم حفظ اللغة.');
+    expect(toast).not.toHaveBeenCalledWith('account.profile.languageSaved');
+  });
+
+  it('SA-09 shows the client of each entry and offers the client filter in the platform log only (UAT C-18)', async () => {
+    await signIn({ tenantId: PLATFORM_TENANT_ID, permissions: ['audit.view'] });
+    const fixture = TestBed.createComponent(AuditLogPage);
+    await render(fixture);
+    backend.expectOne((r) => r.url === AUDIT_API.entries).flush({
+      items: [
+        { id: 'e1', kind: 'Event', atUtc: '2026-10-11T08:00:00Z', actorUserId: 'u1', actorName: 'Admin', entityType: 'Tenant', entityId: 'lab-a', action: 'TenantPlanChanged', correlationId: null, changes: null, reason: null, sequence: 56, payload: '{}', clientTenantId: 'lab-a', clientNameEn: 'V11 Validation Lab', clientNameAr: 'مختبر التحقق' },
+        { id: 'e2', kind: 'FieldChange', atUtc: '2026-10-11T07:00:00Z', actorUserId: 'u1', actorName: 'Admin', entityType: 'Plan', entityId: 'p1', action: 'Modified', correlationId: null, changes: [], reason: null, sequence: null, payload: null, clientTenantId: null },
+      ],
+      page: 1,
+      pageSize: 50,
+      totalCount: 2,
+      totalPages: 1,
+    });
+    backend.expectOne(ACCOUNT_API.auditActors).flush([]);
+    backend.expectOne(AUDIT_API.clients).flush([{ tenantId: 'lab-a', nameEn: 'V11 Validation Lab', nameAr: 'مختبر التحقق', portalSlug: 'v11' }]);
+    await render(fixture);
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('account.audit.client');
+    expect(root.textContent).toContain('V11 Validation Lab');
+    const options = [...root.querySelectorAll<HTMLOptionElement>('select[formcontrolname=clientTenantId] option')].map((option) => option.value);
+    expect(options).toEqual(['', 'lab-a']);
+  });
+
+  it('CP-68 a laboratory log has no client column or filter', async () => {
+    await signIn({ permissions: ['audit.view'] });
+    const fixture = TestBed.createComponent(AuditLogPage);
+    await render(fixture);
+    backend.expectOne((r) => r.url === AUDIT_API.entries).flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 0 });
+    backend.expectOne(ACCOUNT_API.auditActors).flush([]);
+    backend.expectOne(AUDIT_API.clients).flush([]);
+    await render(fixture);
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).not.toContain('account.audit.client');
+    expect(root.querySelector('select[formcontrolname=clientTenantId]')).toBeNull();
+  });
+
   it('CP-65 shows the password rule live and does not send a password that contains the username', async () => {
     await signIn({});
     const fixture = TestBed.createComponent(ProfilePage);
@@ -163,6 +336,9 @@ describe('Account pages', () => {
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('.warn-strip')).not.toBeNull();   // must change
     expect(root.querySelector('.info-strip')?.textContent).toContain('account.profile.laboratoryUnavailable');
+    // UAT R3-04: no internal identifier of the laboratory on the page.
+    expect(root.textContent).not.toContain('account.profile.tenantId');
+    expect(root.querySelector('.layout')?.textContent ?? '').not.toMatch(/\bt1\b/);
     const type = (name: string, value: string): void => {
       const input = root.querySelector<HTMLInputElement>(`input[formcontrolname=${name}]`);
       if (input) {

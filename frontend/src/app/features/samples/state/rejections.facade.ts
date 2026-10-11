@@ -110,6 +110,18 @@ export class RejectionsFacade {
     this.replacement.set(null);
   }
 
+  /** Re-reads the looked-up tube, the rejected list, the reasons and the parameters when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01). A load in flight is left alone. */
+  refresh(): void {
+    for (const write of [this.reject, this.unreject, this.replace, this.printLabel]) {
+      write.reset();
+    }
+
+    this.lookup.reload();
+    this.rejected.reload();
+    this.reasons.reload();
+    this.settings.reload();
+  }
+
   private reloadAll(): void {
     this.rejected.reload();
     if (this.lookupNumber() !== null) {

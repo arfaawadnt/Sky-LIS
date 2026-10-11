@@ -104,12 +104,17 @@ public sealed class RefreshSessionCommandHandler(
         new(ProblemCodes.RefreshTokenRejected, "The refresh token is missing, unknown, expired or no longer valid.", DomainFault.Unauthenticated);
 }
 
-/// <summary>Sign-out revokes the whole family of the presented refresh token (02 §4.1). Silent when the token is unknown: the cookie is cleared either way.</summary>
+/// <summary>
+/// Sign-out revokes the whole family of the presented refresh token (02 §4.1). Only a token whose secret matches a live,
+/// unrotated session is honoured: a forged cookie naming someone else's session id, or a stale one, revokes nothing.
+/// Silent either way: the cookie is cleared regardless.
+/// </summary>
 [AllowUnauthenticated]
 public sealed record SignOutCommand(string? RefreshToken) : ICommand;
 
 public sealed class SignOutCommandHandler(
     IRefreshSessionRepository sessions,
+    IRefreshTokenService refreshTokens,
     ISessionPrincipalQuery principals,
     ISecurityEventLog events,
     IUnitOfWork unitOfWork,
@@ -117,13 +122,13 @@ public sealed class SignOutCommandHandler(
 {
     public async Task Handle(SignOutCommand command, CancellationToken cancellationToken)
     {
-        if (!TryFind(command.RefreshToken, out var sessionId))
+        if (!refreshTokens.TryParse(command.RefreshToken, out var sessionId, out var presentedHash))
         {
             return;
         }
 
         var session = await sessions.GetForUpdateAsync(sessionId, cancellationToken);
-        if (session is null)
+        if (session is null || !PresentedRefreshToken.Matches(session, presentedHash))
         {
             return;
         }
@@ -138,11 +143,15 @@ public sealed class SignOutCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await events.WriteAsync(new SecurityEvent(SecurityEvents.SessionRevoked, SecurityEvent.Info, session.TenantId, session.PlatformUserId, "logout"), cancellationToken);
     }
+}
 
-    private static bool TryFind(string? token, out Guid sessionId)
-    {
-        sessionId = Guid.Empty;
-        var dot = token?.IndexOf('.', StringComparison.Ordinal) ?? -1;
-        return dot > 0 && Guid.TryParseExact(token.AsSpan(0, dot), "N", out sessionId);
-    }
+/// <summary>
+/// Whether a presented refresh token is the current secret of its session (R2-04, sign-out): the hash matches in constant
+/// time and the session was neither rotated nor revoked. A cookie naming someone else's session id with another secret,
+/// or a superseded one, proves nothing and ends nothing.
+/// </summary>
+internal static class PresentedRefreshToken
+{
+    public static bool Matches(RefreshSession session, byte[] presentedHash) =>
+        !session.IsRevoked && session.RotatedAtUtc is null && CryptographicOperations.FixedTimeEquals(session.RefreshTokenHash, presentedHash);
 }

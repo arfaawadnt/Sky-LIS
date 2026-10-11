@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 
 import { CATALOGUE_A_PERMISSIONS, SERVICE_TYPES, type ServiceSequenceChange, type ServiceSequenceRow, type ServiceType } from '../../../core/api/catalogue-a.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
@@ -16,7 +17,7 @@ import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.com
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
-import { csvFileName, downloadCsv, toCsv } from '../data-a/csv-export';
+import { csvFileName, downloadCsv, toCsv, yesNo } from '../data-a/csv-export';
 import { ServiceSequenceFacade } from '../state-a/service-sequence.facade';
 import { CatalogueExportButtonComponent } from '../ui-a/export-button.component';
 
@@ -48,8 +49,12 @@ export class ServiceSequencePage {
   protected readonly i18n = inject(I18nService);
   protected readonly facade = inject(ServiceSequenceFacade);
   private readonly toast = inject(ToastService);
+  private readonly access = inject(PermissionsService);
 
   protected readonly permissions = CATALOGUE_A_PERMISSIONS;
+
+  /** Viewers (no edit right) see the sequence read-only (UAT B-12); the server decides regardless. */
+  protected readonly canEdit = computed(() => this.access.can(CATALOGUE_A_PERMISSIONS.edit));
   protected readonly types = SERVICE_TYPES;
 
   /** Edited values by service id (raw input text, so an empty or invalid entry stays visible). */
@@ -99,7 +104,7 @@ export class ServiceSequencePage {
         { header: this.i18n.t('catalogue-a.csv.nameEn'), value: (row) => row.nameEn },
         { header: this.i18n.t('catalogue-a.csv.nameAr'), value: (row) => row.nameAr },
         { header: t('type'), value: (row) => this.typeLabel(row.type) },
-        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => row.isActive },
+        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => yesNo((key) => this.i18n.t(key), row.isActive) },
       ]),
     );
     return Promise.resolve();
@@ -124,6 +129,10 @@ export class ServiceSequencePage {
   }
 
   protected onInput(row: ServiceSequenceRow, event: Event): void {
+    if (!this.canEdit()) {
+      return;
+    }
+
     const text = (event.target as HTMLInputElement).value.trim();
     this.edits.update((current) => ({ ...current, [row.id]: text }));
   }

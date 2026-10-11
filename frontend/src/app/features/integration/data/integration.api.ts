@@ -237,12 +237,14 @@ export class IntegrationApi {
     return firstValueFrom(this.http.get<T>(url, { params }), { defaultValue: empty }).then(abortable(signal));
   }
 
+  // A 204 answer has a null body and `firstValueFrom` resolves it as null, which `mutation()` reports as failure; success is
+  // undefined (validation 2026-10-11, the C-02 pattern).
   private put(url: string, body: unknown): Promise<void> {
-    return firstValueFrom(this.http.put<void>(url, body), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(url, body), { defaultValue: undefined }).then(() => undefined);
   }
 
   private post(url: string, body: unknown): Promise<void> {
-    return firstValueFrom(this.http.post<void>(url, body), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(url, body), { defaultValue: undefined }).then(() => undefined);
   }
 }
 

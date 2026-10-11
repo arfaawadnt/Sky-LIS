@@ -76,4 +76,21 @@ describe('TreasuryAccessFacade (01 §6.3)', () => {
     filtered.flush(page([]));
     backend.verify();
   });
+
+  it('re-reads the treasury picker on every visit, so a reactivated treasury is offered (UAT B-07)', async () => {
+    await runEffects();
+    backend.expectOne((request) => request.url === TREASURY_API.requests).flush(page([]));
+    backend.expectOne((request) => request.url === TREASURY_API.treasuries).flush(noTreasuries);
+    await runEffects();
+
+    facade.refresh();
+    await runEffects();
+    backend.expectOne((request) => request.url === TREASURY_API.requests).flush(page([]));
+    const picker = backend.expectOne((request) => request.url === TREASURY_API.treasuries);
+    expect(picker.request.params.get('isActive')).toBe('true');
+    picker.flush({ ...noTreasuries, items: [{ id: 'trs-9', code: 'NORTH-CASH', nameEn: 'North cash', nameAr: 'خزينة الشمال', branchId: 'b1', isActive: true, branchCode: 'NORTH', branchNameEn: 'North', branchNameAr: 'الشمال' }], totalCount: 1 });
+    await runEffects();
+    expect(facade.treasuries.value()?.items.map((item) => item.code)).toEqual(['NORTH-CASH']);
+    backend.verify();
+  });
 });

@@ -53,11 +53,11 @@ export class PricingApi {
   }
 
   updatePayer(id: string, request: PayerRequest): Promise<void> {
-    return firstValueFrom(this.http.put<void>(this.payer(id), request), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(this.payer(id), request), { defaultValue: undefined }).then(noContent);
   }
 
   setPayerActive(id: string, active: boolean): Promise<void> {
-    return firstValueFrom(this.http.post<void>(`${this.payer(id)}/${active ? 'reactivate' : 'deactivate'}`, null), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(`${this.payer(id)}/${active ? 'reactivate' : 'deactivate'}`, null), { defaultValue: undefined }).then(noContent);
   }
 
   /** The tenant's cash payer (created on first call, intake Q1). */
@@ -70,11 +70,11 @@ export class PricingApi {
   }
 
   renameTier(payerId: string, tierId: string, request: ContractTierRequest): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${this.payer(payerId)}/tiers/${encodeURIComponent(tierId)}`, request), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${this.payer(payerId)}/tiers/${encodeURIComponent(tierId)}`, request), { defaultValue: undefined }).then(noContent);
   }
 
   setTierActive(payerId: string, tierId: string, active: boolean): Promise<void> {
-    return firstValueFrom(this.http.post<void>(`${this.payer(payerId)}/tiers/${encodeURIComponent(tierId)}/${active ? 'reactivate' : 'deactivate'}`, null), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(`${this.payer(payerId)}/tiers/${encodeURIComponent(tierId)}/${active ? 'reactivate' : 'deactivate'}`, null), { defaultValue: undefined }).then(noContent);
   }
 
   listTierOptions(activeOnly: boolean, signal?: AbortSignal): Promise<readonly TierOption[]> {
@@ -98,11 +98,11 @@ export class PricingApi {
   }
 
   updateBasePriceList(id: string, request: UpdateBasePriceListRequest): Promise<void> {
-    return firstValueFrom(this.http.put<void>(this.list(id), request), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(this.list(id), request), { defaultValue: undefined }).then(noContent);
   }
 
   setBasePriceListActive(id: string, active: boolean): Promise<void> {
-    return firstValueFrom(this.http.post<void>(`${this.list(id)}/${active ? 'activate' : 'deactivate'}`, null), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(`${this.list(id)}/${active ? 'activate' : 'deactivate'}`, null), { defaultValue: undefined }).then(noContent);
   }
 
   getPriceLines(id: string, signal?: AbortSignal): Promise<readonly PriceLineItem[]> {
@@ -133,7 +133,7 @@ export class PricingApi {
   }
 
   setFormula(tierId: string, request: SetContractFormulaRequest): Promise<void> {
-    return firstValueFrom(this.http.put<void>(this.contract(tierId), request), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(this.contract(tierId), request), { defaultValue: undefined }).then(noContent);
   }
 
   applyContractPricing(tierId: string): Promise<ContractApplyResult> {
@@ -141,19 +141,19 @@ export class PricingApi {
   }
 
   negotiatePrice(tierId: string, serviceId: string, request: NegotiatePriceRequest): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${this.contract(tierId)}/prices/${encodeURIComponent(serviceId)}`, request), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${this.contract(tierId)}/prices/${encodeURIComponent(serviceId)}`, request), { defaultValue: undefined }).then(noContent);
   }
 
   clearExclusion(tierId: string, serviceId: string): Promise<void> {
-    return firstValueFrom(this.http.delete<void>(`${this.contract(tierId)}/prices/${encodeURIComponent(serviceId)}/exclusion`), { defaultValue: undefined });
+    return firstValueFrom(this.http.delete<void>(`${this.contract(tierId)}/prices/${encodeURIComponent(serviceId)}/exclusion`), { defaultValue: undefined }).then(noContent);
   }
 
   setAlert(tierId: string, serviceId: string, alertCondition: string | null): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${this.contract(tierId)}/prices/${encodeURIComponent(serviceId)}/alert`, { alertCondition }), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(`${this.contract(tierId)}/prices/${encodeURIComponent(serviceId)}/alert`, { alertCondition }), { defaultValue: undefined }).then(noContent);
   }
 
   copyContractPricing(tierId: string, sourceTierId: string, factor: number | null): Promise<void> {
-    return firstValueFrom(this.http.post<void>(`${this.contract(tierId)}/copy-from/${encodeURIComponent(sourceTierId)}`, { factor }), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(`${this.contract(tierId)}/copy-from/${encodeURIComponent(sourceTierId)}`, { factor }), { defaultValue: undefined }).then(noContent);
   }
 
   getReview(tierId: string): Promise<ContractPricingReviewDocument> {
@@ -174,6 +174,11 @@ export class PricingApi {
 }
 
 /** Resources pass an abort signal; a late result of an aborted load is dropped. */
+/** A 204 body is `null`, and `mutation()` reads `null` as failure: every empty answer resolves `undefined` (UAT B-06 / C-02). */
+function noContent(): void {
+  return undefined;
+}
+
 export function abortable<T>(signal: AbortSignal | undefined): (value: T) => T {
   return (value) => {
     if (signal?.aborted) {

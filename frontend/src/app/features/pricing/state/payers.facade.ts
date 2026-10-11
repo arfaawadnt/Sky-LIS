@@ -63,6 +63,12 @@ export class PayersFacade {
     return this.ensured;
   }
 
+  /** A new visit of the page: provisioning is checked again and a drawer left open by the previous visit is closed (UAT D-14). */
+  refresh(): void {
+    this.ensured = null;
+    this.closeTiers();
+  }
+
   openTiers(payerId: string): void {
     this.addTier.reset();
     this.renameTier.reset();

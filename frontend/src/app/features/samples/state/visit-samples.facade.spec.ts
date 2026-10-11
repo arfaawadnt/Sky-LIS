@@ -45,6 +45,22 @@ describe('VisitSamplesFacade (CP-15)', () => {
     await settle();
   }
 
+  it('re-reads the tubes of the visit on screen when the page opens again, and stays idle without one (UAT D-14, A-01)', async () => {
+    facade.refresh();
+    await runEffects();
+    backend.expectNone(() => true);
+
+    facade.show({ accession: 'ACC-2026-00001', visitId: null });
+    await runEffects();
+    backend.expectOne((request) => request.url === SAMPLES_API.samples).flush(page([]));
+    await runEffects();
+
+    facade.refresh();
+    await runEffects();
+    backend.expectOne((request) => request.url === SAMPLES_API.samples).flush(page([]));
+    backend.verify();
+  });
+
   it('stays idle until an accession is given, then lists its tubes by unit', async () => {
     await runEffects();
     backend.expectNone(() => true);

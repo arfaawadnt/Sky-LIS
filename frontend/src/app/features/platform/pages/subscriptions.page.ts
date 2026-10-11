@@ -44,6 +44,7 @@ import { CsvExportService } from '../data/csv-export';
 import { WalletsFacade } from '../state/wallets.facade';
 import { fileStamp, formatDate, formatDateTime, formatMoney, formatNumber, pick } from '../ui/format';
 import { statusTone } from '../ui/status';
+import { maxTwoDecimals } from '../ui/validators';
 
 type PlanForm = ReturnType<SubscriptionsPage['buildPlanForm']>;
 
@@ -132,7 +133,7 @@ export class SubscriptionsPage {
   protected readonly topUpOpen = signal(false);
   protected readonly topUpFor = signal<TopUpRequestItem | null>(null);
   protected readonly topUpForm = new FormGroup({
-    amount: new FormControl<number | null>(null, { validators: [Validators.required, Validators.min(0.01), Validators.max(100_000_000)] }),
+    amount: new FormControl<number | null>(null, { validators: [Validators.required, Validators.min(0.01), Validators.max(100_000_000), maxTwoDecimals(() => this.i18n.t('platform.wallet.validation.twoDecimals'))] }),
     reference: new FormControl('', { nonNullable: true, validators: [requiredText, Validators.maxLength(100)] }),
     note: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] }),
   });

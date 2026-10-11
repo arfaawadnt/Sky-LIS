@@ -107,6 +107,15 @@ describe('RefundsPage and BatchPaymentPage (CP-24, CP-27)', () => {
     backend.expectOne(`${BILLING_API.visits}/v-1/account`).flush(account({ paid: 300, patientShareTotal: 260, remaining: -40, refundable: 40, balanceStatus: 'RefundDue' }));
     await tick();
 
+    // UAT A-06: the note typed for this refund must not stay for the next one
+    harness.detectChanges();
+    const note = harness.routeNativeElement?.querySelector<HTMLTextAreaElement>('app-billing-movement-form textarea');
+    expect(note).toBeTruthy();
+    if (note) {
+      note.value = 'first refund note';
+      note.dispatchEvent(new Event('input'));
+    }
+
     await Promise.all([
       page.refund(account(), { treasuryId: 't-1', amount: 40, method: 'Cash', reference: null, reasonId: 'r-1', note: null }),
       (async () => {
@@ -117,6 +126,8 @@ describe('RefundsPage and BatchPaymentPage (CP-24, CP-27)', () => {
 
     expect(printed).toEqual(['refund:rf-1']);   // printed although autoPrintReceipt is off
     await tick();
+    harness.detectChanges();
+    expect(harness.routeNativeElement?.querySelector<HTMLTextAreaElement>('app-billing-movement-form textarea')?.value).toBe('');
     backend.expectOne(`${BILLING_API.visits}/v-1/account`).flush(account({ remaining: 0, refundable: 0, balanceStatus: 'Paid' }));
     backend.expectOne((request) => request.url === BILLING_API.refunds && request.method === 'GET').flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 0 });
   });

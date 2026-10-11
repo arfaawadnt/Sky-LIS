@@ -24,6 +24,18 @@ public sealed class PlatformAdminApplicationTests
     }
 
     [Theory]
+    [InlineData("250.555", false)]
+    [InlineData("0.001", false)]
+    [InlineData("250.55", true)]
+    [InlineData("250.500", true)]
+    public void C_19_top_up_amounts_with_more_than_two_decimals_are_refused_by_shape(string text, bool valid)
+    {
+        var amount = decimal.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(valid, new TopUpWalletValidator().Validate(new TopUpWalletCommand(Guid.CreateVersion7(), amount, "INV-1", null, null)).IsValid);
+        Assert.Equal(valid, new RequestWalletTopUpValidator().Validate(new RequestWalletTopUpCommand(amount, null)).IsValid);
+    }
+
+    [Theory]
     [InlineData("short1", "noor.admin", 8, PlatformAdminCodes.PasswordTooShort)]
     [InlineData("my-Noor.Admin-2026", "noor.admin", 8, PlatformAdminCodes.PasswordContainsUsername)]
     public void The_password_policy_refuses_with_its_code(string password, string username, int minimum, string code)

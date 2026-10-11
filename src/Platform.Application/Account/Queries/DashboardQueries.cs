@@ -79,7 +79,7 @@ public sealed class GetBranchDashboardHandler(
             currency,
             kpis,
             DashboardDays.Chart(day, figures.RegistrationsByLocalDay),
-            []);
+            figures.DelayedList ?? []);
     }
 }
 

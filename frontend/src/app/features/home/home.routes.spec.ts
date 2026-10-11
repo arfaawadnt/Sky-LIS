@@ -7,6 +7,7 @@ import { type ActivatedRouteSnapshot, type RouterStateSnapshot, UrlTree, provide
 import { AUTH_API, type AuthResponse } from '../../core/api/auth.contracts';
 import { AuthStore } from '../../core/auth/auth.store';
 import { DASHBOARD_PATH, homeRedirect } from './home.routes';
+import { HomePage } from './pages/home.page';
 
 async function signInWith(permissions: readonly string[]): Promise<void> {
   const pending = TestBed.inject(AuthStore).signIn('user', 'pw', null);
@@ -33,8 +34,33 @@ describe('homeRedirect (SRS CP-05 is the client home)', () => {
     expect((run() as UrlTree).toString()).toBe(DASHBOARD_PATH);
   });
 
-  it('keeps anyone else on the session summary', async () => {
+  // R1-04: this case used to keep the user on a developer placeholder (tenant id, raw expiry, permission keys)
+  it('sends a user without the dashboard to the first menu entry they may open', async () => {
+    await signInWith(['results.view', 'registration.view']);
+    expect((run() as UrlTree).toString()).toBe('/registration/visits'); // reception comes before the laboratory in the menu
+  });
+
+  it('sends a user without any menu permission to the profile, open to every client user', async () => {
     await signInWith([]);
-    expect(run()).toBe(true);
+    expect((run() as UrlTree).toString()).toBe('/account/profile');
+  });
+});
+
+describe('HomePage (R1-04)', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting()] });
+  });
+
+  it('shows a plain welcome and the way forward, never session internals', async () => {
+    await signInWith(['some.permission']);
+    const fixture = TestBed.createComponent(HomePage);
+    await fixture.whenStable();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    expect(text).toContain('Mona');
+    expect(text).not.toContain('t1');
+    expect(text).not.toContain('some.permission');
+    expect((fixture.nativeElement as HTMLElement).querySelector('a')?.getAttribute('href')).toBe('/account/profile');
+    TestBed.inject(HttpTestingController).verify(); // no session call
   });
 });

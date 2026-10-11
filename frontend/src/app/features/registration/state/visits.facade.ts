@@ -105,6 +105,13 @@ export class VisitsFacade {
     this.page.set(page);
   }
 
+  /** Re-reads the register and the tiers when the page opens again (the filter is kept): the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01). A load in flight is left alone. */
+  refresh(): void {
+    this.cancel.reset();
+    this.visits.reload();
+    this.tiers.reload();
+  }
+
   exportRows(): ReturnType<RegistrationApi['export']> {
     return this.api.export(this.filter());
   }

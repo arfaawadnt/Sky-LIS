@@ -75,6 +75,20 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     backend.expectOne((call) => call.url === RESULTS_API.results).flush(caseView([reportUnit(rows)]));
   }
 
+  it('offers the report comment and the internal note only with the rights the server requires (UAT A-02)', async () => {
+    await open(['results.view'], [resultRow()]);
+    // a view-only user (reception): neither dialog, whatever the unit's rights say
+    expect(host.querySelector('app-result-grid [aria-label="results.grid.comment"]')).toBeNull();
+    expect(host.querySelector('app-result-grid [aria-label="results.grid.note"]')).toBeNull();
+    expect(host.querySelector('app-result-grid [aria-label="results.grid.history"]')).not.toBeNull();
+  });
+
+  it('offers the report comment and the internal note to a user who may enter results of the unit', async () => {
+    await open(['results.view', 'results.create'], [resultRow()]);
+    expect(host.querySelector('app-result-grid [aria-label="results.grid.comment"]')).not.toBeNull();
+    expect(host.querySelector('app-result-grid [aria-label="results.grid.note"]')).not.toBeNull();
+  });
+
   it('opens the case of the query parameter, enters a value and saves it with Ctrl+S', async () => {
     await open(['results.view', 'results.create'], [resultRow()]);
 

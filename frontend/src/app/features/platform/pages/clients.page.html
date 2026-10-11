@@ -20,7 +20,7 @@
       <select class="inp" (change)="onPlan($event)">
         <option value="">{{ i18n.t('platform.all') }}</option>
         @for (plan of facade.plans.value()?.items ?? []; track plan.id) {
-          <option [value]="plan.id" [selected]="facade.filter().planId === plan.id">{{ plan.code }} · {{ name(plan) }}</option>
+          <option [value]="plan.id" [selected]="facade.filter().planId === plan.id">{{ plan.code }} · {{ name(plan) }}{{ plan.isActive ? '' : ' (' + i18n.t('platform.clients.planInactive') + ')' }}</option>
         }
       </select>
     </label>
@@ -132,8 +132,8 @@
         <app-form-field [label]="i18n.t('platform.clients.field.plan')" [problem]="saveProblem()">
           <select formControlName="planId">
             <option value="">{{ i18n.t('platform.choose') }}</option>
-            @for (plan of facade.plans.value()?.items ?? []; track plan.id) {
-              <option [value]="plan.id" [disabled]="!plan.isActive && plan.id !== form.controls.planId.value">{{ plan.code }} · {{ name(plan) }}</option>
+            @for (plan of planOptions(); track plan.id) {
+              <option [value]="plan.id">{{ plan.code }} · {{ name(plan) }}{{ plan.isActive ? '' : ' (' + i18n.t('platform.clients.planInactive') + ')' }}</option>
             }
           </select>
         </app-form-field>

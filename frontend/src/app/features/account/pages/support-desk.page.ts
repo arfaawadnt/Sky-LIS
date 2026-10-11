@@ -92,6 +92,7 @@ export class SupportDeskPage {
 
   constructor() {
     void this.i18n.load('account');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01/C-13)
   }
 
   protected laboratory(row: { readonly laboratoryNameEn: string | null; readonly laboratoryNameAr: string | null; readonly tenantId: string }): string {

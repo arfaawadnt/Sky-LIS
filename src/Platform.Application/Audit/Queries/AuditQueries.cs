@@ -9,7 +9,7 @@ namespace Platform.Application.Audit.Queries;
 
 /// <summary>The tenant's audit log (SRS CP-68; SA-09 is the same query under the platform tenant). Read-only; <c>audit.view</c>.</summary>
 [RequirePermissionPolicy(PermissionCatalog.Audit, PermissionAction.View)]
-public sealed record ListAuditEntriesQuery(DateTimeOffset? From, DateTimeOffset? To, Guid? UserId, string? EntityType, string? EntityId, int? Page, int? PageSize) : IQuery<Paged<AuditEntryItem>>;
+public sealed record ListAuditEntriesQuery(DateTimeOffset? From, DateTimeOffset? To, Guid? UserId, string? EntityType, string? EntityId, int? Page, int? PageSize, Guid? ClientTenantId = null) : IQuery<Paged<AuditEntryItem>>;
 
 public sealed class ListAuditEntriesQueryValidator : AbstractValidator<ListAuditEntriesQuery>
 {
@@ -26,7 +26,16 @@ public sealed class ListAuditEntriesQueryValidator : AbstractValidator<ListAudit
 public sealed class ListAuditEntriesQueryHandler(IAuditReader reader) : IQueryHandler<ListAuditEntriesQuery, Paged<AuditEntryItem>>
 {
     public Task<Paged<AuditEntryItem>> Handle(ListAuditEntriesQuery query, CancellationToken cancellationToken) =>
-        reader.ListAsync(new AuditEntryFilter(query.From, query.To, query.UserId, query.EntityType, query.EntityId), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        reader.ListAsync(new AuditEntryFilter(query.From, query.To, query.UserId, query.EntityType, query.EntityId, query.ClientTenantId), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+}
+
+/// <summary>The clients of the platform for the SA-09 client filter (UAT C-18); a laboratory's log has none.</summary>
+[RequirePermissionPolicy(PermissionCatalog.Audit, PermissionAction.View)]
+public sealed record ListAuditClientsQuery : IQuery<IReadOnlyList<AuditClientItem>>;
+
+public sealed class ListAuditClientsQueryHandler(IAuditReader reader) : IQueryHandler<ListAuditClientsQuery, IReadOnlyList<AuditClientItem>>
+{
+    public Task<IReadOnlyList<AuditClientItem>> Handle(ListAuditClientsQuery query, CancellationToken cancellationToken) => reader.ClientsAsync(cancellationToken);
 }
 
 /// <summary>Operators' check of the tamper-evident ledger (01 §4.8 "VerifyChain endpoint").</summary>

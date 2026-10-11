@@ -51,9 +51,10 @@ public sealed class AccountController(ISender sender) : ControllerBase
         [FromQuery] string? entityType,
         [FromQuery] string? entityId,
         [FromQuery] string? language,
+        [FromQuery] Guid? clientTenantId,
         CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportAuditEntriesQuery(from, to, userId, entityType, entityId, language), cancellationToken);
+        var file = await sender.Send(new ExportAuditEntriesQuery(from, to, userId, entityType, entityId, language, clientTenantId), cancellationToken);
         return File(file.Content, "text/csv; charset=utf-8", file.FileName);
     }
 }

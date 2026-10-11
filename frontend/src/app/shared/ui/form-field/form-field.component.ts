@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, ElementRef, Injector, type Signal, afterRenderEffect, computed, contentChild, effect, inject, input, signal, untracked } from '@angular/core';
 import { NgControl } from '@angular/forms';
 
-import type { ProblemDetails } from '../../../core/api/problem-details';
+import type { FieldRule, ProblemDetails } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { type ControlSnapshot, controlState } from '../../forms/control-state';
-import { SERVER_ERROR_KEY, toControlPath } from '../../forms/problem-to-form-errors';
+import { fieldErrorText } from '../../forms/problem-text';
+import { SERVER_ERROR_KEY, SERVER_RULES_KEY, toControlPath } from '../../forms/problem-to-form-errors';
 
 let nextFieldId = 0;
 
@@ -12,7 +13,8 @@ let nextFieldId = 0;
  * `<app-form-field [label]="…" [hint]="…"><input formControlName="code" /></app-form-field>`: label, required
  * marker, hint and the error line of the projected control. Errors come from the control's validators (translated
  * through `shared.validation.*`), from `problemToFormErrors` (`server` error) or from the `problem` input
- * (a `VALIDATION-400` whose `errors` carry this control's name). The label is wired to the control (`for`/`id`,
+ * (a `VALIDATION-400` whose `errors` carry this control's name); a server error whose rules are known is shown in the
+ * user's language with its bounds (C-06), never the validator's English. The label is wired to the control (`for`/`id`,
  * `aria-describedby`, `aria-invalid`) without the page having to invent ids.
  */
 @Component({
@@ -60,7 +62,7 @@ export class FormFieldComponent {
     for (const [key, messages] of Object.entries(errors)) {
       const path = toControlPath(key).toLowerCase();
       if (path === wanted || path.endsWith(`.${wanted}`)) {
-        return messages.join(' ');
+        return fieldErrorText(this.i18n, this.problem()?.rules?.[key], messages);
       }
     }
 
@@ -121,7 +123,8 @@ export class FormFieldComponent {
 
   private translate(errors: Readonly<Record<string, unknown>>): string {
     if (typeof errors[SERVER_ERROR_KEY] === 'string') {
-      return errors[SERVER_ERROR_KEY];
+      const rules = errors[SERVER_RULES_KEY];
+      return Array.isArray(rules) ? fieldErrorText(this.i18n, rules as readonly FieldRule[], [errors[SERVER_ERROR_KEY]]) : errors[SERVER_ERROR_KEY];
     }
 
     if (errors['required']) {

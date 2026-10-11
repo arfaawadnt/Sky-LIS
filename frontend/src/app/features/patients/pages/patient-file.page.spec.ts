@@ -92,7 +92,12 @@ describe('PatientFilePage (CP-11 file, documents, visits, merge)', () => {
     fixture.componentRef.setInput('id', patient.id);
     await flush();
     backend.expectOne(`${PATIENTS_API.patients}/${patient.id}`).flush(patient);
-    backend.expectOne((r) => r.url === `${PATIENTS_API.patients}/${patient.id}/documents`).flush([document]);
+    if (granted.has('files.view')) {
+      backend.expectOne((r) => r.url === `${PATIENTS_API.patients}/${patient.id}/documents`).flush([document]);
+    } else {
+      backend.expectNone((r) => r.url === `${PATIENTS_API.patients}/${patient.id}/documents`);
+    }
+
     backend.match(() => true).forEach((call) => call.flush([]));
     await flush();
     return fixture.nativeElement as HTMLElement;
@@ -118,6 +123,14 @@ describe('PatientFilePage (CP-11 file, documents, visits, merge)', () => {
     expect(host.textContent).not.toContain('patients.merge.open');
   });
 
+  it('offers no Documents tab without files.view (UAT A-03)', async () => {
+    granted = new Set(['patients.view']);
+    const host = await render();
+    const tabs = [...host.querySelectorAll<HTMLElement>('app-tabs [role="tab"]')].map((button) => button.textContent?.trim() ?? '');
+    expect(tabs.some((label) => label.includes('patients.tab.documents'))).toBe(false);
+    expect(tabs.some((label) => label.includes('patients.tab.visits'))).toBe(true);
+  });
+
   it('lists documents of merged files with their own number and offers deactivation to files managers only', async () => {
     granted = new Set(['patients.view', 'files.view', 'files.create']);
     const host = await render();
@@ -134,7 +147,7 @@ describe('PatientFilePage (CP-11 file, documents, visits, merge)', () => {
     granted = new Set(['patients.view']);
     const host = await render();
 
-    tab(host, 2).click();
+    tab(host, 1).click();   // without files.view there is no Documents tab: Visits is the second (UAT A-03)
     await flush();
     backend.expectOne((r) => r.url === PATIENTS_API.visits).flush('', { status: 404, statusText: 'Not Found' });
     await flush();

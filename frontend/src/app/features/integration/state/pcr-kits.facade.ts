@@ -19,6 +19,12 @@ export class PcrKitsFacade {
 
   readonly analysers = resource({ loader: ({ abortSignal }) => this.api.analyserOptions(abortSignal) });
 
+  /** Re-reads the kits and the analysers when the page opens again (the facade outlives the page; UAT D-14). */
+  refresh(): void {
+    this.list.reload();
+    this.analysers.reload();
+  }
+
   readonly save = mutation(
     (input: { id: string | null; request: SavePcrKitRequest }) =>
       input.id === null ? this.api.createKit(input.request).then((created) => created.id) : this.api.updateKit(input.id, input.request).then(() => input.id ?? ''),

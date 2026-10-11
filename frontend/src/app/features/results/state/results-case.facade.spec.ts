@@ -114,6 +114,37 @@ describe('ResultsCaseFacade (CP-19)', () => {
     backend.verify();
   });
 
+  it('resolves the 204 answers of the row writes as success, not as the failure null (comment, note, amend, delta)', async () => {
+    await openCase([resultRow({ status: 'Complete', numericValue: 95, textValue: '95.0' })]);
+    const writes: [Promise<unknown>, string][] = [
+      [facade.comment.execute({ id: 'res-1', text: 'Haemolysed' }), RESULTS_API.comment('res-1')],
+      [facade.note.execute({ id: 'res-1', text: 'Called the ward' }), RESULTS_API.note('res-1')],
+      [facade.acknowledge.execute({ id: 'res-1', comment: null }), RESULTS_API.acknowledgeDelta('res-1')],
+      [facade.amend.execute({ id: 'res-1', value: { numericValue: 96, textValue: null, paragraphs: null, culture: null }, reason: 'typo' }), RESULTS_API.amend('res-1')],
+    ];
+    for (const [pending, url] of writes) {
+      await settle();
+      backend.expectOne(url).flush(null, { status: 204, statusText: 'No Content' });
+      expect(await pending).toBeUndefined();
+      await runEffects();
+      backend.match((call) => call.url === RESULTS_API.results).forEach((call) => call.flush(caseView()));
+    }
+  });
+
+  it('re-reads the open case and drops the previous visit’s drafts and refusals when the page opens again (UAT D-14, A-01)', async () => {
+    await openCase();
+    facade.setDraft(resultRow(), '120');
+    expect(facade.dirtyCount()).toBe(1);
+
+    facade.refresh();
+    expect(facade.dirtyCount()).toBe(0);
+    expect(facade.refusals()).toEqual({});
+    await runEffects();
+    backend.expectOne((call) => call.url === RESULTS_API.results).flush(caseView([reportUnit([resultRow()], { rights: { canEdit: false, canReview: false, canVerify: false, canPrint: false, canModifyVerified: false, canPreviewWithoutVerify: false } })]));
+    await runEffects();
+    expect(facade.activeUnit()?.rights.canEdit).toBe(false);
+  });
+
   it('undoes every listed row with the reason and collects refusals instead of stopping', async () => {
     await openCase([resultRow({ id: 'res-1', status: 'Verified' }), resultRow({ id: 'res-2', status: 'Printed' })]);
 

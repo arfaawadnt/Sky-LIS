@@ -9,6 +9,7 @@ import { CellTemplateDirective } from '../../../shared/ui/data-table/cell-templa
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueBApi } from '../data-b/catalogue-b.api';
+import { ListedFilter } from '../data-b/listed-filter';
 import { CatalogueBExportButtonComponent } from '../ui-b/catalogue-b-export-button.component';
 
 const KIND_TONES: Readonly<Record<ReasonKind, BadgeTone>> = {
@@ -40,7 +41,9 @@ export class ReasonsPage {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(CatalogueBApi);
 
-  protected readonly exportCsv = (): Promise<void> => this.api.reasons.exportCsv({});
+  private readonly listed = new ListedFilter();
+
+  protected readonly exportCsv = (): Promise<void> => this.api.reasons.exportCsv(this.listed.query());
 
   protected readonly config: MasterDataConfig<ReasonListItem, ReasonRequest> = {
     i18nPrefix: 'catalogue-b.reasons',
@@ -60,7 +63,7 @@ export class ReasonsPage {
       { name: 'name', kind: 'localizedText', required: true, maxLength: 200 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.reasons.list({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.reasons.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.reasons.create(dto),
       update: (id, dto) => this.api.reasons.update(id, dto),
       setActive: (id, active) => this.api.reasons.setActive(id, active),

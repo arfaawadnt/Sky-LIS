@@ -18,7 +18,9 @@
           }
         </select>
       </label>
-      <button toolbarActions type="button" class="btn ghost" [disabled]="changes().length === 0" (click)="discard()"><app-icon name="x" [size]="15" />{{ i18n.t('catalogue-a.sequence.discard') }}</button>
+      @if (canEdit()) {
+        <button toolbarActions ngProjectAs="[toolbarActions]" type="button" class="btn ghost" [disabled]="changes().length === 0" (click)="discard()"><app-icon name="x" [size]="15" />{{ i18n.t('catalogue-a.sequence.discard') }}</button>
+      }
       <button toolbarActions type="button" class="btn ghost" (click)="facade.rows.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('catalogue-a.refresh') }}</button>
     </app-toolbar>
 
@@ -37,7 +39,7 @@
 
     <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.rows.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('catalogue-a.sequence.empty')" [caption]="i18n.t('catalogue-a.sequence.title')">
       <ng-template appCell="sequence" [appCellOf]="rows()" let-row>
-        <input class="inp sm mono seq" type="number" min="1" step="1" [value]="value(row)" (input)="onInput(row, $event)" [attr.aria-label]="i18n.t('catalogue-a.sequence.column.sequence') + ' ' + row.code" [class.invalid]="invalidIds().has(row.id) || duplicateIds().has(row.id)" [class.changed]="changed(row)" />
+        <input class="inp sm mono seq" type="number" min="1" step="1" [value]="value(row)" [readOnly]="!canEdit()" [disabled]="!canEdit()" (input)="onInput(row, $event)" [attr.aria-label]="i18n.t('catalogue-a.sequence.column.sequence') + ' ' + row.code" [class.invalid]="invalidIds().has(row.id) || duplicateIds().has(row.id)" [class.changed]="changed(row)" />
       </ng-template>
       <ng-template appCell="type" [appCellOf]="rows()" let-row><app-badge tone="info">{{ typeLabel(row.type) }}</app-badge></ng-template>
       <ng-template appCell="status" [appCellOf]="rows()" let-row><app-badge [status]="row.isActive ? 'Active' : 'Inactive'" /></ng-template>

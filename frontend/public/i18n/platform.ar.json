@@ -22,7 +22,6 @@
   "validation.mismatch": "كلمتا المرور غير متطابقتين.",
   "validation.containsUsername": "يجب ألا تحتوي كلمة المرور على اسم المستخدم.",
   "validation.json": "صيغة JSON غير صحيحة (يُتوقع كائن أو مصفوفة). {detail}",
-
   "status.Trial": "تجريبي",
   "status.Active": "نشط",
   "status.Inactive": "موقوف",
@@ -34,7 +33,6 @@
   "link.Serial": "منفذ تسلسلي (RS-232)",
   "link.Tcp": "شبكة TCP/IP",
   "link.File": "تبادل ملفات",
-
   "error.CLI-001": "عنوان البوابة من 3 إلى 40 حرفًا من a-z و0-9 و'-' وليس اسمًا محجوزًا.",
   "error.CLI-002": "راجع بيانات المعمل: الاسم والعنوان والمدير مطلوبة.",
   "error.CLI-003": "البريد الإلكتروني غير صحيح.",
@@ -61,16 +59,17 @@
   "error.WAL-011": "تمت معالجة الطلب أو رفضه من قبل.",
   "error.WAL-404": "لا توجد محفظة لهذا العميل.",
   "error.WAL-405": "طلب الشحن غير موجود.",
-  "error.GEO-010": "رقم الجوال لا يطابق طول أرقام الدولة المختارة.",
+  "error.GEO-010": "جوال المعمل لا يطابق طول أرقام الدولة المختارة.",
   "error.GEO-011": "الدولة موقوفة.",
   "error.GEO-012": "المحافظة موقوفة.",
   "error.GEO-013": "المحافظة لا تتبع الدولة المختارة.",
+  "error.GEO-014": "جوال المدير لا يطابق طول أرقام الدولة المختارة.",
+  "error.GEO-007": "المنطقة الزمنية ليست اسم IANA مثل Africa/Cairo.",
   "error.GEO-404": "الدولة غير موجودة.",
   "error.GEO-405": "المحافظة غير موجودة.",
   "error.PLT-403": "إدارة المنصة متاحة فقط من بوابة المدير العام.",
   "error.PLT-010": "استخدم تسجيل الخروج لإنهاء جلستك.",
   "error.SES-404": "انتهت الجلسة بالفعل.",
-
   "dashboard.title": "لوحة المتابعة",
   "dashboard.subtitle": "العملاء والنشاط والمحافظ على مستوى المنصة.",
   "dashboard.periodLabel": "الفترة",
@@ -98,7 +97,6 @@
   "dashboard.noActivity": "لا توجد تسجيلات في هذه الفترة بعد.",
   "dashboard.recentClients": "أحدث العملاء",
   "dashboard.viewAll": "عرض الكل",
-
   "clients.title": "العملاء",
   "clients.subtitle": "المعامل على المنصة: البيانات والباقة والبوابة والمحفظة والحالة.",
   "clients.add": "إضافة عميل",
@@ -146,6 +144,9 @@
   "clients.field.newPassword": "كلمة المرور الجديدة",
   "clients.hint.mobile": "كما يُطلب داخل الدولة، مثل 01012345678 أو ‎+20 101 234 5678.",
   "clients.hint.managerMobile": "يستقبل عنوان البوابة ورموز التحقق.",
+  "clients.validation.mobileLength": "جوال المعمل {length} أرقام بعد {dial} في الدولة المختارة.",
+  "clients.validation.managerMobileLength": "جوال المدير {length} أرقام بعد {dial} في الدولة المختارة.",
+  "clients.planInactive": "موقوفة",
   "clients.hint.portalSlug": "اتركه فارغًا ليُشتق من الاسم الإنجليزي؛ لا يمكن تغييره لاحقًا.",
   "clients.hint.adminUsername": "يدخل مدير المعمل بهذا الاسم.",
   "clients.editInfo": "البوابة {url} · المدير {username}",
@@ -160,12 +161,10 @@
   "clients.reason": "السبب",
   "clients.activated": "العميل نشط.",
   "clients.deactivated": "العميل موقوف ومستخدموه ممنوعون من الدخول.",
-
   "subscriptions.title": "الاشتراكات والمحافظ",
   "subscriptions.subtitle": "الباقات والمحافظ المدفوعة مسبقًا للعملاء.",
   "subscriptions.tab.wallets": "محافظ العملاء",
   "subscriptions.tab.plans": "الباقات",
-
   "plans.title": "الباقات",
   "plans.subtitle": "الرسوم الشهرية والحدود التي يحصل عليها العميل.",
   "plans.add": "إضافة باقة",
@@ -189,7 +188,6 @@
   "plans.column.status": "الحالة",
   "plans.field.currencyCode": "العملة",
   "plans.hint.code": "ثابت بعد الإنشاء، مثل STANDARD.",
-
   "wallet.title": "محفظة العميل",
   "wallet.subtitle": "رصيد مدفوع مسبقًا: تُخصم منه الرسوم الشهرية والاستهلاك؛ تتوقف الخدمات المقاسة عند الصفر.",
   "wallet.client": "العميل",
@@ -221,7 +219,7 @@
   "wallet.kind.Subscription": "اشتراك",
   "wallet.kind.Usage": "استهلاك",
   "wallet.hint.reference": "رقم الفاتورة أو التحويل.",
-
+  "wallet.validation.twoDecimals": "المبلغ برقمين عشريين على الأكثر.",
   "sessions.title": "الجلسات",
   "sessions.subtitle": "الجلسات النشطة لمديري المنصة.",
   "sessions.searchPlaceholder": "ابحث بالاسم أو اسم المستخدم",
@@ -239,7 +237,6 @@
   "sessions.column.status": "الحالة",
   "sessions.status.Active": "نشطة",
   "sessions.status.Idle": "خاملة",
-
   "countries.title": "الدول",
   "countries.subtitle": "الدول المخدومة وبيانات التحقق من بيانات المعمل.",
   "countries.add": "إضافة دولة",
@@ -271,7 +268,7 @@
   "countries.hint.isoCode": "حرفان (ISO 3166-1)، مثل EG.",
   "countries.hint.dialCode": "'+' ثم رمز الدولة، مثل ‎+20.",
   "countries.hint.currencyCode": "ثلاثة أحرف (ISO 4217)، مثل EGP.",
-  "countries.hint.timeZone": "اسم IANA، مثل Africa/Cairo.",
+  "countries.hint.timeZone": "اختر منطقة IANA، مثل Africa/Cairo.",
   "countries.hint.mobileLength": "عدد أرقام الجوال الوطني بعد مفتاح الاتصال (مصر 10).",
   "countries.error.GEO-001": "رمز ISO حرفان.",
   "countries.error.GEO-002": "مفتاح الاتصال '+' يليه من رقم إلى أربعة أرقام، مثل ‎+20.",
@@ -279,10 +276,10 @@
   "countries.error.GEO-004": "طول الجوال بين 6 و15 رقمًا.",
   "countries.error.GEO-005": "اللغة الإنجليزية أو العربية.",
   "countries.error.GEO-006": "راجع الأسماء والمنطقة الزمنية والعلم والملاحظات.",
+  "countries.error.GEO-007": "المنطقة الزمنية ليست اسم IANA مثل Africa/Cairo.",
   "countries.error.GEO-100": "توجد دولة بنفس رمز ISO.",
   "countries.error.GEO-110": "للدولة محافظات أو عملاء؛ أوقفها بدل حذفها.",
   "countries.error.GEO-404": "الدولة غير موجودة.",
-
   "governorates.title": "المحافظات",
   "governorates.subtitle": "محافظات ومراكز كل دولة.",
   "governorates.add": "إضافة محافظة",
@@ -304,7 +301,6 @@
   "governorates.error.GEO-101": "توجد محافظة بهذا الاسم في الدولة.",
   "governorates.error.GEO-404": "الدولة غير موجودة.",
   "governorates.error.GEO-405": "المحافظة غير موجودة.",
-
   "templates.title": "قوالب الإشعارات",
   "templates.subtitle": "نصوص الرسائل والبريد بالإنجليزية والعربية؛ القالب الموقوف يُستبدل بالنص المدمج.",
   "templates.add": "إضافة قالب",
@@ -351,7 +347,6 @@
   "templates.error.NTF-004": "قالب البريد يحتاج موضوعًا باللغتين.",
   "templates.error.NTF-100": "يوجد قالب بهذا الرمز.",
   "templates.error.NTF-404": "القالب غير موجود.",
-
   "parameters.title": "إعدادات المنصة",
   "parameters.subtitle": "القيم الافتراضية على مستوى المنصة؛ تبدأ منها كل المعامل.",
   "parameters.scope": "هذه القيم افتراضية للمنصة: المعمل الذي لم يغيّر إعدادًا يقرأ القيمة المحددة هنا.",
@@ -394,6 +389,20 @@
   "parameters.key.newBarcodeOnReject": "باركود جديد للعينة البديلة",
   "parameters.key.reviewBeforeVerify": "المراجعة قبل الاعتماد",
   "parameters.hint.otpLength": "عدد أرقام رمز التحقق (4–10).",
+  "parameters.hint.mandatoryMobile": "جوال المريض إلزامي عند التسجيل.",
+  "parameters.hint.mandatoryDoctor": "الطبيب المحوِّل إلزامي عند التسجيل.",
+  "parameters.hint.mandatoryNationalId": "الرقم القومي إلزامي عند التسجيل.",
+  "parameters.hint.similarNameWarning": "تنبيه عند وجود مريض باسم وجوال متشابهين (BR-01).",
+  "parameters.hint.autoPrintLabels": "طباعة ملصقات العينات عند حفظ الزيارة.",
+  "parameters.hint.autoPrintJobOrder": "طباعة أمر الشغل عند حفظ الزيارة.",
+  "parameters.hint.autoPrintReceipt": "طباعة الإيصال عند تسجيل الدفعة.",
+  "parameters.hint.printUnverified": "السماح بطباعة تقارير بها نتائج غير معتمدة (استثناء BR-09).",
+  "parameters.hint.labelCopies": "عدد نسخ الملصق لكل عينة (1–10).",
+  "parameters.hint.resultLanguage": "لغة التقارير المطبوعة.",
+  "parameters.hint.autoCollect": "تُسجَّل العينات مسحوبة عند حفظ الزيارة.",
+  "parameters.hint.autoReceive": "تُسجَّل العينات مستلمة عند سحبها (BR-03).",
+  "parameters.hint.newBarcodeOnReject": "العينة البديلة تحمل باركودًا جديدًا (BR-18).",
+  "parameters.hint.reviewBeforeVerify": "تمر النتائج بالمراجعة قبل الاعتماد.",
   "parameters.hint.passwordMinLength": "8–64؛ بلا قواعد تركيب (حزمة المعمارية 02 §6.1).",
   "parameters.hint.sessionTimeoutMinutes": "دقائق الخمول قبل قفل الشاشة (1–720).",
   "parameters.hint.trialDays": "القيمة 0 تجعل الاشتراك نشطًا فورًا (0–365).",
@@ -413,7 +422,6 @@
   "parameters.option.masterDataUpdatePolicy.ignore": "عدم إرسال التغييرات",
   "parameters.error.SET-001": "أحد الإعدادات غير معروف للمنصة.",
   "parameters.error.SET-002": "إحدى القيم خارج النطاق المسموح.",
-
   "analyserModels.title": "طرازات الأجهزة",
   "analyserModels.subtitle": "مكتبة الشركات والطرازات التي تختار منها المعامل.",
   "analyserModels.add": "إضافة طراز",
@@ -440,7 +448,6 @@
   "analyserModels.error.LIB-002": "عشرة أنماط على الأكثر بطول 40 حرفًا.",
   "analyserModels.error.LIB-100": "هذه الشركة وهذا الطراز موجودان.",
   "analyserModels.error.LIB-404": "الطراز غير موجود.",
-
   "pcrKits.title": "عُدد PCR",
   "pcrKits.subtitle": "قوالب تفسير العُدد: تخطيط ملف التشغيل وحدود الجينات وقواعد النتيجة.",
   "pcrKits.add": "إضافة عُدة PCR",
@@ -470,7 +477,6 @@
   "pcrKits.error.LIB-101": "توجد عُدة بهذا الاسم.",
   "pcrKits.error.LIB-404": "طراز الجهاز غير موجود.",
   "pcrKits.error.LIB-405": "العُدة غير موجودة.",
-
   "codeSystems.title": "أنظمة الترميز",
   "codeSystems.subtitle": "إصدارات LOINC وCPT وICD-10 وSNOMED ورموزها.",
   "codeSystems.add": "إضافة نظام ترميز",
@@ -506,7 +512,6 @@
   "codeSystems.error.LIB-011": "الملف كبير جدًا.",
   "codeSystems.error.LIB-102": "هذا الإصدار من نظام الترميز موجود.",
   "codeSystems.error.LIB-406": "نظام الترميز غير موجود.",
-
   "ruleTemplates.title": "قوالب القواعد",
   "ruleTemplates.subtitle": "أنماط قواعد طبية قابلة لإعادة الاستخدام تكيّفها المعامل.",
   "ruleTemplates.add": "إضافة قالب قاعدة",
@@ -524,5 +529,6 @@
   "ruleTemplates.hint.formula": "النسب تُكتب ضربًا في حدود المدى، مثل R > 1.2 * HIGH؛ ولكل حد مكمّله (BR-21، BR-22).",
   "ruleTemplates.error.LIB-001": "الاسم والمعادلة مطلوبان.",
   "ruleTemplates.error.LIB-103": "يوجد قالب قاعدة بهذا الاسم.",
-  "ruleTemplates.error.LIB-407": "قالب القاعدة غير موجود."
+  "ruleTemplates.error.LIB-407": "قالب القاعدة غير موجود.",
+  "templates.view": "القالب"
 }

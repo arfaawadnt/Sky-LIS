@@ -5,7 +5,7 @@
       <app-icon name="power" [size]="15" />{{ current.isActive ? i18n.t('catalogue-a.deactivate') : i18n.t('catalogue-a.activate') }}
     </button>
   }
-  <button pageActions ngProjectAs="[pageActions]" type="button" class="btn primary" *appCan="isNew ? permissions.create : permissions.edit" [disabled]="saving()" (click)="save()">
+  <button pageActions ngProjectAs="[pageActions]" type="button" class="btn primary" *appCan="isNew() ? permissions.create : permissions.edit" [disabled]="saving()" (click)="save()">
     {{ saving() ? i18n.t('catalogue-a.saving') : i18n.t('catalogue-a.save') }}
   </button>
 </app-page-header>
@@ -75,7 +75,7 @@
           <app-form-field [label]="i18n.t('catalogue-a.services.field.sampleConditionId')">
             <select formControlName="sampleConditionId">
               <option [ngValue]="null">{{ i18n.t('catalogue-a.none') }}</option>
-              @for (condition of conditions(); track condition.id) {
+              @for (condition of conditionChoices(); track condition.id) {
                 <option [ngValue]="condition.id" [disabled]="!condition.isActive && condition.id !== detail()?.sampleConditionId">{{ conditionText(condition) }}</option>
               }
             </select>
@@ -153,13 +153,13 @@
                 <td>{{ memberName(member) }} @if (!member.isActive) { <app-badge status="Inactive" /> }</td>
                 <td><app-badge tone="neutral">{{ typeLabel(member.memberType) }}</app-badge></td>
                 @if (isProfile()) {
-                  <td class="center"><input type="checkbox" [checked]="member.inSum" (change)="toggleMember(i, 'inSum', $event)" [attr.aria-label]="i18n.t('catalogue-a.services.member.inSum')" /></td>
+                  <td class="center"><input type="checkbox" [disabled]="!canEdit()" [checked]="member.inSum" (change)="toggleMember(i, 'inSum', $event)" [attr.aria-label]="i18n.t('catalogue-a.services.member.inSum')" /></td>
                 }
-                <td class="center"><input type="checkbox" [checked]="member.visible" (change)="toggleMember(i, 'visible', $event)" [attr.aria-label]="i18n.t('catalogue-a.services.member.visible')" /></td>
+                <td class="center"><input type="checkbox" [disabled]="!canEdit()" [checked]="member.visible" (change)="toggleMember(i, 'visible', $event)" [attr.aria-label]="i18n.t('catalogue-a.services.member.visible')" /></td>
                 <td class="actions">
-                  <button type="button" class="row-btn" [disabled]="first" (click)="moveMember(i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
-                  <button type="button" class="row-btn" [disabled]="last" (click)="moveMember(i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
-                  <button type="button" class="row-btn danger" (click)="removeMember(i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
+                  <button type="button" class="row-btn" [disabled]="first || !canEdit()" (click)="moveMember(i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
+                  <button type="button" class="row-btn" [disabled]="last || !canEdit()" (click)="moveMember(i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
+                  <button type="button" class="row-btn danger" [disabled]="!canEdit()" (click)="removeMember(i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
                 </td>
               </tr>
             } @empty {
@@ -178,7 +178,7 @@
                   <span class="mono">{{ candidate.code }}</span>
                   <span class="grow">{{ memberName(candidate) }}</span>
                   <app-badge tone="neutral">{{ typeLabel(candidate.type) }}</app-badge>
-                  <button type="button" class="btn sm soft" (click)="addMember(candidate)"><app-icon name="plus" [size]="13" />{{ i18n.t('catalogue-a.add') }}</button>
+                  <button type="button" class="btn sm soft" [disabled]="!canEdit()" (click)="addMember(candidate)"><app-icon name="plus" [size]="13" />{{ i18n.t('catalogue-a.add') }}</button>
                 </li>
               } @empty {
                 <li class="muted">{{ facade.candidates.isLoading() ? i18n.t('catalogue-a.loading') : i18n.t('catalogue-a.services.picker.none') }}</li>

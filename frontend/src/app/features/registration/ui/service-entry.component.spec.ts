@@ -95,6 +95,18 @@ describe('ServiceEntryComponent (CP-06 service entry, LDM §4.4)', () => {
     fixture.detectChanges();
     expect(internals().pickerOpen()).toBe(true);
 
+    // UAT A-13: an empty box browses the first page of active services at once
+    TestBed.tick();
+    await settle();
+    const browse = backend.expectOne((request) => request.url === CATALOGUE_A_API.lookupServices);
+    expect(browse.request.params.has('search')).toBe(false);
+    expect(browse.request.params.get('orderable')).toBe('true');
+    browse.flush(page([{ id: 's-cbc', code: 'CBC', nameEn: 'Complete blood count', nameAr: 'صورة دم', type: 'Test', shortcutNo: 1 }]));
+    await settle();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.picker-list .pick')?.textContent).toContain('CBC');
+    expect(fixture.nativeElement.querySelector('.picker-list')?.textContent).not.toContain('registration.services.noMatch');
+
     const search = fixture.nativeElement.querySelector('app-search-box input') as HTMLInputElement;
     search.value = 'gluc';
     search.dispatchEvent(new Event('input'));

@@ -16,7 +16,29 @@ import { CellTemplateDirective } from '../../../shared/ui/data-table/cell-templa
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { FormValue, MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueBApi } from '../data-b/catalogue-b.api';
+import { ListedFilter } from '../data-b/listed-filter';
 import { CatalogueBExportButtonComponent } from '../ui-b/catalogue-b-export-button.component';
+
+/**
+ * The option labels of the drawer's Document type and Language selects, in both languages (UAT R2-03). The options are
+ * built once when the page opens, possibly before the Arabic dictionary is loaded, so they carry both texts and the
+ * select shows the one of the current language (the same words as `catalogue-b.templateType.*` / `templateLanguage.*`).
+ */
+export const TEMPLATE_TYPE_LABELS: Readonly<Record<ReportTemplateType, readonly [en: string, ar: string]>> = {
+  Results: ['Results', 'النتائج'],
+  Culture: ['Culture', 'المزرعة'],
+  Text: ['Text report', 'تقرير نصي'],
+  Claim: ['Claim', 'المطالبة'],
+  Receipt: ['Receipt', 'الإيصال'],
+  Label: ['Label', 'الملصق'],
+  JobOrder: ['Job order', 'أمر الشغل'],
+};
+
+export const TEMPLATE_LANGUAGE_LABELS: Readonly<Record<ReportTemplateLanguage, readonly [en: string, ar: string]>> = {
+  En: ['English', 'الإنجليزية'],
+  Ar: ['Arabic', 'العربية'],
+  Both: ['English and Arabic', 'الإنجليزية والعربية'],
+};
 
 /**
  * Report templates (SRS CP-54): print layouts by document type with language, QR and optional bilingual header and
@@ -48,7 +70,9 @@ export class ReportTemplatesPage {
   protected readonly i18n = inject(I18nService);
   private readonly api = inject(CatalogueBApi);
 
-  protected readonly exportCsv = (): Promise<void> => this.api.reportTemplates.exportCsv({});
+  private readonly listed = new ListedFilter();
+
+  protected readonly exportCsv = (): Promise<void> => this.api.reportTemplates.exportCsv(this.listed.query());
 
   protected readonly config: MasterDataConfig<ReportTemplateListItem, ReportTemplateRequest> = {
     i18nPrefix: 'catalogue-b.reportTemplates',
@@ -64,21 +88,22 @@ export class ReportTemplatesPage {
         name: 'type',
         kind: 'select',
         required: true,
-        options: () => Promise.resolve(REPORT_TEMPLATE_TYPES.map((type) => ({ value: type, label: this.i18n.t(`catalogue-b.templateType.${type}`) }))),
+        options: () => Promise.resolve(REPORT_TEMPLATE_TYPES.map((type) => ({ value: type, label: TEMPLATE_TYPE_LABELS[type][0], labelAr: TEMPLATE_TYPE_LABELS[type][1] }))),
       },
       {
         name: 'language',
         kind: 'select',
         required: true,
         defaultValue: 'Both',
-        options: () => Promise.resolve(REPORT_TEMPLATE_LANGUAGES.map((language) => ({ value: language, label: this.i18n.t(`catalogue-b.templateLanguage.${language}`) }))),
+        options: () =>
+          Promise.resolve(REPORT_TEMPLATE_LANGUAGES.map((language) => ({ value: language, label: TEMPLATE_LANGUAGE_LABELS[language][0], labelAr: TEMPLATE_LANGUAGE_LABELS[language][1] }))),
       },
       { name: 'showQr', kind: 'boolean' },
       { name: 'headerText', kind: 'localizedText', required: false, maxLength: 400, hint: 'catalogue-b.reportTemplates.hint.texts' },
       { name: 'footerText', kind: 'localizedText', required: false, maxLength: 400 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.reportTemplates.list({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.reportTemplates.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.reportTemplates.create(dto),
       update: (id, dto) => this.api.reportTemplates.update(id, dto),
       setActive: (id, active) => this.api.reportTemplates.setActive(id, active),

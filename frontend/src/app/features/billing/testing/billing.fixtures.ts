@@ -73,13 +73,13 @@ export function preview(overrides: Partial<CashClosingPreview> = {}): CashClosin
   };
 }
 
-/** Answers the two loads of the cash desk (approved treasuries of this device, tenant parameters) when they are pending. */
+/** Answers the two loads of the cash desk (approved treasuries of this device, the billing print parameters) when they are pending. */
 export function flushCashDesk(backend: HttpTestingController, autoPrintReceipt = true): void {
   for (const request of backend.match((candidate) => candidate.url === BILLING_API.myTreasuries)) {
     request.flush([{ id: 't-1', code: 'MAIN', nameEn: 'Main drawer', nameAr: 'الخزينة الرئيسية', branchId: 'b-1', isActive: true }]);
   }
 
-  for (const request of backend.match((candidate) => candidate.url === '/api/v1/settings')) {
-    request.flush({ settings: [{ key: 'autoPrintReceipt', type: 'Bool', value: String(autoPrintReceipt), defaultValue: 'true', description: '', isDefault: autoPrintReceipt, updatedAtUtc: null, updatedByUserId: null }] });
+  for (const request of backend.match((candidate) => candidate.url === BILLING_API.printSettings)) {
+    request.flush({ autoPrintReceipt });
   }
 }

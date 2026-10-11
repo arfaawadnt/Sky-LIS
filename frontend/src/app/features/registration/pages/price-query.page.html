@@ -90,7 +90,16 @@
           <tr class="pending">
             <td class="mono">{{ line.code }}</td>
             <td>{{ name(line.nameEn, line.nameAr) }}</td>
-            <td colspan="5" class="muted small">{{ facade.quote.isLoading() ? i18n.t('registration.services.pricing') : i18n.t('registration.services.notPlanned') }}</td>
+            <!-- a service the quote refused (gender BR-08, REG-014/015/100…) shows its reason, not "not priced yet" (UAT A-11) -->
+            @if (issuesOf(line.serviceId).length > 0) {
+              <td colspan="5" class="small">
+                @for (issue of issuesOf(line.serviceId); track $index) {
+                  <span class="hint bad">{{ issueText(issue) }}</span>
+                }
+              </td>
+            } @else {
+              <td colspan="5" class="muted small">{{ facade.quote.isLoading() ? i18n.t('registration.services.pricing') : i18n.t('registration.services.notPlanned') }}</td>
+            }
             <td>
               <button type="button" class="icon-btn" [attr.aria-label]="i18n.tf('registration.removeLine', { code: line.code })" (click)="facade.removeLine(line.serviceId)"><app-icon name="x" [size]="15" /></button>
             </td>

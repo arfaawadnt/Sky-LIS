@@ -97,4 +97,16 @@ describe('PriceListEditorFacade (CP-33)', () => {
     backend.expectOne(`${PRICING_API.basePriceLists}/pl26`).flush(LIST_DETAIL);
     backend.verify();
   });
+
+  it('re-reads the same list when a page opens it again, dropping the edits of the previous visit (UAT D-14)', async () => {
+    await loadList();
+    facade.setPrice('s-cbc', 190);
+
+    facade.load('pl26');
+    await runEffects();
+    expect(facade.dirtyRows()).toEqual([]);
+    backend.expectOne(`${PRICING_API.basePriceLists}/pl26`).flush(LIST_DETAIL);
+    backend.expectOne(`${PRICING_API.basePriceLists}/pl26/lines`).flush(LIST_LINES);
+    backend.verify();
+  });
 });

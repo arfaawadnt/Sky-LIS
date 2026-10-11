@@ -44,6 +44,39 @@ public sealed class CatalogueBApplicationTests
         Assert.Equal("Kind,Name (AR)\r\nRejection,انحلال الدم\r\n", Encoding.UTF8.GetString(file.Content.Skip(3).ToArray()));
     }
 
+    [Theory]
+    [InlineData("ar", CsvLanguage.Ar)]
+    [InlineData(" AR ", CsvLanguage.Ar)]
+    [InlineData("en", CsvLanguage.En)]
+    [InlineData(null, CsvLanguage.En)]
+    [InlineData("fr", CsvLanguage.En)]
+    public void B09_the_file_speaks_the_language_the_page_asks_for(string? lang, CsvLanguage expected)
+    {
+        Assert.Equal(expected, CatalogueBCsv.LanguageOf(lang));
+    }
+
+    [Fact]
+    public void B09_flags_and_enum_values_read_like_the_grid_in_both_languages()
+    {
+        Assert.Equal(("Yes", "No"), (CatalogueBCsv.Flag(true), CatalogueBCsv.Flag(false)));
+        Assert.Equal(("نعم", "لا"), (CatalogueBCsv.Flag(true, CsvLanguage.Ar), CatalogueBCsv.Flag(false, CsvLanguage.Ar)));
+        Assert.Equal("Option list", CatalogueBCsv.Label(CsvLanguage.En, "answerType", "OptionList"));
+        Assert.Equal("نعم / لا", CatalogueBCsv.Label(CsvLanguage.Ar, "answerType", "YesNo"));
+        Assert.Equal("All patients", CatalogueBCsv.Label(CsvLanguage.En, "gender", "Any"));
+        Assert.Equal("Text report", CatalogueBCsv.Label(CsvLanguage.En, "templateType", "Text"));
+        Assert.Equal("Text", CatalogueBCsv.Label(CsvLanguage.En, "answerType", "Text"));
+        Assert.Equal("Unknown", CatalogueBCsv.Label(CsvLanguage.Ar, "answerType", "Unknown"));
+    }
+
+    [Fact]
+    public void B09_an_arabic_file_has_arabic_headers()
+    {
+        (string Code, bool Active)[] rows = [("FAST", true)];
+        var file = CatalogueBCsv.Build("preparations", ["Code", "Active"], rows, row => [row.Code, CatalogueBCsv.Flag(row.Active, CsvLanguage.Ar)], Now, CsvLanguage.Ar);
+
+        Assert.Equal("الرمز,نشط\r\nFAST,نعم\r\n", Encoding.UTF8.GetString(file.Content.Skip(3).ToArray()));
+    }
+
     [Fact]
     public async Task A12_every_page_is_read_until_the_last()
     {

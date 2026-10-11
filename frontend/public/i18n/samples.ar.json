@@ -52,7 +52,7 @@
   "allStatuses": "الكل",
   "searchPlaceholder": "رقم العينة أو الزيارة…",
   "exportCsv": "تصدير CSV",
-  "exported": "تم تصدير {count} صفاً.",
+  "exported": "تم تنزيل ملف CSV.",
   "refresh": "تحديث",
   "loadError": "تعذّر تحميل العينات.",
   "track": "تتبع",

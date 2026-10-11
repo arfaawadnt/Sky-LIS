@@ -36,6 +36,15 @@ export class AnalyserTestsFacade {
 
   readonly sampleTypes = resource({ loader: ({ abortSignal }) => this.api.sampleTypes(abortSignal) });
 
+  /** Re-reads everything the two pages show when one opens again (the facade outlives the page; UAT D-14). */
+  refresh(): void {
+    this.analysers.reload();
+    this.mappings.reload();
+    this.sampleCodes.reload();
+    this.units.reload();
+    this.sampleTypes.reload();
+  }
+
   readonly save = mutation(
     (input: { mappingId: string | null; request: SaveMappingRequest }) => {
       const analyserId = this.requireAnalyser();

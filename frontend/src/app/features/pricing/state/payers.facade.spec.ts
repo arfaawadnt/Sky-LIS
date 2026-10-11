@@ -103,4 +103,25 @@ describe('PayersFacade (CP-32)', () => {
     expect(await pending).toBeNull();
     expect(facade.setTierActive.problem()).not.toBeNull();
   });
+
+  it('a new visit closes the drawer left open and checks the cash payer again (UAT D-14)', async () => {
+    const first = facade.list({ search: '', active: true }, { page: 1, pageSize: 50 });
+    await settle();
+    backend.expectOne(PRICING_API.defaultPayer).flush({ payerId: 'p-cash', contractTierId: 't-default', created: false });
+    await settle();
+    backend.expectOne((request) => request.url === PRICING_API.payers).flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 0 });
+    await first;
+    facade.openTiers('p-axa');
+    await runEffects();
+    backend.expectOne(`${PRICING_API.payers}/p-axa`).flush({ ...cash, id: 'p-axa', isDefault: false });
+
+    facade.refresh();
+    expect(facade.tiersPayerId()).toBeNull();
+    const second = facade.list({ search: '', active: true }, { page: 1, pageSize: 50 });
+    await settle();
+    backend.expectOne(PRICING_API.defaultPayer).flush({ payerId: 'p-cash', contractTierId: 't-default', created: false });
+    await settle();
+    backend.expectOne((request) => request.url === PRICING_API.payers).flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 0 });
+    await second;
+  });
 });

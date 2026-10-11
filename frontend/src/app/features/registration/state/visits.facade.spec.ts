@@ -54,6 +54,21 @@ describe('VisitsFacade (CP-10)', () => {
     backend.verify();
   });
 
+  it('re-reads the register and the tiers when the page opens again (UAT D-14, A-01)', async () => {
+    await runEffects();
+    backend.expectOne((request) => request.url === REGISTRATION_API.visits).flush(page([visitRow()]));
+    backend.expectOne((request) => request.url === PRICING_API.tierOptions).flush([cashTier]);
+    await runEffects();
+
+    facade.refresh();
+    await runEffects();
+    backend.expectOne((request) => request.url === REGISTRATION_API.visits).flush(page([]));
+    backend.expectOne((request) => request.url === PRICING_API.tierOptions).flush([cashTier]);
+    await runEffects();
+    expect(facade.visits.value()?.items.length).toBe(0);
+    backend.verify();
+  });
+
   it('classifies the search text, drops the day range for "all dates" and resets to the first page', async () => {
     await runEffects();
     backend.match(() => true).forEach((call) => call.flush(call.request.url === PRICING_API.tierOptions ? [] : page([])));

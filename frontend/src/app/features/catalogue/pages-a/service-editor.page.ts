@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, u
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { map } from 'rxjs';
 
 import {
   CATALOGUE_A_PERMISSIONS,
@@ -19,6 +20,7 @@ import {
 } from '../../../core/api/catalogue-a.contracts';
 import { type ProblemDetails, ProblemCodes } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { localizedPick, localizedTextGroup } from '../../../shared/forms/localized-text';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
@@ -86,6 +88,7 @@ export class ServiceEditorPage {
   protected readonly options = inject(CatalogueAOptions);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly access = inject(PermissionsService);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
 
@@ -93,8 +96,12 @@ export class ServiceEditorPage {
   protected readonly types = SERVICE_TYPES;
   protected readonly genders = GENDER_RESTRICTIONS;
 
-  protected readonly serviceId = this.route.snapshot.paramMap.get('id');
-  protected readonly isNew = this.serviceId === null;
+  /** The id in the address bar, followed reactively: the router reuses this page when only `:id` changes (UAT B-05). */
+  protected readonly serviceId = toSignal(this.route.paramMap.pipe(map((params) => params.get('id'))), { initialValue: this.route.snapshot.paramMap.get('id') });
+  protected readonly isNew = computed(() => this.serviceId() === null);
+
+  /** Viewers (no create / edit right) see the service read-only (UAT B-12); the server decides regardless. */
+  protected readonly canEdit = computed(() => this.access.can(this.isNew() ? CATALOGUE_A_PERMISSIONS.create : CATALOGUE_A_PERMISSIONS.edit));
 
   protected readonly form = new FormGroup({
     code: new FormControl('', { nonNullable: true, validators: [requiredText, codeValidator, Validators.maxLength(16)] }),
@@ -140,7 +147,17 @@ export class ServiceEditorPage {
     { id: 'members', label: this.i18n.t('catalogue-a.services.tab.members'), badge: this.members().length, disabled: this.memberKind() === null },
   ]);
 
-  protected readonly detail = computed<ServiceDetail | null>(() => (this.facade.detail.hasValue() ? this.facade.detail.value() : null));
+  /** The loaded service, only while it is the one in the address bar: a previous record is never shown or acted on (UAT B-05). */
+  protected readonly detail = computed<ServiceDetail | null>(() => {
+    const detail = this.facade.detail.hasValue() ? this.facade.detail.value() : null;
+    return detail !== null && detail.id === this.serviceId() ? detail : null;
+  });
+
+  /** The active conditions of the chosen sample type, plus the one the service already holds (BR-24, UAT B-08). */
+  protected readonly conditionChoices = computed(() => {
+    const current = this.detail()?.sampleConditionId ?? null;
+    return this.conditions().filter((condition) => condition.isActive || condition.id === current);
+  });
 
   protected readonly title = computed(() => {
     const detail = this.detail();
@@ -154,7 +171,7 @@ export class ServiceEditorPage {
 
   protected readonly candidates = computed<readonly MemberCandidate[]>(() => {
     const chosen = new Set(this.members().map((member) => member.memberId));
-    const own = this.serviceId;
+    const own = this.serviceId();
     return (this.facade.candidates.hasValue() ? this.facade.candidates.value() : []).filter((candidate) => !chosen.has(candidate.id) && candidate.id !== own);
   });
 
@@ -163,12 +180,19 @@ export class ServiceEditorPage {
 
   constructor() {
     void this.i18n.load('catalogue-a');
-    this.facade.load(this.serviceId);
     this.options.refresh();   // the options outlive the page: re-read on open (UAT D-14)
-    if (!this.isNew) {
-      this.form.controls.code.disable();
-      this.form.controls.type.disable();
-    }
+
+    // every id in the address bar opens its own record, also when the router reuses the page (UAT B-05)
+    effect(() => {
+      const id = this.serviceId();
+      untracked(() => this.open(id));
+    });
+
+    // read-only without the right to save (UAT B-12)
+    effect(() => {
+      this.canEdit();
+      untracked(() => this.applyAccess());
+    });
 
     // the loaded detail fills the form once per load
     effect(() => {
@@ -229,6 +253,10 @@ export class ServiceEditorPage {
   }
 
   protected addMember(candidate: MemberCandidate): void {
+    if (!this.canEdit()) {
+      return;
+    }
+
     this.members.update((rows) => [
       ...rows,
       { kind: candidate.kind, memberId: candidate.id, code: candidate.code, nameEn: candidate.nameEn, nameAr: candidate.nameAr, memberType: candidate.type, isActive: true, inSum: false, visible: true },
@@ -237,11 +265,19 @@ export class ServiceEditorPage {
   }
 
   protected removeMember(index: number): void {
+    if (!this.canEdit()) {
+      return;
+    }
+
     this.members.update((rows) => rows.filter((_, position) => position !== index));
     this.membersDirty.set(true);
   }
 
   protected moveMember(index: number, offset: -1 | 1): void {
+    if (!this.canEdit()) {
+      return;
+    }
+
     const target = index + offset;
     this.members.update((rows) => {
       const first = rows[index];
@@ -259,14 +295,19 @@ export class ServiceEditorPage {
   }
 
   protected toggleMember(index: number, flag: 'inSum' | 'visible', event: Event): void {
+    if (!this.canEdit()) {
+      return;
+    }
+
     const checked = (event.target as HTMLInputElement).checked;
     this.members.update((rows) => rows.map((row, position) => (position === index ? { ...row, [flag]: checked } : row)));
     this.membersDirty.set(true);
   }
 
   async save(): Promise<void> {
-    if (this.saving()) {
-      return;
+    const id = this.serviceId();
+    if (this.saving() || !this.canEdit() || (id !== null && this.detail() === null)) {
+      return;   // nothing to save for a viewer, nor before the record in the address bar is loaded
     }
 
     if (!markAllTouched(this.form)) {
@@ -278,10 +319,10 @@ export class ServiceEditorPage {
     this.generalProblem.set(null);
     this.membersProblem.set(null);
     try {
-      if (this.serviceId === null) {
+      if (id === null) {
         await this.create();
       } else {
-        await this.update(this.serviceId);
+        await this.update(id);
       }
     } finally {
       this.saving.set(false);
@@ -428,6 +469,30 @@ export class ServiceEditorPage {
     });
     this.members.set(detail.members.map((member) => ({ ...member })));
     this.membersDirty.set(false);
+    this.applyAccess();
+  }
+
+  /** Opens the record of the address bar: a new id clears the problems and refills the page from the server. */
+  private open(id: string | null): void {
+    this.generalProblem.set(null);
+    this.membersProblem.set(null);
+    this.activeTab.set('general');
+    this.facade.load(id);
+    this.applyAccess();
+  }
+
+  /** Every input follows the right to save; the code and the type never change once created (CAT-035). */
+  private applyAccess(): void {
+    if (!this.canEdit()) {
+      this.form.disable({ emitEvent: false });
+      return;
+    }
+
+    this.form.enable({ emitEvent: false });
+    if (!this.isNew()) {
+      this.form.controls.code.disable({ emitEvent: false });
+      this.form.controls.type.disable({ emitEvent: false });
+    }
   }
 
   private applyType(type: ServiceType): void {
@@ -440,7 +505,7 @@ export class ServiceEditorPage {
 
     // a new service that switches between test members and service members starts its member list again
     const kind = serviceMemberKind(type);
-    if (this.isNew && this.members().some((member) => member.kind !== kind)) {
+    if (this.isNew() && this.members().some((member) => member.kind !== kind)) {
       this.members.set([]);
     }
   }

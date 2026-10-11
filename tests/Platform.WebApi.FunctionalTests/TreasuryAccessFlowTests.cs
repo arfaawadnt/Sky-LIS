@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Platform.Contracts.Common;
+using Platform.Contracts.Organization;
 using Platform.Contracts.Treasury;
 using Platform.WebApi.FunctionalTests.Support;
 
@@ -19,6 +20,29 @@ public sealed class TreasuryAccessFlowTests(ApiFactory factory) : IClassFixture<
     private static readonly string[] RequesterPermissions = ["treasury.view", "treasury.create", "treasury.cancel", "treasury.manage"];
     private static readonly string[] ApproverPermissions = ["treasury.view", "treasury.approve"];
     private static readonly string[] SelfApproverPermissions = ["treasury.view", "treasury.create", "treasury.approve"];
+
+    [DatabaseFact]
+    public async Task The_treasury_list_names_the_branch_for_a_reader_without_organization_rights()
+    {
+        var tenant = Guid.CreateVersion7();
+        var (organizer, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["organization.view", "organization.create"], displayName: "Organizer");
+        var (manager, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: RequesterPermissions, displayName: "Treasury Manager");
+        var (reader, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["treasury.view"], displayName: "Reception");
+        var organizerClient = await SignedInClientAsync(organizer);
+        var managerClient = await SignedInClientAsync(manager);
+        var readerClient = await SignedInClientAsync(reader);
+
+        var branch = await organizerClient.PostAsJsonAsync("/api/v1/organization/branches", new CreateBranchRequest("NORTH", "North", "الشمال", null, null, null, null, "EGP"));
+        Assert.Equal(HttpStatusCode.Created, branch.StatusCode);
+        var branchId = (await branch.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+        Assert.Equal(HttpStatusCode.Created, (await managerClient.PostAsJsonAsync(Treasuries, new CreateTreasuryRequest("NORTH-CASH", "North cash", "خزينة الشمال", branchId))).StatusCode);
+
+        // UAT A-04: the reader holds no organization.view, yet sees CODE · name from the list itself
+        Assert.Equal(HttpStatusCode.Forbidden, (await readerClient.GetAsync("/api/v1/organization/branches")).StatusCode);
+        var listed = await readerClient.GetFromJsonAsync<Paged<TreasuryListItem>>(Treasuries);
+        var item = Assert.Single(listed!.Items);
+        Assert.Equal((branchId, "NORTH", "North", "الشمال"), (item.BranchId, item.BranchCode, item.BranchNameEn, item.BranchNameAr));
+    }
 
     [DatabaseFact]
     public async Task A_cashier_requests_access_an_approver_decides_and_the_outsider_is_refused()

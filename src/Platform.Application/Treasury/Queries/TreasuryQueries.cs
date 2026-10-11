@@ -1,6 +1,7 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
 using Platform.Application.Abstractions.Security;
+using Platform.Application.Organization;
 using Platform.Contracts.Common;
 using Platform.Contracts.Treasury;
 using Platform.Domain.Authorization;
@@ -14,10 +15,18 @@ namespace Platform.Application.Treasury.Queries;
 [RequirePermissionPolicy(PermissionCatalog.Treasury, PermissionAction.View)]
 public sealed record ListTreasuriesQuery(bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<TreasuryListItem>>;
 
-public sealed class ListTreasuriesHandler(ITreasuryRepository treasuries) : IQueryHandler<ListTreasuriesQuery, Paged<TreasuryListItem>>
+/// <summary>The page of treasuries with each branch's code and names from the Organization read port (UAT A-04: a reader without <c>organization.view</c> sees <c>CODE · name</c>).</summary>
+public sealed class ListTreasuriesHandler(ITreasuryRepository treasuries, IBranchLookup branches) : IQueryHandler<ListTreasuriesQuery, Paged<TreasuryListItem>>
 {
-    public Task<Paged<TreasuryListItem>> Handle(ListTreasuriesQuery query, CancellationToken cancellationToken) =>
-        treasuries.ListAsync(query.IsActive, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+    public async Task<Paged<TreasuryListItem>> Handle(ListTreasuriesQuery query, CancellationToken cancellationToken)
+    {
+        var page = await treasuries.ListAsync(query.IsActive, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken).ConfigureAwait(false);
+        var names = await branches.GetManyAsync(page.Items.Select(item => item.BranchId).ToList(), cancellationToken).ConfigureAwait(false);
+        var items = page.Items
+            .Select(item => names.TryGetValue(item.BranchId, out var branch) ? item with { BranchCode = branch.Code, BranchNameEn = branch.NameEn, BranchNameAr = branch.NameAr } : item)
+            .ToList();
+        return new Paged<TreasuryListItem>(items, page.Page, page.PageSize, page.TotalCount);
+    }
 }
 
 /// <summary><paramref name="Status"/> is the status name; <paramref name="MineOnly"/> narrows to the actor's own requests.</summary>

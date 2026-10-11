@@ -74,7 +74,7 @@
                 }
               }
               @if (canManage() && !item(parameter.key)?.isDefault) {
-                <button type="button" class="btn sm ghost" (click)="facade.resetToDefault(parameter.key)" [attr.title]="i18n.tf('organization.parameters.defaultIs', { value: item(parameter.key)?.defaultValue ?? '' })">
+                <button type="button" class="btn sm ghost" (click)="facade.resetToDefault(parameter.key)" [attr.title]="i18n.tf('organization.parameters.defaultIs', { value: item(parameter.key)?.inheritedValue ?? item(parameter.key)?.defaultValue ?? '' })">
                   {{ i18n.t('organization.parameters.useDefault') }}
                 </button>
               }

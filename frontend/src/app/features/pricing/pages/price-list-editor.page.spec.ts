@@ -61,6 +61,24 @@ describe('PriceListEditorPage (CP-33)', () => {
     backend.verify();
   });
 
+  it('names the derived contracts without linking to the Release-2 contract pricing page (UAT R1-03)', async () => {
+    const fixture = TestBed.createComponent(PriceListEditorPage);
+    fixture.componentRef.setInput('listId', 'pl26');
+    await flush();
+    backend.expectOne(`${PRICING_API.basePriceLists}/pl26`).flush({
+      ...LIST_DETAIL,
+      derivedContracts: [{ contractPricingId: 'cp1', payerId: 'p-axa', contractTierId: 't-gold', payerNameEn: 'AXA', payerNameAr: 'أكسا', tierNameEn: 'Gold', tierNameAr: 'ذهبي', appliedAtUtc: null }],
+    });
+    backend.expectOne(`${PRICING_API.basePriceLists}/pl26/lines`).flush(LIST_LINES);
+    await flush();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const chip = [...host.querySelectorAll('.chips .chip')].find((candidate) => candidate.textContent?.includes('AXA'));
+    expect(chip?.textContent).toContain('Gold');
+    expect(chip?.tagName).toBe('SPAN');
+    expect(host.querySelector('a[href*="/pricing/contract-pricing"]')).toBeNull();
+  });
+
   it('adds a typed service from the catalogue picker with Enter (SRS keyboard rule)', async () => {
     const { host } = await render();
 

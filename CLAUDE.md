@@ -243,7 +243,26 @@ QMS source is never read or copied (section 1); everything here is written from 
   OpenAPI generator lands), `core/i18n` (lang/dir signals, per-feature JSON in `public/i18n`), `core/state/mutation.ts`,
   `shell/nav.registry.ts`, `features/auth` (login page), `features/home`; `shared/patient` (patient picker, form, demographics
   and lookup API shared by Patients and Registration; reads the `patients` dictionary); `core/release.ts` (`RELEASE_SCOPE`,
-  `inReleaseScope`); `AuthStore.updateLanguage` saves the language switch (CP-65) and `hydrate` applies the saved one. Commands in `frontend/`: `npm run build`,
+  `inReleaseScope`); `AuthStore.updateLanguage` saves the language switch (CP-65) and `hydrate` applies the saved one.
+  **Session rules (validation fixes C-01, A-01, 2026-10-11)**: `AuthStore.refreshOnce()` compares user and tenant with the
+  tab's profile and never adopts another identity (state cleared, full load of `/login`); the interceptor never replays
+  after a failed or foreign refresh; `signOut()` ends with a full page load of `/login` (callers must not navigate) so no
+  route-provided facade survives a user change; `core/auth/session-channel.ts` (`SESSION_CHANNEL`, BroadcastChannel
+  `platform-session`, `provideSessionSync()` in `app.config.ts`) tells other tabs of a sign-in/sign-out;
+  `core/auth/session-navigation.ts` (`BROWSER_NAVIGATION`, `signInUrl`, `meaningfulReturnUrl`, `isLoginRoute`); specs use
+  `provideSessionTesting(new FakeBrowserNavigation(), …)` from `core/auth/session-testing.ts`. **Route guard**:
+  `shell/nav.guard.ts` `navRegistryGuard` (first `canActivateChild` of the shell route) refuses a URL whose longest
+  matching `NAV_REGISTRY` entry lacks the user's permission or is outside `RELEASE_SCOPE`, and a feature whose entries are
+  all Release 2; `/account` carries `tenantGuard`; a platform user forced to change password goes to `/admin/profile`.
+  `NavEntry.menu` (`false` or a release) marks action-only pages: in scope and guarded but not in the sidebar (e.g.
+  `/billing/refunds`, opened from Payments in Release 1) — never mark such a page `release: 'R2'`. A refusal shows
+  `shell.pageNotAvailable`; the client home forwards to the dashboard or the first menu entry (`landingEntry`). Other tabs
+  of the same session follow a profile change (`profile-changed` on the session channel, `profileChangeInterceptor` for
+  `PROFILE_CHANGES` endpoints, `followProfileChanges()` in the shell). A sign-in revokes the session of the refresh cookie
+  the browser presented (secret checked).
+  Every route-provided facade re-reads on each visit of its page (`refresh()` from the page constructor). **Validation
+  messages**: `VALIDATION-400` problem details carry an optional `rules` entry per field (FluentValidation rule + numeric
+  bounds, never request values); `shared/forms/problem-text.ts` renders them field by field in both languages. Commands in `frontend/`: `npm run build`,
   `npm run lint` (ESLint + `scripts/check-boundaries.mjs`), `npm run test:ci`. Rules: no `any`/`$any()`, no web storage, no
   `subscribe()` in components, core/shared never import features, features never import each other.
 - Business modules (Task 5, 03 §3–§10, D-04/D-07): the first feature module is **Treasury access** (SRS CP-28/CP-29,

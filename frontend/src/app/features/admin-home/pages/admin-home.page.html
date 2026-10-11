@@ -1,10 +1,8 @@
 <app-page-header [title]="i18n.t('adminHome.title')" [subtitle]="i18n.t('adminHome.subtitle')" />
 
 <div class="kpis">
-  <app-stat-card [label]="i18n.t('adminHome.kpi.clients')" value="—" icon="building" />
-  <app-stat-card [label]="i18n.t('adminHome.kpi.activeSubscriptions')" value="—" icon="check" tone="ok" />
-  <app-stat-card [label]="i18n.t('adminHome.kpi.openTickets')" value="—" icon="alert" tone="warn" />
-  <app-stat-card [label]="i18n.t('adminHome.kpi.agentsOnline')" value="—" icon="plug" tone="info" />
+  <app-stat-card [label]="i18n.t('adminHome.kpi.clients')" [value]="clients()" icon="building" />
+  <app-stat-card [label]="i18n.t('adminHome.kpi.activeSubscriptions')" [value]="activeSubscriptions()" icon="check" tone="ok" />
 </div>
 
 <app-section-card [title]="i18n.t('adminHome.welcomeTitle')">

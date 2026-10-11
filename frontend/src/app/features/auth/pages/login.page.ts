@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import type { AuthResponse, TenantChoice } from '../../../core/api/auth.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { isLoginRoute } from '../../../core/auth/session-navigation';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PortalService } from '../../../core/portal/portal.service';
 import { mutation } from '../../../core/state/mutation';
@@ -118,9 +119,4 @@ export class LoginPage {
 
     await this.router.navigateByUrl(target);
   }
-}
-
-/** `/login`, `/login/recover`, `/login?…`: the routes of this feature, never a destination after signing in. */
-export function isLoginRoute(url: string): boolean {
-  return url === '/login' || url.startsWith('/login/') || url.startsWith('/login?');
 }

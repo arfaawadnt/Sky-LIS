@@ -1,5 +1,5 @@
 <app-page-header [title]="i18n.t('treasury.title')" [subtitle]="i18n.t('treasury.subtitle')">
-  <button pageActions type="button" class="btn ghost" (click)="facade.requests.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('treasury.refresh') }}</button>
+  <button pageActions type="button" class="btn ghost" (click)="facade.refresh()"><app-icon name="refresh" [size]="15" />{{ i18n.t('treasury.refresh') }}</button>
 </app-page-header>
 
 <div class="layout">

@@ -47,6 +47,22 @@ export function formatTime(value: string | null | undefined, lang: string): stri
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(locale(lang), { timeStyle: 'short' }).format(date);
 }
 
+/** A `yyyy-MM-dd` local day in the user's language and digits (the dashboard's day; never shifted by the time zone). */
+export function formatDay(day: string, lang: string): string {
+  const [year, month, date] = day.split('-').map(Number);
+  if (!year || !month || !date) {
+    return day;
+  }
+
+  return new Intl.DateTimeFormat(locale(lang), { dateStyle: 'medium' }).format(new Date(year, month - 1, date));
+}
+
+/** `ResultVerified` → "Result verified", `ResultLogEntry` → "Result log entry": a readable fallback for a technical name. */
+export function humanize(name: string): string {
+  const words = name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').trim();
+  return words.length === 0 ? name : words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
+}
+
 /** A short weekday label for a `yyyy-MM-dd` local day (chart axis). */
 export function weekday(day: string, lang: string): string {
   const [year, month, date] = day.split('-').map(Number);

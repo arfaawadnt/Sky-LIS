@@ -343,16 +343,28 @@ export class UserEditorPage {
   }
 
   protected async saveRole(): Promise<void> {
+    const roleId = this.pendingRole();
+    if (roleId !== null) {
+      await this.assignRole(roleId);
+    }
+  }
+
+  /** A role picked on the access tab and not assigned yet, or null. */
+  private pendingRole(): string | null {
     const user = this.user();
     const roleId = this.roleChoice();
-    if (user === null || roleId === '' || roleId === user.roleId) {
-      return;
-    }
+    return user === null || roleId === '' || roleId === user.roleId ? null : roleId;
+  }
 
+  /** Assigns the role after the confirmation; true when it is stored. */
+  private async assignRole(roleId: string): Promise<boolean> {
     const confirmed = await this.confirm.confirm({ title: this.i18n.t('organization.users.confirmRole.title'), message: this.i18n.t('organization.users.confirmRole.message') });
     if (confirmed && (await this.facade.assignRole.execute(roleId)) !== null) {
       this.toast.success(this.i18n.t('organization.users.roleSaved'));
+      return true;
     }
+
+    return false;
   }
 
   protected async saveBranches(): Promise<void> {
@@ -365,7 +377,15 @@ export class UserEditorPage {
       return;
     }
 
-    if ((await this.facade.assignBranches.execute(this.allBranches() ? [] : [...this.branchChoice()])) !== null) {
+    // One tab, one save: a role picked but not assigned yet is assigned too (after its confirmation), never silently
+    // dropped by the re-read that follows the branches (UAT B-14). Declined or refused, the user is told it was not stored.
+    const branchIds = this.allBranches() ? [] : [...this.branchChoice()];
+    const roleId = this.pendingRole();
+    if (roleId !== null && !(await this.assignRole(roleId))) {
+      this.toast.warn(this.i18n.t('organization.users.roleNotAssigned'));
+    }
+
+    if ((await this.facade.assignBranches.execute(branchIds)) !== null) {
       this.toast.success(this.i18n.t('organization.users.branchesSaved'));
     }
   }

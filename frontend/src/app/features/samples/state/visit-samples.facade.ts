@@ -53,6 +53,11 @@ export class VisitSamplesFacade {
 
   readonly exporting = mutation((fileName: string) => Promise.resolve(this.exporter.exportRows(this.rows(), fileName)));
 
+  /** Re-reads the visit's tubes when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01). A load in flight is left alone. */
+  refresh(): void {
+    this.samples.reload();
+  }
+
   show(lookup: VisitLookup): void {
     const accession = lookup.accession?.trim() ?? '';
     const visitId = lookup.visitId?.trim() ?? '';

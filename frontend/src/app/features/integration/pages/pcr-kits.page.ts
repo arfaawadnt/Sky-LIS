@@ -181,6 +181,7 @@ export class PcrKitsPage {
 
   constructor() {
     void this.i18n.load('integration');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14)
   }
 
   protected analyserName(option: { nameEn: string; nameAr: string }): string {

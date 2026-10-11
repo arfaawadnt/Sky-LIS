@@ -163,6 +163,7 @@ export class ResultsByAccessionPage {
 
   constructor() {
     void this.i18n.load('results');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
     effect(() => {
       const accession = this.accession()?.trim().toUpperCase() ?? '';
       untracked(() => {
@@ -237,6 +238,11 @@ export class ResultsByAccessionPage {
 
   protected canEnter(unit: ReportUnitView): boolean {
     return this.permissions.can(RESULTS_PERMISSIONS.enter) && unit.rights.canEdit;
+  }
+
+  /** Internal notes (T11) need results.create; the report comment follows canEnter (UAT A-02). */
+  protected canAnnotate(): boolean {
+    return this.permissions.can(RESULTS_PERMISSIONS.enter);
   }
 
   protected canReview(unit: ReportUnitView): boolean {

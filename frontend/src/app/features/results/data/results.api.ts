@@ -82,23 +82,23 @@ export class ResultsApi {
   }
 
   undo(resultId: string, reason: string): Promise<void> {
-    return firstValueFrom(this.http.post<void>(RESULTS_API.undo(resultId), { reason }), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(RESULTS_API.undo(resultId), { reason }), { defaultValue: undefined }).then(noContent);
   }
 
   amend(resultId: string, value: AmendInput, reason: string): Promise<void> {
-    return firstValueFrom(this.http.post<void>(RESULTS_API.amend(resultId), { ...value, reason }), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(RESULTS_API.amend(resultId), { ...value, reason }), { defaultValue: undefined }).then(noContent);
   }
 
   acknowledgeDelta(resultId: string, comment: string | null): Promise<void> {
-    return firstValueFrom(this.http.post<void>(RESULTS_API.acknowledgeDelta(resultId), { comment }), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(RESULTS_API.acknowledgeDelta(resultId), { comment }), { defaultValue: undefined }).then(noContent);
   }
 
   setComment(resultId: string, text: string | null): Promise<void> {
-    return firstValueFrom(this.http.put<void>(RESULTS_API.comment(resultId), { text }), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(RESULTS_API.comment(resultId), { text }), { defaultValue: undefined }).then(noContent);
   }
 
   setNote(resultId: string, text: string | null): Promise<void> {
-    return firstValueFrom(this.http.put<void>(RESULTS_API.note(resultId), { text }), { defaultValue: undefined });
+    return firstValueFrom(this.http.put<void>(RESULTS_API.note(resultId), { text }), { defaultValue: undefined }).then(noContent);
   }
 
   log(resultId: string, signal?: AbortSignal): Promise<readonly ResultLogItem[]> {
@@ -115,7 +115,7 @@ export class ResultsApi {
   }
 
   print(reportUnitKey: string): Promise<void> {
-    return firstValueFrom(this.http.post<void>(RESULTS_API.print(reportUnitKey), null), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(RESULTS_API.print(reportUnitKey), null), { defaultValue: undefined }).then(noContent);
   }
 
   worklist(query: WorklistQuery, signal?: AbortSignal): Promise<WorklistPage> {
@@ -184,4 +184,9 @@ function abortable<T>(signal: AbortSignal | undefined): (value: T) => T {
 
     return value;
   };
+}
+
+/** A 204 arrives as a `null` body; a write without a result resolves to `undefined`, because a mutation's `null` means it failed (UAT: 204 answers). */
+function noContent(): undefined {
+  return undefined;
 }

@@ -42,7 +42,8 @@ public sealed class AuthController(ISender sender) : ControllerBase
     public async Task<ActionResult<AuthResponse>> PostSignIn([FromBody] SignInRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await sender.Send(new SignInCommand(request.Tenant, request.Username, request.Password, ClientIp(), UserAgent()), cancellationToken);
+        // R2-04: the cookie this browser still holds is about to be overwritten; the handler ends the session it names.
+        var result = await sender.Send(new SignInCommand(request.Tenant, request.Username, request.Password, ClientIp(), UserAgent(), RefreshCookie.Read(HttpContext)), cancellationToken);
 
         if (result.Step == AuthResponse.StepSignedIn && result.RefreshToken is not null && result.Kind == SessionKind.Browser)
         {

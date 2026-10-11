@@ -3,6 +3,7 @@ import { Routes } from '@angular/router';
 import { anonymousGuard, authGuard } from './core/auth/auth.guard';
 import { platformGuard, tenantGuard } from './core/auth/portal.guards';
 import { branchGuard, passwordChangeGuard } from './features/account/account.guards';
+import { navRegistryGuard } from './shell/nav.guard';
 
 /**
  * Lazy routes per feature (01 §6.5). Guards are affordance; the server decides on every request. The signed-in
@@ -23,8 +24,9 @@ export const routes: Routes = [
     path: '',
     canActivate: [authGuard],
     loadComponent: () => import('./shell/shell.component').then((m) => m.ShellComponent),
-    // CP-04: a client session picks its branch first; an administrator reset forces a password change (both let the account pages through)
-    canActivateChild: [branchGuard, passwordChangeGuard],
+    // A-08 / C-15: a typed URL obeys the navigation registry (permission and release); CP-04: a client session picks its
+    // branch first; an administrator reset forces a password change (both let the account pages through)
+    canActivateChild: [navRegistryGuard, branchGuard, passwordChangeGuard],
     children: [
       {
         path: '',
@@ -74,6 +76,7 @@ export const routes: Routes = [
       },
       {
         path: 'account',
+        canActivate: [tenantGuard], // C-14: the platform portal has its own account pages under /admin
         loadChildren: () => import('./features/account/account.routes').then((m) => m.ACCOUNT_ROUTES),
       },
       {

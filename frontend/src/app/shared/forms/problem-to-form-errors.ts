@@ -1,9 +1,15 @@
 import type { AbstractControl, FormGroup } from '@angular/forms';
 
-import type { ProblemDetails } from '../../core/api/problem-details';
+import type { FieldRule, ProblemDetails } from '../../core/api/problem-details';
 
-/** The error key the kit uses for server-reported field errors; `FormFieldComponent` renders it verbatim. */
+/**
+ * The error key the kit uses for server-reported field errors. `FormFieldComponent` renders it verbatim unless
+ * `SERVER_RULES_KEY` sits beside it, in which case it shows its own localized text for those rules (C-06).
+ */
 export const SERVER_ERROR_KEY = 'server';
+
+/** The machine-readable rules of a server field error (`FieldRule[]`), set by `problemToFormErrors` when the problem has them. */
+export const SERVER_RULES_KEY = 'serverRules';
 
 function lowerFirst(segment: string): string {
   return segment.length === 0 ? segment : segment.charAt(0).toLowerCase() + segment.slice(1);
@@ -36,8 +42,9 @@ function findControl(form: FormGroup, path: string): AbstractControl | null {
 
 /**
  * Maps a `VALIDATION-400` problem (`errors: { nameEn: ["..."] }`) onto the controls of a form: each matched control
- * gets `{ server: "message" }` and is marked touched so the field shows it; the entries without a control come back
- * so the page can show them as a general message. Returns an empty map when the problem carries no field errors.
+ * gets `{ server: "message" }` (plus `{ serverRules: [...] }` when the server named the rules, so the field shows a
+ * localized text, C-06) and is marked touched so the field shows it; the entries without a control come back so the page
+ * can show them as a general message. Returns an empty map when the problem carries no field errors.
  */
 export function problemToFormErrors(problem: ProblemDetails | null, form: FormGroup): Readonly<Record<string, readonly string[]>> {
   const unmatched: Record<string, readonly string[]> = {};
@@ -52,7 +59,8 @@ export function problemToFormErrors(problem: ProblemDetails | null, form: FormGr
       continue;
     }
 
-    control.setErrors({ ...(control.errors ?? {}), [SERVER_ERROR_KEY]: messages.join(' ') });
+    const rules: readonly FieldRule[] | undefined = problem.rules?.[key];
+    control.setErrors({ ...(control.errors ?? {}), [SERVER_ERROR_KEY]: messages.join(' '), ...(rules && rules.length > 0 ? { [SERVER_RULES_KEY]: rules } : {}) });
     control.markAsTouched();
   }
 
@@ -63,7 +71,7 @@ export function problemToFormErrors(problem: ProblemDetails | null, form: FormGr
 export function clearServerErrors(control: AbstractControl): void {
   const errors = control.errors;
   if (errors && SERVER_ERROR_KEY in errors) {
-    const rest = Object.fromEntries(Object.entries(errors).filter(([key]) => key !== SERVER_ERROR_KEY));
+    const rest = Object.fromEntries(Object.entries(errors).filter(([key]) => key !== SERVER_ERROR_KEY && key !== SERVER_RULES_KEY));
     control.setErrors(Object.keys(rest).length === 0 ? null : rest);
   }
 

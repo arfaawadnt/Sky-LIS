@@ -5,7 +5,7 @@
       <app-icon name="power" [size]="15" />{{ current.isActive ? i18n.t('catalogue-a.deactivate') : i18n.t('catalogue-a.activate') }}
     </button>
   }
-  <button pageActions ngProjectAs="[pageActions]" type="button" class="btn primary" *appCan="isNew ? permissions.create : permissions.edit" [disabled]="saving()" (click)="save()">
+  <button pageActions ngProjectAs="[pageActions]" type="button" class="btn primary" *appCan="isNew() ? permissions.create : permissions.edit" [disabled]="saving()" (click)="save()">
     {{ saving() ? i18n.t('catalogue-a.saving') : i18n.t('catalogue-a.save') }}
   </button>
 </app-page-header>
@@ -79,7 +79,7 @@
         <app-form-field [label]="i18n.t('catalogue-a.tests.field.sampleConditionId')">
           <select formControlName="sampleConditionId">
             <option [ngValue]="null">{{ i18n.t('catalogue-a.none') }}</option>
-            @for (condition of conditions(); track condition.id) {
+            @for (condition of conditionChoices(); track condition.id) {
               <option [ngValue]="condition.id" [disabled]="!condition.isActive && condition.id !== detail()?.sampleConditionId">{{ conditionText(condition) }}</option>
             }
           </select>
@@ -181,9 +181,9 @@
                   }
                   <td><input class="inp sm wide" type="text" formControlName="textRange" maxlength="200" [attr.aria-label]="i18n.t('catalogue-a.tests.ranges.textRange')" /></td>
                   <td class="actions">
-                    <button type="button" class="row-btn" [disabled]="first" (click)="move('bands', i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
-                    <button type="button" class="row-btn" [disabled]="last" (click)="move('bands', i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
-                    <button type="button" class="row-btn danger" (click)="removeAt('bands', i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
+                    <button type="button" class="row-btn" [disabled]="first || !canEdit()" (click)="move('bands', i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
+                    <button type="button" class="row-btn" [disabled]="last || !canEdit()" (click)="move('bands', i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
+                    <button type="button" class="row-btn danger" [disabled]="!canEdit()" (click)="removeAt('bands', i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
                   </td>
                 </tr>
               } @empty {
@@ -192,7 +192,7 @@
             </tbody>
           </table>
         </div>
-        <button type="button" class="btn sm soft add-row" (click)="addBand()"><app-icon name="plus" [size]="14" />{{ i18n.t('catalogue-a.tests.ranges.add') }}</button>
+        <button type="button" class="btn sm soft add-row" [disabled]="!canEdit()" (click)="addBand()"><app-icon name="plus" [size]="14" />{{ i18n.t('catalogue-a.tests.ranges.add') }}</button>
       </div>
     }
 
@@ -232,9 +232,9 @@
                   </span>
                 </td>
                 <td class="actions">
-                  <button type="button" class="row-btn" [disabled]="first" (click)="move('values', i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
-                  <button type="button" class="row-btn" [disabled]="last" (click)="move('values', i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
-                  <button type="button" class="row-btn danger" (click)="removeAt('values', i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
+                  <button type="button" class="row-btn" [disabled]="first || !canEdit()" (click)="move('values', i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
+                  <button type="button" class="row-btn" [disabled]="last || !canEdit()" (click)="move('values', i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
+                  <button type="button" class="row-btn danger" [disabled]="!canEdit()" (click)="removeAt('values', i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
                 </td>
               </tr>
             } @empty {
@@ -242,7 +242,7 @@
             }
           </tbody>
         </table>
-        <button type="button" class="btn sm soft add-row" (click)="addValue()"><app-icon name="plus" [size]="14" />{{ i18n.t('catalogue-a.tests.values.add') }}</button>
+        <button type="button" class="btn sm soft add-row" [disabled]="!canEdit()" (click)="addValue()"><app-icon name="plus" [size]="14" />{{ i18n.t('catalogue-a.tests.values.add') }}</button>
       </div>
     }
 
@@ -267,11 +267,11 @@
             <app-search-box [placeholder]="i18n.t('catalogue-a.tests.formula.searchTests')" (searchChange)="searchReferences($event)" />
             <ul class="candidates">
               @for (item of referenceResults(); track item.id) {
-                @if (item.id !== testId) {
+                @if (item.id !== testId()) {
                   <li>
                     <span class="mono">{{ item.code }}</span>
                     <span class="grow">{{ name(item) }}</span>
-                    <button type="button" class="btn sm soft" (click)="insertReference(item)"><app-icon name="plus" [size]="13" />{{ i18n.t('catalogue-a.add') }}</button>
+                    <button type="button" class="btn sm soft" [disabled]="!canEdit()" (click)="insertReference(item)"><app-icon name="plus" [size]="13" />{{ i18n.t('catalogue-a.add') }}</button>
                   </li>
                 }
               } @empty {
@@ -302,15 +302,15 @@
               </app-form-field>
             </div>
             <div class="actions">
-              <button type="button" class="row-btn" [disabled]="first" (click)="move('paragraphs', i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
-              <button type="button" class="row-btn" [disabled]="last" (click)="move('paragraphs', i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
-              <button type="button" class="row-btn danger" (click)="removeAt('paragraphs', i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
+              <button type="button" class="row-btn" [disabled]="first || !canEdit()" (click)="move('paragraphs', i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
+              <button type="button" class="row-btn" [disabled]="last || !canEdit()" (click)="move('paragraphs', i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
+              <button type="button" class="row-btn danger" [disabled]="!canEdit()" (click)="removeAt('paragraphs', i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
             </div>
           </fieldset>
         } @empty {
           <p class="muted">{{ i18n.t('catalogue-a.tests.paragraphs.none') }}</p>
         }
-        <button type="button" class="btn sm soft add-row" (click)="addParagraph()"><app-icon name="plus" [size]="14" />{{ i18n.t('catalogue-a.tests.paragraphs.add') }}</button>
+        <button type="button" class="btn sm soft add-row" [disabled]="!canEdit()" (click)="addParagraph()"><app-icon name="plus" [size]="14" />{{ i18n.t('catalogue-a.tests.paragraphs.add') }}</button>
       </div>
     }
 

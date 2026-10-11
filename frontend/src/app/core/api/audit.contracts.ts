@@ -29,6 +29,18 @@ export interface AuditEntryItem {
   readonly reason: string | null;
   readonly sequence: number | null;
   readonly payload: string | null;
+  /** SA-09 "client" (UAT C-18): the laboratory the entry concerns, in the platform tenant's log only. */
+  readonly clientTenantId?: string | null;
+  readonly clientNameEn?: string | null;
+  readonly clientNameAr?: string | null;
+}
+
+/** A client the platform log can be filtered by (`GET /api/v1/audit/clients`; empty in a laboratory). */
+export interface AuditClientItem {
+  readonly tenantId: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly portalSlug: string;
 }
 
 export type AuditEntriesPage = Paged<AuditEntryItem>;
@@ -39,6 +51,8 @@ export interface AuditEntryFilter {
   readonly userId: string | null;
   readonly entityType: string | null;
   readonly entityId: string | null;
+  /** The platform log's client filter (SA-09); ignored in a laboratory. */
+  readonly clientTenantId?: string | null;
   readonly page: number;
   readonly pageSize: number;
 }
@@ -52,6 +66,7 @@ export interface ChainVerificationResult {
 export const AUDIT_API = {
   entries: '/api/v1/audit/entries',
   verifyChain: '/api/v1/audit/verify-chain',
+  clients: '/api/v1/audit/clients',
 } as const;
 
 export const AUDIT_PERMISSIONS = {

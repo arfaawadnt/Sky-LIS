@@ -55,18 +55,21 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
   let printer: PrinterStub;
   let harness: RouterTestingHarness;
   let confirmAnswer = true;
+  /** Permission keys the signed-in user lacks (UAT R3-02); everything else is granted. */
+  let denied = new Set<string>();
 
   beforeEach(() => {
     printer = new PrinterStub();
     confirmAnswer = true;
+    denied = new Set<string>();
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
-        { provide: AuthStore, useValue: { currentBranch: signal<string | null>('b-1'), hasPermission: () => true } satisfies Pick<AuthStore, 'currentBranch' | 'hasPermission'> },
+        { provide: AuthStore, useValue: { currentBranch: signal<string | null>('b-1'), hasPermission: (key: string) => !denied.has(key) } satisfies Pick<AuthStore, 'currentBranch' | 'hasPermission'> },
         { provide: DeviceIdentityService, useValue: { deviceId: () => 'device-test' } satisfies Pick<DeviceIdentityService, 'deviceId'> },
-        { provide: PermissionsService, useValue: { can: () => true } satisfies Pick<PermissionsService, 'can'> },
+        { provide: PermissionsService, useValue: { can: (key: string) => !denied.has(key) } satisfies Pick<PermissionsService, 'can'> },
         { provide: RegistrationPrinter, useValue: printer },
         { provide: ConfirmService, useValue: { confirm: () => Promise.resolve(confirmAnswer), promptReason: () => Promise.resolve(null) } satisfies Pick<ConfirmService, 'confirm' | 'promptReason'> },
         provideRouter(
@@ -242,6 +245,22 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
     expect(facade().register.problem()?.code).toBe('REG-002');
     backend.expectNone(BILLING_API.payments);
     expect(printer.printed).toEqual([]);
+  });
+
+  it('shows a saved visit read-only to a user without registration.edit: no Save, no New registration, every control disabled (UAT R3-02)', async () => {
+    denied = new Set(['registration.edit', 'registration.create']);
+    const page = await open('/registration/visits/v-1', () => backend.expectOne(`${REGISTRATION_API.visits}/v-1`).flush(visitDetail()));
+    harness.detectChanges();
+
+    const host = harness.routeNativeElement!;
+    expect(host.textContent).toContain('registration.readOnly');
+    const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).filter((button) => !button.hidden);
+    expect(buttons.some((button) => /saveChanges|newRegistration/.test(button.textContent ?? ''))).toBe(false);
+    expect(host.querySelector<HTMLFieldSetElement>('fieldset.layout-fieldset')?.disabled).toBe(true);
+
+    await page.save();
+    await tick();
+    backend.expectNone((request) => request.method !== 'GET');
   });
 
   it('opens a saved visit for editing: the saved lines are listed, a reserved line can be released, and no payment panel is shown', async () => {

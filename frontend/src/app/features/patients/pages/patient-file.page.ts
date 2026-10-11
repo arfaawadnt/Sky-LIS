@@ -93,9 +93,12 @@ export class PatientFilePage {
     { label: this.patient()?.number ?? '…', path: null },
   ]);
 
+  /** The Documents tab only with `files.view` (UAT A-03: it was offered and failed with 403). */
   protected readonly tabs = computed<readonly TabItem[]>(() => [
     { id: 'file', label: this.i18n.t('patients.tab.file') },
-    { id: 'documents', label: this.i18n.t('patients.tab.documents'), badge: this.facade.documents.hasValue() ? this.documents().filter((document) => document.isActive).length : null },
+    ...(this.facade.canSeeDocuments()
+      ? [{ id: 'documents', label: this.i18n.t('patients.tab.documents'), badge: this.facade.documents.hasValue() ? this.documents().filter((document) => document.isActive).length : null }]
+      : []),
     { id: 'visits', label: this.i18n.t('patients.tab.visits') },
   ]);
 
@@ -119,6 +122,7 @@ export class PatientFilePage {
 
   constructor() {
     void this.i18n.load('patients');
+    this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
 
     effect(() => {
       const id = this.id();

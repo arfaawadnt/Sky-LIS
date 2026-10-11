@@ -32,16 +32,30 @@ internal static class TestDatabase
     /// Test processes share one database. Each process holds a session advisory lock for its lifetime, so suites run
     /// one process at a time, and prepares the schema once; nothing else coordinates them.
     /// </summary>
-    /// <summary>Empties every table of the application schemas (CASCADE), whatever modules exist, so fixtures never list tables.</summary>
+    /// <summary>
+    /// Empties every table of the application schemas (CASCADE), whatever modules exist, so fixtures never list tables. Tables
+    /// whose rows are never deleted refuse TRUNCATE by trigger (migration AppendOnlyTruncateGuard); the reset disables those
+    /// triggers explicitly, inside the same transaction, and enables them again.
+    /// </summary>
     public const string TruncateAllSql = """
         DO $$
-        DECLARE tables text;
+        DECLARE tables text; guard record;
         BEGIN
             SELECT string_agg(format('%I.%I', table_schema, table_name), ', ') INTO tables
             FROM information_schema.tables
             WHERE table_schema IN ('identity', 'app', 'ops', 'audit', 'read', 'saas') AND table_type = 'BASE TABLE' AND table_name NOT LIKE '\_\_%';
             IF tables IS NOT NULL THEN
+                FOR guard IN SELECT format('ALTER TABLE %I.%I %%s TRIGGER %I', n.nspname, c.relname, t.tgname) AS statement
+                             FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+                             WHERE NOT t.tgisinternal AND (t.tgtype & 32) <> 0 AND n.nspname IN ('identity', 'app', 'ops', 'audit', 'read', 'saas') LOOP
+                    EXECUTE format(guard.statement, 'DISABLE');
+                END LOOP;
                 EXECUTE 'TRUNCATE ' || tables || ' CASCADE';
+                FOR guard IN SELECT format('ALTER TABLE %I.%I %%s TRIGGER %I', n.nspname, c.relname, t.tgname) AS statement
+                             FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+                             WHERE NOT t.tgisinternal AND (t.tgtype & 32) <> 0 AND n.nspname IN ('identity', 'app', 'ops', 'audit', 'read', 'saas') LOOP
+                    EXECUTE format(guard.statement, 'ENABLE');
+                END LOOP;
             END IF;
         END $$;
         """;

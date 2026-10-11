@@ -5,7 +5,5 @@
   "welcome": "تم تسجيل الدخول باسم",
   "placeholder": "أرقام المنصة في لوحة المتابعة (نظرة عامة › لوحة المتابعة): العملاء والنشاط والمحافظ حسب الفترة.",
   "kpi.clients": "العملاء",
-  "kpi.activeSubscriptions": "الاشتراكات النشطة",
-  "kpi.openTickets": "التذاكر المفتوحة",
-  "kpi.agentsOnline": "الوكلاء المتصلون"
+  "kpi.activeSubscriptions": "الاشتراكات النشطة"
 }

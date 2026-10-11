@@ -37,9 +37,15 @@ export function toCsv<T>(rows: readonly T[], columns: readonly CsvColumn<T>[]): 
   return `${BYTE_ORDER_MARK}${lines.join('\r\n')}\r\n`;
 }
 
-/** `catalogue-tests-2026-10-09.csv`. */
+/** `catalogue-tests-2026-10-09.csv`, dated in the user's own calendar (not UTC, UAT B-09). */
 export function csvFileName(name: string, now: Date = new Date()): string {
-  return `${name}-${now.toISOString().slice(0, 10)}.csv`;
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${name}-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.csv`;
+}
+
+/** A flag as the grid says it: the translated Yes / No, never `true` / `false` (UAT B-09). */
+export function yesNo(translate: (key: string) => string, value: boolean): string {
+  return translate(value ? 'shared.yes' : 'shared.no');
 }
 
 /** Hands the text to the browser as a file download (no-op where the platform has no object URLs, e.g. tests). */

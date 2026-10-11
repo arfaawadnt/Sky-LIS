@@ -24,9 +24,9 @@ public sealed class PreparationsController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetPreparationQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? answerType, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? answerType, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportPreparationsQuery(search, isActive, answerType), cancellationToken);
+        var file = await sender.Send(new ExportPreparationsQuery(search, isActive, answerType, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -74,9 +74,9 @@ public sealed class DiagnosesController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetDiagnosisQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportDiagnosesQuery(search, isActive), cancellationToken);
+        var file = await sender.Send(new ExportDiagnosesQuery(search, isActive, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -124,9 +124,9 @@ public sealed class ShortcutSetsController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetShortcutSetQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportShortcutSetsQuery(search, isActive), cancellationToken);
+        var file = await sender.Send(new ExportShortcutSetsQuery(search, isActive, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -174,9 +174,9 @@ public sealed class TestRulesController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetTestRuleQuery(id), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? clinicalGroupId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? clinicalGroupId, [FromQuery] string? lang, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportTestRulesQuery(search, isActive, clinicalGroupId), cancellationToken);
+        var file = await sender.Send(new ExportTestRulesQuery(search, isActive, clinicalGroupId, lang), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 

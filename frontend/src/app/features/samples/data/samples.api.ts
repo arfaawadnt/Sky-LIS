@@ -75,11 +75,11 @@ export class SamplesApi {
   }
 
   reject(id: string, reasonId: string, note: string | null): Promise<void> {
-    return firstValueFrom(this.http.post<void>(SAMPLES_API.reject(id), { reasonId, note }), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(SAMPLES_API.reject(id), { reasonId, note }), { defaultValue: undefined }).then(noContent);
   }
 
   unreject(id: string, note: string | null): Promise<void> {
-    return firstValueFrom(this.http.post<void>(SAMPLES_API.unreject(id), { note }), { defaultValue: undefined });
+    return firstValueFrom(this.http.post<void>(SAMPLES_API.unreject(id), { note }), { defaultValue: undefined }).then(noContent);
   }
 
   replace(id: string, note: string | null): Promise<CreatedResource> {
@@ -112,4 +112,9 @@ function abortable<T>(signal: AbortSignal | undefined): (value: T) => T {
 
     return value;
   };
+}
+
+/** A 204 arrives as a `null` body; a write without a result resolves to `undefined`, because a mutation's `null` means it failed (UAT: 204 answers). */
+function noContent(): undefined {
+  return undefined;
 }

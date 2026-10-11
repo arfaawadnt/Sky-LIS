@@ -55,9 +55,13 @@
           }
           <span class="chips">
             @for (contract of list.derivedContracts; track contract.contractPricingId) {
-              <a class="chip" [routerLink]="['/pricing/contract-pricing', contract.contractTierId]">
-                {{ tierLabel(contract.payerNameEn, contract.payerNameAr) }} / {{ tierLabel(contract.tierNameEn, contract.tierNameAr) }}
-              </a>
+              @if (contractPricingOffered) {
+                <a class="chip" [routerLink]="['/pricing/contract-pricing', contract.contractTierId]">
+                  {{ tierLabel(contract.payerNameEn, contract.payerNameAr) }} / {{ tierLabel(contract.tierNameEn, contract.tierNameAr) }}
+                </a>
+              } @else {
+                <span class="chip">{{ tierLabel(contract.payerNameEn, contract.payerNameAr) }} / {{ tierLabel(contract.tierNameEn, contract.tierNameAr) }}</span>
+              }
             }
           </span>
         </dd>

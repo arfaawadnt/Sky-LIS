@@ -49,10 +49,14 @@ public static class PlatformAdminCodes
     public const string MobileLengthInvalid = "GEO-004";
     public const string LanguageInvalid = "GEO-005";
     public const string GeographyTextInvalid = "GEO-006";
+    public const string TimeZoneInvalid = "GEO-007";
     public const string MobileInvalidForCountry = "GEO-010";
     public const string CountryInactive = "GEO-011";
     public const string GovernorateInactive = "GEO-012";
     public const string GovernorateNotInCountry = "GEO-013";
+
+    /// <summary>The manager's mobile does not match the country (the laboratory's own mobile is <see cref="MobileInvalidForCountry"/>), so a form can mark the field (validation 2026-10-11, C-03).</summary>
+    public const string ManagerMobileInvalidForCountry = "GEO-014";
     public const string IsoCodeExists = "GEO-100";
     public const string GovernorateExists = "GEO-101";
     public const string CountryInUse = "GEO-110";

@@ -171,7 +171,9 @@ export class RegistrationFacade {
     const discount = this.discountTotal();
     const due = round2(patient - discount);
     const paid = saved?.balance?.paid ?? 0;
-    return { list, payer, patient, discount, due, paid, remaining: round2(due - paid) };
+    // Refunds return money already paid (UAT R3-01): what the laboratory holds is paid − refunded, as the server balance counts it.
+    const refunded = saved?.balance?.refunded ?? 0;
+    return { list, payer, patient, discount, due, paid, refunded, remaining: round2(due - (paid - refunded)) };
   });
 
   /** True once a treasury is approved for this user on this device in the session branch (BR-27); without one the visit is saved unpaid. */
@@ -365,6 +367,21 @@ export class RegistrationFacade {
 
   setAnswer(preparationId: string, answer: string): void {
     this.answers.update((answers) => ({ ...answers, [preparationId]: answer }));
+  }
+
+  /**
+   * Re-reads the parameters and rights, the reference lists, the treasuries, the saved visit and the dry run when the page
+   * opens again (what was typed stays): the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01). A load in flight is left alone.
+   */
+  refresh(): void {
+    this.settings.reload();
+    this.tiers.reload();
+    this.doctors.reload();
+    this.diagnoses.reload();
+    this.discountReasons.reload();
+    this.treasuries.reload();
+    this.visit.reload();
+    this.check.reload();
   }
 
   /** Clears the visit being typed; `keepContract` keeps the chosen tier for the next patient. */

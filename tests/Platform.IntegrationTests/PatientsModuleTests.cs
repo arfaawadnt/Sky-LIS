@@ -187,6 +187,44 @@ public sealed class PatientsModuleTests(DatabaseFixture fixture)
         Assert.StartsWith(tenant.ToString("N"), await repository.GetStorageKeyAsync(documentId, CancellationToken.None), StringComparison.Ordinal);
     }
 
+    [DatabaseFact]
+    public async Task The_register_figures_count_the_visits_of_each_file_and_their_last_date_within_the_tenant()
+    {
+        // UAT A-09 (CP-11 "visit count, last visit"): Registration's adapter of the register's read port.
+        var tenant = Guid.CreateVersion7();
+        var frequent = await RegisterAsync(tenant, "Frequent Visitor", null, null);
+        var once = await RegisterAsync(tenant, "Single Visitor", null, null);
+        var never = await RegisterAsync(tenant, "Never Visited", null, null);
+        await InsertVisitAsync(tenant, frequent, Now.AddDays(-30));
+        await InsertVisitAsync(tenant, frequent, Now.AddDays(-2));
+        await InsertVisitAsync(tenant, frequent, Now.AddDays(-10));
+        await InsertVisitAsync(tenant, once, Now.AddHours(-1));
+        await InsertVisitAsync(Guid.CreateVersion7(), frequent, Now);   // another laboratory's row never counts
+
+        using var scope = fixture.AppScope(tenant, Guid.CreateVersion7());
+        var figures = await scope.ServiceProvider.GetRequiredService<IPatientVisitStatistics>().ForPatientsAsync([frequent, once, never], CancellationToken.None);
+
+        Assert.Equal(new PatientVisitFigures(3, Now.AddDays(-2)), figures[frequent]);
+        Assert.Equal(new PatientVisitFigures(1, Now.AddHours(-1)), figures[once]);
+        Assert.False(figures.ContainsKey(never));
+        Assert.Empty(await scope.ServiceProvider.GetRequiredService<IPatientVisitStatistics>().ForPatientsAsync([], CancellationToken.None));
+    }
+
+    /// <summary>A walk-in visit row of Registration: raw SQL with the NOT NULL columns of app.visits (no DB defaults).</summary>
+    private async Task InsertVisitAsync(Guid tenant, Guid patientId, DateTimeOffset registeredAtUtc)
+    {
+        var id = Guid.CreateVersion7();
+        using var scope = fixture.AppScope(tenant, Guid.CreateVersion7());
+        await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO app.visits (id, tenant_id, accession, patient_id, branch_id, location_type, payer_id, contract_tier_id, batch_id, urgent, biohazard,
+                                    collected_outside, utc_offset_minutes, status, registered_at_utc, registered_by_user_id, total_list_price, discount_total,
+                                    patient_share_total, payer_share_total, discount_value, revision, created_at_utc)
+            VALUES ({0}, {1}, {2}, {3}, {4}, 'Walkin', {5}, {6}, NULL, false, false, false, 0, 'Open', {7}, {8}, 0, 0, 0, 0, 0, 1, {7})
+            """,
+            id, tenant, $"ACC-IT-{id.ToString("N")[^10..].ToUpperInvariant()}", patientId, Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), registeredAtUtc, Guid.CreateVersion7());
+    }
+
     private async Task<Guid> RegisterAsync(Guid tenant, string fullName, string? nameAr, string? mobile, PatientGender gender = PatientGender.Male, string? nationalId = null, string? number = null)
     {
         using var scope = fixture.AppScope(tenant, Guid.CreateVersion7());

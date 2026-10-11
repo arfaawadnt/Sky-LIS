@@ -110,6 +110,14 @@ export class CollectionFacade {
     this.outcomes.set([]);
   }
 
+  /** Re-reads today's list and the parameters when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01). A load in flight is left alone. */
+  refresh(): void {
+    this.scan.reset();
+    this.bulk.reset();
+    this.today.reload();
+    this.settings.reload();
+  }
+
   setStatus(status: SampleStatus | null): void {
     this.filter.update((current) => ({ ...current, status, page: 1 }));
   }

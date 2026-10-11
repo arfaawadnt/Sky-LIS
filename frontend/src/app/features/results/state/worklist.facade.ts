@@ -129,4 +129,15 @@ export class WorklistFacade {
   clear(): void {
     this.filter.set(defaultWorklistFilter());
   }
+
+  /** Re-reads the rows and the filter lists when the page opens again (the filter itself is kept): the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's, with its result rights — must never stay on screen (UAT D-14, A-01). A load in flight is left alone. */
+  refresh(): void {
+    this.document.reset();
+    this.exportCsv.reset();
+    this.list.reload();
+    this.groups.reload();
+    this.tests.reload();
+    this.payers.reload();
+    this.analysers.reload();
+  }
 }
