@@ -13,7 +13,7 @@ export interface BarProblem {
 
 /**
  * The sticky bottom bar of the registration page (UX option B): every open item as a chip that jumps to its field, the
- * notices the save will ask to confirm, the amount due and the Save button (Ctrl+S is handled by the page). Sits inside
+ * notices the save will ask to confirm, the amount due and the Save button (F10 is handled by the page). Sits inside
  * the page's save-shortcut host so the shortcut also works while the focus is on the bar.
  */
 @Component({
@@ -38,7 +38,7 @@ export interface BarProblem {
       <span class="due"><span class="small muted">{{ dueLabel() }}</span> <b>{{ due() }}</b></span>
       <button type="button" class="btn primary save" [disabled]="saving()" (click)="save.emit()">
         <app-icon name="check" [size]="15" />{{ saveLabel() }}
-        <kbd>Ctrl+S</kbd>
+        <kbd>F10</kbd>
       </button>
     </div>
   `,

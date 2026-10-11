@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import type { PatientFormSettings, RegisterPatientRequest } from '../../core/api/patients.contracts';
+import type { CountryOption, GovernorateOption, PatientFormSettings, RegisterPatientRequest } from '../../core/api/patients.contracts';
 import { PermissionsService } from '../../core/permissions/permissions.service';
 import { PatientFormComponent } from './patient-form.component';
 import { ageBetween, todayIso } from './patient-demographics';
@@ -9,10 +9,12 @@ import { ageBetween, todayIso } from './patient-demographics';
 @Component({
   imports: [PatientFormComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<app-patient-form [settings]="settings()" (save)="saved.push($event)" />`,
+  template: `<app-patient-form [settings]="settings()" [countries]="countries()" [governorates]="governorates()" (save)="saved.push($event)" />`,
 })
 class HostComponent {
   readonly settings = signal<PatientFormSettings | null>(null);
+  readonly countries = signal<readonly CountryOption[]>([]);
+  readonly governorates = signal<readonly GovernorateOption[]>([]);
   readonly saved: RegisterPatientRequest[] = [];
   readonly form = viewChild.required(PatientFormComponent);
 }
@@ -148,6 +150,80 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
     expect(fixture.componentInstance.form().submit()).toBe(false);
     await fixture.whenStable();
     expect(more?.open).toBe(true);
+  });
+
+  describe('Egyptian national id', () => {
+    const countries: readonly CountryOption[] = [
+      { id: 'c-eg', code: 'EG', nameEn: 'Egypt', nameAr: 'مصر', mobileLength: 10 },
+      { id: 'c-sa', code: 'SA', nameEn: 'Saudi Arabia', nameAr: 'السعودية', mobileLength: 9 },
+    ];
+    const governorates: readonly GovernorateOption[] = [
+      { id: 'g-cairo', nameEn: 'Cairo', nameAr: 'القاهرة', countryId: 'c-eg' },
+      { id: 'g-giza', nameEn: 'Giza', nameAr: 'الجيزة', countryId: 'c-eg' },
+    ];
+
+    async function renderWithLists(): Promise<Awaited<ReturnType<typeof render>>> {
+      const rendered = await render();
+      rendered.fixture.componentInstance.countries.set(countries);
+      rendered.fixture.componentInstance.governorates.set(governorates);
+      await rendered.fixture.whenStable();
+      return rendered;
+    }
+
+    it('fills the empty date of birth, gender and governorate', async () => {
+      const { fixture, host } = await renderWithLists();
+      type(host, 'nationalId', '29601010100022');
+      await fixture.whenStable();
+
+      expect(value(host, 'dateOfBirth')).toBe('1996-01-01');
+      expect(value(host, 'gender')).toBe('Female');
+      expect(value(host, 'governorateId')).toBe('g-cairo');
+      expect(value(host, 'title')).toBe('Ms');   // the untouched default "Mr" follows the id
+      expect(value(host, 'ageYears')).not.toBe('');
+      expect(host.textContent).toContain('patients.nationalId.filled');
+      expect(host.querySelector('.id-conflicts')).toBeNull();
+
+      // a corrected id moves the values it filled
+      type(host, 'nationalId', '28512252101235');
+      await fixture.whenStable();
+      expect(value(host, 'dateOfBirth')).toBe('1985-12-25');
+      expect(value(host, 'gender')).toBe('Male');
+      expect(value(host, 'governorateId')).toBe('g-giza');
+
+      type(host, 'fullName', 'Omar');
+      await fixture.whenStable();
+      expect(fixture.componentInstance.form().submit()).toBe(true);
+      expect(fixture.componentInstance.saved[0]).toEqual(expect.objectContaining({ dateOfBirth: '1985-12-25', gender: 'Male', governorateId: 'g-giza', nationalId: '28512252101235' }));
+    });
+
+    it('never overwrites what the clerk entered and lists the contradictions', async () => {
+      const { fixture, host } = await renderWithLists();
+      type(host, 'dateOfBirth', '1990-05-05');
+      host.querySelector<HTMLInputElement>('input[type="radio"][value="Female"]')?.click();
+      await fixture.whenStable();
+
+      type(host, 'nationalId', '28512252101235');   // a man born 1985-12-25 in Giza
+      await fixture.whenStable();
+      expect(value(host, 'dateOfBirth')).toBe('1990-05-05');
+      expect(value(host, 'gender')).toBe('Female');
+      expect(value(host, 'governorateId')).toBe('g-giza');   // empty, so filled
+      const conflicts = host.querySelector('.id-conflicts')?.textContent ?? '';
+      expect(conflicts).toContain('patients.nationalId.birthDiffers');
+      expect(conflicts).toContain('patients.nationalId.genderDiffers');
+    });
+
+    it('reads nothing when the nationality is not Egyptian or the id is not an Egyptian one', async () => {
+      const { fixture, host } = await renderWithLists();
+      type(host, 'nationalId', 'A1234567');
+      await fixture.whenStable();
+      expect(value(host, 'dateOfBirth')).toBe('');
+
+      type(host, 'nationality', 'SA');
+      type(host, 'nationalId', '29601010100022');
+      await fixture.whenStable();
+      expect(value(host, 'dateOfBirth')).toBe('');
+      expect(value(host, 'governorateId')).toBe('');
+    });
   });
 
   it('picks the gender with the switch', async () => {

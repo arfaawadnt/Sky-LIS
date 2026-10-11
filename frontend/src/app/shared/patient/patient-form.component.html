@@ -43,9 +43,22 @@
         <input type="text" formControlName="fullName" maxlength="200" autocomplete="off" lang="en" dir="ltr" (input)="onIdentityInput()" />
       </app-form-field>
     </div>
-    <app-form-field [label]="i18n.t('patients.field.nameAr')">
-      <input type="text" formControlName="nameAr" maxlength="200" autocomplete="off" lang="ar" dir="rtl" />
-    </app-form-field>
+    <div class="row pair">
+      <app-form-field [label]="i18n.t('patients.field.nameAr')">
+        <input type="text" formControlName="nameAr" maxlength="200" autocomplete="off" lang="ar" dir="rtl" />
+      </app-form-field>
+      <!-- typed early: an Egyptian id fills the empty date of birth, gender and governorate -->
+      <app-form-field [label]="i18n.t('patients.field.nationalId')" [hint]="nationalIdHint()">
+        <input type="text" formControlName="nationalId" maxlength="32" autocomplete="off" dir="ltr" inputmode="numeric" (input)="onNationalIdInput($event)" />
+      </app-form-field>
+    </div>
+    @if (nationalIdConflicts().length > 0) {
+      <ul class="id-conflicts warn-strip" role="status">
+        @for (conflict of nationalIdConflicts(); track conflict) {
+          <li>{{ conflict }}</li>
+        }
+      </ul>
+    }
   </section>
 
   <!-- 2. clinical: sex, date of birth or age (one line), condition (reference ranges) -->
@@ -57,7 +70,7 @@
         <div class="seg">
           @for (gender of genders; track gender) {
             <label class="seg-opt">
-              <input type="radio" formControlName="gender" [value]="gender" [attr.value]="gender" />
+              <input type="radio" formControlName="gender" [value]="gender" [attr.value]="gender" (change)="genderEdited()" />
               <span>{{ i18n.t('patients.gender.' + gender) }}</span>
             </label>
           }
@@ -65,20 +78,21 @@
       </fieldset>
 
       <fieldset class="birth">
-        <legend class="seg-legend">{{ i18n.t('patients.field.birthOrAge') }} <span class="req" aria-hidden="true">*</span></legend>
+        <!-- the group name is for screen readers; on screen the labels stand on one line with the gender's -->
+        <legend class="visually-hidden">{{ i18n.t('patients.field.birthOrAge') }}</legend>
         <div class="birth-row">
-          <app-form-field class="dob" [label]="i18n.t('patients.field.dateOfBirth')" [hint]="birthSource() === 'age' ? i18n.t('patients.hint.estimatedBirth') : null">
-            <input type="date" formControlName="dateOfBirth" [min]="'1900-01-01'" [max]="today" (input)="onBirthInput()" (change)="onBirthInput()" />
+          <app-form-field class="dob" [label]="i18n.t('patients.field.dateOfBirth')" [required]="true" [hint]="birthSource() === 'age' ? i18n.t('patients.hint.estimatedBirth') : null">
+            <input type="date" formControlName="dateOfBirth" [min]="'1900-01-01'" [max]="today" (input)="birthEdited(); onBirthInput()" (change)="birthEdited(); onBirthInput()" />
           </app-form-field>
-          <span class="or" aria-hidden="true">{{ i18n.t('patients.field.or') }}</span>
+          <span class="or" aria-hidden="true"><span class="or-spacer">&nbsp;</span><span class="or-text">{{ i18n.t('patients.field.or') }}</span></span>
           <app-form-field class="age" [label]="i18n.t('patients.field.ageYears')">
-            <input type="number" formControlName="ageYears" min="0" max="150" step="1" inputmode="numeric" (input)="onAgeInput()" />
+            <input type="number" formControlName="ageYears" min="0" max="150" step="1" inputmode="numeric" (input)="birthEdited(); onAgeInput()" />
           </app-form-field>
           <app-form-field class="age" [label]="i18n.t('patients.field.ageMonths')">
-            <input type="number" formControlName="ageMonths" min="0" max="11" step="1" inputmode="numeric" (input)="onAgeInput()" />
+            <input type="number" formControlName="ageMonths" min="0" max="11" step="1" inputmode="numeric" (input)="birthEdited(); onAgeInput()" />
           </app-form-field>
           <app-form-field class="age" [label]="i18n.t('patients.field.ageDays')">
-            <input type="number" formControlName="ageDays" min="0" max="31" step="1" inputmode="numeric" (input)="onAgeInput()" />
+            <input type="number" formControlName="ageDays" min="0" max="31" step="1" inputmode="numeric" (input)="birthEdited(); onAgeInput()" />
           </app-form-field>
         </div>
         @if (form.hasError('birthOrAge') && (form.controls.dateOfBirth.touched || form.controls.ageYears.touched)) {
@@ -99,7 +113,7 @@
     }
   </section>
 
-  <!-- 3. reach: mobile with its country, national id -->
+  <!-- 3. reach: mobile with its country -->
   <section class="group">
     <h3 class="group-title">{{ i18n.t('patients.section.reach') }}</h3>
     <div class="row pair">
@@ -119,9 +133,6 @@
           <input type="tel" formControlName="mobile" maxlength="32" autocomplete="off" dir="ltr" inputmode="tel" (input)="onIdentityInput()" />
         </app-form-field>
       </div>
-      <app-form-field [label]="i18n.t('patients.field.nationalId')">
-        <input type="text" formControlName="nationalId" maxlength="32" autocomplete="off" dir="ltr" />
-      </app-form-field>
     </div>
   </section>
 
@@ -151,7 +162,7 @@
 
       @if (governorates().length > 0) {
         <app-form-field [label]="i18n.t('patients.field.governorate')">
-          <select formControlName="governorateId">
+          <select formControlName="governorateId" (change)="governorateEdited()">
             <option value="">—</option>
             @for (governorate of governorates(); track governorate.id) {
               <option [value]="governorate.id">{{ optionName(governorate) }}</option>

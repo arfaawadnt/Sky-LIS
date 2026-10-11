@@ -234,7 +234,17 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **The Egyptian national ID fills the patient's date of birth, gender and governorate.** Typing a 14-digit Egyptian
+  ID (century, date of birth, governorate of birth, sequence whose last digit is odd for male and even for female) fills
+  those fields when they are empty. An untouched default title follows the gender ("Ms" for a woman). Values the ID
+  filled follow a corrected ID; anything the clerk entered is never overwritten, and a contradiction is listed under the
+  name row. IDs of other nationalities and passports are ignored, and the check digit is not used to refuse.
+  National ID now sits beside the Arabic name so it can be typed first.
+- **F10 saves** (registration, results entry, editors and dialogs), the save key of the LDM forms the laboratories know.
+  Ctrl+S still works, but neither key reaches the browser any more: Ctrl+S no longer opens "Save page as…" where no
+  form listens, and F10 no longer moves the focus to the browser menu. On-screen hints now say F10.
+- **Patient form alignment:** the gender switch, date of birth, "or age" and the age boxes share one label line and one
+  40 px control line.
 
 ### v0.5.1 — 2026-10-11
 

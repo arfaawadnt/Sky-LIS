@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { type AbstractControl, FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors, type ValidatorFn, Validators } from '@angular/forms';
 
 import {
@@ -28,6 +29,7 @@ import { BadgeComponent } from '../ui/badge/badge.component';
 import { CanDirective } from '../ui/can.directive';
 import { FormFieldComponent } from '../ui/form-field/form-field.component';
 import { IconComponent } from '../ui/icon/icon.component';
+import { type NationalIdFacts, readEgyptianNationalId } from './egyptian-national-id';
 import { ageBetween, ageParts, birthDateFromAge, defaultGender, isValidAge, isValidMobile, normalizeMobile, parseIso, todayIso } from './patient-demographics';
 
 /** What the user is typing in a new file, for the similar-patient lookup (BR-01). */
@@ -52,13 +54,20 @@ const FIELD_OF_CODE: Readonly<Record<string, string>> = {
   'PAT-012': 'email',
 };
 
+/** ISO code of Egypt in the platform's country list (the only national id the form reads). */
+const EGYPT = 'EG';
+
+/** The fields an Egyptian national id can fill. */
+type IdField = 'dob' | 'gender' | 'governorate';
+
 /** The optional fields folded under "More details". */
 const DETAIL_FIELDS = ['nationality', 'email', 'governorateId', 'city', 'address', 'comments'] as const;
 
 /**
- * The patient create/edit form (CP-06 patient data, CP-11), in four groups — identity (title, both names), sex and age
- * (gender switch, date of birth or age on one line, condition), contact (mobile with its country, national id) and the
- * optional details folded until needed: title proposes the gender, date of birth ↔ age sync in both
+ * The patient create/edit form (CP-06 patient data, CP-11), in four groups — identity (title, both names, national id),
+ * sex and age (gender switch, date of birth or age on one line, condition), contact (mobile with its country) and the
+ * optional details folded until needed. An Egyptian national id fills the empty date of birth, gender and governorate of
+ * birth (`egyptian-national-id.ts`) and lists what it contradicts; title proposes the gender, date of birth ↔ age sync in both
  * directions (the last one typed is what is saved), mobile digits checked against the chosen country's length when the
  * platform publishes it (8–15 otherwise), mandatory mobile / national id from the tenant parameters, VIP only for
  * `patients.viewConfidential`, and the similar-patient warning while a new file is typed. Presentational: inputs in,
@@ -140,6 +149,57 @@ export class PatientFormComponent {
     },
     { validators: [(group) => this.validateBirthOrAge(group)] },
   );
+
+  /** The form value as a signal, so the national-id checks follow every change. */
+  private readonly formValue = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
+
+  /** Fields whose current value came from the national id: they follow a corrected id, a user edit releases them. */
+  private readonly fromId = new Set<IdField>();
+  protected readonly idFilled = signal<readonly IdField[]>([]);
+
+  /** What the typed national id says, when it is an Egyptian one and the nationality is Egyptian or not given. */
+  protected readonly nationalIdFacts = computed<NationalIdFacts | null>(() => {
+    const value = this.formValue();
+    const nationality = value.nationality ?? '';
+    return nationality === '' || nationality === EGYPT ? readEgyptianNationalId(value.nationalId ?? '', this.today) : null;
+  });
+
+  protected readonly nationalIdHint = computed(() => {
+    const fields = this.idFilled();
+    if (fields.length === 0 || this.nationalIdFacts() === null) {
+      return null;
+    }
+
+    const separator = this.i18n.lang() === 'ar' ? '، ' : ', ';
+    return this.i18n.tf('patients.nationalId.filled', { fields: fields.map((field) => this.i18n.t(`patients.nationalId.field.${field}`)).join(separator) });
+  });
+
+  /** What the clerk entered that the national id contradicts (never overwritten: shown so it can be checked). */
+  protected readonly nationalIdConflicts = computed<readonly string[]>(() => {
+    const facts = this.nationalIdFacts();
+    const value = this.formValue();
+    const filled = new Set(this.idFilled());
+    if (facts === null) {
+      return [];
+    }
+
+    const conflicts: string[] = [];
+    if (!filled.has('dob') && this.birthSource() === 'dob' && value.dateOfBirth && value.dateOfBirth !== facts.dateOfBirth) {
+      conflicts.push(this.i18n.tf('patients.nationalId.birthDiffers', { date: facts.dateOfBirth }));
+    }
+
+    const gender = this.i18n.t(`patients.gender.${facts.gender}`);
+    if (value.gender && value.gender !== facts.gender) {
+      conflicts.push(this.i18n.tf('patients.nationalId.genderDiffers', { gender }));
+    } else {
+      const titleGender = value.title ? defaultGender(value.title) : null;
+      if (this.form.controls.title.dirty && titleGender !== null && titleGender !== facts.gender) {
+        conflicts.push(this.i18n.tf('patients.nationalId.titleDiffers', { gender }));
+      }
+    }
+
+    return conflicts;
+  });
 
   constructor() {
     void this.i18n.load('patients');
@@ -226,7 +286,83 @@ export class PatientFormComponent {
     return true;
   }
 
+  /**
+   * An Egyptian national id fills the date of birth, the gender (a new file whose gender the clerk did not pick) and the
+   * governorate of birth when they are empty, or when they came from the id before (a corrected id). Nothing the clerk
+   * entered is overwritten; a contradiction is listed instead (`nationalIdConflicts`).
+   */
+  protected onNationalIdInput(event: Event): void {
+    const nationality = this.form.controls.nationality.value;
+    const raw = (event.target as HTMLInputElement).value;
+    const facts = nationality === '' || nationality === EGYPT ? readEgyptianNationalId(raw, this.today) : null;
+    if (facts === null) {
+      return;   // values taken from an earlier valid id stay, and follow it once the id is valid again
+    }
+
+    const controls = this.form.controls;
+    if (this.fromId.has('dob') || (controls.dateOfBirth.value === '' && this.typedAge() === null)) {
+      controls.dateOfBirth.setValue(facts.dateOfBirth);
+      this.onBirthInput();
+      this.fromId.add('dob');
+    }
+
+    if (this.fromId.has('gender') || (!this.isEdit() && !controls.gender.dirty)) {
+      controls.gender.setValue(facts.gender);
+      this.fromId.add('gender');
+      // the form's default title ("Mr") was never chosen: give it the id's gender (a title the clerk picked is kept and flagged)
+      const titleGender = defaultGender(controls.title.value);
+      if (!controls.title.dirty && titleGender !== null && titleGender !== facts.gender) {
+        controls.title.setValue(facts.gender === 'Male' ? 'Mr' : 'Ms');
+      }
+    }
+
+    const governorate = this.governorateOf(facts);
+    if (governorate !== null && (this.fromId.has('governorate') || controls.governorateId.value === '')) {
+      controls.governorateId.setValue(governorate.id);
+      this.fromId.add('governorate');
+    } else if (governorate === null && this.fromId.has('governorate')) {
+      controls.governorateId.setValue('');
+      this.fromId.delete('governorate');
+    }
+
+    this.idFilled.set([...this.fromId]);
+  }
+
+  /** The clerk changed one of the fields the id filled: it is theirs from now on. */
+  protected birthEdited(): void {
+    this.releaseFromId('dob');
+  }
+
+  protected genderEdited(): void {
+    this.releaseFromId('gender');
+  }
+
+  protected governorateEdited(): void {
+    this.releaseFromId('governorate');
+  }
+
+  private releaseFromId(field: IdField): void {
+    if (this.fromId.delete(field)) {
+      this.idFilled.set([...this.fromId]);
+    }
+  }
+
+  /** The platform's Egyptian governorate named by the id (none when born abroad or not in the list). */
+  private governorateOf(facts: NationalIdFacts): GovernorateOption | null {
+    const name = facts.governorateNameEn?.toLowerCase();
+    if (name === undefined) {
+      return null;
+    }
+
+    const egypt = this.countries().find((country) => country.code === EGYPT)?.id ?? null;
+    return this.governorates().find((option) => option.nameEn.toLowerCase() === name && (egypt === null || !option.countryId || option.countryId === egypt)) ?? null;
+  }
+
   protected onTitleChange(): void {
+    if (this.fromId.has('gender')) {
+      return;   // the national id is surer than the title's guess
+    }
+
     const gender = defaultGender(this.form.controls.title.value);
     if (gender !== null) {
       this.form.controls.gender.setValue(gender);
@@ -343,6 +479,8 @@ export class PatientFormComponent {
     });
     this.birthSource.set(estimated ? 'age' : 'dob');
     this.moreOpen.set(DETAIL_FIELDS.some((field) => this.form.controls[field].value.trim() !== ''));
+    this.fromId.clear();
+    this.idFilled.set([]);
   }
 
   private reset(name: string): void {
@@ -350,6 +488,8 @@ export class PatientFormComponent {
     this.form.controls.fullName.setValue(name);
     this.birthSource.set(null);
     this.moreOpen.set(false);
+    this.fromId.clear();
+    this.idFilled.set([]);
   }
 
   private validateBirth(control: AbstractControl): ValidationErrors | null {

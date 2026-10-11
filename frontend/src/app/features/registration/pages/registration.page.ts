@@ -68,7 +68,7 @@ interface SuccessState {
  * F2 opens the picker); the lines priced and planned by the server dry run (tubes BR-02, expected dates BR-13, frequency
  * BR-12, contract alerts, rules, preparations). Beside them the "Ready to save" checklist and the checkout (totals, the
  * discount folded until needed and kept within the user's cap, the payment panel). At the bottom a sticky bar lists every
- * open item (each jumps to its field, which is marked once a save was tried) with the amount due and Save (Ctrl+S). After
+ * open item (each jumps to its field, which is marked once a save was tried) with the amount due and Save (F10). After
  * saving, a dialog shows the accession, the payment is posted to Billing and labels, job order and receipt print per the
  * parameters. `/visits/:visitId` opens a saved visit to add or release
  * services and change its details or discount (no payment panel there).

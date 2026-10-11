@@ -116,7 +116,7 @@ function toGovernorate(value: Record<string, unknown>): GovernorateOption | null
     return null;
   }
 
-  return { id, nameEn, nameAr: text(value['nameAr']) ?? nameEn };
+  return { id, nameEn, nameAr: text(value['nameAr']) ?? nameEn, countryId: text(value['countryId']) };
 }
 
 function toCondition(value: Record<string, unknown>): ConditionOption | null {

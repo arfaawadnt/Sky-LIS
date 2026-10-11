@@ -5,6 +5,7 @@ import { provideRouter, withComponentInputBinding, withViewTransitions } from '@
 import { routes } from './app.routes';
 import { AuthStore } from './core/auth/auth.store';
 import { provideSessionSync } from './core/auth/session-channel';
+import { provideSaveShortcutGuard } from './shared/forms/save-shortcut.directive';
 import { authInterceptor } from './core/http/auth.interceptor';
 import { credentialEnvelopeInterceptor } from './core/http/credential-envelope.interceptor';
 import { csrfInterceptor } from './core/http/csrf.interceptor';
@@ -31,6 +32,7 @@ export const appConfig: ApplicationConfig = {
         profileChangeInterceptor, // a successful own-profile change tells the other tabs (R2-01)
       ]),
     ),
+    provideSaveShortcutGuard(), // F10 / Ctrl+S never reach the browser (no "Save page as…", no menu focus); forms save through appSaveShortcut
     provideSessionSync(), // tabs tell each other of a sign-in, a sign-out (C-01) or a profile change (R2-01); BroadcastChannel, no web storage
     provideAppInitializer(() => inject(AuthStore).hydrate()),
   ],

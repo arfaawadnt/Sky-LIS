@@ -19,7 +19,7 @@
   "exported": "تم تنزيل ملف CSV.",
   "open": "فتح",
   "edit": "تعديل",
-  "save": "حفظ (Ctrl+S)",
+  "save": "حفظ (F10)",
   "saving": "جارٍ الحفظ…",
   "cancel": "إلغاء",
   "created": "تم إنشاء ملف المريض {number}.",
@@ -194,5 +194,12 @@
   "section.reach": "التواصل",
   "field.or": "أو العمر",
   "more.title": "تفاصيل إضافية",
-  "more.hint": "اختيارية: الجنسية، البريد الإلكتروني، العنوان، الملاحظات"
+  "more.hint": "اختيارية: الجنسية، البريد الإلكتروني، العنوان، الملاحظات",
+  "nationalId.filled": "مُلئت من الرقم القومي: {fields}.",
+  "nationalId.field.dob": "تاريخ الميلاد",
+  "nationalId.field.gender": "الجنس",
+  "nationalId.field.governorate": "المحافظة",
+  "nationalId.birthDiffers": "الرقم القومي يحدد تاريخ الميلاد {date}، والتاريخ المُدخل مختلف.",
+  "nationalId.genderDiffers": "الرقم القومي لمريض من جنس «{gender}»، والجنس المختار مختلف.",
+  "nationalId.titleDiffers": "الرقم القومي لمريض من جنس «{gender}»؛ راجع اللقب."
 }

@@ -39,9 +39,15 @@ form {
   grid-template-columns: auto minmax(0, 1fr);
 }
 
-/* contact: the mobile (country + number) gets the wider share */
+/* Arabic name | national id; in Contact the mobile (country + number) takes the first cell */
 .pair {
-  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.id-conflicts {
+  margin: 0;
+  padding-inline-start: var(--sp-5);
+  font-size: var(--fs-sm);
 }
 
 .req {
@@ -57,10 +63,11 @@ form {
   min-width: 0;
 }
 
+/* same metrics as app-form-field's label (12px / 600, 5px gap) so the switch lines up with the inputs beside it */
 .seg-legend {
   padding: 0;
-  margin-block-end: 4px;
-  font-size: var(--fs-sm);
+  margin-block-end: 5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ink-2);
 }
@@ -76,7 +83,7 @@ form {
   position: relative;
   display: inline-flex;
   align-items: center;
-  min-height: 38px;
+  min-height: 38px;   /* + the 1px border above and below = the 40px inputs of the row */
   padding: 0 var(--sp-4);
   cursor: pointer;
   background: var(--surface);
@@ -113,11 +120,27 @@ form {
   align-items: start;
 }
 
+/* "or age": an empty label line, then text centred on the 40px input line */
 .or {
-  align-self: center;
-  margin-block-start: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   font-size: var(--fs-sm);
   color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.or-spacer {
+  font-size: 12px;
+}
+
+.or-text {
+  line-height: 40px;
+}
+
+/* one height for every control of the row (a date input is taller by default) */
+.sex-row input:not([type='radio']) {
+  height: 40px;
 }
 
 .field-error {

@@ -1,6 +1,6 @@
 {
   "title": "Registration",
-  "subtitle": "Walk-in registration: patient, contract, services, discount and payment in one screen. Enter adds a service, F2 opens the picker, Ctrl+S saves.",
+  "subtitle": "Walk-in registration: patient, contract, services, discount and payment in one screen. Enter adds a service, F2 opens the picker, F10 saves.",
   "editTitle": "Visit {accession}",
   "readOnly": "You can view this visit but not change it.",
   "editSubtitle": "Add or release services, change the details or the discount of a saved visit. Nothing is deleted.",
@@ -285,7 +285,7 @@
   "error.BIL-021": "The treasury is inactive.",
   "error.BIL-022": "The treasury belongs to another branch than your session.",
   "error.BIL-040": "Your role does not hold the payment right.",
-  "deskSubtitle": "Type to find a service, Enter adds it, F2 opens the catalogue, Ctrl+S saves.",
+  "deskSubtitle": "Type to find a service, Enter adds it, F2 opens the catalogue, F10 saves.",
   "patientVisit.cardTitle": "Patient and visit",
   "flags": "Visit flags",
   "services.keys": "↑↓ choose · Enter add · F2 catalogue",

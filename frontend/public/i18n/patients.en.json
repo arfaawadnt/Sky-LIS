@@ -19,7 +19,7 @@
   "exported": "The CSV file was downloaded.",
   "open": "Open",
   "edit": "Edit",
-  "save": "Save (Ctrl+S)",
+  "save": "Save (F10)",
   "saving": "Saving…",
   "cancel": "Cancel",
   "created": "Patient file {number} was created.",
@@ -194,5 +194,12 @@
   "section.reach": "Contact",
   "field.or": "or age",
   "more.title": "More details",
-  "more.hint": "optional: nationality, e-mail, address, comments"
+  "more.hint": "optional: nationality, e-mail, address, comments",
+  "nationalId.filled": "Filled from the national ID: {fields}.",
+  "nationalId.field.dob": "date of birth",
+  "nationalId.field.gender": "gender",
+  "nationalId.field.governorate": "governorate",
+  "nationalId.birthDiffers": "The national ID gives the date of birth {date}; the date entered differs.",
+  "nationalId.genderDiffers": "The national ID belongs to a {gender} patient; the gender chosen differs.",
+  "nationalId.titleDiffers": "The national ID belongs to a {gender} patient; check the title."
 }

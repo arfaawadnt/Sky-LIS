@@ -228,6 +228,8 @@ export interface GovernorateOption {
   readonly id: string;
   readonly nameEn: string;
   readonly nameAr: string;
+  /** The country the governorate belongs to (matches `CountryOption.id`); the national-id fill only looks in Egypt's. */
+  readonly countryId?: string | null;
 }
 
 /** A patient condition of the catalogue (`/api/v1/catalogue/patient-conditions`, agent `cat`). */
