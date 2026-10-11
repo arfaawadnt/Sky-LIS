@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sky LIS — Validation Report — LIS-VR-001 v1.0</title>
+<meta name="description" content="Full validation of Sky LIS v0.3.8: automated suites, both portals page by page, and the frontend-to-database backend cycle.">
+<style>
+  :root{--bad:#C8102E;--bad-soft:#FBE7EA;--bg:#F3F6FB;--blue-soft:#E8F1FE;--blue:#2A7DF5;--grad:linear-gradient(90deg,#2A7DF5,#6E3BE4);--ink:#14213A;--line-soft:#EAEFF6;--line:#DCE3EE;--muted:#6B7A90;--navy:#0B2A5B;--ok-soft:#E3F5EC;--ok:#13865A;--paper:#fff;--violet-soft:#EFE9FD;--violet:#6E3BE4;--warn-soft:#FFF3DF;--warn:#B26B00}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+  .page{max-width:1180px;margin:0 auto;padding:32px 16px 64px}
+  header.doc{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:28px 32px;position:relative;overflow:hidden}
+  header.doc::before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:var(--grad)}
+  h1{margin:0 0 6px;font-size:28px;letter-spacing:-.01em;color:var(--navy)}
+  .sub{margin:0;color:var(--muted)}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 24px;margin-top:18px;font-size:13px}
+  .meta b{display:block;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:11px}
+  h2{font-size:20px;color:var(--navy);margin:40px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+  h3{font-size:16px;margin:22px 0 8px}
+  p{margin:8px 0}
+  .lead{color:var(--muted)}
+  .verdict{background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--warn);border-radius:12px;padding:18px 22px;margin:18px 0}
+  .verdict h3{margin:0 0 6px;color:var(--warn)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:18px 0}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card .n{font-size:28px;font-weight:700;color:var(--navy);line-height:1.1}
+  .card .n.ok{color:var(--ok)} .card .n.bad{color:var(--bad)}
+  .card .l{color:var(--muted);font-size:13px;margin-top:6px}
+  .box{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin:16px 0}
+  table{width:100%;border-collapse:collapse;margin:12px 0 4px;font-size:13.5px;background:var(--paper)}
+  th,td{border:1px solid var(--line);padding:7px 9px;vertical-align:top;text-align:left}
+  th{background:var(--line-soft);font-weight:600;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td.id{font-family:Consolas,monospace;font-size:12.5px;white-space:nowrap;color:var(--navy)}
+  tr.total td{font-weight:700;background:var(--line-soft)}
+  code{font-family:Consolas,monospace;font-size:12.5px;background:var(--line-soft);padding:1px 5px;border-radius:4px}
+  .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .s1{background:var(--bad-soft);color:var(--bad)} .s2{background:var(--warn-soft);color:var(--warn)}
+  .s3{background:var(--blue-soft);color:var(--blue)} .s4{background:var(--line-soft);color:var(--muted)}
+  .pass{background:var(--ok-soft);color:var(--ok)} .fail{background:var(--bad-soft);color:var(--bad)}
+  ul.tight{margin:6px 0;padding-left:20px} ul.tight li{margin:3px 0}
+  footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+  @media (max-width:720px){table{display:block;overflow-x:auto}header.doc{padding:22px 18px}}
+  @media print{body{background:#fff;font-size:11.5px}.page{max-width:none;padding:0}.box,.card,.verdict,header.doc{break-inside:avoid;border-color:#bbb}h2{break-after:avoid}tr{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="doc">
+  <h1>Sky LIS — Validation Report</h1>
+  <p class="sub">Full validation of the application as released: the automated test suites, every Release-1 page and function of the Super Admin and client portals, the public pages, and the backend cycle from the screen to the PostgreSQL database.</p>
+  <div class="meta">
+    <div><b>Document</b>LIS-VR-001 · v1.0</div>
+    <div><b>Validation date</b>2026-10-11</div>
+    <div><b>Release under test</b>v0.3.8 (commit <code>3a83e9c</code>), github.com/arfaawadnt/Sky-LIS</div>
+    <div><b>Environment</b>WIN-9S2KO4FA64L: validation stack (API 127.0.0.1:5102, SPA :4300) and the installed site https://192.168.80.38:5443, one database <code>lis</code> (PostgreSQL 17, :5433)</div>
+    <div><b>Detailed results</b><code>docs/validation/2026-10-11/*.md</code>, script <code>tests/validation/backend-cycle.mjs</code></div>
+  </div>
+</header>
+
+<div class="verdict">
+  <h3>Verdict: functionally and data-wise validated — two session defects must be fixed before shared-workstation use</h3>
+  <p>Every Release-1 business workflow of both portals works end to end, every business rule tested is enforced by the server, and every save checked reached the database with the right values, tenant, links, audit entries and processed outbox events. No data loss or data corruption was found in the backend, and tenant isolation held at the API and at the database row level.</p>
+  <p>The defects are in the browser application. Two are severity 1 and both concern <b>two users sharing one browser</b>: after a sign-out and sign-in, some pages keep the previous user's data (A-01), and a forgotten tab can continue as the user who signed in last (C-01). Five severity-2 defects lose user input or mis-report a successful save. The recommendation is to fix the S1 and S2 groups (section 6), re-test them, and then open user acceptance with the personas.</p>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="n ok">1,589</div><div class="l">automated tests passed, 0 failed (backend 1,212 · frontend 377)</div></div>
+  <div class="card"><div class="n">469</div><div class="l">manual test cases on the two portals; 457 executed, <b>403 passed</b> (88 %)</div></div>
+  <div class="card"><div class="n ok">36 / 36</div><div class="l">backend-cycle steps passed with 320 database assertions; 5 / 5 on the installed site</div></div>
+  <div class="card"><div class="n ok">56</div><div class="l">database verifications after UI saves, all matching what the screen saved</div></div>
+  <div class="card"><div class="n bad">49</div><div class="l">findings: 2 × S1 · 5 × S2 · 21 × S3 · 21 × S4, in 14 fix groups</div></div>
+</div>
+
+<h2>1. Scope and method</h2>
+<div class="box">
+  <ul class="tight">
+    <li><b>Automated layer.</b> The full solution build and the five backend suites (domain, architecture gates, application, integration on a real PostgreSQL, functional through the real API and database), the frontend lint with module boundaries, the frontend unit tests and the production build.</li>
+    <li><b>Manual layer, page by page.</b> Four testers covered every Release-1 menu entry of both portals (26 client, 33 Super Admin) and the public pages: every list (search, filters, sort, paging, export), every editor (create, edit, validation messages, activate and deactivate), every row action and dialog, the keyboard shortcuts, the permissions of each persona, and the Arabic right-to-left view of each page. Expected results came from the business SRS (LIS-SRS-001), the module intakes and the UAT scripts (LIS-UAT-001 v0.4).</li>
+    <li><b>Backend cycle.</b> After every save on a screen the tester queried the database read-only: the row in the right table with exactly the entered values and tenant, the child rows, the audit trail and field changes, and the processing of the transaction's outbox events. A fifth tester built a repeatable script that drives the API directly through a complete laboratory cycle and asserts the database after each request, including the negative and isolation checks.</li>
+    <li><b>Release-1 scope only.</b> Release-2 pages hidden by the release switch were not tested. Nothing was changed in the application during the validation; every defect is recorded with its suspected cause instead.</li>
+  </ul>
+</div>
+
+<h2>2. Results by layer</h2>
+<h3>2.1 Automated suites</h3>
+<table>
+  <thead><tr><th>Suite</th><th>What it proves</th><th class="num">Passed</th><th class="num">Failed</th></tr></thead>
+  <tbody>
+    <tr><td>Backend build (<code>Platform.sln</code>, warnings as errors)</td><td>the solution compiles cleanly under the analyzers</td><td class="num">0 warnings</td><td class="num">0 errors</td></tr>
+    <tr><td>Domain unit tests</td><td>aggregates, state transitions, invariants, segregation of duties</td><td class="num">714</td><td class="num">0</td></tr>
+    <tr><td>Architecture tests</td><td>layer rules, request policies, migrations, release versioning, deployment package gates</td><td class="num">99</td><td class="num">0</td></tr>
+    <tr><td>Application unit tests</td><td>command and query handlers, security primitives, configuration guards</td><td class="num">213</td><td class="num">0</td></tr>
+    <tr><td>Integration tests (real PostgreSQL)</td><td>persistence, row-level security, audit chain, outbox, read ports</td><td class="num">109</td><td class="num">0</td></tr>
+    <tr><td>Functional tests (real API + database)</td><td>sign-in, provisioning, registration, billing, results flows over HTTP</td><td class="num">77</td><td class="num">0</td></tr>
+    <tr><td>Frontend lint and module boundaries</td><td>code rules and feature isolation</td><td class="num">clean</td><td class="num">0</td></tr>
+    <tr><td>Frontend unit tests (106 files)</td><td>facades, pages, interceptors, guards, shared kit</td><td class="num">377</td><td class="num">0</td></tr>
+    <tr><td>Frontend production build</td><td>the shipped bundle builds; one budget warning: the landing page stylesheet is 29 bytes over its 4 kB budget</td><td class="num">built</td><td class="num">0</td></tr>
+    <tr class="total"><td colspan="2">Total automated tests</td><td class="num">1,589</td><td class="num">0</td></tr>
+  </tbody>
+</table>
+
+<h3>2.2 Manual validation of the portals</h3>
+<table>
+  <thead><tr><th>Area</th><th>Pages covered</th><th class="num">Cases</th><th class="num">Executed</th><th class="num">Passed</th><th class="num">Failed</th><th class="num">Blocked</th><th class="num">Not tested</th><th>Defects</th></tr></thead>
+  <tbody>
+    <tr><td>A · Client operations (demo laboratory)</td><td>dashboard, registration and edit, search registrations and all row actions, job order, price query, patients, worklist, results by accession, payments, refunds, treasury access, treasuries, profile, session</td><td class="num">133</td><td class="num">128</td><td class="num">118</td><td class="num">10</td><td class="num">1</td><td class="num">4</td><td>1 S1 · 7 S3 · 7 S4</td></tr>
+    <tr><td>B · Client set-up from an empty laboratory</td><td>branches, roles &amp; privileges, users, clinical groups, sample types, units, tests (numeric, list, formula, text), services (single, profile, package), sequence, preparations, comments, doctors, microbiology lists, payers and tiers, base price lists, treasuries and access; proof registration and result entry with the new set-up</td><td class="num">197</td><td class="num">196</td><td class="num">176</td><td class="num">20</td><td class="num">0</td><td class="num">1</td><td>2 S2 · 4 S3 · 8 S4</td></tr>
+    <tr><td>C · Super Admin portal and public pages</td><td>home, dashboard, roles, admin users, clients and provisioning, subscriptions and wallets, sessions, audit log and chain, 18 master-data registers, countries, governorates, platform parameters, notification templates, profile; public site, subscription wizard, sign-in, recovery; portal isolation</td><td class="num">139</td><td class="num">133</td><td class="num">109</td><td class="num">24</td><td class="num">3</td><td class="num">3</td><td>1 S1 · 3 S2 · 9 S3 · 6 S4</td></tr>
+    <tr class="total"><td colspan="2">Total</td><td class="num">469</td><td class="num">457</td><td class="num">403</td><td class="num">54</td><td class="num">4</td><td class="num">8</td><td>2 S1 · 5 S2 · 20 S3 · 21 S4</td></tr>
+  </tbody>
+</table>
+<p class="lead">A failed case is a case whose observed behaviour differs from the specification; the 54 failed cases map to 48 defects because several cases share one cause (for example the missing export on five set-up pages).</p>
+
+<h3>2.3 Backend cycle (API to database)</h3>
+<table>
+  <thead><tr><th>Run</th><th>Content</th><th class="num">Steps</th><th class="num">Database assertions</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td>Full cycle, validation API</td><td>provision a new client; users, role with reduced rights; catalogue (group, sample type, unit, numeric test with range and panic limits, list test, services); price list, cash and credit payers; treasury and access with segregation of duties; patient; visit of 250 EGP with payments of 100 and 150; result entry with panic flag, verify-before-review refused when the setting is on, review, verify, amend; cancellation and refund; tenant setting</td><td class="num">36 / 36</td><td class="num">320</td><td><span class="pill pass">pass</span></td></tr>
+    <tr><td>Negative and integrity checks</td><td>validation 400 with problem details; duplicates refused (<code>CAT-102</code>) and the unique index under concurrency (<code>UNIQUE-409</code>); stale row version (<code>CONCURRENCY-409</code>); missing permission (403 <code>AUTHZ-001</code>); another laboratory reading the records (404, nothing leaks); database row-level-security probe (0 rows under another tenant); audit entries and hash chain verified; no password, hash or security stamp in audit or outbox payloads</td><td class="num">included</td><td class="num">included</td><td><span class="pill pass">pass</span></td></tr>
+    <tr><td>Deployed path, installed site</td><td>https://192.168.80.38:5443 through IIS and the service: sign-in, list, create, database check</td><td class="num">5 / 5</td><td class="num">—</td><td><span class="pill pass">pass</span></td></tr>
+  </tbody>
+</table>
+
+<h2>3. Data persistence evidence</h2>
+<div class="box">
+  <p>Every save performed on a screen was followed by a read-only query of the database as the owner role. All 56 verifications matched what the screen saved.</p>
+  <table>
+    <thead><tr><th>Area</th><th class="num">Verifications</th><th>What was confirmed</th><th>Outbox and audit</th></tr></thead>
+    <tbody>
+      <tr><td>A · Client operations</td><td class="num">13</td><td>visits with lines, tubes and samples; results and their log; payments, voids and refunds with the visit balance; treasury access requests and decisions; patient files and uploaded documents</td><td>every outbox event processed, none dead-lettered; audit events and field changes written</td></tr>
+      <tr><td>B · Client set-up</td><td class="num">20</td><td>branches, roles with permissions, special and result rights, users with branch assignments; tests with range bands, list values, formula and paragraphs; services with members; price lines; payers and tiers; treasuries</td><td>123 events processed, none dead-lettered; audit trail 128 entries without gaps</td></tr>
+      <tr><td>C · Super Admin</td><td class="num">23</td><td>provisioned client (tenant, wallet, branch, administrator, membership, role) and the copy of all 21 master-data tables with remapped references; plans and wallet top-ups; master-data registers; countries, governorates, parameters, templates</td><td>957 events processed, none dead-lettered; audit chain verified (59 entries)</td></tr>
+      <tr><td>D · Backend cycle script</td><td class="num">320 assertions</td><td>every API write asserted on status, amounts, reference numbers, tenant and foreign keys</td><td>events matched to the audit trail; slowest processed in 1.9 s</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>4. Business rules confirmed</h2>
+<div class="box">
+  <ul class="tight">
+    <li><b>Registration and money:</b> duplicate and gender-restricted services, reserved lines, discount cap and mandatory reason, partial payment, non-cash reference, payment above the remaining balance refused, payment only on a treasury approved for the device, refund limited to the refundable amount, cancellation with reason, verified lines cannot be cancelled.</li>
+    <li><b>Results:</b> entry only on received samples, flags and panic values against the age and sex band, formula computation, list and text tests, delta acknowledgement, verify refused with missing values, review-before-verify when enabled, amend only with the special right and a reason, result rights per clinical group and branch.</li>
+    <li><b>Segregation of duties:</b> a treasury access requester cannot approve their own request (<code>SOD-TRS-001</code>).</li>
+    <li><b>Organization and security:</b> live permission change (BR-17), branch selection, must-change password gate, lockout after five failures, lock and unlock, deactivated client refused at sign-in (<code>CLI-020</code>), password policy inherited from the platform parameter.</li>
+    <li><b>Catalogue and pricing:</b> unique codes (<code>CAT-0xx</code>), BR-19 affordances, price list copy with factor, contract tiers (<code>PRC-0xx</code>), master-data copy to new clients (BR-25).</li>
+    <li><b>Isolation:</b> tenant isolation at the API (404 across laboratories) and in the database (row-level security), client feature routes closed to platform sessions, <code>/admin</code> closed to laboratory sessions.</li>
+  </ul>
+</div>
+
+<h2>5. Defect register</h2>
+<p class="lead">Severity: <span class="pill s1">S1</span> security, data loss or a blocked workflow · <span class="pill s2">S2</span> wrong result, workaround exists · <span class="pill s3">S3</span> minor functional · <span class="pill s4">S4</span> cosmetic. Ids are those of the detailed result files (A client operations, B client set-up, C Super Admin and public, D backend cycle).</p>
+
+<h3>5.1 Severity 1 and 2</h3>
+<table>
+  <thead><tr><th>Id</th><th>Sev.</th><th>Finding</th><th>Module</th><th>Cause</th><th>Group</th></tr></thead>
+  <tbody>
+    <tr><td class="id">C-01</td><td><span class="pill s1">S1</span></td><td>A tab whose session ended keeps showing its user but continues as whoever signed in last in the same browser: the shared refresh cookie is used and the request replayed. A stale tab's password change ran as the platform administrator.</td><td>Frontend core (auth)</td><td>the store adopts the refreshed profile without checking that user and tenant are unchanged (<code>auth.store.ts</code>, <code>auth.interceptor.ts</code>)</td><td>FG-1</td></tr>
+    <tr><td class="id">A-01</td><td><span class="pill s1">S1</span></td><td>After sign-out and sign-in in the same tab, the worklist and results by accession keep the previous user's data and rights; a chemistry-only technician saw haematology values. The server refused the write (read exposure).</td><td>Results</td><td>route-provided facades survive sign-out; sign-out navigates without reloading</td><td>FG-2</td></tr>
+    <tr><td class="id">C-13</td><td><span class="pill s2">S2</span></td><td>The account pages keep the previous session's data: a user without audit rights saw the platform audit log; the platform administrator saw a laboratory's profile.</td><td>Account</td><td>same as A-01</td><td>FG-2</td></tr>
+    <tr><td class="id">C-02</td><td><span class="pill s2">S2</span></td><td>Roles and admin users treat every successful empty answer (204) as a failure: no confirmation, the reset-password dialog stays open.</td><td>Organization</td><td>204 resolves to <code>null</code> in <code>organization.api.ts</code> (also pricing, results, patients, samples, integration)</td><td>FG-3</td></tr>
+    <tr><td class="id">C-05 / B-04</td><td><span class="pill s2">S2</span></td><td>When one save step of the test editor is refused, the typed range bands or list values are lost and the server's reason (<code>CAT-053/054/058/070</code>) is never shown.</td><td>Catalogue</td><td><code>test-editor.page.ts</code> <code>createAll()</code> navigates away, <code>updateAll()</code> reloads</td><td>FG-4</td></tr>
+    <tr><td class="id">B-05</td><td><span class="pill s2">S2</span></td><td>After browser back/forward between two service or test editors, the page shows and acts on the previous record (a deactivation hit the wrong service).</td><td>Catalogue</td><td>editors read the record id once from the route snapshot</td><td>FG-5</td></tr>
+  </tbody>
+</table>
+
+<h3>5.2 Severity 3</h3>
+<table>
+  <thead><tr><th>Id</th><th>Finding</th><th>Module</th><th>Group</th></tr></thead>
+  <tbody>
+    <tr><td class="id">B-07</td><td>The treasury picker on treasury access is kept across sign-out and sign-in; a reactivated treasury is not offered.</td><td>Treasury</td><td>FG-2</td></tr>
+    <tr><td class="id">B-06</td><td>Role, user and contract-tier actions answered with 204 are shown as failures.</td><td>Organization, Pricing</td><td>FG-3</td></tr>
+    <tr><td class="id">A-08</td><td>Pages outside a user's rights, and Release-2 billing routes, open by typed URL; the server refuses the data.</td><td>Shell routes</td><td>FG-6</td></tr>
+    <tr><td class="id">C-14</td><td>A platform session can open the <code>/account</code> pages (no tenant guard on that route).</td><td>Shell routes</td><td>FG-6</td></tr>
+    <tr><td class="id">C-15</td><td><code>/admin</code> pages have no permission guard; hidden pages open by URL (server answers 403).</td><td>Shell routes</td><td>FG-6</td></tr>
+    <tr><td class="id">A-02</td><td>Reception (view-only on results) is offered the comment and internal-note dialogs; the server refuses the save.</td><td>Results</td><td>FG-7</td></tr>
+    <tr><td class="id">A-03</td><td>The patient Documents tab is shown to users without <code>files.view</code> and fails with 403.</td><td>Patients</td><td>FG-7</td></tr>
+    <tr><td class="id">A-04</td><td>The treasuries list shows a raw branch id to users without <code>organization.view</code>.</td><td>Treasury</td><td>FG-7</td></tr>
+    <tr><td class="id">C-04</td><td>Catalogue CSV export ignores the search and status filters.</td><td>Catalogue</td><td>FG-8</td></tr>
+    <tr><td class="id">B-10</td><td>Branches, roles, users, payers and treasuries have no export (SRS grid rule).</td><td>Organization, Pricing, Treasury</td><td>FG-8</td></tr>
+    <tr><td class="id">B-02</td><td>A branch was saved with a governorate of another country; the server does not check the pair.</td><td>Organization</td><td>FG-9</td></tr>
+    <tr><td class="id">C-03</td><td>Add client does not check mobile numbers against the country length in the browser; the server message names no field.</td><td>Platform</td><td>FG-9</td></tr>
+    <tr><td class="id">C-07</td><td>Add and edit client offer inactive plans, which the server refuses.</td><td>Platform</td><td>FG-9</td></tr>
+    <tr><td class="id">C-08</td><td>A country's time zone is not checked against IANA names (<code>Mars/Base</code> was saved).</td><td>Platform</td><td>FG-9</td></tr>
+    <tr><td class="id">A-05</td><td>Payments prints a receipt after every payment although the laboratory's auto-print parameter is off (the cashier cannot read the settings, and the page defaults to printing).</td><td>Billing</td><td>FG-11</td></tr>
+    <tr><td class="id">A-06</td><td>The payment and refund form keeps note, reason, method and reference after a save; a refund was stored with the previous note.</td><td>Billing</td><td>FG-11</td></tr>
+    <tr><td class="id">C-09</td><td>The laboratory settings answer shows the code default instead of the inherited platform value.</td><td>Settings</td><td>FG-12</td></tr>
+    <tr><td class="id">C-17</td><td>Client creation is not in the platform audit trail (filed in the new laboratory's trail).</td><td>Platform, Audit</td><td>FG-12</td></tr>
+    <tr><td class="id">C-18</td><td>The audit log has no Client column (SA-09).</td><td>Audit</td><td>FG-12</td></tr>
+    <tr><td class="id">D-01</td><td>Append-only triggers on the audit tables, payments and refunds cover UPDATE and DELETE but not TRUNCATE; only the owner role could truncate (the runtime role cannot).</td><td>Database</td><td>FG-13</td></tr>
+    <tr><td class="id">A-09</td><td>The patients list lacks the visit-count and last-visit columns of CP-11.</td><td>Patients</td><td>FG-14</td></tr>
+  </tbody>
+</table>
+
+<h3>5.3 Severity 4</h3>
+<table>
+  <thead><tr><th>Id</th><th>Finding</th><th>Group</th></tr></thead>
+  <tbody>
+    <tr><td class="id">B-08, B-13</td><td>An inactive sample condition is offered in the test editor; the formula error repeats its position.</td><td>FG-4</td></tr>
+    <tr><td class="id">B-12</td><td>Read-only users can type into the service-sequence and test-editor fields (there is no Save).</td><td>FG-7</td></tr>
+    <tr><td class="id">B-09, A-15</td><td>CSV exports ignore the status filter and use inconsistent formats; registration dates are raw UTC.</td><td>FG-8</td></tr>
+    <tr><td class="id">B-03, C-06, C-19</td><td>Generic or raw untranslated validation messages; a wallet top-up of 250.555 is silently rounded.</td><td>FG-9</td></tr>
+    <tr><td class="id">A-07, C-10, C-11, C-12, C-16, A-10, A-12</td><td>Raw dictionary keys shown briefly; ten English hints on the Arabic parameters page; Release-2 features listed on the landing page; two menu entries both called "Dashboard"; English branch name under the Arabic letterhead; dashboard captions and mixed digits.</td><td>FG-10</td></tr>
+    <tr><td class="id">A-11, A-13, A-14, B-01, B-11, B-14</td><td>Gender-refused service shown as "Not priced yet" in price query; the F2 picker empty until a term is typed; worklist search ignores patient names; new branch currency not defaulted to EGP; lock message and the sign-in return address after sign-out; an unsaved role choice dropped when saving branches.</td><td>FG-14</td></tr>
+  </tbody>
+</table>
+
+<h2>6. Recommended fix plan</h2>
+<table>
+  <thead><tr><th>Group</th><th>Content</th><th>Defects</th><th>Approach</th><th>Effort</th></tr></thead>
+  <tbody>
+    <tr><td class="id">FG-1</td><td>Session identity on refresh</td><td>C-01 (S1)</td><td>after every refresh compare user and tenant with the current ones; on a change clear the state and send the tab to sign-in; tell other tabs of a sign-out (BroadcastChannel)</td><td>1–2 days</td></tr>
+    <tr><td class="id">FG-2</td><td>Per-user state after sign-out</td><td>A-01 (S1), C-13 (S2), B-07 (S3)</td><td>full page reload on sign-out and on a user change, which discards every module's in-memory state at once; keep the per-facade refresh for visits within one session</td><td>1 day</td></tr>
+    <tr><td class="id">FG-3</td><td>Successful empty answers</td><td>C-02 (S2), B-06 (S3)</td><td>one shared helper for 204 answers in every API service (organization, pricing, results, patients, samples, integration, auth store), with a spec</td><td>1 day</td></tr>
+    <tr><td class="id">FG-4</td><td>Test editor</td><td>C-05/B-04 (S2), B-08, B-13 (S4)</td><td>keep typed bands and values on a refused step, show the server reason per section; filter inactive conditions; message text</td><td>2 days</td></tr>
+    <tr><td class="id">FG-5</td><td>Editors bound to the route</td><td>B-05 (S2)</td><td>read the record id from the route as a signal and reload on change</td><td>1 day</td></tr>
+    <tr><td class="id">FG-6</td><td>Route guards</td><td>A-08, C-14, C-15 (S3)</td><td>permission guard derived from the navigation registry on every route; tenant guard on <code>/account</code>; release guard on Release-2 routes</td><td>1–2 days</td></tr>
+    <tr><td class="id">FG-7</td><td>Rights-aware affordances</td><td>A-02, A-03, A-04 (S3), B-12 (S4)</td><td>hide or disable actions and tabs the user cannot use</td><td>1 day</td></tr>
+    <tr><td class="id">FG-8</td><td>Exports</td><td>C-04, B-10 (S3), B-09, A-15 (S4)</td><td>export the filtered set; add the missing exports; one CSV format (local dates, Yes/No, labels)</td><td>2 days</td></tr>
+    <tr><td class="id">FG-9</td><td>Validation and messages</td><td>B-02, C-03, C-07, C-08 (S3), B-03, C-06, C-19 (S4)</td><td>server checks (governorate in country, IANA zone, active plan) and field-level messages in both languages</td><td>2 days</td></tr>
+    <tr><td class="id">FG-10</td><td>Dictionaries and wording</td><td>A-07, A-10, A-12, C-10, C-11, C-12, C-16 (S4)</td><td>missing keys, Arabic hints, landing text, letterhead, labels</td><td>1 day</td></tr>
+    <tr><td class="id">FG-11</td><td>Billing form and printing</td><td>A-05, A-06 (S3)</td><td>read the auto-print parameters through a billing-scoped endpoint; reset the form after each save</td><td>1 day</td></tr>
+    <tr><td class="id">FG-12</td><td>Platform audit and settings</td><td>C-09, C-17, C-18 (S3)</td><td>show the inherited value; file onboarding in the platform trail (decision A-10 of LIS-RP-001); client column</td><td>2 days</td></tr>
+    <tr><td class="id">FG-13</td><td>Database hardening</td><td>D-01 (S3)</td><td>add statement-level TRUNCATE triggers to the append-only tables in a new migration, with an architecture gate</td><td>half a day</td></tr>
+    <tr><td class="id">FG-14</td><td>Small UX items</td><td>A-09 (S3), A-11, A-13, A-14, B-01, B-11, B-14 (S4)</td><td>individual fixes</td><td>2 days</td></tr>
+  </tbody>
+</table>
+<p class="lead">Suggested order: FG-1 and FG-2 first (the two S1), then FG-3, FG-4, FG-5 (the S2), a targeted re-test of those cases, then FG-6 to FG-14 alongside user acceptance.</p>
+
+<h2>7. Not tested or blocked, and why</h2>
+<table>
+  <thead><tr><th>Item</th><th>Reason</th><th>Coverage elsewhere</th></tr></thead>
+  <tbody>
+    <tr><td>Password recovery completion, subscription wizard completion, inactive-template fallback text</td><td>no SMS / e-mail gateway on this host (pilot prerequisite B-01 of LIS-RP-001)</td><td>both flows tested up to the one-time-code step</td></tr>
+    <tr><td>Laboratory block on the profile page</td><td>the demo laboratory has no subscription record</td><td>—</td></tr>
+    <tr><td>Paging of lists</td><td>no list reached the smallest page size of 20 in the test data</td><td>paging is covered by the frontend unit tests</td></tr>
+    <tr><td>Sessions CSV export, report-template logo upload, test timing tab in the Super Admin editor</td><td>not reached in the time box</td><td>numeric, list, formula and text tests validated in the client editor (B)</td></tr>
+    <tr><td>Forced API requests from the browser</td><td>no access token is placed in a page by policy</td><td>validation, 403, 404, 409 and isolation covered by the backend-cycle script (D)</td></tr>
+    <tr><td>Native printing and file downloads</td><td>automation does not open the print dialog</td><td>rendered documents and downloaded files captured in the page and checked</td></tr>
+    <tr><td>Results query submitted with Enter</td><td>synthetic key events do not submit the form (inconclusive)</td><td>F8 tested and working</td></tr>
+  </tbody>
+</table>
+
+<h2>8. Test data and housekeeping</h2>
+<div class="box">
+  <ul class="tight">
+    <li>All validation data carries the prefix <b>V11</b>: three "V11 API Lab" clients (one per backend-cycle run), "V11 Validation Lab", the Walk-through Laboratory set-up (branches, roles, users, catalogue, prices, treasuries) and its proof visit, and visits, payments and refunds in the demo laboratory. The full list is in each result file.</li>
+    <li>New accounts and their passwords are recorded only in the git-ignored credentials file on this host (<code>v11.*</code>, <code>v11api.*</code>, <code>v11lab.admin</code>).</li>
+    <li>The auto-print parameters of the demo laboratory and the Walk-through Laboratory are off for automation; switch them back on before a manual session. Platform parameters were restored.</li>
+    <li>The installed site stayed online during the whole validation; the testers used a separate stack on port 5102 against the same database.</li>
+  </ul>
+</div>
+
+<h2>9. Detailed results</h2>
+<table>
+  <thead><tr><th>File</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr><td><code>docs/validation/2026-10-11/client-operations.md</code></td><td>tester A: coverage, 133 cases, 13 database verifications, 15 defects</td></tr>
+    <tr><td><code>docs/validation/2026-10-11/client-setup.md</code></td><td>tester B: coverage, 197 cases, 20 database verifications, 14 defects</td></tr>
+    <tr><td><code>docs/validation/2026-10-11/super-admin-and-public.md</code></td><td>tester C: coverage, 139 cases, 23 database verifications, 19 defects</td></tr>
+    <tr><td><code>docs/validation/2026-10-11/backend-cycle.md</code> and <code>tests/validation/backend-cycle.mjs</code></td><td>tester D: the repeatable script, 36 steps, 320 assertions, negative checks, deployed run, 1 defect; rerun with <code>node tests/validation/backend-cycle.mjs http://127.0.0.1:5102</code></td></tr>
+  </tbody>
+</table>
+
+<footer>LIS-VR-001 v1.0 · 2026-10-11 · Sky LIS, National Technology · Validation of release v0.3.8. Defect ids are stable and match the detailed result files.</footer>
+</div>
+</body>
+</html>

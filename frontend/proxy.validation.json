@@ -1,0 +1,5 @@
+{
+  "/api": { "target": "http://127.0.0.1:5102", "secure": false },
+  "/health": { "target": "http://127.0.0.1:5102", "secure": false },
+  "/.well-known": { "target": "http://127.0.0.1:5102", "secure": false }
+}

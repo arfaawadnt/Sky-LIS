@@ -234,7 +234,15 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Validation report** `docs/validation/2026-10-11/Sky-LIS_Validation_Report.html` (+ PDF, LIS-VR-001): full validation of
+  v0.3.8. 1,589 automated tests passed; 469 manual cases on both portals (457 executed, 403 passed); 56 database
+  verifications after UI saves; backend cycle 36 / 36 steps with 320 database assertions and 5 / 5 on the installed site;
+  49 findings (2 S1, 5 S2, 21 S3, 21 S4) in 14 fix groups. Detailed results per area in the same folder.
+- **Backend-cycle script** `tests/validation/backend-cycle.mjs`: provisions a client and drives a complete laboratory cycle
+  through the API, asserting the database after every request, plus negative and isolation checks; reruns against any
+  base URL (`--deployed --insecure-tls` for the installed site).
+- **Validation stack**: launch configurations `validation-api` (127.0.0.1:5102) and `validation-spa` (4300, proxy
+  `frontend/proxy.validation.json`) run beside the installed service on the same database.
 
 ### v0.3.8 — 2026-10-10
 

@@ -65,6 +65,36 @@
       ],
       "port": 4300,
       "url": "http://127.0.0.1:4300"
+    },
+    {
+      "name": "validation-api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Platform.WebApi/Platform.WebApi.csproj",
+        "-c",
+        "Release",
+        "--no-build",
+        "--",
+        "--Kestrel:Endpoints:Http:Url=http://127.0.0.1:5102"
+      ],
+      "port": 5102
+    },
+    {
+      "name": "validation-spa",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "start",
+        "--",
+        "--proxy-config",
+        "proxy.validation.json"
+      ],
+      "port": 4300,
+      "url": "http://127.0.0.1:4300"
     }
   ]
 }

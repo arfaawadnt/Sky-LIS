@@ -51,7 +51,7 @@ Chosen to avoid everything already in use on this machine (checked 2026-10-08).
 | Dev API (HTTP / HTTPS)       | `5100` / `5101`                                          | `5000`, `5080` (QMS APIs)                    |
 | Dev SPA server               | `4300`                                                   | `4200` (keep free for other dev work)        |
 | Dev PostgreSQL               | private instance `E:\LIS\.local\pg17` (in use) or Docker container `lis-postgres`; host port `5433` | `5432` (shared PostgreSQL 17, holds `ntqams`) |
-| Other dev services           | ports `5102`–`5199`                                      | `80`, `443`, `8080`, `5985`, `3389`          |
+| Other dev services           | ports `5102`–`5199` (`5102` = validation API beside the installed service) | `80`, `443`, `8080`, `5985`, `3389`          |
 | Database and roles           | db `lis`, owner role `lis_owner`, app role `lis_app`     | db `ntqams`, role `postgres`                 |
 | Docker Compose project       | `name: lis` → containers `lis-*`, volumes `lis_*`, network `lis_default` | none yet (daemon was off)    |
 | Windows services (prod/test) | `NTLIS` (port `5100`) / `NTLIS_TEST` (port `5180`); `LIS_POSTGRES` = the private PostgreSQL 17 instance of this host as a service (5433, NetworkService) | `NTQAMS`, `NTQAMS_TEST`, `postgresql-x64-17` (5432) |
@@ -127,6 +127,16 @@ pages → new modules → go-live). Generated from `docs/plan/src/plan.data.js` 
 `docs/plan/Sky-LIS_Release-1_Remaining-Points.html` (+ `.pdf`, LIS-RP-001) lists every open point after Release 1 by phase
 (A decisions, B pilot prerequisites, C hardening, D acceptance evidence, E Release 2) with stable ids `A-nn`…`E-nn`; hand-written
 HTML (no build step), PDF via the same `pdf.ps1`. Update it with the UAT scripts and the runbook.
+
+### Validation
+
+`docs/validation/<date>/` holds a validation campaign: `Sky-LIS_Validation_Report.html` (+ `.pdf`, LIS-VR-001; hand-written,
+PDF via `pdf.ps1`) and the detailed result files per area (defect ids `A-nn` client operations, `B-nn` client set-up,
+`C-nn` Super Admin and public, `D-nn` backend cycle). `tests/validation/backend-cycle.mjs` (Node, no dependencies) provisions a
+client and drives a full laboratory cycle through the API with database assertions; secrets only from git-ignored files.
+The validation stack runs beside the installed service: launch configurations `validation-api` (API on 127.0.0.1:5102, via
+`--Kestrel:Endpoints:Http:Url`) and `validation-spa` (4300, proxy `frontend/proxy.validation.json`); browser sessions are per
+host name, so parallel testers use `127.0.0.1` and `localhost` (the built-in browser opens no other names).
 
 ### Requirements specification
 
