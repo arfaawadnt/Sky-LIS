@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRender, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import { PAYMENT_METHODS, type PaymentCreated, type PaymentMethod } from '../../../core/api/billing.contracts';
@@ -33,7 +33,25 @@ import { toSummary } from '../../../shared/patient/patient-demographics';
 import { PatientPickerComponent } from '../../../shared/patient/patient-picker.component';
 import { RegistrationFacade, type SaveBlocker } from '../state/registration.facade';
 import { RegistrationPrinter } from '../state/registration-printer';
+import { type BarProblem, RegistrationActionBarComponent } from '../ui/registration-action-bar.component';
+import { type ChecklistItem, RegistrationReadinessComponent } from '../ui/registration-readiness.component';
 import { type PickedService, ServiceEntryComponent } from '../ui/service-entry.component';
+import { type VisitFlag, VisitFlagsComponent } from '../ui/visit-flags.component';
+
+/** The field each save blocker sends the clerk to (first match wins). */
+const BLOCKER_TARGETS: Readonly<Record<SaveBlocker, string | null>> = {
+  patient: '#reg-patient input, #reg-patient button',
+  contract: '#reg-contract',
+  lines: '#reg-service-entry',
+  issues: '#reg-services tr.has-issue .icon-btn, #reg-services tr.pending .icon-btn, #reg-service-entry',
+  checking: null,
+  doctor: '#reg-doctor',
+  discountReason: '#reg-discount-reason',
+  discountCap: '#reg-discount-value',
+  paymentReference: '#reg-pay-reference',
+  paymentTreasury: '#reg-pay-treasury',
+  paymentAmount: '#reg-pay-amount',
+};
 
 interface SuccessState {
   readonly visit: VisitRegisteredResponse;
@@ -44,12 +62,15 @@ interface SuccessState {
 }
 
 /**
- * Registration (SRS CP-06, WF-02; Release 1: no location/room, payment captured on the page, BR-26). Keyboard-first:
- * the patient picker (search, similar-name warning, new file), the visit data, the service entry (Enter resolves a
- * code, shortcut number, alias or set; F2 opens the picker), the lines priced and planned by the server dry run
- * (tubes BR-02, expected dates BR-13, frequency BR-12, contract alerts, rules, preparations), the discount within the
- * user's cap, the payment panel and Ctrl+S. After saving, a dialog shows the accession, the payment is posted to Billing
- * and labels, job order and receipt print per the parameters. `/visits/:visitId` opens a saved visit to add or release
+ * Registration (SRS CP-06, WF-02; Release 1: no location/room, payment captured on the page, BR-26), laid out as a desk
+ * console (UX option B): one strip for the patient picker (search, similar-name warning, new file) and the visit data with
+ * the flags as toggles; the service entry (suggestions while typing; Enter resolves a code, shortcut number, alias or set;
+ * F2 opens the picker); the lines priced and planned by the server dry run (tubes BR-02, expected dates BR-13, frequency
+ * BR-12, contract alerts, rules, preparations). Beside them the "Ready to save" checklist and the checkout (totals, the
+ * discount folded until needed and kept within the user's cap, the payment panel). At the bottom a sticky bar lists every
+ * open item (each jumps to its field, which is marked once a save was tried) with the amount due and Save (Ctrl+S). After
+ * saving, a dialog shows the accession, the payment is posted to Billing and labels, job order and receipt print per the
+ * parameters. `/visits/:visitId` opens a saved visit to add or release
  * services and change its details or discount (no payment panel there).
  */
 @Component({
@@ -65,6 +86,9 @@ interface SuccessState {
     IconComponent,
     PatientPickerComponent,
     ServiceEntryComponent,
+    RegistrationReadinessComponent,
+    RegistrationActionBarComponent,
+    VisitFlagsComponent,
   ],
   templateUrl: './registration.page.html',
   styleUrl: './registration.page.css',
@@ -80,6 +104,8 @@ export class RegistrationPage {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly entry = viewChild(ServiceEntryComponent);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   /** Route parameter of the edit page. */
   readonly visitId = input<string>();
@@ -98,6 +124,9 @@ export class RegistrationPage {
   protected readonly saving = signal(false);
   protected readonly successOpen = signal(false);
   protected readonly success = signal<SuccessState | null>(null);
+  /** True once a save was tried with something missing: the open fields are then marked. */
+  protected readonly attempted = signal(false);
+  private readonly discountOpen = signal(false);
   private adoptedVisit: string | null = null;
 
   protected readonly title = computed(() => {
@@ -137,6 +166,58 @@ export class RegistrationPage {
   protected readonly currency = computed(() => this.facade.result()?.currency ?? this.facade.settings.value()?.currency ?? '');
 
   protected readonly treasuryList = computed(() => this.facade.treasuries.value() ?? []);
+
+  protected readonly doctorRequired = computed(() => this.facade.settings.value()?.mandatoryDoctor ?? false);
+
+  protected readonly discountActive = computed(() => (this.facade.discount().value ?? 0) > 0);
+
+  /** The discount is folded away until the clerk opens it, a discount is set (also a saved one) or it blocks the save. */
+  protected readonly showDiscount = computed(() =>
+    this.discountOpen() || this.discountActive() || this.facade.blockers().some((blocker) => blocker === 'discountReason' || blocker === 'discountCap'));
+
+  /** Services of a frequency alert (REG-201), tinted in the lines table. */
+  protected readonly warnedServices = computed(() => new Set(this.facade.frequencyAlerts().map((alert) => alert.serviceId ?? '')));
+
+  protected readonly checklist = computed<readonly ChecklistItem[]>(() => {
+    const blockers = new Set(this.facade.blockers());
+    const edit = this.facade.isEdit();
+    const items: ChecklistItem[] = [];
+    const add = (key: string, doneLabel: string, keys: readonly SaveBlocker[]): void => {
+      const open = keys.find((blocker) => blocker !== 'checking' && blockers.has(blocker));
+      if (open !== undefined) {
+        items.push({ key, state: 'open', label: this.blockerText(open), blocker: open });
+      } else if (keys.includes('checking') && blockers.has('checking')) {
+        items.push({ key, state: 'pending', label: this.i18n.t('registration.ready.checking'), blocker: null });
+      } else {
+        items.push({ key, state: 'done', label: doneLabel, blocker: null });
+      }
+    };
+
+    if (!edit) {
+      add('patient', this.i18n.t('registration.ready.patient'), ['patient']);
+    }
+
+    add('contract', this.i18n.t('registration.ready.contract'), ['contract']);
+    add('services', edit ? this.i18n.t('registration.ready.servicesEdit') : this.i18n.tf('registration.ready.services', { count: this.facade.plannedLines().length }), ['lines', 'issues', 'checking']);
+    if (this.doctorRequired()) {
+      add('doctor', this.i18n.t('registration.ready.doctor'), ['doctor']);
+    }
+
+    if (this.discountActive()) {
+      add('discount', this.i18n.t('registration.ready.discount'), ['discountReason', 'discountCap']);
+    }
+
+    if (this.facade.canPay() && this.facade.paymentAmount() > 0) {
+      add('payment', this.i18n.t('registration.ready.payment'), ['paymentTreasury', 'paymentReference', 'paymentAmount']);
+    }
+
+    return items;
+  });
+
+  protected readonly barProblems = computed<readonly BarProblem[]>(() => this.facade.blockers().map((blocker) => ({ blocker, text: this.blockerText(blocker) })));
+
+  protected readonly barNotices = computed(() =>
+    this.facade.frequencyAlerts().map((alert) => this.i18n.tf('registration.bar.confirmOnSave', { service: alert.serviceCode ?? '' })));
 
   constructor() {
     void this.i18n.load('registration');
@@ -257,6 +338,17 @@ export class RegistrationPage {
     return this.i18n.tf(`registration.validation.${blocker}`, { cap: this.facade.settings.value()?.discountCapPercent ?? 0 });
   }
 
+  /** Whether a field is marked: only after a save was tried while its blocker is open. */
+  protected invalid(blocker: SaveBlocker): boolean {
+    return this.attempted() && this.facade.blockers().includes(blocker);
+  }
+
+  /** The codes of the planned services that ask a preparation question ("" while none of them is planned). */
+  protected askedBy(question: PreparationQuestionItem): string {
+    const asking = new Set(question.serviceIds);
+    return this.facade.plannedLines().filter((line) => asking.has(line.serviceId)).map((line) => line.code).join(', ');
+  }
+
   protected answerOf(preparationId: string): string {
     return this.facade.answers()[preparationId] ?? '';
   }
@@ -301,6 +393,41 @@ export class RegistrationPage {
     this.facade.patchDiscount({ kind: kind === 'Amount' ? 'Amount' : 'Percent' });
   }
 
+  protected toggleFlag(flag: VisitFlag): void {
+    this.facade.patchHeader({ [flag]: !this.facade.header()[flag] });
+  }
+
+  protected toggleDiscount(): void {
+    this.discountOpen.set(!this.showDiscount());
+  }
+
+  /** Brings the field of an open item into view and focuses it (the folded discount opens first). */
+  protected focusBlocker(blocker: SaveBlocker): void {
+    const selector = BLOCKER_TARGETS[blocker];
+    if (selector === null) {
+      return;
+    }
+
+    if (blocker === 'discountReason' || blocker === 'discountCap') {
+      this.discountOpen.set(true);
+    }
+
+    afterNextRender(() => {
+      const target = this.host.nativeElement.querySelector<HTMLElement>(selector);
+      if (target === null) {
+        return;
+      }
+
+      try {
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } catch {
+        // jsdom (unit tests) does not scroll; the focus below is what matters
+      }
+
+      target.focus({ preventScroll: true });
+    }, { injector: this.injector });
+  }
+
   protected setMethod(method: PaymentMethod): void {
     this.facade.patchPayment({ method });
   }
@@ -313,6 +440,7 @@ export class RegistrationPage {
       return;
     }
 
+    this.attempted.set(false);
     this.facade.reset(true);
   }
 
@@ -335,8 +463,11 @@ export class RegistrationPage {
     }
 
     const blockers = this.facade.blockers();
-    if (blockers.length > 0) {
-      this.toast.error(this.blockerText(blockers[0] ?? 'lines'));
+    const first = blockers[0];
+    if (first !== undefined) {
+      this.attempted.set(true);
+      this.toast.error(blockers.length === 1 ? this.blockerText(first) : this.i18n.tf('registration.validation.many', { count: blockers.length }));
+      this.focusBlocker(first);
       return;
     }
 
@@ -386,6 +517,7 @@ export class RegistrationPage {
 
   protected newRegistration(): void {
     this.successOpen.set(false);
+    this.attempted.set(false);
     this.facade.reset(true);
   }
 
@@ -429,6 +561,7 @@ export class RegistrationPage {
       payment = await this.facade.pay.execute(created.id);
     }
 
+    this.attempted.set(false);
     this.success.set({ visit: created, patient, payment, paymentProblem: payment === null ? this.facade.pay.problem() : null, amount });
     this.successOpen.set(true);
     await this.autoPrint(created, payment);
@@ -480,6 +613,7 @@ export class RegistrationPage {
 
     this.facade.visit.reload();
     this.adoptedVisit = null;
+    this.attempted.set(false);
     this.toast.success(this.i18n.t(changed ? 'registration.savedChanges' : 'registration.nothingChanged'));
   }
 

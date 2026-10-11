@@ -1,28 +1,21 @@
+/* Desk console layout (UX option B): work column + checkout column, sticky action bar spanning both. */
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: var(--sp-4);
   align-items: start;
 }
 
-.main {
+.main,
+.side {
   display: grid;
   gap: var(--sp-4);
   min-width: 0;
 }
 
-.summary {
-  position: sticky;
-  inset-block-start: var(--sp-4);
-}
-
 @media (max-width: 1100px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .summary {
-    position: static;
   }
 }
 
@@ -33,17 +26,24 @@
   margin-block-end: var(--sp-1);
 }
 
-.static {
-  display: block;
-  padding: var(--sp-2) 0;
+.req {
+  color: var(--bad);
+}
+
+.field.invalid .label {
+  color: var(--bad);
   font-weight: 600;
 }
 
-.flags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-4);
-  align-items: center;
+/* ---- patient and visit strip ------------------------------------------------------------------------------------ */
+
+.patient-row {
+  border-radius: var(--r);
+}
+
+.patient-row.invalid {
+  box-shadow: 0 0 0 2px var(--bad);
+  padding: var(--sp-2);
 }
 
 .patient-line {
@@ -53,14 +53,20 @@
   align-items: center;
 }
 
-.kbd {
-  margin-inline-start: var(--sp-2);
-  padding: 0 var(--sp-1);
-  border-radius: var(--r-sm);
-  background: rgba(255, 255, 255, 0.2);
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-xs);
+.visit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--sp-3);
+  margin-block-start: var(--sp-4);
+  padding-block-start: var(--sp-4);
+  border-block-start: 1px solid var(--line-soft);
 }
+
+.flags {
+  margin-block-start: var(--sp-3);
+}
+
+/* ---- services ----------------------------------------------------------------------------------------------------- */
 
 .table-wrap {
   overflow-x: auto;
@@ -106,13 +112,17 @@
   font-size: var(--fs-xs);
 }
 
+.lines tr.has-warning {
+  background: var(--warn-soft);
+}
+
 .lines tr.has-issue {
   background: var(--bad-soft);
 }
 
 .lines .empty {
   text-align: center;
-  padding: var(--sp-4);
+  padding: var(--sp-5) var(--sp-4);
 }
 
 .hint {
@@ -178,29 +188,13 @@
   color: var(--info);
 }
 
-.methods {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  margin-block-end: var(--sp-3);
+.prep-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--sp-3);
 }
 
-.method {
-  min-width: 110px;
-  padding: var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-  cursor: pointer;
-}
-
-.method.active {
-  border-color: var(--blue);
-  background: var(--blue-soft);
-  font-weight: 600;
-}
+/* ---- checkout ------------------------------------------------------------------------------------------------------ */
 
 .totals {
   display: grid;
@@ -224,20 +218,97 @@
 }
 
 .totals .due {
+  align-items: baseline;
   border-block-start: 1px solid var(--line);
   padding-block-start: var(--sp-2);
+}
+
+.totals .due dt {
+  color: var(--ink);
   font-weight: 700;
 }
 
-.blockers {
-  margin: var(--sp-3) 0;
-  padding-inline-start: var(--sp-4);
+.totals .due dd {
+  font-size: var(--fs-xl);
+  font-weight: 700;
 }
 
-.wide {
-  width: 100%;
-  margin-block-start: var(--sp-3);
+.totals .remaining {
+  font-weight: 700;
 }
+
+.cur {
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.fold {
+  margin-block-start: var(--sp-4);
+  border-block-start: 1px solid var(--line);
+}
+
+.fold-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+
+.fold-title {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.chevron {
+  transition: transform var(--ease);
+}
+
+.chevron.open {
+  transform: rotate(180deg);
+}
+
+.fold-body {
+  display: grid;
+  gap: var(--sp-3);
+  padding-block-end: var(--sp-1);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+
+.methods {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+
+.inp.amount {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  text-align: end;
+}
+
+/* the sticky bar (its own component) spans both columns */
+.action-bar {
+  grid-column: 1 / -1;
+}
+
+/* ---- success dialog ------------------------------------------------------------------------------------------------ */
 
 .success {
   text-align: center;

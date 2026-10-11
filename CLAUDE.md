@@ -325,6 +325,10 @@ QMS source is never read or copied (section 1); everything here is written from 
   service-entry, preparations, quote). Frontend `features/registration`: `/registration/new` (CP-06, payment on the page via
   `POST /api/v1/billing/payments`), `/registration/visits` (CP-10), `/registration/visits/:id` (edit), `…/job-order`,
   `/registration/price-query` (CP-12); the page provisions the cash payer lazily (`POST /api/v1/pricing/payers/default`).
+  CP-06 layout = desk console (UX option B, chosen 2026-10-11): patient+visit strip, service entry with typeahead
+  (`ui/service-entry.component.ts`, also on CP-12), checklist `ui/registration-readiness`, sticky `ui/registration-action-bar`
+  (inside the `appSaveShortcut` host), `ui/visit-flags`; a blocked save sets `attempted` (marks fields) and `focusBlocker()`
+  jumps via `BLOCKER_TARGETS`. Keep the page stylesheet under the 4 kB component budget (move blocks into `ui/` components).
   Bookings, batches, transfers and the cancellations register are Release 2 (backend only).
 - Results (wave 3, slot `res`; intake `docs/intake/LIS-INT-RES-001_Results.md`; migrations `Results`, `ResultLogSequence`):
   `Result` aggregate (`app.results`, states Ordered → Complete → Reviewed → Verified → Printed, cancel/undo/amend, flags,

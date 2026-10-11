@@ -133,6 +133,44 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
     expect(page.successOpen()).toBe(false);
   });
 
+  it('lists every open item in the checklist and the action bar, and marks the fields after a blocked save', async () => {
+    const page = await open('/registration/new');
+    harness.detectChanges();
+    const host = harness.routeNativeElement!;
+
+    // the cash contract is preselected: one of three done, patient and services open, nothing marked yet
+    expect(host.querySelectorAll('app-reg-readiness .item.done').length).toBe(1);
+    expect(host.querySelectorAll('app-reg-readiness .item.open').length).toBe(2);
+    expect(host.textContent).toContain('registration.ready.count');
+    expect(Array.from(host.querySelectorAll('.action-bar .chip.bad')).map((chip) => chip.textContent?.trim())).toEqual(['registration.validation.patient', 'registration.validation.lines']);
+    expect(host.querySelector('#reg-patient.invalid')).toBeNull();
+
+    await page.save();
+    await tick();
+    harness.detectChanges();
+    expect(host.querySelector('#reg-patient.invalid')).not.toBeNull();
+    expect(TestBed.inject(ToastService).toasts().some((toast) => toast.kind === 'error' && toast.text.includes('registration.validation.many'))).toBe(true);
+
+    await typedVisit(page);
+    harness.detectChanges();
+    expect(host.querySelectorAll('app-reg-readiness .item.open').length).toBe(0);
+    expect(host.querySelector('.action-bar .chip.bad')).toBeNull();
+    expect(host.querySelector('#reg-patient.invalid')).toBeNull();
+  });
+
+  it('keeps the discount folded until it is opened or set', async () => {
+    await open('/registration/new');
+    harness.detectChanges();
+    const host = harness.routeNativeElement!;
+    expect(host.querySelector('#reg-discount')).toBeNull();
+
+    host.querySelector<HTMLButtonElement>('.fold-head')?.click();
+    await tick();
+    harness.detectChanges();
+    expect(host.querySelector('#reg-discount')).not.toBeNull();
+    expect(host.querySelector('.fold-head')?.getAttribute('aria-expanded')).toBe('true');
+  });
+
   it('preselects the patient of a patient-file link (/registration?patientId=) and the services of a price-query link', async () => {
     await open('/registration?patientId=p-1&services=s-cbc,s-glu&tierId=tier-ins', () => {
       backend.expectOne(`${PATIENTS_API.patients}/p-1`).flush({ ...patient, statedAge: null, ageRecordedOn: null, registeredOn: '2026-10-01', patientConditionId: null, nationality: null, email: null, governorateId: null, city: null, address: null, comments: null });

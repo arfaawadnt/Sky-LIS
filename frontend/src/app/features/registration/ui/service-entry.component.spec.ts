@@ -123,6 +123,66 @@ describe('ServiceEntryComponent (CP-06 service entry, LDM §4.4)', () => {
     expect(fixture.nativeElement.querySelector('.picker-list .pick')?.textContent).toContain('GLU');
   });
 
+  it('suggests matching services while the clerk types; ↓ + Enter adds the chosen one without the server resolve', async () => {
+    const field = input();
+    field.value = 'glu';
+    field.dispatchEvent(new Event('input'));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    TestBed.tick();
+    await settle();
+
+    const lookup = backend.expectOne((request) => request.url === CATALOGUE_A_API.lookupServices);
+    expect(lookup.request.params.get('search')).toBe('glu');
+    lookup.flush(page([
+      { id: 's-glu', code: 'GLU', nameEn: 'Glucose', nameAr: 'جلوكوز', type: 'Test', shortcutNo: 11 },
+      { id: 's-gtt', code: 'GTT', nameEn: 'Glucose tolerance', nameAr: 'منحنى السكر', type: 'Test', shortcutNo: 12 },
+    ]));
+    await settle();
+    fixture.detectChanges();
+
+    const options = fixture.nativeElement.querySelectorAll('#reg-service-suggestions [role="option"]') as NodeListOf<HTMLElement>;
+    expect(options.length).toBe(2);
+    expect(field.getAttribute('aria-expanded')).toBe('true');
+
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    fixture.detectChanges();
+    expect(field.getAttribute('aria-activedescendant')).toBe('reg-service-option-1');
+
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await settle();
+    fixture.detectChanges();
+
+    expect(added).toEqual([[{ serviceId: 's-gtt', code: 'GTT', nameEn: 'Glucose tolerance', nameAr: 'منحنى السكر' }]]);
+    expect(fixture.nativeElement.querySelector('#reg-service-suggestions')).toBeNull();
+    backend.expectNone((request) => request.url === REGISTRATION_API.serviceEntry);
+  });
+
+  it('closes the suggestions on Escape and resolves the text on Enter when nothing is chosen', async () => {
+    const field = input();
+    field.value = 'cbc';
+    field.dispatchEvent(new Event('input'));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    TestBed.tick();
+    await settle();
+    backend.expectOne((request) => request.url === CATALOGUE_A_API.lookupServices).flush(page([{ id: 's-cbc', code: 'CBC', nameEn: 'Complete blood count', nameAr: 'صورة دم', type: 'Test', shortcutNo: 10 }]));
+    await settle();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('#reg-service-suggestions')).not.toBeNull();
+
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('#reg-service-suggestions')).toBeNull();
+
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await settle();
+    const call = backend.expectOne((request) => request.url === REGISTRATION_API.serviceEntry);
+    expect(call.request.params.get('text')).toBe('cbc');
+    call.flush({ kind: 'Service', services: [cbc], setCode: null, setNameEn: null, setNameAr: null, candidates: [] } satisfies ServiceEntryResult);
+    await settle();
+    expect(added.length).toBe(1);
+  });
+
   it('falls back to the picker when the lookup fails', async () => {
     await typeAndEnter('xyz');
     backend.expectOne((request) => request.url === REGISTRATION_API.serviceEntry).flush({ type: 'about:blank', title: 'Down', status: 500, code: 'INTERNAL-500' }, { status: 500, statusText: 'Error' });

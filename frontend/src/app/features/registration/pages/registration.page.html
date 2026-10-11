@@ -1,13 +1,7 @@
-<app-page-header [title]="title()" [subtitle]="i18n.t(facade.isEdit() ? 'registration.editSubtitle' : 'registration.subtitle')">
+<app-page-header [title]="title()" [subtitle]="facade.isEdit() ? i18n.t('registration.editSubtitle') + ' · ' + branchName() : i18n.t('registration.deskSubtitle')">
   <button pageActions type="button" class="btn ghost" *appCan="permissions.create" (click)="clear()">{{ i18n.t(facade.isEdit() ? 'registration.newRegistration' : 'registration.clear') }}</button>
   @if (facade.isEdit()) {
     <a pageActions class="btn" [routerLink]="['/registration/visits', facade.visitId(), 'job-order']"><app-icon name="printer" [size]="15" />{{ i18n.t('registration.jobOrder.title') }}</a>
-  }
-  @if (!readOnly()) {
-    <button pageActions type="button" class="btn primary" [disabled]="saving()" (click)="save()">
-      <app-icon name="check" [size]="15" />{{ saving() ? i18n.t('registration.saving') : i18n.t(facade.isEdit() ? 'registration.saveChanges' : 'registration.save') }}
-      <span class="kbd">Ctrl+S</span>
-    </button>
   }
 </app-page-header>
 
@@ -22,36 +16,31 @@
       <p class="problem" role="alert">{{ i18n.t('registration.visitLoadError') }}</p>
     }
 
-    <!-- patient (CP-06 patient data; BR-01 similar-name warning in the picker) -->
-    <app-section-card [title]="i18n.t('registration.patient.cardTitle')">
-      @if (facade.isEdit()) {
-        @if (facade.saved(); as saved) {
-          <div class="patient-line">
-            <app-icon name="user" [size]="18" />
-            <span class="mono">{{ saved.patient.number }}</span>
-            <b>{{ name(saved.patient.fullName, saved.patient.nameAr) }}</b>
-            <span class="muted small">{{ saved.patient.gender ? i18n.t('registration.gender.' + saved.patient.gender) : '' }} · {{ saved.patient.ageYears }} {{ i18n.t('registration.years') }}</span>
-            @if (saved.patient.mobile) {
-              <span class="mono small" dir="ltr">{{ saved.patient.mobile }}</span>
-            }
-            <app-badge [status]="saved.status" />
-          </div>
+    <!-- patient and visit in one strip (CP-06 patient data; BR-01 similar-name warning in the picker; R1: no location / room) -->
+    <app-section-card [title]="i18n.t('registration.patientVisit.cardTitle')">
+      <div id="reg-patient" class="patient-row" [class.invalid]="invalid('patient')">
+        @if (facade.isEdit()) {
+          @if (facade.saved(); as saved) {
+            <div class="patient-line">
+              <app-icon name="user" [size]="18" />
+              <b>{{ name(saved.patient.fullName, saved.patient.nameAr) }}</b>
+              <span class="mono">{{ saved.patient.number }}</span>
+              <span class="muted small">{{ saved.patient.gender ? i18n.t('registration.gender.' + saved.patient.gender) : '' }} · {{ saved.patient.ageYears }} {{ i18n.t('registration.years') }}</span>
+              @if (saved.patient.mobile) {
+                <span class="mono small" dir="ltr">{{ saved.patient.mobile }}</span>
+              }
+              <app-badge [status]="saved.status" />
+            </div>
+          }
+        } @else {
+          <app-patient-picker [selected]="facade.patient()" (picked)="onPatient($event)" (cleared)="facade.setPatient(null)" />
         }
-      } @else {
-        <app-patient-picker [selected]="facade.patient()" (picked)="onPatient($event)" (cleared)="facade.setPatient(null)" />
-      }
-    </app-section-card>
+      </div>
 
-    <!-- visit data (R1: no location / department / room) -->
-    <app-section-card [title]="i18n.t('registration.visit.cardTitle')">
-      <div class="form-grid three">
-        <div class="field">
-          <span class="label">{{ i18n.t('registration.field.branch') }}</span>
-          <span class="static">{{ branchName() }}</span>
-        </div>
-        <label class="field">
-          <span class="label">{{ i18n.t('registration.field.contract') }} *</span>
-          <select class="inp" [disabled]="facade.isEdit()" (change)="facade.patchHeader({ tierId: value($event) })">
+      <div class="visit-grid">
+        <label class="field" [class.invalid]="invalid('contract')">
+          <span class="label">{{ i18n.t('registration.field.contract') }} <span class="req" aria-hidden="true">*</span></span>
+          <select id="reg-contract" class="inp" required [attr.aria-invalid]="invalid('contract')" [disabled]="facade.isEdit()" (change)="facade.patchHeader({ tierId: value($event) })">
             <option value="">{{ i18n.t('registration.chooseContract') }}</option>
             @if (facade.isEdit()) {
               @if (facade.saved(); as saved) {
@@ -64,12 +53,21 @@
             }
           </select>
         </label>
-        <label class="field">
-          <span class="label">{{ i18n.t('registration.field.doctor') }}{{ facade.settings.value()?.mandatoryDoctor ? ' *' : '' }}</span>
-          <select class="inp" (change)="facade.patchHeader({ doctorId: value($event) })">
+        <label class="field" [class.invalid]="invalid('doctor')">
+          <span class="label">{{ i18n.t('registration.field.doctor') }}@if (doctorRequired()) { <span class="req" aria-hidden="true">*</span>}</span>
+          <select id="reg-doctor" class="inp" [required]="doctorRequired()" [attr.aria-invalid]="invalid('doctor')" (change)="facade.patchHeader({ doctorId: value($event) })">
             <option value="">{{ i18n.t('registration.noDoctor') }}</option>
             @for (doctor of facade.doctors.value() ?? []; track doctor.id) {
               <option [value]="doctor.id" [selected]="doctor.id === facade.header().doctorId">{{ doctor.code }} · {{ name(doctor.nameEn, doctor.nameAr) }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">{{ i18n.t('registration.field.diagnosis') }}</span>
+          <select class="inp" [disabled]="facade.isEdit()" (change)="facade.patchHeader({ diagnosisId: value($event) })">
+            <option value="">{{ i18n.t('registration.noDiagnosis') }}</option>
+            @for (diagnosis of facade.diagnoses.value() ?? []; track diagnosis.id) {
+              <option [value]="diagnosis.id" [selected]="diagnosis.id === facade.header().diagnosisId">{{ diagnosis.icdCode }} · {{ name(diagnosis.nameEn, diagnosis.nameAr) }}</option>
             }
           </select>
         </label>
@@ -81,25 +79,19 @@
           <span class="label">{{ i18n.t('registration.field.insuranceId') }}</span>
           <input class="inp" type="text" maxlength="50" [value]="facade.header().insuranceId" (input)="facade.patchHeader({ insuranceId: value($event) })" />
         </label>
-        <label class="field">
-          <span class="label">{{ i18n.t('registration.field.diagnosis') }}</span>
-          <select class="inp" [disabled]="facade.isEdit()" (change)="facade.patchHeader({ diagnosisId: value($event) })">
-            <option value="">{{ i18n.t('registration.noDiagnosis') }}</option>
-            @for (diagnosis of facade.diagnoses.value() ?? []; track diagnosis.id) {
-              <option [value]="diagnosis.id" [selected]="diagnosis.id === facade.header().diagnosisId">{{ diagnosis.icdCode }} · {{ name(diagnosis.nameEn, diagnosis.nameAr) }}</option>
-            }
-          </select>
-        </label>
-        <div class="field full flags">
-          <label class="check"><input type="checkbox" [checked]="facade.header().urgent" (change)="facade.patchHeader({ urgent: checked($event) })" /> {{ i18n.t('registration.flag.urgent') }}</label>
-          <label class="check"><input type="checkbox" [checked]="facade.header().biohazard" (change)="facade.patchHeader({ biohazard: checked($event) })" /> {{ i18n.t('registration.flag.biohazard') }}</label>
-          <label class="check"><input type="checkbox" [checked]="facade.header().collectedOutside" (change)="facade.patchHeader({ collectedOutside: checked($event) })" /> {{ i18n.t('registration.flag.collectedOutside') }}</label>
-        </div>
       </div>
+
+      <app-reg-visit-flags
+        class="flags"
+        [urgent]="facade.header().urgent"
+        [biohazard]="facade.header().biohazard"
+        [collectedOutside]="facade.header().collectedOutside"
+        (toggled)="toggleFlag($event)"
+      />
     </app-section-card>
 
-    <!-- services (Enter / F2; BR-02 tubes, BR-05 reserved, BR-06 prices, BR-13 expected dates) -->
-    <app-section-card [title]="i18n.t('registration.services.cardTitle')" [subtitle]="i18n.t('registration.services.hint')">
+    <!-- services (typeahead / Enter / F2; BR-02 tubes, BR-05 reserved, BR-06 prices, BR-13 expected dates) -->
+    <app-section-card id="reg-services" [title]="i18n.t('registration.services.cardTitle')">
       <app-reg-service-entry [disabled]="facade.isEdit() && facade.saved()?.status !== 'Open'" (added)="onAdded($event)" />
 
       @if (facade.check.error()) {
@@ -118,23 +110,23 @@
               <th>{{ i18n.t('registration.column.code') }}</th>
               <th>{{ i18n.t('registration.column.service') }}</th>
               <th>{{ i18n.t('registration.column.status') }}</th>
+              <th>{{ i18n.t('registration.column.sample') }}</th>
+              <th>{{ i18n.t('registration.column.expected') }}</th>
               <th class="num">{{ i18n.t('registration.column.patientShare') }}</th>
               <th class="num">{{ i18n.t('registration.column.payerShare') }}</th>
-              <th>{{ i18n.t('registration.column.expected') }}</th>
-              <th>{{ i18n.t('registration.column.sample') }}</th>
               <th><span class="visually-hidden">{{ i18n.t('registration.column.actions') }}</span></th>
             </tr>
           </thead>
           <tbody>
             @for (line of savedLines(); track line.id) {
               <tr class="saved" [class.cancelled]="line.status === 'Cancelled'" [class.member]="line.kind === 'PackageMember'">
-                <td class="mono">{{ line.kind === 'PackageMember' ? '↳ ' : '' }}{{ line.code }}</td>
+                <td class="mono code">{{ line.kind === 'PackageMember' ? '↳ ' : '' }}{{ line.code }}</td>
                 <td>{{ name(line.nameEn, line.nameAr) }}</td>
                 <td><app-badge [status]="line.status">{{ i18n.t('registration.lineStatus.' + line.status) }}</app-badge></td>
+                <td class="mono small">{{ line.sampleNumber ?? '' }}</td>
+                <td class="small nowrap">{{ when(line.expectedResultAtUtc) }}</td>
                 <td class="num">{{ line.kind === 'PackageMember' ? '' : amount(line.patientShare) }}</td>
                 <td class="num">{{ line.kind === 'PackageMember' ? '' : amount(line.payerShare) }}</td>
-                <td class="small">{{ when(line.expectedResultAtUtc) }}</td>
-                <td class="mono small">{{ line.sampleNumber ?? '' }}</td>
                 <td>
                   @if (line.status === 'Reserved' && line.kind !== 'PackageMember' && canRelease()) {
                     <button type="button" class="btn sm" [disabled]="facade.release.pending()" (click)="release(line)">{{ i18n.t('registration.release') }}</button>
@@ -144,8 +136,8 @@
             }
 
             @for (line of facade.plannedLines(); track line.serviceId) {
-              <tr class="planned" [class.has-issue]="issuesOf(line.serviceId).length > 0">
-                <td class="mono">{{ line.code }}</td>
+              <tr class="planned" [class.has-issue]="issuesOf(line.serviceId).length > 0" [class.has-warning]="warnedServices().has(line.serviceId)">
+                <td class="mono code">{{ line.code }}</td>
                 <td>
                   {{ name(line.nameEn, line.nameAr) }}
                   @if (line.origin !== 'Manual') {
@@ -171,14 +163,14 @@
                     <app-badge [status]="line.status">{{ i18n.t('registration.lineStatus.' + line.status) }}</app-badge>
                   }
                 </td>
-                <td class="num">{{ line.priced ? amount(line.patientShare) : '—' }}</td>
-                <td class="num">{{ line.priced ? amount(line.payerShare) : '—' }}</td>
-                <td class="small">{{ when(line.expectedResultAtUtc) }}</td>
                 <td class="small">
                   @if (tubeOf(line); as tube) {
                     <span class="mono">{{ tube.unitCode }}</span> {{ name(tube.sampleTypeNameEn, tube.sampleTypeNameAr) }}
                   }
                 </td>
+                <td class="small nowrap">{{ when(line.expectedResultAtUtc) }}</td>
+                <td class="num">{{ line.priced ? amount(line.patientShare) : '—' }}</td>
+                <td class="num">{{ line.priced ? amount(line.payerShare) : '—' }}</td>
                 <td>
                   @if (isManual(line.serviceId)) {
                     <button type="button" class="icon-btn" [attr.aria-label]="i18n.tf('registration.removeLine', { code: line.code })" (click)="facade.removeLine(line.serviceId)"><app-icon name="x" [size]="15" /></button>
@@ -189,7 +181,7 @@
 
             @for (line of pendingLines(); track line.serviceId) {
               <tr class="pending">
-                <td class="mono">{{ line.code }}</td>
+                <td class="mono code">{{ line.code }}</td>
                 <td>{{ name(line.nameEn, line.nameAr) }}</td>
                 <!-- a service the dry run refused (REG-014/015/100…) is not planned: its issue is the reason, not "not priced yet" -->
                 @if (issuesOf(line.serviceId).length > 0) {
@@ -217,8 +209,8 @@
       </div>
 
       @if ((facade.result()?.tubes ?? []).length > 0) {
-        <p class="small muted tubes">
-          {{ i18n.t('registration.services.tubes') }}:
+        <p class="small tubes">
+          <b>{{ i18n.t('registration.services.tubes') }}:</b>
           @for (tube of facade.result()?.tubes ?? []; track tube.key + (tube.existingTubeId ?? '')) {
             <span class="tag">{{ tube.unitCode }} · {{ name(tube.sampleTypeNameEn, tube.sampleTypeNameAr) }}@if (tube.sampleConditionNameEn) { · {{ name(tube.sampleConditionNameEn, tube.sampleConditionNameAr) }}}{{ tube.sampleNumber ? ' (' + tube.sampleNumber + ')' : '' }}</span>
           }
@@ -237,11 +229,11 @@
     }
 
     @if (preparations().length > 0) {
-      <app-section-card [title]="i18n.t('registration.preparations.title')" [subtitle]="i18n.t('registration.preparations.hint')">
-        <div class="form-grid">
+      <app-section-card id="reg-preparations" [title]="i18n.t('registration.preparations.title')" [subtitle]="i18n.t('registration.preparations.hint')">
+        <div class="prep-grid">
           @for (question of preparations(); track question.preparationId) {
             <div class="field" role="group" [attr.aria-label]="name(question.questionEn, question.questionAr)">
-              <span class="label">{{ name(question.questionEn, question.questionAr) }}</span>
+              <span class="label">{{ name(question.questionEn, question.questionAr) }}@if (askedBy(question); as codes) { <span class="muted small">· {{ i18n.tf('registration.preparations.askedBy', { codes }) }}</span>}</span>
               @switch (question.answerType) {
                 @case ('YesNo') {
                   <select class="inp" (change)="facade.setAnswer(question.preparationId, value($event))">
@@ -267,102 +259,124 @@
         </div>
       </app-section-card>
     }
-
-    <!-- discount (cap from the role or the tenant parameter; reason mandatory) -->
-    <app-section-card [title]="i18n.t('registration.discount.cardTitle')" [subtitle]="i18n.tf('registration.discount.hint', { cap: facade.settings.value()?.discountCapPercent ?? 0 })">
-      <div class="form-grid three">
-        <label class="field">
-          <span class="label">{{ i18n.t('registration.discount.kind') }}</span>
-          <select class="inp" (change)="setDiscountKind(value($event))">
-            @for (kind of discountKinds; track kind) {
-              <option [value]="kind" [selected]="facade.discount().kind === kind">{{ i18n.t('registration.discount.kinds.' + kind) }}</option>
-            }
-          </select>
-        </label>
-        <label class="field">
-          <span class="label">{{ i18n.t('registration.discount.value') }}</span>
-          <input class="inp" type="number" min="0" step="0.01" [value]="facade.discount().value ?? ''" (input)="facade.patchDiscount({ value: numberOrNull($event) })" />
-        </label>
-        <label class="field">
-          <span class="label">{{ i18n.t('registration.discount.reason') }}</span>
-          <select class="inp" (change)="facade.patchDiscount({ reasonId: value($event) })">
-            <option value="">{{ i18n.t('registration.discount.chooseReason') }}</option>
-            @for (reason of facade.discountReasons.value() ?? []; track reason.id) {
-              <option [value]="reason.id" [selected]="reason.id === facade.discount().reasonId">{{ name(reason.nameEn, reason.nameAr) }}</option>
-            }
-          </select>
-        </label>
-      </div>
-    </app-section-card>
-
-    <!-- R1 payment panel (BR-26): new visits only; posted to Billing right after the visit is saved -->
-    @if (facade.canPay()) {
-      <app-section-card [title]="i18n.t('registration.payment.cardTitle')" [subtitle]="i18n.t('registration.payment.hint')">
-        @if (treasuryList().length === 0) {
-          <p class="warn-strip">{{ i18n.t('registration.payment.noTreasury') }}</p>
-        } @else {
-          <div class="methods" role="radiogroup" [attr.aria-label]="i18n.t('registration.payment.method')">
-            @for (method of methods; track method) {
-              <button type="button" class="method" role="radio" [attr.aria-checked]="facade.payment().method === method" [class.active]="facade.payment().method === method" (click)="setMethod(method)">
-                {{ i18n.t('registration.payment.methods.' + method) }}
-              </button>
-            }
-          </div>
-          <div class="form-grid three">
-            <label class="field">
-              <span class="label">{{ i18n.t('registration.payment.amount') }} ({{ currency() }})</span>
-              <input class="inp" type="number" min="0" step="0.01" [value]="facade.paymentAmount()" (input)="facade.patchPayment({ amount: numberOrNull($event) })" />
-            </label>
-            @if (facade.payment().method !== 'Cash') {
-              <label class="field">
-                <span class="label">{{ i18n.t('registration.payment.reference') }} *</span>
-                <input class="inp" type="text" maxlength="100" [value]="facade.payment().reference" (input)="facade.patchPayment({ reference: value($event) })" />
-              </label>
-            }
-            <label class="field">
-              <span class="label">{{ i18n.t('registration.payment.treasury') }}</span>
-              <select class="inp" (change)="facade.patchPayment({ treasuryId: value($event) })">
-                @for (treasury of treasuryList(); track treasury.id) {
-                  <option [value]="treasury.id" [selected]="treasury.id === facade.payment().treasuryId">{{ treasury.code }} · {{ name(treasury.nameEn, treasury.nameAr) }}</option>
-                }
-              </select>
-            </label>
-          </div>
-        }
-      </app-section-card>
-    }
   </div>
 
-  <aside class="summary" [attr.aria-label]="i18n.t('registration.summary.title')">
-    <app-section-card [title]="i18n.t('registration.summary.title')">
+  <aside class="side" [attr.aria-label]="i18n.t('registration.checkout.title')">
+    <!-- readiness checklist: what is done and what is still missing before Save (each open item jumps to its field) -->
+    @if (!readOnly()) {
+      <app-section-card [title]="i18n.t('registration.ready.title')">
+        <app-reg-readiness [items]="checklist()" (jump)="focusBlocker($event)" />
+      </app-section-card>
+    }
+
+    <app-section-card [title]="i18n.t('registration.checkout.title')">
       <dl class="totals">
-        <div><dt>{{ i18n.t('registration.summary.services') }}</dt><dd>{{ savedLines().length + facade.plannedLines().length }}</dd></div>
-        <div><dt>{{ i18n.t('registration.summary.total') }}</dt><dd class="num">{{ amount(facade.totals().list) }}</dd></div>
+        <div><dt>{{ i18n.tf('registration.checkout.services', { count: savedLines().length + facade.plannedLines().length }) }}</dt><dd class="num">{{ amount(facade.totals().list) }}</dd></div>
         <div><dt>{{ i18n.t('registration.summary.payerShare') }}</dt><dd class="num">{{ amount(facade.totals().payer) }}</dd></div>
         <div><dt>{{ i18n.t('registration.summary.patientShare') }}</dt><dd class="num">{{ amount(facade.totals().patient) }}</dd></div>
         <div><dt>{{ i18n.t('registration.summary.discount') }}</dt><dd class="num">− {{ amount(facade.totals().discount) }}</dd></div>
-        <div class="due"><dt>{{ i18n.t('registration.summary.due') }}</dt><dd class="num">{{ amount(facade.totals().due) }} {{ currency() }}</dd></div>
+        <div class="due"><dt>{{ i18n.t('registration.summary.due') }}</dt><dd class="num">{{ amount(facade.totals().due) }} <span class="cur">{{ currency() }}</span></dd></div>
         @if (facade.isEdit()) {
           <div><dt>{{ i18n.t('registration.summary.paid') }}</dt><dd class="num">{{ amount(facade.totals().paid) }}</dd></div>
           @if (facade.totals().refunded > 0) {
             <div><dt>{{ i18n.t('registration.summary.refunded') }}</dt><dd class="num">− {{ amount(facade.totals().refunded) }}</dd></div>
           }
-          <div class="due"><dt>{{ i18n.t('registration.summary.remaining') }}</dt><dd class="num">{{ amount(facade.totals().remaining) }}</dd></div>
+          <div class="remaining"><dt>{{ i18n.t('registration.summary.remaining') }}</dt><dd class="num">{{ amount(facade.totals().remaining) }}</dd></div>
         } @else if (facade.canPay()) {
           <div><dt>{{ i18n.t('registration.summary.paidNow') }}</dt><dd class="num">{{ amount(facade.paymentAmount()) }}</dd></div>
-          <div class="due"><dt>{{ i18n.t('registration.summary.remaining') }}</dt><dd class="num">{{ amount(facade.totals().due - facade.paymentAmount()) }}</dd></div>
+          <div class="remaining"><dt>{{ i18n.t('registration.summary.remaining') }}</dt><dd class="num">{{ amount(facade.totals().due - facade.paymentAmount()) }}</dd></div>
         }
       </dl>
-      @if (facade.blockers().length > 0) {
-        <ul class="blockers">
-          @for (blocker of facade.blockers(); track blocker) {
-            <li class="small muted">{{ blockerText(blocker) }}</li>
-          }
-        </ul>
+
+      <!-- discount: folded until needed (cap from the role or the tenant parameter; reason mandatory) -->
+      <div class="fold">
+        <button type="button" class="fold-head" [attr.aria-expanded]="showDiscount()" aria-controls="reg-discount" (click)="toggleDiscount()">
+          <span>{{ i18n.t('registration.discount.cardTitle') }} <span class="muted small">· {{ i18n.tf('registration.discount.capShort', { cap: facade.settings.value()?.discountCapPercent ?? 0 }) }}</span></span>
+          <app-icon class="chevron" [class.open]="showDiscount()" name="chevron-down" [size]="15" />
+        </button>
+        @if (showDiscount()) {
+          <div id="reg-discount" class="fold-body">
+            <div class="pair">
+              <label class="field">
+                <span class="label">{{ i18n.t('registration.discount.kind') }}</span>
+                <select class="inp" (change)="setDiscountKind(value($event))">
+                  @for (kind of discountKinds; track kind) {
+                    <option [value]="kind" [selected]="facade.discount().kind === kind">{{ i18n.t('registration.discount.kinds.' + kind) }}</option>
+                  }
+                </select>
+              </label>
+              <label class="field" [class.invalid]="invalid('discountCap')">
+                <span class="label">{{ i18n.t('registration.discount.value') }}</span>
+                <input id="reg-discount-value" class="inp" type="number" min="0" step="0.01" [attr.aria-invalid]="invalid('discountCap')" [value]="facade.discount().value ?? ''" (input)="facade.patchDiscount({ value: numberOrNull($event) })" />
+              </label>
+            </div>
+            <label class="field" [class.invalid]="invalid('discountReason')">
+              <span class="label">{{ i18n.t('registration.discount.reason') }}@if (discountActive()) { <span class="req" aria-hidden="true">*</span>}</span>
+              <select id="reg-discount-reason" class="inp" [required]="discountActive()" [attr.aria-invalid]="invalid('discountReason')" (change)="facade.patchDiscount({ reasonId: value($event) })">
+                <option value="">{{ i18n.t('registration.discount.chooseReason') }}</option>
+                @for (reason of facade.discountReasons.value() ?? []; track reason.id) {
+                  <option [value]="reason.id" [selected]="reason.id === facade.discount().reasonId">{{ name(reason.nameEn, reason.nameAr) }}</option>
+                }
+              </select>
+            </label>
+          </div>
+        }
+      </div>
+
+      <!-- R1 payment (BR-26): new visits only; posted to Billing right after the visit is saved -->
+      @if (facade.canPay()) {
+        <div class="fold">
+          <div class="fold-title">{{ i18n.t('registration.payment.cardTitle') }}</div>
+          <div class="fold-body">
+            @if (treasuryList().length === 0) {
+              <p class="warn-strip">{{ i18n.t('registration.payment.noTreasury') }}</p>
+            } @else {
+              <div class="methods" role="radiogroup" [attr.aria-label]="i18n.t('registration.payment.method')">
+                @for (method of methods; track method) {
+                  <button type="button" class="btn" role="radio" [attr.aria-checked]="facade.payment().method === method" [class.primary]="facade.payment().method === method" (click)="setMethod(method)">
+                    {{ i18n.t('registration.payment.methods.' + method) }}
+                  </button>
+                }
+              </div>
+              <label class="field" [class.invalid]="invalid('paymentAmount')">
+                <span class="label">{{ i18n.t('registration.payment.amount') }} ({{ currency() }})</span>
+                <input id="reg-pay-amount" class="inp amount" type="number" min="0" step="0.01" [attr.aria-invalid]="invalid('paymentAmount')" [value]="facade.paymentAmount()" (input)="facade.patchPayment({ amount: numberOrNull($event) })" />
+              </label>
+              @if (facade.payment().method !== 'Cash') {
+                <label class="field" [class.invalid]="invalid('paymentReference')">
+                  <span class="label">{{ i18n.t('registration.payment.reference') }} <span class="req" aria-hidden="true">*</span></span>
+                  <input id="reg-pay-reference" class="inp" type="text" maxlength="100" required [attr.aria-invalid]="invalid('paymentReference')" [value]="facade.payment().reference" (input)="facade.patchPayment({ reference: value($event) })" />
+                </label>
+              }
+              <label class="field" [class.invalid]="invalid('paymentTreasury')">
+                <span class="label">{{ i18n.t('registration.payment.treasury') }}</span>
+                <select id="reg-pay-treasury" class="inp" [attr.aria-invalid]="invalid('paymentTreasury')" (change)="facade.patchPayment({ treasuryId: value($event) })">
+                  @for (treasury of treasuryList(); track treasury.id) {
+                    <option [value]="treasury.id" [selected]="treasury.id === facade.payment().treasuryId">{{ treasury.code }} · {{ name(treasury.nameEn, treasury.nameAr) }}</option>
+                  }
+                </select>
+              </label>
+            }
+          </div>
+        </div>
       }
-      <button type="button" class="btn primary wide" [hidden]="readOnly()" [disabled]="saving()" (click)="save()">{{ saving() ? i18n.t('registration.saving') : i18n.t(facade.isEdit() ? 'registration.saveChanges' : 'registration.save') }}</button>
     </app-section-card>
   </aside>
+
+  <!-- action bar: every open item as a chip that jumps to its field, the amount due and Save (Ctrl+S) -->
+  @if (!readOnly()) {
+    <app-reg-action-bar
+      class="action-bar"
+      [problems]="barProblems()"
+      [notices]="barNotices()"
+      [dueLabel]="i18n.t(facade.isEdit() ? 'registration.summary.remaining' : 'registration.summary.due')"
+      [due]="amount(facade.isEdit() ? facade.totals().remaining : facade.totals().due) + ' ' + currency()"
+      [saveLabel]="saving() ? i18n.t('registration.saving') : i18n.t(facade.isEdit() ? 'registration.saveChanges' : 'registration.save')"
+      [saving]="saving()"
+      (jump)="focusBlocker($event)"
+      (save)="save()"
+    />
+  }
 </div>
 </fieldset>
 
