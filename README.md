@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.5.0** · released 2026-10-11 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.5.1** · released 2026-10-11 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.5.1 — 2026-10-11
 
 - **New patient form reorganised (CP-06 / CP-11).** The form now has four labelled groups: Identity (title beside the
   English name, then the Arabic name), Sex and age (a Male / Female switch, then date of birth "or age" in years, months
