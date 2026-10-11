@@ -18,7 +18,8 @@ certificate, what differs from the standard layout.
 | Files root | `E:\lis-data\files` (created by the installer) |
 | Smoke test | `smoke-test.ps1 -BaseUrl https://WIN-9S2KO4FA64L -ApiUrl http://127.0.0.1:5100 -SkipCertificateCheck`: 20 / 20 |
 | Data | the database holds the development and UAT dry-run data (demo laboratory, "Walk-through Laboratory", test patients and visits); the tenant parameters `autoPrintLabels`, `autoPrintJobOrder`, `autoPrintReceipt` of the demo laboratory were switched off for the automated dry run |
-| Not installed | the test lane (`NTLIS_TEST`, `lis-ui-test`), a scheduled backup task, an SMS/e-mail gateway |
+| Backups | since 2026-10-11: `E:\lis-data\postgres.env` (host `127.0.0.1`, port **5433**, database `lis`, superuser `postgres`, `lis_owner`; ACL SYSTEM read, Administrators full) and the scheduled task **`NTLIS database backup`** (daily 02:00, SYSTEM, highest privileges, runs late if the server was off, 2 h limit) running `C:\lis-app\deploy\backup-database.ps1 -EnvFile E:\lis-data\postgres.env -BackupRoot E:\lis-backups -RetentionDays 30`. `C:\lis-app\deploy` is a copy of `deploy\windows`: refresh it after a release that changes the scripts. First run started by hand: result 0, `lis-20261011-231109.dump`. Not yet replicated off the machine |
+| Not installed | the test lane (`NTLIS_TEST`, `lis-ui-test`), an SMS/e-mail gateway, off-machine copies of `E:\lis-backups` |
 | Rollback | `install-ui-site.ps1 -Rollback`, `install-api-service.ps1 -Rollback`; database via `restore-database.ps1` with the service stopped |
 | Uninstall | `sc.exe delete NTLIS` after `Stop-Service NTLIS`; remove the site and pool with the WebAdministration module; `sc.exe delete LIS_POSTGRES` returns the instance to console use (`pg_ctl start`) |
 
