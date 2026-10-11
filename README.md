@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.4.1** · released 2026-10-11 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.5.0** · released 2026-10-11 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -235,6 +235,17 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ### Unreleased
 
 _Nothing yet._
+
+### v0.5.0 — 2026-10-11
+
+- **Registration page redesigned as a desk console (CP-06, UX option B with option C's checklist).** Patient and visit
+  data share one strip, and the visit flags are toggle buttons. Matching services are suggested while typing (↑↓ chooses,
+  Enter adds, Esc closes); Enter without a suggestion still resolves shortcut numbers and sets, and ↑↓ now also move
+  through the F2 catalogue list. A "Ready to save" checklist sits beside the checkout. The discount is folded until
+  needed, and payment moved into the checkout column. A sticky bottom bar lists every open item as a chip that jumps to
+  its field, with the amount due and Save (Ctrl+S). A blocked save now marks all missing fields and focuses the first one,
+  instead of naming only the first problem. New components: `registration-readiness`, `registration-action-bar`,
+  `visit-flags`. Business rules and API calls are unchanged.
 
 ### v0.4.1 — 2026-10-11
 
