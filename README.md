@@ -234,7 +234,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **The sidebar collapses from the top header.** The ☰ button at the start of the top bar now collapses and expands the
+  sidebar on every screen size (on screens under 960 px it still opens the menu as a drawer). The "Collapse menu" button
+  at the foot of the sidebar is removed. The button's label and `aria-expanded` follow the state ("Collapse menu" /
+  "Expand menu").
 
 ### v0.5.2 — 2026-10-11
 

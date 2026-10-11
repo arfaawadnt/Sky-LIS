@@ -32,10 +32,4 @@
     }
   </nav>
 
-  <div class="sb-foot">
-    <button type="button" class="collapse-btn" (click)="collapseToggled.emit()" [attr.aria-expanded]="!collapsed()" [attr.aria-label]="i18n.t(collapsed() ? 'shell.expandMenu' : 'shell.collapseMenu')">
-      <app-icon [name]="collapseIcon()" [size]="16" />
-      <span class="txt">{{ i18n.t('shell.collapseMenu') }}</span>
-    </button>
-  </div>
 </aside>

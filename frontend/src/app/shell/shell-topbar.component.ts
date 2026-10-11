@@ -8,7 +8,8 @@ import { IconComponent } from '../shared/ui/icon/icon.component';
 import { SearchBoxComponent } from '../shared/ui/search-box/search-box.component';
 
 /**
- * The top bar of the shell (prototypes' `.topbar`): menu button (under 960px), brand, the navigation search
+ * The top bar of the shell (prototypes' `.topbar`): menu button (collapses / expands the sidebar; under 960px opens it
+ * as a drawer), brand, the navigation search
  * (the Ctrl+K fallback when a page has no search box of its own), portal pill, language toggle, and the user
  * button with its menu (language, sign-out). The shell owns the state; this component renders it.
  */
@@ -28,6 +29,9 @@ export class ShellTopbarComponent {
 
   readonly portalLabel = input.required<string>();
   readonly mobileOpen = input(false);
+  readonly collapsed = input(false);
+  /** Under 960px the menu button opens the drawer instead of collapsing the sidebar. */
+  readonly narrow = input(false);
   readonly navSearch = model('');
   readonly menuOpen = model(false);
 
@@ -35,6 +39,11 @@ export class ShellTopbarComponent {
   readonly searchSubmitted = output<void>();
   readonly languageToggled = output<void>();
   readonly signOutRequested = output<void>();
+
+  protected readonly menuExpanded = computed(() => (this.narrow() ? this.mobileOpen() : !this.collapsed()));
+
+  protected readonly menuLabel = computed(() =>
+    this.i18n.t(this.narrow() ? 'shell.openMenu' : this.collapsed() ? 'shell.expandMenu' : 'shell.collapseMenu'));
 
   protected readonly displayName = computed(() => this.auth.currentUser()?.displayName ?? '');
 

@@ -10,7 +10,6 @@
     [mobileOpen]="mobileOpen()"
     (navigated)="closeMobile()"
     (closeRequested)="closeMobile()"
-    (collapseToggled)="toggleCollapsed()"
   />
 
   @if (mobileOpen()) {
@@ -21,9 +20,11 @@
     <app-shell-topbar
       [portalLabel]="portalLabel()"
       [mobileOpen]="mobileOpen()"
+      [collapsed]="collapsed()"
+      [narrow]="narrow()"
       [(navSearch)]="navSearch"
       [(menuOpen)]="userMenuOpen"
-      (menuToggled)="toggleMobile()"
+      (menuToggled)="onMenuButton()"
       (searchSubmitted)="openFirstMatch()"
       (languageToggled)="toggleLanguage()"
       (signOutRequested)="signOut()"

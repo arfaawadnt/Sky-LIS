@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DOCUMENT, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
@@ -14,9 +14,13 @@ import { NAV_GROUPS, NAV_REGISTRY } from './nav.registry';
 import { ShellSidebarComponent } from './shell-sidebar.component';
 import { ShellTopbarComponent } from './shell-topbar.component';
 
+/** The sidebar becomes a drawer below this width (px); keep in step with the 959px media queries of the shell CSS. */
+const NARROW_BELOW = 960;
+
 /**
  * The signed-in layout (01 §6.2, prototypes' `.shell`): sidebar + top bar + routed page + footer. It owns the
- * layout state (collapsed, mobile drawer, user menu, navigation search) and the global keys: Ctrl+K focuses the
+ * layout state (collapsed, mobile drawer, user menu, navigation search); the menu button at the start of the top bar
+ * collapses the sidebar (or opens the drawer under 960px). The global keys: Ctrl+K focuses the
  * first search box of the page (else the navigation search), Esc closes the user menu, then the mobile drawer.
  * The navigation is the registry filtered by portal (`PortalService`: admin for the platform tenant) and
  * permission.
@@ -27,7 +31,7 @@ import { ShellTopbarComponent } from './shell-topbar.component';
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '(document:keydown)': 'onDocumentKeydown($event)' },
+  host: { '(document:keydown)': 'onDocumentKeydown($event)', '(window:resize)': 'onResize()' },
 })
 export class ShellComponent {
   protected readonly i18n = inject(I18nService);
@@ -37,8 +41,12 @@ export class ShellComponent {
   private readonly router = inject(Router);
   private readonly searchFocus = inject(SearchFocusService);
 
+  private readonly view = inject(DOCUMENT).defaultView;
+
   protected readonly collapsed = signal(false);
   protected readonly mobileOpen = signal(false);
+  /** Under 960px the sidebar is an off-canvas drawer (same breakpoint as the sidebar and top bar CSS). */
+  protected readonly narrow = signal(this.isNarrow());
   protected readonly userMenuOpen = signal(false);
   protected readonly navSearch = signal('');
 
@@ -71,8 +79,21 @@ export class ShellComponent {
     followProfileChanges(); // R2-01: a password changed in another tab ends this tab's forced change
   }
 
-  protected toggleCollapsed(): void {
-    this.collapsed.update((value) => !value);
+  /** The menu button at the start of the top bar: collapses / expands the sidebar, or opens the drawer under 960px. */
+  protected onMenuButton(): void {
+    if (this.narrow()) {
+      this.toggleMobile();
+    } else {
+      this.collapsed.update((value) => !value);
+    }
+  }
+
+  protected onResize(): void {
+    this.narrow.set(this.isNarrow());
+  }
+
+  private isNarrow(): boolean {
+    return (this.view?.innerWidth ?? NARROW_BELOW) < NARROW_BELOW;
   }
 
   protected toggleMobile(): void {

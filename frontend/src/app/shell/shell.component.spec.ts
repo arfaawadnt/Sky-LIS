@@ -81,6 +81,28 @@ describe('ShellComponent', () => {
     expect(navLinks(fixture.nativeElement as HTMLElement)).toEqual(['/account/profile']);
   });
 
+  it('collapses and expands the sidebar from the menu button at the start of the top bar', async () => {
+    await signIn('11111111-1111-1111-1111-111111111111', ['dashboard.view']);
+    const fixture = TestBed.createComponent(ShellComponent);
+    await fixture.whenStable();
+    const host = fixture.nativeElement as HTMLElement;
+    const button = host.querySelector<HTMLButtonElement>('.topbar .menu-btn');
+
+    expect(host.querySelector('.collapse-btn')).toBeNull();   // no longer at the foot of the sidebar
+    expect(button?.getAttribute('aria-expanded')).toBe('true');
+    expect(button?.getAttribute('aria-label')).toBe('shell.collapseMenu');
+
+    button?.click();
+    await fixture.whenStable();
+    expect(host.querySelector('.shell')?.classList.contains('collapsed')).toBe(true);
+    expect(button?.getAttribute('aria-expanded')).toBe('false');
+    expect(button?.getAttribute('aria-label')).toBe('shell.expandMenu');
+
+    button?.click();
+    await fixture.whenStable();
+    expect(host.querySelector('.shell')?.classList.contains('collapsed')).toBe(false);
+  });
+
   it('shows the admin navigation for the platform tenant', async () => {
     await signIn(PLATFORM_TENANT_ID, ['treasury.view']);
     const fixture = TestBed.createComponent(ShellComponent);

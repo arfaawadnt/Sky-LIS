@@ -16,7 +16,7 @@
 }
 
 .menu-btn {
-  display: none;
+  display: inline-grid;
 }
 
 .brand {
@@ -159,10 +159,6 @@
   .topbar {
     padding: 0 12px;
     gap: 8px;
-  }
-
-  .menu-btn {
-    display: inline-grid;
   }
 
   .brand span,
