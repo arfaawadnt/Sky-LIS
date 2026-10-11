@@ -237,12 +237,6 @@
   font-weight: 700;
 }
 
-.cur {
-  font-size: var(--fs-sm);
-  font-weight: 400;
-  color: var(--ink-2);
-}
-
 .fold {
   margin-block-start: var(--sp-4);
   border-block-start: 1px solid var(--line);
@@ -301,6 +295,12 @@
   font-size: var(--fs-lg);
   font-weight: 600;
   text-align: end;
+}
+
+.services-card.invalid {
+  display: block;
+  border-radius: var(--r-lg);
+  box-shadow: 0 0 0 2px var(--bad);
 }
 
 /* the sticky bar (its own component) spans both columns */

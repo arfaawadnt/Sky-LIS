@@ -51,7 +51,7 @@ Chosen to avoid everything already in use on this machine (checked 2026-10-08).
 | Dev API (HTTP / HTTPS)       | `5100` / `5101`                                          | `5000`, `5080` (QMS APIs)                    |
 | Dev SPA server               | `4300`                                                   | `4200` (keep free for other dev work)        |
 | Dev PostgreSQL               | private instance `E:\LIS\.local\pg17` (in use) or Docker container `lis-postgres`; host port `5433` | `5432` (shared PostgreSQL 17, holds `ntqams`) |
-| Other dev services           | ports `5102`–`5199` (`5102` = validation API beside the installed service) | `80`, `443`, `8080`, `5985`, `3389`          |
+| Other dev services           | ports `5102`–`5199` (`5102` = validation API beside the installed service; `5110` = second dev SPA `ux-spa` proxying the validation API) | `80`, `443`, `8080`, `5985`, `3389`          |
 | Database and roles           | db `lis`, owner role `lis_owner`, app role `lis_app`     | db `ntqams`, role `postgres`                 |
 | Docker Compose project       | `name: lis` → containers `lis-*`, volumes `lis_*`, network `lis_default` | none yet (daemon was off)    |
 | Windows services (prod/test) | `NTLIS` (port `5100`) / `NTLIS_TEST` (port `5180`); `LIS_POSTGRES` = the private PostgreSQL 17 instance of this host as a service (5433, NetworkService) | `NTQAMS`, `NTQAMS_TEST`, `postgresql-x64-17` (5432) |

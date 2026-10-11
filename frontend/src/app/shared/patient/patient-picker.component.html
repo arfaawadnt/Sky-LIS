@@ -15,7 +15,7 @@
   </div>
 } @else if (mode() === 'search') {
   <div class="search-row">
-    <app-search-box class="grow" [placeholder]="i18n.t('patients.picker.placeholder')" [label]="i18n.t('patients.picker.label')" (searchChange)="onSearch($event)" />
+    <app-search-box class="grow" [placeholder]="i18n.t('patients.picker.placeholder')" [label]="i18n.t('patients.picker.label')" (valueChange)="typed.set($event)" (searchChange)="onSearch($event)" />
     @if (allowCreate()) {
       <button type="button" class="btn primary" *appCan="permissions.create" (click)="startCreate()"><app-icon name="plus" [size]="15" />{{ i18n.t('patients.new') }}</button>
     }
@@ -29,10 +29,10 @@
     } @else if (rows().length === 0) {
       <app-empty-state icon="search" [title]="i18n.t('patients.picker.noMatch')" [message]="i18n.t('patients.picker.noMatchHint')" />
     } @else {
-      <ul class="results" [attr.aria-label]="i18n.t('patients.picker.results')">
+      <ul class="results" [class.stale]="stale()" [attr.aria-busy]="stale()" [attr.aria-label]="i18n.t('patients.picker.results')">
         @for (row of rows(); track row.id) {
           <li>
-            <button type="button" class="result" (click)="choose(row)">
+            <button type="button" class="result" [disabled]="stale()" (click)="choose(row)">
               <span class="mono number">{{ row.number }}</span>
               <span class="name">{{ row.fullName }}@if (row.nameAr) { · <span dir="rtl" lang="ar">{{ row.nameAr }}</span>}</span>
               <span class="small muted">{{ i18n.t('patients.gender.' + row.gender) }} · {{ ageText(row) }}</span>

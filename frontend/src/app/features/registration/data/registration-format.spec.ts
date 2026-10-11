@@ -1,6 +1,13 @@
-import { classifySearch, discountAmount, discountPercent, localDayEndUtc, localDayStartUtc, money, pick, round2, utcOffsetMinutes } from './registration-format';
+import { classifySearch, count, discountAmount, discountPercent, localDayEndUtc, localDayStartUtc, money, pick, round2, utcOffsetMinutes } from './registration-format';
 
 describe('registration-format', () => {
+  it('writes counts and percentages in the digits of the language (UAT A-07)', () => {
+    expect(count(3, 'en')).toBe('3');
+    expect(count(3, 'ar')).toBe('٣');
+    expect(count(10, 'ar')).toBe('١٠');
+    expect(count(null, 'ar')).toBe('٠');
+  });
+
   it('formats money with two decimals and treats missing values as zero', () => {
     expect(money(1234.5)).toBe('1,234.50');
     expect(money(null)).toBe('0.00');

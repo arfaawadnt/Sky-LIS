@@ -234,7 +234,20 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **New patient form reorganised (CP-06 / CP-11).** The form now has four labelled groups: Identity (title beside the
+  English name, then the Arabic name), Sex and age (a Male / Female switch, then date of birth "or age" in years, months
+  and days on one line, then the patient condition), Contact (mobile country beside the mobile, then national ID), and a
+  folded "More details" section (nationality, e-mail, governorate, city, address, comments). That section opens by itself
+  when it holds data or when one of its fields refuses the save. The layout follows the width of its container, so it
+  stacks cleanly in the registration strip, the side panel and the patient file. This also fixes the ragged layout where
+  Title and Gender took a whole row each.
+- **Fix A-01 (S2): a saved registration no longer comes back as a draft.** The draft is cleared as soon as the visit is
+  saved, so "Open the visit", "Collect on the Payments page" or closing the dialog can no longer lead to a duplicate visit
+  and payment.
+- **Fix A-07: Arabic digits in the registration checklist, action bar, discount cap and counts.**
+- **Fix A-08: a blocked save also marks the services card and entry box** when no service was added or one was refused.
+- **Fix A-09: the patient picker disables (and dims) the previous search's results** as soon as the text changes, until
+  the new search answers.
 
 ### v0.5.0 — 2026-10-11
 

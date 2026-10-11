@@ -114,6 +114,31 @@ describe('PatientPickerComponent (CP-06 patient search / create)', () => {
     expect(host.querySelector('.chosen .number')?.textContent).toContain('PAT-2026-00001');
   });
 
+  it('disables the previous results as soon as the text changes, until the new search answers (UAT A-09)', async () => {
+    const { fixture, host } = await render();
+    const search = host.querySelector<HTMLInputElement>('app-search-box input');
+    type(search, 'mona');
+    search?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await flush();
+    backend.expectOne((r) => r.url === PATIENTS_API.patients).flush({ items: [mona], page: 1, pageSize: 10, totalCount: 1, totalPages: 1 });
+    await flush();
+    expect(host.querySelector<HTMLButtonElement>('button.result')?.disabled).toBe(false);
+
+    type(search, 'walk-in two');
+    await flush();
+    const stale = host.querySelector<HTMLButtonElement>('button.result');
+    expect(stale?.disabled).toBe(true);
+    stale?.click();
+    await flush();
+    expect(fixture.componentInstance.picked).toEqual([]);
+
+    search?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await flush();
+    backend.expectOne((r) => r.url === PATIENTS_API.patients && r.params.get('q') === 'walk-in two').flush({ items: [mona], page: 1, pageSize: 10, totalCount: 1, totalPages: 1 });
+    await flush();
+    expect(host.querySelector<HTMLButtonElement>('button.result')?.disabled).toBe(false);
+  });
+
   it('creates a new file inline, warns about similar files and emits the registered file', async () => {
     const { fixture, host } = await render();
 

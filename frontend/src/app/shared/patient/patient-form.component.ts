@@ -52,8 +52,13 @@ const FIELD_OF_CODE: Readonly<Record<string, string>> = {
   'PAT-012': 'email',
 };
 
+/** The optional fields folded under "More details". */
+const DETAIL_FIELDS = ['nationality', 'email', 'governorateId', 'city', 'address', 'comments'] as const;
+
 /**
- * The patient create/edit form (CP-06 patient data, CP-11): title proposes the gender, date of birth ↔ age sync in both
+ * The patient create/edit form (CP-06 patient data, CP-11), in four groups — identity (title, both names), sex and age
+ * (gender switch, date of birth or age on one line, condition), contact (mobile with its country, national id) and the
+ * optional details folded until needed: title proposes the gender, date of birth ↔ age sync in both
  * directions (the last one typed is what is saved), mobile digits checked against the chosen country's length when the
  * platform publishes it (8–15 otherwise), mandatory mobile / national id from the tenant parameters, VIP only for
  * `patients.viewConfidential`, and the similar-patient warning while a new file is typed. Presentational: inputs in,
@@ -98,6 +103,8 @@ export class PatientFormComponent {
   /** Which of the two the user gave last: that one is saved, the other is derived. */
   protected readonly birthSource = signal<'dob' | 'age' | null>(null);
   private readonly mobileCountry = signal('');
+  /** The folded "More details" section: open while the clerk wants it, when it holds data or when a field in it is wrong. */
+  protected readonly moreOpen = signal(false);
 
   protected readonly mobileLength = computed(() => this.countries().find((country) => country.code === this.mobileCountry())?.mobileLength ?? null);
   protected readonly mobileCountries = computed(() => this.countries().filter((country) => country.mobileLength !== null));
@@ -162,6 +169,7 @@ export class PatientFormComponent {
 
         if (problem.code === ProblemCodes.validationFailed) {
           problemToFormErrors(problem, this.form);
+          this.revealInvalidDetails();
           return;
         }
 
@@ -171,6 +179,8 @@ export class PatientFormComponent {
           control.setErrors({ ...(control.errors ?? {}), [SERVER_ERROR_KEY]: problemMessage(this.i18n, 'patients', problem) });
           control.markAsTouched();
         }
+
+        this.revealInvalidDetails();
       });
     });
 
@@ -183,7 +193,12 @@ export class PatientFormComponent {
       clearServerErrors(control);
     }
 
-    if (this.pending() || !markAllTouched(this.form)) {
+    if (this.pending()) {
+      return false;
+    }
+
+    if (!markAllTouched(this.form)) {
+      this.revealInvalidDetails();
       return false;
     }
 
@@ -263,6 +278,17 @@ export class PatientFormComponent {
     }, SIMILAR_DEBOUNCE_MS);
   }
 
+  protected onMoreToggle(event: Event): void {
+    this.moreOpen.set((event.target as HTMLDetailsElement).open);
+  }
+
+  /** Opens "More details" when one of its fields holds an error, so the clerk sees why the save was refused. */
+  private revealInvalidDetails(): void {
+    if (DETAIL_FIELDS.some((field) => this.form.controls[field].invalid)) {
+      this.moreOpen.set(true);
+    }
+  }
+
   protected onMobileCountryChange(event: Event): void {
     this.mobileCountry.set((event.target as HTMLSelectElement).value);
     this.form.controls.mobile.updateValueAndValidity();
@@ -316,12 +342,14 @@ export class PatientFormComponent {
       isVip: patient.isVip ?? false,
     });
     this.birthSource.set(estimated ? 'age' : 'dob');
+    this.moreOpen.set(DETAIL_FIELDS.some((field) => this.form.controls[field].value.trim() !== ''));
   }
 
   private reset(name: string): void {
     this.form.reset();
     this.form.controls.fullName.setValue(name);
     this.birthSource.set(null);
+    this.moreOpen.set(false);
   }
 
   private validateBirth(control: AbstractControl): ValidationErrors | null {

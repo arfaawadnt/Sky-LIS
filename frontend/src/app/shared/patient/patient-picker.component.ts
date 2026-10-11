@@ -60,6 +60,15 @@ export class PatientPickerComponent {
 
   protected readonly rows = computed<readonly PatientListItem[]>(() => (this.results.hasValue() ? this.results.value().items : []));
 
+  /** What is in the box right now (every keystroke); `query` follows it after the debounce. */
+  protected readonly typed = signal('');
+
+  /**
+   * The listed results belong to an older text: the box changed and the debounce or the search is still running. They
+   * stay visible (no flicker) but cannot be picked (UAT A-09: a fast click chose the previous term's patient).
+   */
+  protected readonly stale = computed(() => this.typed().trim() !== this.query() || this.results.isLoading());
+
   protected readonly settings = resource({
     params: () => (this.mode() === 'create' ? true : undefined),
     loader: ({ abortSignal }) => this.api.formSettings(abortSignal),

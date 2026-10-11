@@ -149,6 +149,9 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
     await tick();
     harness.detectChanges();
     expect(host.querySelector('#reg-patient.invalid')).not.toBeNull();
+    // UAT A-08: the empty services list is marked too
+    expect(host.querySelector('.services-card.invalid')).not.toBeNull();
+    expect(host.querySelector('#reg-service-entry')?.getAttribute('aria-invalid')).toBe('true');
     expect(TestBed.inject(ToastService).toasts().some((toast) => toast.kind === 'error' && toast.text.includes('registration.validation.many'))).toBe(true);
 
     await typedVisit(page);
@@ -156,6 +159,7 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
     expect(host.querySelectorAll('app-reg-readiness .item.open').length).toBe(0);
     expect(host.querySelector('.action-bar .chip.bad')).toBeNull();
     expect(host.querySelector('#reg-patient.invalid')).toBeNull();
+    expect(host.querySelector('.services-card.invalid')).toBeNull();
   });
 
   it('keeps the discount folded until it is opened or set', async () => {
@@ -209,6 +213,14 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
     expect(printer.printed).toEqual(['labels:v-9', 'receipt:pay-1']);
     harness.detectChanges();
     expect(harness.routeNativeElement?.textContent).toContain('ACC-2026-00009');
+
+    // UAT A-01: the spent draft is cleared at once, so "Open the visit" / "Payments" / closing the dialog cannot bring it
+    // back as ready to save (the route-provided facade outlives the page); the dialog keeps its own copy
+    expect(facade().patient()).toBeNull();
+    expect(facade().lines()).toEqual([]);
+    expect(facade().payment().reference).toBe('');
+    expect(facade().blockers()).toContain('patient');
+    expect(page.success()?.visit.accession).toBe('ACC-2026-00009');
     backend.verify();
   });
 

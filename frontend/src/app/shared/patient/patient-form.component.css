@@ -1,5 +1,7 @@
+/* Laid out by the width of its container (registration strip, drawer, patient file), not of the window. */
 :host {
   display: block;
+  container-type: inline-size;
 }
 
 form {
@@ -7,35 +9,137 @@ form {
   gap: var(--sp-4);
 }
 
-.birth {
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  padding: var(--sp-3);
-  margin: 0;
-  min-width: 0;
+.group {
+  display: grid;
+  gap: var(--sp-3);
 }
 
-.birth legend {
-  padding-inline: var(--sp-1);
-  font-size: var(--fs-sm);
-  font-weight: 600;
+.group-title {
+  margin: 0;
+  padding-block-end: var(--sp-1);
+  border-block-end: 1px solid var(--line-soft);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--ink-2);
+}
+
+.row {
+  display: grid;
+  gap: var(--sp-3);
+  align-items: start;
+}
+
+.name-row {
+  grid-template-columns: 120px minmax(0, 1fr);
+}
+
+.sex-row {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+/* contact: the mobile (country + number) gets the wider share */
+.pair {
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
 }
 
 .req {
   color: var(--bad);
 }
 
-.birth-grid {
+/* gender as a two-button switch */
+.seg-field,
+.birth {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.seg-legend {
+  padding: 0;
+  margin-block-end: 4px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.seg-opt {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 var(--sp-4);
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.seg-opt + .seg-opt {
+  border-inline-start: 1px solid var(--line);
+}
+
+.seg-opt input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.seg-opt:has(input:checked) {
+  background: var(--blue-soft);
+  color: var(--blue-3);
+  font-weight: 700;
+}
+
+.seg-opt:has(input:focus-visible) {
+  box-shadow: inset var(--focus-ring);
+}
+
+/* date of birth "or" years / months / days on one line */
+.birth-row {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
-  gap: var(--sp-3);
+  grid-template-columns: minmax(150px, 1.6fr) auto repeat(3, minmax(56px, 1fr));
+  gap: var(--sp-2);
+  align-items: start;
+}
+
+.or {
+  align-self: center;
+  margin-block-start: 18px;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
 }
 
 .field-error {
   margin: var(--sp-2) 0 0;
   color: var(--bad);
   font-size: var(--fs-sm);
+}
+
+.half {
+  max-width: 50%;
+}
+
+/* mobile = country + number side by side */
+.mobile {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: var(--sp-2);
+  align-items: start;
+}
+
+.mobile:has(> :only-child) {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .ff-plain {
@@ -50,6 +154,39 @@ form {
   color: var(--ink-2);
 }
 
+/* optional details */
+.more {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.more summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-height: 40px;
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+}
+
+.more-title {
+  font-weight: 600;
+}
+
+.more-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+  padding: 0 var(--sp-3) var(--sp-3);
+}
+
+.more-grid .wide {
+  grid-column: 1 / -1;
+}
+
+/* similar-patient warning */
 .similar {
   display: grid;
   gap: var(--sp-2);
@@ -92,20 +229,38 @@ form {
   overflow-wrap: anywhere;
 }
 
-.vip {
-  margin-block-start: var(--sp-1);
-}
+/* narrow containers: stack, keep age boxes together */
+@container (max-width: 620px) {
+  .sex-row,
+  .pair,
+  .more-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 
-@media (max-width: 720px) {
-  .birth-grid {
+  .half {
+    max-width: none;
+  }
+
+  .birth-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .birth-grid > :first-child {
+  .birth-row .dob {
     grid-column: 1 / -1;
   }
 
+  .or {
+    display: none;
+  }
+
   .similar-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container (max-width: 380px) {
+  .name-row,
+  .mobile {
     grid-template-columns: minmax(0, 1fr);
   }
 }

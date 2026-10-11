@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
+import { count } from '../data/registration-format';
 import type { SaveBlocker } from '../state/registration.facade';
 
 /** One line of the "Ready to save" checklist: done, still open (with the blocker it jumps to) or waiting for the dry run. */
@@ -21,7 +22,7 @@ export interface ChecklistItem {
   imports: [IconComponent],
   template: `
     <div class="head">
-      <span class="count" [class.done]="done() === items().length">{{ i18n.tf('registration.ready.count', { done: done(), total: items().length }) }}</span>
+      <span class="count" [class.done]="done() === items().length">{{ i18n.tf('registration.ready.count', { done: num(done()), total: num(items().length) }) }}</span>
       <span class="progress" aria-hidden="true"><span class="bar" [style.width.%]="percent()"></span></span>
     </div>
     <ul class="list">
@@ -143,6 +144,11 @@ export class RegistrationReadinessComponent {
   readonly jump = output<SaveBlocker>();
 
   protected readonly done = computed(() => this.items().filter((item) => item.state === 'done').length);
+
+  /** Counts in the digits of the language (UAT A-07). */
+  protected num(value: number): string {
+    return count(value, this.i18n.lang());
+  }
 
   protected readonly percent = computed(() => {
     const total = this.items().length;

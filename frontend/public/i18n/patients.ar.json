@@ -189,5 +189,10 @@
   "error.PAT-404": "ملف المريض غير موجود.",
   "error.PAT-405": "المستند غير موجود.",
   "column.visits": "الزيارات",
-  "column.lastVisit": "آخر زيارة"
+  "column.lastVisit": "آخر زيارة",
+  "section.sexAge": "الجنس والعمر",
+  "section.reach": "التواصل",
+  "field.or": "أو العمر",
+  "more.title": "تفاصيل إضافية",
+  "more.hint": "اختيارية: الجنسية، البريد الإلكتروني، العنوان، الملاحظات"
 }

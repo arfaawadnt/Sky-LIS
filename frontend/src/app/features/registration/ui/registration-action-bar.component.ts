@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, input, output } from '@angu
 
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
+import { count } from '../data/registration-format';
 import type { SaveBlocker } from '../state/registration.facade';
 
 /** An open item of the save, as the bar shows it. */
@@ -22,7 +23,7 @@ export interface BarProblem {
   template: `
     <div class="status">
       @if (problems().length > 0) {
-        <span class="title bad">{{ i18n.tf('registration.bar.toFix', { count: problems().length }) }}</span>
+        <span class="title bad">{{ i18n.tf('registration.bar.toFix', { count: num(problems().length) }) }}</span>
         @for (problem of problems(); track problem.blocker) {
           <button type="button" class="chip bad" (click)="jump.emit(problem.blocker)">{{ problem.text }}</button>
         }
@@ -156,4 +157,9 @@ export class RegistrationActionBarComponent {
 
   readonly jump = output<SaveBlocker>();
   readonly save = output<void>();
+
+  /** Counts in the digits of the language (UAT A-07). */
+  protected num(value: number): string {
+    return count(value, this.i18n.lang());
+  }
 }

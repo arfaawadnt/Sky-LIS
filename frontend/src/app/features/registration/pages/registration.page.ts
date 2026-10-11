@@ -27,7 +27,7 @@ import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
-import { dateTime, money, pick } from '../data/registration-format';
+import { count, dateTime, money, pick } from '../data/registration-format';
 import { PatientLookupApi } from '../../../shared/patient/patient-lookup.api';
 import { toSummary } from '../../../shared/patient/patient-demographics';
 import { PatientPickerComponent } from '../../../shared/patient/patient-picker.component';
@@ -198,7 +198,7 @@ export class RegistrationPage {
     }
 
     add('contract', this.i18n.t('registration.ready.contract'), ['contract']);
-    add('services', edit ? this.i18n.t('registration.ready.servicesEdit') : this.i18n.tf('registration.ready.services', { count: this.facade.plannedLines().length }), ['lines', 'issues', 'checking']);
+    add('services', edit ? this.i18n.t('registration.ready.servicesEdit') : this.i18n.tf('registration.ready.services', { count: this.num(this.facade.plannedLines().length) }), ['lines', 'issues', 'checking']);
     if (this.doctorRequired()) {
       add('doctor', this.i18n.t('registration.ready.doctor'), ['doctor']);
     }
@@ -296,6 +296,11 @@ export class RegistrationPage {
     return money(value, this.i18n.lang());
   }
 
+  /** Counts and percentages in the digits of the language (UAT A-07). */
+  protected num(value: number): string {
+    return count(value, this.i18n.lang());
+  }
+
   protected when(utc: string | null | undefined): string {
     return dateTime(utc, this.i18n.lang());
   }
@@ -335,12 +340,17 @@ export class RegistrationPage {
   }
 
   protected blockerText(blocker: SaveBlocker): string {
-    return this.i18n.tf(`registration.validation.${blocker}`, { cap: this.facade.settings.value()?.discountCapPercent ?? 0 });
+    return this.i18n.tf(`registration.validation.${blocker}`, { cap: this.num(this.facade.settings.value()?.discountCapPercent ?? 0) });
   }
 
   /** Whether a field is marked: only after a save was tried while its blocker is open. */
   protected invalid(blocker: SaveBlocker): boolean {
     return this.attempted() && this.facade.blockers().includes(blocker);
+  }
+
+  /** The services card is marked when no service was added or one was refused (UAT A-08). */
+  protected servicesInvalid(): boolean {
+    return this.invalid('lines') || this.invalid('issues');
   }
 
   /** The codes of the planned services that ask a preparation question ("" while none of them is planned). */
@@ -466,7 +476,7 @@ export class RegistrationPage {
     const first = blockers[0];
     if (first !== undefined) {
       this.attempted.set(true);
-      this.toast.error(blockers.length === 1 ? this.blockerText(first) : this.i18n.tf('registration.validation.many', { count: blockers.length }));
+      this.toast.error(blockers.length === 1 ? this.blockerText(first) : this.i18n.tf('registration.validation.many', { count: this.num(blockers.length) }));
       this.focusBlocker(first);
       return;
     }
@@ -563,6 +573,9 @@ export class RegistrationPage {
 
     this.attempted.set(false);
     this.success.set({ visit: created, patient, payment, paymentProblem: payment === null ? this.facade.pay.problem() : null, amount });
+    // The draft is spent: the dialog keeps its own copy. The route-provided facade outlives the page, so a draft left here
+    // came back as "ready to save" after "Open the visit" / "Payments" / closing the dialog (UAT A-01: duplicate visit).
+    this.facade.reset(true);
     this.successOpen.set(true);
     await this.autoPrint(created, payment);
   }

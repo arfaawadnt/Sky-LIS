@@ -8,6 +8,12 @@ export function money(value: number | null | undefined, lang: Language = 'en'): 
   return new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 }
 
+/** A count or percentage in the digits of the language (Arabic-Indic in Arabic, UAT A-07), never grouped oddly. */
+export function count(value: number | null | undefined, lang: Language = 'en'): string {
+  const number = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 2 }).format(number);
+}
+
 export function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }

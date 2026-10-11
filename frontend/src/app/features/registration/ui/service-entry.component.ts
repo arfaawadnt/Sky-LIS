@@ -36,7 +36,7 @@ export interface PickedService {
     <div class="entry">
       <label class="visually-hidden" for="reg-service-entry">{{ i18n.t('registration.services.entryLabel') }}</label>
       <div class="combo">
-        <div class="command" [class.disabled]="disabled()">
+        <div class="command" [class.disabled]="disabled()" [class.invalid]="invalid()">
           <span class="prompt" aria-hidden="true">›</span>
           <input
             #entry
@@ -48,6 +48,7 @@ export interface PickedService {
             aria-controls="reg-service-suggestions"
             [attr.aria-expanded]="suggestionsOpen()"
             [attr.aria-activedescendant]="activeId()"
+            [attr.aria-invalid]="invalid() || null"
             [placeholder]="i18n.t('registration.services.entryPlaceholder')"
             [disabled]="disabled()"
             [value]="text()"
@@ -138,6 +139,10 @@ export interface PickedService {
 
     .command:focus-within {
       box-shadow: var(--focus-ring);
+    }
+
+    .command.invalid {
+      border-color: var(--bad);
     }
 
     .command.disabled {
@@ -261,6 +266,8 @@ export class ServiceEntryComponent {
   private suggestTimer: ReturnType<typeof setTimeout> | undefined;
 
   readonly disabled = input(false);
+  /** Marked by the host after a refused save (no service added, or one refused). */
+  readonly invalid = input(false);
   readonly added = output<readonly PickedService[]>();
 
   protected readonly text = signal('');

@@ -189,5 +189,10 @@
   "error.PAT-404": "The patient file was not found.",
   "error.PAT-405": "The document was not found.",
   "column.visits": "Visits",
-  "column.lastVisit": "Last visit"
+  "column.lastVisit": "Last visit",
+  "section.sexAge": "Sex and age",
+  "section.reach": "Contact",
+  "field.or": "or age",
+  "more.title": "More details",
+  "more.hint": "optional: nationality, e-mail, address, comments"
 }

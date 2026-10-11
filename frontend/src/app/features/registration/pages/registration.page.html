@@ -91,8 +91,8 @@
     </app-section-card>
 
     <!-- services (typeahead / Enter / F2; BR-02 tubes, BR-05 reserved, BR-06 prices, BR-13 expected dates) -->
-    <app-section-card id="reg-services" [title]="i18n.t('registration.services.cardTitle')">
-      <app-reg-service-entry [disabled]="facade.isEdit() && facade.saved()?.status !== 'Open'" (added)="onAdded($event)" />
+    <app-section-card id="reg-services" class="services-card" [class.invalid]="servicesInvalid()" [title]="i18n.t('registration.services.cardTitle')">
+      <app-reg-service-entry [invalid]="servicesInvalid()" [disabled]="facade.isEdit() && facade.saved()?.status !== 'Open'" (added)="onAdded($event)" />
 
       @if (facade.check.error()) {
         <p class="problem" role="alert">{{ i18n.t('registration.checkError') }}</p>
@@ -271,11 +271,11 @@
 
     <app-section-card [title]="i18n.t('registration.checkout.title')">
       <dl class="totals">
-        <div><dt>{{ i18n.tf('registration.checkout.services', { count: savedLines().length + facade.plannedLines().length }) }}</dt><dd class="num">{{ amount(facade.totals().list) }}</dd></div>
+        <div><dt>{{ i18n.tf('registration.checkout.services', { count: num(savedLines().length + facade.plannedLines().length) }) }}</dt><dd class="num">{{ amount(facade.totals().list) }}</dd></div>
         <div><dt>{{ i18n.t('registration.summary.payerShare') }}</dt><dd class="num">{{ amount(facade.totals().payer) }}</dd></div>
         <div><dt>{{ i18n.t('registration.summary.patientShare') }}</dt><dd class="num">{{ amount(facade.totals().patient) }}</dd></div>
         <div><dt>{{ i18n.t('registration.summary.discount') }}</dt><dd class="num">− {{ amount(facade.totals().discount) }}</dd></div>
-        <div class="due"><dt>{{ i18n.t('registration.summary.due') }}</dt><dd class="num">{{ amount(facade.totals().due) }} <span class="cur">{{ currency() }}</span></dd></div>
+        <div class="due"><dt>{{ i18n.t('registration.summary.due') }}</dt><dd class="num">{{ amount(facade.totals().due) }} <span class="small muted">{{ currency() }}</span></dd></div>
         @if (facade.isEdit()) {
           <div><dt>{{ i18n.t('registration.summary.paid') }}</dt><dd class="num">{{ amount(facade.totals().paid) }}</dd></div>
           @if (facade.totals().refunded > 0) {
@@ -291,7 +291,7 @@
       <!-- discount: folded until needed (cap from the role or the tenant parameter; reason mandatory) -->
       <div class="fold">
         <button type="button" class="fold-head" [attr.aria-expanded]="showDiscount()" aria-controls="reg-discount" (click)="toggleDiscount()">
-          <span>{{ i18n.t('registration.discount.cardTitle') }} <span class="muted small">· {{ i18n.tf('registration.discount.capShort', { cap: facade.settings.value()?.discountCapPercent ?? 0 }) }}</span></span>
+          <span>{{ i18n.t('registration.discount.cardTitle') }} <span class="muted small">· {{ i18n.tf('registration.discount.capShort', { cap: num(facade.settings.value()?.discountCapPercent ?? 0) }) }}</span></span>
           <app-icon class="chevron" [class.open]="showDiscount()" name="chevron-down" [size]="15" />
         </button>
         @if (showDiscount()) {

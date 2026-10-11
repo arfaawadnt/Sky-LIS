@@ -95,6 +95,25 @@
       ],
       "port": 4300,
       "url": "http://127.0.0.1:4300"
+    },
+    {
+      "name": "ux-spa",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "start",
+        "--",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "5110",
+        "--proxy-config",
+        "proxy.validation.json"
+      ],
+      "port": 5110,
+      "url": "http://127.0.0.1:5110"
     }
   ]
 }

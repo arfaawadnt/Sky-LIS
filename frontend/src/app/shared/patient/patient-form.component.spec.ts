@@ -30,7 +30,9 @@ function type(host: HTMLElement, control: string, value: string): void {
 }
 
 function value(host: HTMLElement, control: string): string {
-  return host.querySelector<HTMLInputElement | HTMLSelectElement>(`[formcontrolname="${control}"]`)?.value ?? '';
+  // the gender is a radio switch: its value is the checked option's
+  const checked = host.querySelector<HTMLInputElement>(`input[type="radio"][formcontrolname="${control}"]:checked`);
+  return checked?.value ?? host.querySelector<HTMLInputElement | HTMLSelectElement>(`[formcontrolname="${control}"]`)?.value ?? '';
 }
 
 describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
@@ -132,5 +134,29 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
     await fixture.whenStable();
     expect(fixture.componentInstance.form().submit()).toBe(true);
     expect(fixture.componentInstance.saved[0]?.isVip).toBe(true);
+  });
+
+  it('folds the optional details and opens them when a field in them refuses the save', async () => {
+    const { fixture, host } = await render();
+    const more = host.querySelector<HTMLDetailsElement>('details.more');
+    expect(more?.open).toBe(false);
+
+    type(host, 'fullName', 'Ali');
+    type(host, 'ageYears', '30');
+    type(host, 'email', 'not-an-address');
+    await fixture.whenStable();
+    expect(fixture.componentInstance.form().submit()).toBe(false);
+    await fixture.whenStable();
+    expect(more?.open).toBe(true);
+  });
+
+  it('picks the gender with the switch', async () => {
+    const { fixture, host } = await render();
+    type(host, 'fullName', 'Mona');
+    type(host, 'ageYears', '30');
+    host.querySelector<HTMLInputElement>('input[type="radio"][value="Female"]')?.click();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.form().submit()).toBe(true);
+    expect(fixture.componentInstance.saved[0]?.gender).toBe('Female');
   });
 });

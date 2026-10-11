@@ -105,3 +105,8 @@
     gap: 2px;
   }
 }
+
+/* results of an older text while the new one is searched (UAT A-09) */
+.results.stale {
+  opacity: 0.5;
+}
