@@ -101,6 +101,29 @@ function Invoke-Sc([string[]] $Arguments) {
     return $output
 }
 
+function Wait-InstallReleased([string] $Root, [int] $Seconds = 60) {
+    # The SCM reports Stopped before the process has exited and released its files.
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    while ((Get-Date) -lt $deadline) {
+        $running = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($Root, [System.StringComparison]::OrdinalIgnoreCase) })
+        if ($running.Count -eq 0) { return }
+        Start-Sleep -Milliseconds 500
+    }
+    throw "A process of $Root is still running after $Seconds s; stop it and run the installer again."
+}
+
+function Move-FolderWithRetry([string] $Source, [string] $Destination, [int] $Attempts = 10) {
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        try {
+            Move-Item -LiteralPath $Source -Destination $Destination -ErrorAction Stop
+            return
+        } catch [System.IO.IOException] {
+            if ($attempt -eq $Attempts) { throw }
+            Start-Sleep -Seconds 2
+        }
+    }
+}
+
 function Get-ServiceOrNull([string] $Name) {
     return Get-Service -Name $Name -ErrorAction SilentlyContinue
 }
@@ -232,11 +255,11 @@ $existing = Get-ServiceOrNull $serviceName
 if ($PSCmdlet.ParameterSetName -eq 'Rollback') {
     if (-not (Test-Path -LiteralPath (Join-Path $previousDir 'Platform.WebApi.exe'))) { throw "$previousDir holds no previous build to roll back to." }
     if (-not $existing) { throw "Service $serviceName does not exist." }
-    if ($PSCmdlet.ShouldProcess($serviceName, 'Stop service')) { if ($existing.Status -ne 'Stopped') { Stop-Service -Name $serviceName -Force; $existing.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60)) } }
+    if ($PSCmdlet.ShouldProcess($serviceName, 'Stop service')) { if ($existing.Status -ne 'Stopped') { Stop-Service -Name $serviceName -Force; $existing.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60)) }; Wait-InstallReleased $root }
     $swap = Join-Path $root 'app.swap'
     if ($PSCmdlet.ShouldProcess("$appDir <-> $previousDir", 'Swap current and previous build')) {
         if (Test-Path -LiteralPath $swap) { Remove-Item -LiteralPath $swap -Recurse -Force }
-        Move-Item -LiteralPath $appDir -Destination $swap
+        Move-FolderWithRetry $appDir $swap
         Move-Item -LiteralPath $previousDir -Destination $appDir
         Move-Item -LiteralPath $swap -Destination $previousDir
         Copy-Item -LiteralPath $configFile -Destination (Join-Path $appDir 'appsettings.Production.json') -Force
@@ -287,12 +310,12 @@ if ($ConfigSource -and ($ConfigSource -ne $configFile)) {
 
 # --- stop, rotate, copy --------------------------------------------------------------------------------------------
 if ($existing -and $existing.Status -ne 'Stopped') {
-    if ($PSCmdlet.ShouldProcess($serviceName, 'Stop service')) { Stop-Service -Name $serviceName -Force; $existing.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60)) }
+    if ($PSCmdlet.ShouldProcess($serviceName, 'Stop service')) { Stop-Service -Name $serviceName -Force; $existing.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60)); Wait-InstallReleased $root }
 }
 if (Test-Path -LiteralPath $appDir) {
     if ($PSCmdlet.ShouldProcess($appDir, "Keep as $previousDir and replace with the package")) {
         if (Test-Path -LiteralPath $previousDir) { Remove-Item -LiteralPath $previousDir -Recurse -Force }
-        Move-Item -LiteralPath $appDir -Destination $previousDir
+        Move-FolderWithRetry $appDir $previousDir
     }
 }
 if ($PSCmdlet.ShouldProcess($appDir, "Copy package $PackagePath")) {

@@ -234,7 +234,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Service installer**: waits until the service process has exited and retries moving the previous build, instead of
+  failing when the stopped service still holds its files (seen during the 0.4.0 upgrade).
+- **Installation on WIN-9S2KO4FA64L upgraded to 0.4.0** (`docs/deploy/Installations.md`): smoke test 20 / 20 by name and
+  17 / 17 by IP, backend-cycle deployed run 5 / 5.
 
 ### v0.4.0 — 2026-10-11
 
