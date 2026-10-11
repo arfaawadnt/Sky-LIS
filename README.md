@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.5.1** · released 2026-10-11 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.5.2** · released 2026-10-11 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.5.2 — 2026-10-11
 
 - **The Egyptian national ID fills the patient's date of birth, gender and governorate.** Typing a 14-digit Egyptian
   ID (century, date of birth, governorate of birth, sequence whose last digit is odd for male and even for female) fills
