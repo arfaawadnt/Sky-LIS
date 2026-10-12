@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Results;
 using Platform.Contracts.Common;
 using Platform.Domain.Catalogue;
@@ -191,7 +192,7 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
                 row.Result.Accession.StartsWith(term)
                 || (row.Sample != null && row.Sample.SampleNumber.StartsWith(term))
                 || patients.Any(patient => patient.Id == row.Result.PatientId
-                    && (patient.Number.StartsWith(term) || EF.Functions.ILike(patient.FullName, name) || (patient.NameAr != null && EF.Functions.ILike(patient.NameAr, name)))));
+                    && (patient.Number.StartsWith(term) || EF.Functions.ILike(patient.FullName, name, "\\") || (patient.NameAr != null && EF.Functions.ILike(patient.NameAr, name, "\\")))));
         }
 
         var total = await joined.LongCountAsync(cancellationToken).ConfigureAwait(false);
@@ -201,12 +202,27 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
 
         var tests = Context.Set<LabTest>().AsNoTracking();
         var groups = Context.Set<ClinicalGroup>().AsNoTracking();
+
+        // B-03: the order chosen in the table applies to the whole filtered list, before paging; without one, urgent
+        // first, then the expected time.
+        var sorts = SortsOf(joined)
+            .Column("accession", row => row.Result.Accession)
+            .Column("patientEn", row => patients.Where(patient => patient.Id == row.Result.PatientId).Select(patient => patient.FullName).FirstOrDefault())
+            .Column("patientAr", row => patients.Where(patient => patient.Id == row.Result.PatientId).Select(patient => patient.NameAr ?? patient.FullName).FirstOrDefault())
+            .Column("testEn", row => tests.Where(test => test.Id == row.Result.TestId).Select(test => test.Name.En).FirstOrDefault())
+            .Column("testAr", row => tests.Where(test => test.Id == row.Result.TestId).Select(test => test.Name.Ar).FirstOrDefault())
+            .Column("status", row => row.Result.Status == ResultStatus.Ordered ? 0 : row.Result.Status == ResultStatus.Complete ? 1 : row.Result.Status == ResultStatus.Reviewed ? 2 : row.Result.Status == ResultStatus.Verified ? 3 : row.Result.Status == ResultStatus.Printed ? 4 : 5)
+            .Column("expectedAtUtc", row => row.Result.ExpectedAtUtc)
+            .Column("delay", row => ((row.Result.Status == ResultStatus.Verified || row.Result.Status == ResultStatus.Printed) && row.Result.VerifiedAtUtc != null ? row.Result.VerifiedAtUtc.Value : nowUtc) - row.Result.ExpectedAtUtc)
+            .ThenBy(row => row.Result.Accession)
+            .ThenBy(row => row.Result.Id);
+        var ordered = sorts.Apply(joined, filter.Sort, candidates => candidates
+            .OrderByDescending(row => row.Result.Urgent)
+            .ThenBy(row => row.Result.ExpectedAtUtc)
+            .ThenBy(row => row.Result.Accession)
+            .ThenBy(row => row.Result.Id));
         var rows = await (
-            from row in joined
-                .OrderByDescending(row => row.Result.Urgent)
-                .ThenBy(row => row.Result.ExpectedAtUtc)
-                .ThenBy(row => row.Result.Accession)
-                .ThenBy(row => row.Result.Id)
+            from row in ordered
                 .Skip(page.Skip)
                 .Take(page.PageSize)
             from patient in patients.Where(patient => patient.Id == row.Result.PatientId).DefaultIfEmpty()
@@ -223,6 +239,10 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
                 PatientNameAr = patient == null ? null : patient.NameAr,
                 Gender = patient == null ? (PatientGender?)null : patient.Gender,
                 DateOfBirth = patient == null ? null : patient.DateOfBirth,
+                AgeYears = patient == null ? null : patient.AgeYears,
+                AgeMonths = patient == null ? null : patient.AgeMonths,
+                AgeDays = patient == null ? null : patient.AgeDays,
+                AgeRecordedOn = patient == null ? null : patient.AgeRecordedOn,
                 row.Result.TestId,
                 TestCode = test == null ? null : test.Code,
                 TestNameEn = test == null ? null : test.Name.En,
@@ -246,12 +266,22 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
             }).ToListAsync(cancellationToken).ConfigureAwait(false);
 
         var items = rows.Select(row => new WorklistRow(
-            row.Id, row.VisitId, row.Accession, row.PatientId, row.PatientNumber, row.PatientName, row.PatientNameAr, row.Gender, row.DateOfBirth,
+            row.Id, row.VisitId, row.Accession, row.PatientId, row.PatientNumber, row.PatientName, row.PatientNameAr, row.Gender, BirthOf(row.DateOfBirth, row.AgeYears, row.AgeMonths, row.AgeDays, row.AgeRecordedOn),
             row.TestId, row.TestCode, row.TestNameEn, row.TestNameAr, row.ClinicalGroupId, row.GroupNameEn, row.GroupNameAr, row.Status,
             row.TubeId, row.SampleNumber, row.SampleStatus?.ToString(), row.CollectedAtUtc, row.ClockStartUtc, row.ExpectedAtUtc, row.VerifiedAtUtc,
             row.Urgent, row.TextValue, row.Flag, row.PrintCount, row.Source)).ToList();
         return new WorklistSlice(items, total, requests, tubes, delayed);
     }
+
+    /// <summary>The sortable columns of the worklist over the joined result and sample rows (the type is anonymous, hence inferred).</summary>
+    private static SortColumns<T> SortsOf<T>(IQueryable<T> _) => new(ResultsSortKeys.Worklist);
+
+    /// <summary>
+    /// The known date of birth, or the one implied by the age stated at registration (as the patient register shows it):
+    /// a patient registered by age has an age on the worklist too (validation A-05, 2026-10-11).
+    /// </summary>
+    internal static DateOnly? BirthOf(DateOnly? dateOfBirth, int? ageYears, int? ageMonths, int? ageDays, DateOnly? ageRecordedOn) =>
+        dateOfBirth ?? (ageYears is { } years && ageRecordedOn is { } on ? new Platform.Domain.Patients.PatientAge(years, ageMonths ?? 0, ageDays ?? 0).BirthDateOn(on) : null);
 
     public async Task<Paged<ResultVisitRow>> SearchVisitsAsync(ResultVisitFilter filter, ResultVisibility visibility, PageRequest page, CancellationToken cancellationToken)
     {
@@ -289,7 +319,7 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
         if (filter.PatientName is { Length: > 0 } name)
         {
             var pattern = LikePattern(name);
-            var ids = patients.Where(patient => EF.Functions.ILike(patient.FullName, pattern) || (patient.NameAr != null && EF.Functions.ILike(patient.NameAr, pattern))).Select(patient => patient.Id);
+            var ids = patients.Where(patient => EF.Functions.ILike(patient.FullName, pattern, "\\") || (patient.NameAr != null && EF.Functions.ILike(patient.NameAr, pattern, "\\"))).Select(patient => patient.Id);
             visible = visible.Where(result => ids.Contains(result.PatientId));
         }
 

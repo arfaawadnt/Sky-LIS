@@ -108,7 +108,15 @@ internal sealed class FakeCatalogue : ICatalogueLookup
         Inactive = Add("OLD", ServiceType.Test, Chemistry, Serum, test: Test("OLD"), active: false);
         Unpriced = Add("NOPRICE", ServiceType.Test, Chemistry, Serum, test: Test("NOPRICE"));
         Package = Add("CHK", ServiceType.Package, null, null, members: [Urea.Id, Cbc.Id]);
+        Creatinine = Add("CREA", ServiceType.Test, Chemistry, Serum, test: Test("CREA", frequencyDays: 30));
+        Renal = Add("RENAL", ServiceType.Profile, Chemistry, Serum, tests: [Creatinine.Members[0].MemberId, Tests.Values.Single(test => test.Code == "UREA").Id]);
     }
+
+    /// <summary>A single-test service whose test is also a member of <see cref="Renal"/> (validation A-11).</summary>
+    public CatalogueServiceInfo Creatinine { get; }
+
+    /// <summary>A profile of the CREA and UREA tests.</summary>
+    public CatalogueServiceInfo Renal { get; }
 
     public CatalogueServiceInfo Glucose { get; }
 
@@ -180,11 +188,14 @@ internal sealed class FakeCatalogue : ICatalogueLookup
         GenderRestriction gender = GenderRestriction.Any,
         string? precaution = null,
         bool active = true,
-        IReadOnlyList<Guid>? members = null)
+        IReadOnlyList<Guid>? members = null,
+        IReadOnlyList<Guid>? tests = null)
     {
         var memberInfos = test is not null
             ? [new CatalogueServiceMemberInfo(ServiceMemberKind.Test, test.Id, 1, true, true)]
-            : (members ?? []).Select((id, index) => new CatalogueServiceMemberInfo(ServiceMemberKind.Service, id, index + 1, true, true)).ToList();
+            : tests is not null
+                ? tests.Select((id, index) => new CatalogueServiceMemberInfo(ServiceMemberKind.Test, id, index + 1, true, true)).ToList()
+                : (members ?? []).Select((id, index) => new CatalogueServiceMemberInfo(ServiceMemberKind.Service, id, index + 1, true, true)).ToList();
         var service = new CatalogueServiceInfo(
             Guid.CreateVersion7(), code, code, null, code + " en", code + " ar", null, type, group, sampleType, null, gender, 0, 1, precaution, false, true, true, null, Services.Count + 1, active, memberInfos);
         Services[service.Id] = service;

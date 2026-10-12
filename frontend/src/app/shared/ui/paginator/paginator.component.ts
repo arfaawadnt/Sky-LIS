@@ -31,7 +31,11 @@ export class PaginatorComponent {
 
   protected readonly to = computed(() => Math.min(this.totalCount(), this.page() * this.pageSize()));
 
-  protected readonly summary = computed(() => this.i18n.tf('shared.paginator.showing', { from: this.from(), to: this.to(), total: this.totalCount() }));
+  /** R-03: the numbers of the footer in the digits of the language on screen (Arabic-Indic in Arabic, like the amounts of the lists). */
+  private readonly numberFormat = computed(() => new Intl.NumberFormat(this.i18n.lang() === 'ar' ? 'ar-EG' : 'en-GB', { maximumFractionDigits: 0 }));
+
+  protected readonly summary = computed(() =>
+    this.i18n.tf('shared.paginator.showing', { from: this.number(this.from()), to: this.number(this.to()), total: this.number(this.totalCount()) }));
 
   /** Up to five page numbers around the current one. */
   protected readonly window = computed<readonly number[]>(() => {
@@ -48,6 +52,11 @@ export class PaginatorComponent {
   });
 
   protected readonly isRtl = computed(() => this.i18n.dir() === 'rtl');
+
+  /** A page number, a page size or a count in the language's digits. */
+  protected number(value: number): string {
+    return this.numberFormat().format(value);
+  }
 
   protected go(page: number): void {
     if (page < 1 || page > Math.max(1, this.totalPages()) || page === this.page()) {

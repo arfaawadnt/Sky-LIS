@@ -5,7 +5,7 @@ using Platform.Domain.Samples;
 
 namespace Platform.Application.Samples;
 
-/// <summary>Filters of the sample registers (intake §14). Dates bound the time the sample was ordered; <see cref="Search"/> matches the start of the sample number or the accession.</summary>
+/// <summary>Filters of the sample registers (intake §14). Dates bound the time the sample was ordered; <see cref="Search"/> matches the start of the sample number or the accession; <see cref="Sort"/> orders the whole list before paging (validation v0.5.0 B-03, <see cref="SamplesSortKeys.Samples"/>).</summary>
 public sealed record SampleFilter(
     Guid? VisitId,
     string? Accession,
@@ -14,7 +14,8 @@ public sealed record SampleFilter(
     DateTimeOffset? ToUtc,
     Guid? BranchId,
     Guid? ClinicalGroupId,
-    string? Search);
+    string? Search,
+    ListSort Sort = default);
 
 /// <summary>Write side plus the projections of the module's registers and documents. Every read is bounded to the current tenant.</summary>
 public interface ISampleRepository : IRepository<Sample>

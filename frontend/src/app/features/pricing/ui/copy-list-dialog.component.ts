@@ -1,8 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, output, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
-import type { ProblemDetails } from '../../../core/api/problem-details';
+import { ProblemCodes, type ProblemDetails } from '../../../core/api/problem-details';
 import { type CopyBasePriceListRequest, type CopyOperation, PRICE_LIMITS, ROUNDING_STEPS } from '../../../core/api/pricing.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedTextGroup } from '../../../shared/forms/localized-text';
@@ -24,6 +24,11 @@ export interface CopySource {
   readonly year: number;
 }
 
+/** PRC-101: a base price list with this code already exists. */
+const LIST_CODE_TAKEN = 'PRC-101';
+
+const MAX_CODE_LENGTH = 16;
+
 /**
  * "Copy list" of CP-33 (LDM "Copy price list"): a new list from the source with × factor or + amount and a rounding
  * step; the new list is created inactive. Dumb: emits the request; the page runs the mutation and passes `pending`/`problem`.
@@ -35,11 +40,11 @@ export interface CopySource {
     <app-dialog [(open)]="open" [title]="i18n.t('pricing.copy.title')" size="md">
       <form [formGroup]="form" (ngSubmit)="submit()" appSaveShortcut (appSaveShortcut)="submit()" novalidate>
         <p class="muted small">{{ i18n.tf('pricing.copy.help', { code: source()?.code ?? '' }) }}</p>
-        @if (problem(); as current) {
+        @if (bannerProblem(); as current) {
           <p class="problem" role="alert">{{ problemText(current) }}</p>
         }
         <div class="form-grid">
-          <app-form-field [label]="i18n.t('pricing.lists.field.code')" [hint]="i18n.t('pricing.lists.hint.code')">
+          <app-form-field [label]="i18n.t('pricing.lists.field.code')" [hint]="i18n.t('pricing.lists.hint.code')" [problem]="codeProblem()">
             <input type="text" formControlName="code" appUppercase maxlength="16" autocomplete="off" spellcheck="false" />
           </app-form-field>
           <app-form-field [label]="i18n.t('pricing.lists.field.year')">
@@ -91,6 +96,8 @@ export class CopyListDialogComponent {
   readonly source = input<CopySource | null>(null);
   readonly pending = input(false);
   readonly problem = input<ProblemDetails | null>(null);
+  /** Codes of existing lists (any status) the page read before opening: the proposal skips them (UAT B-06). */
+  readonly takenCodes = input<ReadonlySet<string>>(new Set<string>());
   readonly confirmCopy = output<CopyBasePriceListRequest>();
 
   protected readonly steps = ROUNDING_STEPS;
@@ -105,6 +112,24 @@ export class CopyListDialogComponent {
   });
 
   private readonly value = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
+
+  /** The code of the last submit: a duplicate-code refusal stays under the field until the code is changed. */
+  private readonly submittedCode = signal<string | null>(null);
+
+  /** PRC-101 (code taken) is a field error under the code, not a banner (UAT B-06). */
+  protected readonly codeProblem = computed<ProblemDetails | null>(() => {
+    const problem = this.problem();
+    if (problem?.code !== LIST_CODE_TAKEN || cleanCode(this.value().code ?? '') !== this.submittedCode()) {
+      return null;
+    }
+
+    return { ...problem, code: ProblemCodes.validationFailed, errors: { code: [problemMessage(this.i18n, 'pricing', problem)] }, rules: null };
+  });
+
+  protected readonly bannerProblem = computed(() => {
+    const problem = this.problem();
+    return problem?.code === LIST_CODE_TAKEN ? null : problem;
+  });
 
   /** "100 → 110" with the current operation, value and step. */
   protected readonly example = computed(() => {
@@ -131,6 +156,7 @@ export class CopyListDialogComponent {
     }
 
     const value = this.form.getRawValue();
+    this.submittedCode.set(cleanCode(value.code));
     this.confirmCopy.emit({
       code: value.code.trim(),
       nameEn: value.name.en.trim(),
@@ -148,8 +174,9 @@ export class CopyListDialogComponent {
 
   private reset(source: CopySource): void {
     const year = Math.min(source.year + 1, 2100);
+    this.submittedCode.set(null);
     this.form.reset({
-      code: nextCode(source.code, source.year, year),
+      code: freeCode(nextCode(source.code, source.year, year), this.takenCodes()),
       name: { en: source.nameEn.replace(String(source.year), String(year)), ar: source.nameAr.replace(String(source.year), String(year)) },
       year,
       operation: 'Multiply',
@@ -157,6 +184,40 @@ export class CopyListDialogComponent {
       roundingStep: 1,
     });
   }
+}
+
+function cleanCode(code: string): string {
+  return code.trim().toUpperCase();
+}
+
+/**
+ * What the page searches the existing lists for before opening the dialog: the start of next year's code, short enough
+ * that every `-n` variant `freeCode` may propose contains it (UAT B-06).
+ */
+export function copyCodeStem(source: CopySource): string {
+  return nextCode(source.code, source.year, Math.min(source.year + 1, 2100)).slice(0, MAX_CODE_LENGTH - 4);
+}
+
+/**
+ * The proposal when it is free, otherwise the first free `<code>-2`, `<code>-3`, … (cut to 16 characters), so the dialog
+ * never proposes an existing list's code, active or not (UAT B-06). The server still refuses a taken code (PRC-101).
+ */
+export function freeCode(candidate: string, taken: ReadonlySet<string>): string {
+  const code = cleanCode(candidate);
+  const used = new Set([...taken].map(cleanCode));
+  if (!used.has(code)) {
+    return code;
+  }
+
+  for (let suffix = 2; suffix < 1000; suffix++) {
+    const tail = `-${suffix}`;
+    const next = `${code.slice(0, MAX_CODE_LENGTH - tail.length)}${tail}`;
+    if (!used.has(next)) {
+      return next;
+    }
+  }
+
+  return code;
 }
 
 /** `PL26` of 2026 → `PL27`; `MAIN-2026` → `MAIN-2027`; otherwise `<code>-COPY`. */

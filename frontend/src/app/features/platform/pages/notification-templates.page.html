@@ -30,7 +30,7 @@
   }
 
   <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.templates.isLoading()" [emptyTitle]="i18n.t('platform.templates.empty')"
-                  [caption]="i18n.t('platform.templates.title')" (rowActivate)="openEdit($event)">
+                  [caption]="i18n.t('platform.templates.title')" [sort]="facade.sort()" [serverSort]="true" (sortChange)="facade.setSort($event)" (rowActivate)="openEdit($event)">
     <ng-template appCell="channel" [appCellOf]="facade.rows()" let-row>
       <app-badge [tone]="tone(row.channel)">{{ channelLabel(row.channel) }}</app-badge>
     </ng-template>
@@ -38,7 +38,8 @@
       <app-badge [status]="row.isActive ? 'Active' : 'Inactive'">{{ i18n.t(row.isActive ? 'platform.status.Active' : 'platform.status.Inactive') }}</app-badge>
     </ng-template>
     <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
-      <button type="button" class="row-btn" (click)="openEdit(row)" [attr.aria-label]="i18n.t('platform.templates.edit')" [title]="i18n.t('platform.templates.edit')"><app-icon name="edit" [size]="15" /></button>
+      <!-- C-10: without notifications.manage the dialog is read-only, so the row action says "View template" -->
+      <button type="button" class="row-btn" (click)="openEdit(row)" [attr.aria-label]="i18n.t(rowActionLabel())" [title]="i18n.t(rowActionLabel())"><app-icon [name]="canManage() ? 'edit' : 'eye'" [size]="15" /></button>
       <button type="button" class="row-btn" [class.danger]="row.isActive" *appCan="permissions.notificationsManage" (click)="toggle(row)"
               [attr.aria-label]="i18n.t(row.isActive ? 'platform.deactivate' : 'platform.activate')" [title]="i18n.t(row.isActive ? 'platform.deactivate' : 'platform.activate')"><app-icon name="power" [size]="15" /></button>
     </ng-template>

@@ -163,6 +163,80 @@ public sealed class ResultsUseCaseTests
     }
 
     [Fact]
+    public async Task R_BR11_A02_a_previous_result_verified_after_entry_flags_the_new_one_before_verification()
+    {
+        // Validation A-02 (2026-10-11): CREA 1.2 (ACC-24) and 2.0 (ACC-25) entered, then ACC-24 verified, then ACC-25.
+        var world = new World();
+        var creatinine = world.AddTest("CREA", deltaPercent: 20m);
+        var older = await world.OrderedInNewVisitAsync(creatinine, "ACC-2026-00024");
+        var newer = await world.OrderedInNewVisitAsync(creatinine, "ACC-2026-00025");
+        await world.SaveAsync(new ResultValueItem(older.Id, 1.2m, null, null, null), new ResultValueItem(newer.Id, 2.0m, null, null, null));
+        Assert.False(newer.DeltaFlag);
+
+        await world.VerifyOneAsync(older.Id);
+        world.Clock.UtcNow = world.Clock.UtcNow.AddMinutes(5);
+        var commits = world.UnitOfWork.Commits;
+
+        var refusal = await Assert.ThrowsAsync<DomainException>(() => world.VerifyOneAsync(newer.Id));
+        Assert.Equal(ResultsCodes.DeltaNotAcknowledged, refusal.Code);
+        Assert.Equal(commits + 1, world.UnitOfWork.Commits);   // the refreshed flag is saved with the refusal
+        Assert.True(newer.DeltaFlag);
+        Assert.Equal((66.7m, older.Id), (newer.DeltaPercent!.Value, newer.PreviousResultId!.Value));
+
+        await world.AcknowledgeAsync(newer.Id);
+        await world.VerifyOneAsync(newer.Id);
+        Assert.Equal(ResultStatus.Verified, newer.Status);
+    }
+
+    [Fact]
+    public async Task R_BR11_A02_bulk_verification_of_both_visits_flags_the_later_one_and_review_refreshes_the_flag()
+    {
+        var world = new World();
+        var creatinine = world.AddTest("CREA", deltaPercent: 20m);
+        var older = await world.OrderedInNewVisitAsync(creatinine, "ACC-2026-00024");
+        var newer = await world.OrderedInNewVisitAsync(creatinine, "ACC-2026-00025");
+        await world.SaveAsync(new ResultValueItem(older.Id, 1.2m, null, null, null), new ResultValueItem(newer.Id, 2.0m, null, null, null));
+
+        var outcome = await world.VerifyAsync(older.Id, newer.Id);
+
+        Assert.Equal([older.Id], outcome.Changed);
+        var refused = Assert.Single(outcome.Refused);
+        Assert.Equal((newer.Id, ResultsCodes.DeltaNotAcknowledged), (refused.ResultId, refused.Code));
+        Assert.True(newer.DeltaFlag);
+
+        // A third visit entered before the second was verified: review alone brings the flag forward.
+        var third = await world.OrderedInNewVisitAsync(creatinine, "ACC-2026-00026");
+        await world.SaveAsync(new ResultValueItem(third.Id, 1.3m, null, null, null));
+        Assert.Equal(1.2m, third.PreviousValue);
+        world.Clock.UtcNow = world.Clock.UtcNow.AddMinutes(1);
+        await world.AcknowledgeAsync(newer.Id);
+        await world.VerifyOneAsync(newer.Id);
+        await world.ReviewOneAsync(third.Id);
+        Assert.Equal((ResultStatus.Reviewed, newer.Id, true), (third.Status, third.PreviousResultId!.Value, third.DeltaFlag));
+    }
+
+    [Fact]
+    public async Task R_BR11_A02_the_verified_policy_flags_the_patient_s_open_results_of_the_test()
+    {
+        var world = new World();
+        var creatinine = world.AddTest("CREA", deltaPercent: 20m);
+        var older = await world.OrderedInNewVisitAsync(creatinine, "ACC-2026-00024");
+        var newer = await world.OrderedInNewVisitAsync(creatinine, "ACC-2026-00025");
+        await world.SaveAsync(new ResultValueItem(older.Id, 1.2m, null, null, null), new ResultValueItem(newer.Id, 2.0m, null, null, null));
+        await world.VerifyOneAsync(older.Id);
+        var verified = Assert.Single(older.DomainEvents.OfType<ResultVerified>());
+
+        var policy = new RecheckDeltasOnResultVerifiedPolicy(world.Results, world.Catalogue, world.UnitOfWork, world.Clock);
+        await policy.HandleAsync(verified, CancellationToken.None);
+
+        Assert.True(newer.DeltaFlag);
+        Assert.Equal(older.Id, newer.PreviousResultId);
+        var commits = world.UnitOfWork.Commits;
+        await policy.HandleAsync(verified, CancellationToken.None);
+        Assert.Equal(commits, world.UnitOfWork.Commits);   // idempotent
+    }
+
+    [Fact]
     public async Task R_T9_a_cancelled_line_cancels_its_results_once()
     {
         var world = new World();
@@ -264,9 +338,9 @@ public sealed class ResultsUseCaseTests
 
         private ResultsUser User => new(Actor, Branch);
 
-        public CatalogueTestInfo AddTest(string code, LabTestType type = LabTestType.Numeric, IReadOnlyList<CatalogueRangeBandInfo>? bands = null, string? formula = null, IReadOnlyList<string>? references = null, bool hidden = false)
+        public CatalogueTestInfo AddTest(string code, LabTestType type = LabTestType.Numeric, IReadOnlyList<CatalogueRangeBandInfo>? bands = null, string? formula = null, IReadOnlyList<string>? references = null, bool hidden = false, decimal? deltaPercent = null)
         {
-            var test = FakeCatalogue.Test(code, Group, type, 1, bands, formula, references, hidden);
+            var test = FakeCatalogue.Test(code, Group, type, 1, bands, formula, references, hidden, deltaPercent);
             Catalogue.With(test);
             return test;
         }
@@ -282,10 +356,22 @@ public sealed class ResultsUseCaseTests
 
         public Task RegisterAsync(params RegisteredLine[] lines) => RegisterAsync(Tube, lines);
 
-        public Task RegisterAsync(Guid tube, params RegisteredLine[] lines)
+        public Task RegisterAsync(Guid tube, params RegisteredLine[] lines) => RegisterVisitAsync(Visit, "ACC-2026-00009", tube, lines);
+
+        /// <summary>Another visit of the same patient (its own tube, received), with one result of <paramref name="test"/>.</summary>
+        public async Task<Result> OrderedInNewVisitAsync(CatalogueTestInfo test, string accession)
+        {
+            var visit = Guid.CreateVersion7();
+            var tube = Guid.CreateVersion7();
+            await RegisterVisitAsync(visit, accession, tube, new RegisteredLine(Guid.CreateVersion7(), AddService(ServiceType.Test, test.Id).Id, tube, "Ordered", []));
+            Samples.Received(tube, visit);
+            return Results.Items.Single(result => result.VisitId == visit && result.TestId == test.Id);
+        }
+
+        public Task RegisterVisitAsync(Guid visit, string accession, Guid tube, params RegisteredLine[] lines)
         {
             var services = lines.Select(line => line.ServiceId).ToList();
-            var registered = new VisitRegistered(Visit, "ACC-2026-00009", Branch, Patient, null, null, false, Actor, [new RegisteredTube(tube, "SMP-1", Group, Guid.CreateVersion7(), null, services)], lines, Registered);
+            var registered = new VisitRegistered(visit, accession, Branch, Patient, null, null, false, Actor, [new RegisteredTube(tube, "SMP-1", Group, Guid.CreateVersion7(), null, services)], lines, Registered);
             return new CreateResultsOnVisitRegisteredPolicy(Results, Catalogue, Samples, Visits, UnitOfWork).HandleAsync(registered, CancellationToken.None);
         }
 
@@ -304,7 +390,16 @@ public sealed class ResultsUseCaseTests
                 .Handle(new EnterResultValueCommand(resultId, value, null, null, null), CancellationToken.None);
 
         public Task<BulkResultOutcome> VerifyAsync(params Guid[] ids) =>
-            new VerifyResultsHandler(Results, Settings, Privileges, new FakeDirectory(), UnitOfWork, User, Clock).Handle(new VerifyResultsCommand(ids), CancellationToken.None);
+            new VerifyResultsHandler(Results, Catalogue, Settings, Privileges, new FakeDirectory(), UnitOfWork, User, Clock).Handle(new VerifyResultsCommand(ids), CancellationToken.None);
+
+        public Task VerifyOneAsync(Guid id) =>
+            new VerifyResultHandler(Results, Catalogue, Settings, Privileges, new FakeDirectory(), UnitOfWork, User, Clock).Handle(new VerifyResultCommand(id), CancellationToken.None);
+
+        public Task ReviewOneAsync(Guid id) =>
+            new ReviewResultHandler(Results, Catalogue, Privileges, new FakeDirectory(), UnitOfWork, User, Clock).Handle(new ReviewResultCommand(id), CancellationToken.None);
+
+        public Task AcknowledgeAsync(Guid id) =>
+            new AcknowledgeDeltaHandler(Results, Catalogue, Privileges, new FakeDirectory(), UnitOfWork, User, Clock).Handle(new AcknowledgeDeltaCommand(id, "Checked."), CancellationToken.None);
 
         public Task<LaboratoryReportDocument> ReportAsync(string key, bool preview) =>
             new GetReportDocumentHandler(Results, Catalogue, Samples, new FakeDirectory(), Patients, Visits, new FakeReferences(), new NoDoctors(), new NoTemplates(), Settings, Privileges, User, Clock)

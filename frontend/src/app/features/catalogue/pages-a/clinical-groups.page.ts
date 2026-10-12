@@ -4,6 +4,8 @@ import { CATALOGUE_A_PERMISSIONS, type ClinicalGroupListItem, type ClinicalGroup
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
 import { CanDirective } from '../../../shared/ui/can.directive';
+import { sortParams } from '../../../shared/forms/paging';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { MasterDataConfig, MasterDataFilter, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueAApi } from '../data-a/catalogue-a.api';
@@ -36,10 +38,11 @@ export class ClinicalGroupsPage {
 
   protected readonly config: MasterDataConfig<ClinicalGroupListItem, ClinicalGroupRequest> = {
     i18nPrefix: 'catalogue-a.groups',
+    sortMode: 'server',
     columns: [
       { key: 'code', header: 'catalogue-a.groups.column.code', mono: true, sortable: true, width: '120px' },
       { key: 'unitCode', header: 'catalogue-a.groups.column.unitCode', mono: true, width: '90px' },
-      { key: 'name', header: 'catalogue-a.groups.column.name', sortable: true, value: (row) => this.name(row) },
+      { key: 'name', header: 'catalogue-a.groups.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (row) => this.name(row) },
       { key: 'reportName', header: 'catalogue-a.groups.column.reportName', secondary: true },
       { key: 'displayOrder', header: 'catalogue-a.groups.column.displayOrder', align: 'end', sortable: true, width: '110px', secondary: true },
     ],
@@ -54,7 +57,7 @@ export class ClinicalGroupsPage {
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listClinicalGroups({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+        return this.api.listClinicalGroups({ ...sortParams(filter.sort), search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
       },
       create: (dto) => this.api.createClinicalGroup(dto),
       update: (id, dto) => this.api.updateClinicalGroup(id, dto),

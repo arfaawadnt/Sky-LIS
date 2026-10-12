@@ -4,6 +4,7 @@ import type { CommentTemplateListItem, CommentTemplateRequest } from '../../../c
 import { CATALOGUE_B_PERMISSIONS } from '../../../core/api/catalogue-b.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
+import { sortParams } from '../../../shared/forms/paging';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueBApi } from '../data-b/catalogue-b.api';
@@ -36,6 +37,7 @@ export class CommentTemplatesPage {
 
   protected readonly config: MasterDataConfig<CommentTemplateListItem, CommentTemplateRequest> = {
     i18nPrefix: 'catalogue-b.comments',
+    sortMode: 'server',
     columns: [
       { key: 'shortName', header: 'catalogue-b.comments.column.shortName', mono: true, sortable: true, width: '150px' },
       { key: 'text', header: 'catalogue-b.comments.column.text', value: (item) => localizedPick({ en: item.textEn, ar: item.textAr }, this.i18n.lang()) },
@@ -52,7 +54,7 @@ export class CommentTemplatesPage {
       { name: 'text', kind: 'localizedText', required: true, maxLength: 400 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.commentTemplates.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.commentTemplates.list({ ...this.listed.track(filter), ...sortParams(filter.sort), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.commentTemplates.create(dto),
       update: (id, dto) => this.api.commentTemplates.update(id, dto),
       setActive: (id, active) => this.api.commentTemplates.setActive(id, active),

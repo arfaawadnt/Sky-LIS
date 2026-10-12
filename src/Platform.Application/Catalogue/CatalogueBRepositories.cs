@@ -24,8 +24,11 @@ public enum CatalogueBList
     SensitivityValues = 13,
 }
 
-/// <summary>The filter every register shares: free-text search (code / name / text, case-insensitive) and the active flag (null = both).</summary>
-public sealed record CatalogueBFilter(string? Search, bool? IsActive);
+/// <summary>
+/// The filter every register shares: free-text search (code / name / text, case-insensitive) and the active flag (null = both).
+/// <see cref="Sort"/> is the server-side order of the master-data registers (validation v0.5.0 B-03; keys in <see cref="CatalogueSortKeys"/>).
+/// </summary>
+public sealed record CatalogueBFilter(string? Search, bool? IsActive, ListSort Sort = default);
 
 // Write side plus the projections each register needs (ADR-0010 carried forward). Every read is bounded to the current
 // tenant. Uniqueness probes compare codes exactly (codes are stored upper-case) and names case-insensitively.

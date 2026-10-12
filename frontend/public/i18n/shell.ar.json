@@ -41,7 +41,7 @@
   "nav.priceQuery": "استعلام الأسعار",
   "nav.patients": "المرضى",
   "nav.worklist": "قائمة العمل",
-  "nav.resultsByAccession": "النتائج برقم الاستلام",
+  "nav.resultsByAccession": "النتائج برقم الزيارة",
   "nav.sampleCollection": "السحب والاستلام",
   "nav.samplesByVisit": "عينات الزيارة",
   "nav.sampleRejections": "رفض / إلغاء الرفض",

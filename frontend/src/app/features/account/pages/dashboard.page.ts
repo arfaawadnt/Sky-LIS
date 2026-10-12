@@ -52,7 +52,7 @@ const QUICK_ACTIONS: readonly QuickAction[] = [
 /**
  * The dashboard (SRS CP-05): the session branch's day at a glance — eight KPIs (a figure whose module is not live
  * yet reads "—"), the 7-day registrations chart, the delayed tests (BR-13, filled by Results), the recent activity
- * (audit log) and quick actions to the main pages. The date picker shows any past day of the branch.
+ * (audit log) and quick actions to the main pages. The date picker shows today or any past day of the branch.
  */
 @Component({
   selector: 'app-dashboard-page',
@@ -131,7 +131,8 @@ export class DashboardPage {
       { key: 'delayedTests', label: label('delayedTests'), icon: 'alert', tone: (kpis?.delayedTests ?? 0) > 0 ? 'bad' : 'ok', ...count(kpis?.delayedTests, this.i18n.t('account.dashboard.pastTurnaround')) },
       { key: 'rejectedSamples', label: label('rejectedSamples'), icon: 'x', tone: (kpis?.rejectedSamples ?? 0) > 0 ? 'bad' : 'ok', release: 'R2', ...count(kpis?.rejectedSamples, today) },
     ];
-    const list = all.filter((kpi) => inReleaseScope(kpi.release ?? 'R1'));
+    const seesMoney = this.auth.hasPermission(ACCOUNT_PERMISSIONS.billingView);   // validation observation O-9
+    const list = all.filter((kpi) => inReleaseScope(kpi.release ?? 'R1') && (kpi.key !== 'collectedToday' || seesMoney));
 
     if (this.auth.hasPermission(ACCOUNT_PERMISSIONS.walletView)) {
       list.push({
@@ -151,7 +152,9 @@ export class DashboardPage {
     (this.data()?.registrationsByDay ?? []).map((bar) => {
       const lang = this.i18n.lang();
       const count = formatNumber(bar.count, lang);
-      return { label: weekday(bar.date, lang), value: bar.count, display: count, description: this.i18n.tf('account.dashboard.chartBar', { date: formatDay(bar.date, lang), count }) };
+      // R-10: one registration reads in the singular ('1 registration'), in both languages
+      const key = bar.count === 1 ? 'account.dashboard.chartBarOne' : 'account.dashboard.chartBar';
+      return { label: weekday(bar.date, lang), value: bar.count, display: count, description: this.i18n.tf(key, { date: formatDay(bar.date, lang), count }) };
     }),
   );
 
@@ -166,8 +169,10 @@ export class DashboardPage {
     this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01/C-13)
   }
 
+  /** A cleared or future day returns to today and the box shows it (validation A-10). */
   protected onDate(event: Event): void {
-    this.facade.setDate((event.target as HTMLInputElement).value);
+    const input = event.target as HTMLInputElement;
+    input.value = this.facade.setDate(input.value);
   }
 
   protected time(value: string): string {

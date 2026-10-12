@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Contracts.Common;
 using Platform.Contracts.PlatformAdmin;
@@ -13,7 +14,7 @@ namespace Platform.Application.PlatformAdmin.Queries;
 
 /// <summary><paramref name="Source"/>: Subscription|Manual; <paramref name="Status"/>: Trial|Active|Inactive; <paramref name="Search"/> matches name, portal slug, manager and mobiles.</summary>
 [RequirePermissionPolicy(PermissionCatalog.Tenancy, PermissionAction.View)]
-public sealed record ListClientsQuery(string? Search, string? Source, Guid? PlanId, string? Status, int? Page, int? PageSize) : IQuery<Paged<ClientListItem>>, IPlatformAdministrationRequest;
+public sealed record ListClientsQuery(string? Search, string? Source, Guid? PlanId, string? Status, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<ClientListItem>>, IPlatformAdministrationRequest;
 
 public sealed class ListClientsValidator : AbstractValidator<ListClientsQuery>
 {
@@ -24,6 +25,8 @@ public sealed class ListClientsValidator : AbstractValidator<ListClientsQuery>
         RuleFor(query => query.Status).IsEnumName(typeof(TenantStatus), caseSensitive: false).When(query => !string.IsNullOrEmpty(query.Status));
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(PlatformAdminSortKeys.Clients);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
@@ -36,7 +39,8 @@ public sealed class ListClientsHandler(ITenantRepository tenants, IClientUsageCo
             string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim(),
             string.IsNullOrEmpty(query.Source) ? null : Enum.Parse<TenantSource>(query.Source, ignoreCase: true),
             query.PlanId,
-            string.IsNullOrEmpty(query.Status) ? null : Enum.Parse<TenantStatus>(query.Status, ignoreCase: true));
+            string.IsNullOrEmpty(query.Status) ? null : Enum.Parse<TenantStatus>(query.Status, ignoreCase: true),
+            ListSort.Of(query.Sort, query.Direction));
         var page = await tenants.ListAsync(filter, PageRequest.Normalized(query.Page, query.PageSize), portal.PortalDomain, cancellationToken);
         if (page.Items.Count == 0)
         {

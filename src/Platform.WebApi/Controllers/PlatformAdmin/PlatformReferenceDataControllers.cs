@@ -13,8 +13,8 @@ namespace Platform.WebApi.Controllers.PlatformAdmin;
 public sealed class PlatformCountriesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<CountryListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListCountriesQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<CountryListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListCountriesQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<CreatedResource>> Create([FromBody] CountryRequest request, CancellationToken cancellationToken)
@@ -61,8 +61,8 @@ public sealed class PlatformCountriesController(ISender sender) : ControllerBase
 public sealed class PlatformGovernoratesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<GovernorateListItem>>> List([FromQuery] Guid? countryId, [FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListGovernoratesQuery(countryId, search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<GovernorateListItem>>> List([FromQuery] Guid? countryId, [FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListGovernoratesQuery(countryId, search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<CreatedResource>> Create([FromBody] GovernorateRequest request, CancellationToken cancellationToken)
@@ -101,8 +101,8 @@ public sealed class PlatformGovernoratesController(ISender sender) : ControllerB
 public sealed class PlatformNotificationTemplatesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<NotificationTemplateListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListNotificationTemplatesQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<NotificationTemplateListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListNotificationTemplatesQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("placeholders")]
     public async Task<ActionResult<TemplatePlaceholders>> Placeholders(CancellationToken cancellationToken) =>

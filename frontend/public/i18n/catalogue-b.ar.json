@@ -179,6 +179,7 @@
   "common.deactivate": "إيقاف",
   "common.deactivated": "تم الإيقاف.",
   "common.edit": "تعديل",
+  "common.view": "عرض",
   "common.empty": "لا توجد سجلات مطابقة.",
   "common.export": "تصدير CSV",
   "common.exportError": "تعذر تصدير الملف.",

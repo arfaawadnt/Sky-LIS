@@ -4,16 +4,18 @@ using Platform.Application.Abstractions.Messaging;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Abstractions.Settings;
 using Platform.Contracts.Account;
+using Platform.Domain.Account;
 using Platform.Domain.Authorization;
 using Platform.Domain.Settings;
 using Platform.SharedKernel.Abstractions;
+using Platform.SharedKernel.Primitives;
 
 namespace Platform.Application.Account.Queries;
 
 /// <summary>
 /// CP-05: the session branch's day at a glance (intake LIS-INT-ACC-001 §14). <paramref name="Date"/> is the local day
 /// (<c>yyyy-MM-dd</c>, default today) and <paramref name="UtcOffsetMinutes"/> the browser's offset from UTC (default 0),
-/// so "today" is the user's day. Figures whose source module is not built yet are <see langword="null"/>; the wallet
+/// so "today" is the user's day; a later day is refused (ACC-030, validation A-10). Figures whose source module is not built yet are <see langword="null"/>; the wallet
 /// balance needs <c>wallet.view</c> as well.
 /// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Dashboard, PermissionAction.View)]
@@ -46,9 +48,14 @@ public sealed class GetBranchDashboardHandler(
         var branchId = BranchScope.Require(user);
         var offsetMinutes = query.UtcOffsetMinutes ?? 0;
         var offset = TimeSpan.FromMinutes(offsetMinutes);
+        var today = DateOnly.FromDateTime(clock.UtcNow.ToOffset(offset).DateTime);
         var day = string.IsNullOrEmpty(query.Date)
-            ? DateOnly.FromDateTime(clock.UtcNow.ToOffset(offset).DateTime)
+            ? today
             : DateOnly.ParseExact(query.Date, DashboardDays.Format, CultureInfo.InvariantCulture);
+        if (day > today)
+        {
+            throw new DomainException(AccountCodes.DashboardDayInFuture, "The dashboard shows today or an earlier day.", DomainFault.Validation);
+        }
 
         var window = DashboardDays.Window(day, offsetMinutes);
         var figures = await reader.ReadAsync(branchId, window, cancellationToken);
@@ -62,7 +69,8 @@ public sealed class GetBranchDashboardHandler(
         var currency = await settings.GetAsync(SettingKeys.DefaultCurrency, cancellationToken);
         var kpis = new BranchDashboardKpis(
             figures.Registrations,
-            figures.CollectedToday,
+            // Money is shown only to users who may see payments (validation 2026-10-11, observation O-9).
+            privileges.Has(PermissionCatalog.Key(PermissionCatalog.Billing, PermissionAction.View)) ? figures.CollectedToday : null,
             figures.SamplesReceived,
             figures.PendingResults,    // app.results (Reporting, intake LIS-INT-REP-001 §14); null until Results is migrated
             figures.UnverifiedBacklog,

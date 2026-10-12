@@ -123,6 +123,28 @@ describe('Platform administration facades (01 §6.3)', () => {
     backend.verify();
   });
 
+  it('B-03: sorts the clients on the server from page 1 (name by language, plan, wallet, creation date)', async () => {
+    const facade = TestBed.inject(ClientsFacade);
+    await runEffects();
+    backend.expectOne((request) => request.url === PLATFORM_API.clients).flush(page([client]));
+    backend.expectOne((request) => request.url === PLATFORM_API.plans).flush(page([]));
+    backend.expectOne((request) => request.url === PLATFORM_API.countries).flush(page([]));
+
+    facade.setPage({ page: 2, pageSize: 50 });
+    await runEffects();
+    backend.expectOne((request) => request.url === PLATFORM_API.clients).flush(page([]));
+
+    facade.setSort({ key: 'walletBalance', direction: 'desc' });
+    await runEffects();
+    const byWallet = backend.expectOne((request) => request.url === PLATFORM_API.clients);
+    expect([byWallet.request.params.get('sort'), byWallet.request.params.get('direction'), byWallet.request.params.get('page')]).toEqual(['walletBalance', 'desc', '1']);
+    byWallet.flush(page([]));
+
+    facade.setSort({ key: 'name', direction: 'asc' });
+    await runEffects();
+    expect(backend.expectOne((request) => request.url === PLATFORM_API.clients).request.params.get('sort')).toBe('nameEn');
+  });
+
   it('deactivation sends the reason and a refusal keeps its problem code', async () => {
     const facade = TestBed.inject(ClientsFacade);
     await runEffects();

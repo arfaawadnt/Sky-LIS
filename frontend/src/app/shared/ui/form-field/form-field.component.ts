@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, ElementRef, Injector, type Signal, afterRenderEffect, computed, contentChild, effect, inject, input, signal, untracked } from '@angular/core';
-import { NgControl } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, ElementRef, Injector, type Signal, afterEveryRender, afterRenderEffect, computed, contentChild, effect, inject, input, signal, untracked } from '@angular/core';
+import { type AbstractControl, NgControl } from '@angular/forms';
 
 import type { FieldRule, ProblemDetails } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
@@ -88,8 +88,12 @@ export class FormFieldComponent {
   constructor() {
     effect(() => {
       const control = this.ngControl()?.control ?? null;
-      untracked(() => this.stateSource.set(controlState(control, this.injector)));
+      untracked(() => this.bind(control));
     });
+    // A `formControlName` inside a control-flow block can get its control after the content query resolved, so the
+    // effect above saw none and the field never showed its state (validation round 3 R3-03). Re-check after renders;
+    // `bind` is a no-op while the control is the same one.
+    afterEveryRender(() => this.bind(this.ngControl()?.control ?? null));
 
     afterRenderEffect(() => {
       this.ngControl();
@@ -97,6 +101,17 @@ export class FormFieldComponent {
       const describedBy = invalid ? this.errorId : this.hint() ? this.hintId : null;
       untracked(() => this.wire(invalid, describedBy));
     });
+  }
+
+  private bound: AbstractControl | null = null;
+
+  private bind(control: AbstractControl | null): void {
+    if (control === this.bound) {
+      return;
+    }
+
+    this.bound = control;
+    this.stateSource.set(controlState(control, this.injector));
   }
 
   private wire(invalid: boolean, describedBy: string | null): void {

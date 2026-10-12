@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { CATALOGUE_A_PERMISSIONS, type MeasurementUnitListItem, type MeasurementUnitRequest } from '../../../core/api/catalogue-a.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { CanDirective } from '../../../shared/ui/can.directive';
+import { sortParams } from '../../../shared/forms/paging';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { MasterDataConfig, MasterDataFilter } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueAApi } from '../data-a/catalogue-a.api';
@@ -31,12 +32,13 @@ export class UnitsPage {
 
   protected readonly config: MasterDataConfig<MeasurementUnitListItem, MeasurementUnitRequest> = {
     i18nPrefix: 'catalogue-a.units',
+    sortMode: 'server',
     columns: [{ key: 'name', header: 'catalogue-a.units.column.name', mono: true, sortable: true }],
     fields: [{ name: 'name', kind: 'text', required: true, maxLength: 50, hint: 'catalogue-a.units.hint.name' }],
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listUnits({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+        return this.api.listUnits({ ...sortParams(filter.sort), search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
       },
       create: (dto) => this.api.createUnit(dto),
       update: (id, dto) => this.api.updateUnit(id, dto),

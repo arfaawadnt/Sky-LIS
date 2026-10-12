@@ -29,7 +29,7 @@ import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
 import { formatDateTime } from '../../../shared/patient/patient-demographics';
 import { saveFile } from '../data/save-file';
 import { PatientsFacade } from '../state/patients.facade';
-import { ageParts } from '../../../shared/patient/patient-demographics';
+import { ageText, localDigits } from '../../../shared/patient/patient-demographics';
 import { PatientFormComponent, type TypedIdentity } from '../../../shared/patient/patient-form.component';
 
 /**
@@ -81,14 +81,15 @@ export class PatientsPage {
   protected readonly columns = computed<readonly TableColumn<PatientListItem>[]>(() => {
     const columns: TableColumn<PatientListItem>[] = [
       { key: 'number', header: 'patients.column.number', mono: true, width: '150px', sortable: true },
-      { key: 'name', header: 'patients.column.name', sortable: true, value: (row) => row.fullName },
+      { key: 'name', header: 'patients.column.name', sortable: true, value: (row) => (row.identityMasked === true ? this.i18n.t('patients.vipMasked') : row.fullName) },
       { key: 'gender', header: 'patients.column.gender', width: '90px', value: (row) => this.i18n.t(`patients.gender.${row.gender}`) },
       { key: 'age', header: 'patients.column.age', width: '110px', value: (row) => this.ageText(row) },
       { key: 'mobile', header: 'patients.column.mobile', mono: true, width: '140px' },
       { key: 'nationalId', header: 'patients.column.nationalId', mono: true, secondary: true },
       { key: 'condition', header: 'patients.column.condition', secondary: true, value: (row) => this.conditionName(row.patientConditionId) },
       // CP-11 "visit count, last visit" (UAT A-09), counted by Registration
-      { key: 'visitCount', header: 'patients.column.visits', width: '80px', align: 'end', value: (row) => row.visitCount ?? 0 },
+      // in the language's digits (round 2 R2-02); the column sorts by the number
+      { key: 'visitCount', header: 'patients.column.visits', width: '80px', align: 'end', value: (row) => localDigits(row.visitCount ?? 0, this.i18n.lang()), sortValue: (row) => row.visitCount ?? 0 },
       { key: 'lastVisitAtUtc', header: 'patients.column.lastVisit', width: '150px', secondary: true, value: (row) => (row.lastVisitAtUtc ? formatDateTime(row.lastVisitAtUtc, this.i18n.lang()) : '—') },
     ];
     if (this.permissionsService.can(PATIENTS_PERMISSIONS.viewConfidential)) {
@@ -186,9 +187,7 @@ export class PatientsPage {
   }
 
   protected ageText(row: PatientListItem): string {
-    const text = ageParts(row.age)
-      .map((part) => this.i18n.tf(`patients.age.${part.unit}`, { value: part.value }))
-      .join(' ');
+    const text = ageText(row.age, this.i18n.lang(), (key, params) => this.i18n.tf(key, params));
     return row.dateOfBirthIsEstimated ? `≈ ${text}` : text;
   }
 

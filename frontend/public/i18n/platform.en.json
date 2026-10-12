@@ -187,6 +187,7 @@
   "plans.column.clients": "Clients",
   "plans.column.status": "Status",
   "plans.field.currencyCode": "Currency",
+  "plans.validation.twoDecimals": "The monthly fee has at most two decimals.",
   "plans.hint.code": "Fixed once created, e.g. STANDARD.",
   "wallet.title": "Client wallet",
   "wallet.subtitle": "Prepaid credit: the monthly fee and metered usage debit it; metered services pause at zero.",
@@ -370,6 +371,7 @@
   "parameters.key.defaultCurrency": "Default currency",
   "parameters.key.defaultLanguage": "Default language",
   "parameters.key.masterDataUpdatePolicy": "Master-data update policy",
+  "parameters.key.timeZone": "Time zone",
   "parameters.key.delayWarnPercent": "Delay warning (% of turnaround)",
   "parameters.key.delayLatePercent": "Late (% of turnaround)",
   "parameters.key.discountCapPercent": "Discount cap (%)",
@@ -409,6 +411,7 @@
   "parameters.hint.defaultCurrency": "ISO 4217 code, e.g. EGP.",
   "parameters.hint.defaultLanguage": "Language of new users.",
   "parameters.hint.masterDataUpdatePolicy": "How later global master-data changes reach laboratories (BR-25).",
+  "parameters.hint.timeZone": "IANA zone (e.g. Africa/Cairo) of a laboratory's calendar day when its client record names none.",
   "parameters.hint.delayWarnPercent": "A test is at risk from this share of its turnaround (BR-13).",
   "parameters.hint.delayLatePercent": "A test is late from this share of its turnaround (BR-13).",
   "parameters.hint.discountCapPercent": "Highest discount without a higher cap on the role (0–100).",
@@ -530,5 +533,6 @@
   "ruleTemplates.error.LIB-001": "Name and formula are required.",
   "ruleTemplates.error.LIB-103": "A rule template with this name already exists.",
   "ruleTemplates.error.LIB-407": "The rule template was not found.",
-  "templates.view": "Template"
+  "templates.view": "Template",
+  "templates.viewAction": "View template"
 }

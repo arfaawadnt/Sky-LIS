@@ -13,6 +13,7 @@ import {
 } from '../api/auth.contracts';
 import { ACCOUNT_API } from '../api/account.contracts';
 import { I18nService } from '../i18n/i18n.service';
+import { REFRESH_LOCK } from './refresh-lock';
 import { SESSION_CHANNEL, type SessionMessage } from './session-channel';
 import { BROWSER_NAVIGATION, SIGN_IN_PATH, signInUrl } from './session-navigation';
 
@@ -28,7 +29,8 @@ export interface CurrentUser {
  * and nowhere else: never web storage, never a cookie the script can read, never decoded. Identity, tenant and
  * permissions come from the sign-in and refresh responses (`profile`), so the token stays opaque to the client.
  * Refresh is single-flight: concurrent 401s share one call to `/api/v1/auth/refresh`, which the browser sends
- * with the httpOnly `__Secure-rt` cookie.
+ * with the httpOnly `__Secure-rt` cookie. Across the tabs of the browser it is serialised by `REFRESH_LOCK` (Web Locks,
+ * C-02), so two tabs never present the same cookie at the same moment.
  *
  * That cookie is shared by every tab of the browser, so a refresh may come back as **another user** (C-01: tab B signed
  * in as Y after tab A's session of X ended). A refresh is therefore accepted only for the user and tenant the tab was
@@ -42,12 +44,14 @@ export class AuthStore {
   private readonly i18n = inject(I18nService);
   private readonly navigation = inject(BROWSER_NAVIGATION);
   private readonly channel = inject(SESSION_CHANNEL);
+  private readonly refreshLock = inject(REFRESH_LOCK);
 
   private readonly accessToken = signal<string | null>(null);
   private readonly expiresAtUtc = signal<Date | null>(null);
   private readonly profileState = signal<AuthProfile | null>(null);
   private readonly hydrated = signal(false);
   private readonly profileRevisionState = signal(0);
+  private readonly endedState = signal(false);
   private refreshInFlight: Promise<string | null> | null = null;
 
   /** The bearer token for the auth interceptor; `null` when signed out. */
@@ -62,6 +66,13 @@ export class AuthStore {
    * Whoever caches profile data (the account session, the password-change guard) re-reads it when this moves.
    */
   readonly profileRevision = this.profileRevisionState.asReadonly();
+
+  /**
+   * Round 2 R2-05: true once this tab's session ended by a sign-out (here or in another tab) and the sign-in page is
+   * loading. The profile stays until the page unloads, so no page's resource re-runs for a changed user or branch; the
+   * auth interceptor sends no API request any more and `refresh` answers `null` without asking the server.
+   */
+  readonly hasEnded = this.endedState.asReadonly();
 
   /** True once the start-up refresh has settled, either way. */
   readonly isHydrated = this.hydrated.asReadonly();
@@ -155,6 +166,10 @@ export class AuthStore {
    * caller must not replay anything.
    */
   refresh(): Promise<string | null> {
+    if (this.endedState()) {
+      return Promise.resolve(null);
+    }
+
     this.refreshInFlight ??= this.refreshOnce().finally(() => {
       this.refreshInFlight = null;
     });
@@ -182,16 +197,19 @@ export class AuthStore {
     await firstValueFrom(this.http.post<void>(AUTH_API.recoveryComplete, body));
   }
 
-  /** Ends the session on the server, tells the other tabs and reloads the sign-in page without a return URL (A-01, B-11). */
+  /**
+   * Ends the session on the server, tells the other tabs and reloads the sign-in page without a return URL (A-01, B-11).
+   * The token goes at once; the profile stays until the page unloads (round 2 R2-05: clearing it re-ran the open page's
+   * resources, keyed by the user or the branch, and each reload was refused with a 401 before `/login` arrived).
+   */
   async signOut(): Promise<void> {
     try {
       await firstValueFrom(this.http.post<void>(AUTH_API.signOut, null));
     } catch {
-      // the server clears the cookie either way; local state is cleared below
+      // the server clears the cookie either way; the token is dropped below
     } finally {
-      this.clear();
       this.channel.post({ kind: 'signed-out' });
-      this.navigation.load(SIGN_IN_PATH);
+      this.leave(SIGN_IN_PATH);
     }
   }
 
@@ -205,7 +223,8 @@ export class AuthStore {
     const before = this.profileState();
     let response: AuthResponse;
     try {
-      response = await firstValueFrom(this.http.post<AuthResponse>(AUTH_API.refresh, null));
+      // C-02: one refresh at a time across the tabs; a waiting tab sends the cookie the previous refresh has just set
+      response = await this.refreshLock(() => firstValueFrom(this.http.post<AuthResponse>(AUTH_API.refresh, null)));
     } catch {
       this.endSession(before, true);
       return null;
@@ -243,7 +262,7 @@ export class AuthStore {
    */
   private onOtherTab(message: SessionMessage): void {
     const profile = this.profileState();
-    if (profile === null) {
+    if (profile === null || this.endedState()) {
       return;
     }
 
@@ -260,8 +279,15 @@ export class AuthStore {
       return;
     }
 
-    this.clear();
-    this.navigation.load(SIGN_IN_PATH);
+    this.leave(SIGN_IN_PATH);
+  }
+
+  /** The end of a session that this tab did not lose by itself: no token, nothing requested any more, then the full page load. */
+  private leave(url: string): void {
+    this.endedState.set(true);
+    this.accessToken.set(null);
+    this.expiresAtUtc.set(null);
+    this.navigation.load(url);
   }
 
   private apply(response: AuthResponse): void {
@@ -269,6 +295,7 @@ export class AuthStore {
       return;
     }
 
+    this.endedState.set(false);
     this.accessToken.set(response.accessToken);
     this.expiresAtUtc.set(response.expiresAtUtc ? new Date(response.expiresAtUtc) : null);
     this.profileState.set(response.profile);

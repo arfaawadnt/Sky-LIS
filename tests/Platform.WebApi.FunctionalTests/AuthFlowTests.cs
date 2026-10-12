@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using Platform.Contracts.Common;
 using Platform.Contracts.Identity;
 using Platform.WebApi.FunctionalTests.Support;
@@ -15,6 +17,11 @@ namespace Platform.WebApi.FunctionalTests;
 public sealed class AuthFlowTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private static readonly string[] HeaderPaths = ["/health/live", "/api/v1/auth/me", "/no-such-route"];
+
+    /// <summary>Just past the refresh grace of C-02 (<c>SessionPolicy.RefreshReuseGrace</c>, 5 s by default).</summary>
+    private static readonly TimeSpan GraceElapsed = TimeSpan.FromSeconds(6);
+
+    private static int _isoCounter;
 
     [DatabaseFact]
     public async Task Security_headers_are_present_on_success_and_error_responses()
@@ -128,6 +135,8 @@ public sealed class AuthFlowTests(ApiFactory factory) : IClassFixture<ApiFactory
         Assert.NotEqual(first.AccessToken, second.AccessToken);
         Assert.Equal(HttpStatusCode.OK, (await auth.MeAsync(second.AccessToken)).StatusCode);
 
+        // C-02: inside the grace window the immediate predecessor is answered; replayed after it, it is reuse as before
+        factory.Clock.Advance(GraceElapsed);
         var reuse = await auth.RefreshAsync(cookie1);
         Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
         Assert.Equal(ProblemCodes.RefreshTokenRejected, await AuthClient.CodeOf(reuse));
@@ -137,7 +146,162 @@ public sealed class AuthFlowTests(ApiFactory factory) : IClassFixture<ApiFactory
 
         factory.Clock.Advance(TimeSpan.FromSeconds(11));   // past the principal cache
         Assert.Equal(HttpStatusCode.Unauthorized, (await auth.MeAsync(second.AccessToken)).StatusCode);
-        factory.Clock.Advance(TimeSpan.FromSeconds(-11));
+        factory.Clock.Advance(TimeSpan.FromSeconds(-11) - GraceElapsed);
+    }
+
+    [DatabaseFact]
+    public async Task Two_tabs_refreshing_with_the_same_cookie_at_once_both_succeed_and_nothing_is_revoked()
+    {
+        // C-02: the tabs of one browser share the cookie; both reload together and present the same token
+        var (username, _, _) = await factory.SeedUserAsync();
+        var auth = new AuthClient(factory.CreateClient());
+        var (_, cookie1, _) = await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password);
+
+        var responses = await Task.WhenAll(auth.RefreshAsync(cookie1), auth.RefreshAsync(cookie1));
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+        var bodies = await Task.WhenAll(responses.Select(response => response.Content.ReadFromJsonAsync<AuthResponse>()));
+        Assert.All(bodies, body => Assert.False(string.IsNullOrEmpty(body!.AccessToken)));
+
+        // exactly one response rotated (and set the cookie); the other was answered with the session that replaced it
+        var rotated = responses.Where(response => response.Headers.TryGetValues("Set-Cookie", out var values) && values.Any(v => v.StartsWith("__Secure-rt=", StringComparison.Ordinal))).ToList();
+        var cookie2 = AuthClient.CookieValue(Assert.Single(rotated).Headers.GetValues("Set-Cookie").Single(v => v.StartsWith("__Secure-rt=", StringComparison.Ordinal)));
+        foreach (var body in bodies)
+        {
+            Assert.Equal(HttpStatusCode.OK, (await auth.MeAsync(body!.AccessToken)).StatusCode);
+        }
+
+        // the family is intact: the cookie the browser now holds keeps rotating
+        Assert.Equal(HttpStatusCode.OK, (await auth.RefreshAsync(cookie2)).StatusCode);
+    }
+
+    [DatabaseFact]
+    public async Task A_rotation_that_loses_the_race_on_the_row_is_answered_with_the_winner()
+    {
+        // C-02, the truly simultaneous case: both requests read the token before either committed. The loser's own rotation
+        // is refused by the row version (CONCURRENCY-409); it is then judged against the committed winner, inside the grace.
+        var (username, _, _) = await factory.SeedUserAsync();
+        var auth = new AuthClient(factory.CreateClient());
+        var (_, cookie1, _) = await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password);
+
+        using var loser = factory.Services.CreateScope();
+        Assert.True(loser.ServiceProvider.GetRequiredService<Platform.Application.Abstractions.Tokens.IRefreshTokenService>().TryParse(cookie1, out var sessionId, out _));
+        var stale = await loser.ServiceProvider.GetRequiredService<Platform.Application.Identity.IRefreshSessionRepository>().GetForUpdateAsync(sessionId, CancellationToken.None);
+        Assert.Null(stale!.RotatedAtUtc);   // tracked by the loser's unit of work as it was before the winner rotated it
+
+        var winner = await auth.RefreshAsync(cookie1);
+        Assert.Equal(HttpStatusCode.OK, winner.StatusCode);
+
+        var result = await loser.ServiceProvider.GetRequiredService<MediatR.ISender>().Send(new Platform.Application.Identity.Commands.RefreshSessionCommand(cookie1, null, null));
+        Assert.Null(result.RefreshToken);   // a grace answer: no second successor, the winner's cookie stays current
+        Assert.Equal(HttpStatusCode.OK, (await auth.MeAsync(result.AccessToken.Token)).StatusCode);
+        var cookie2 = AuthClient.CookieValue(winner.Headers.GetValues("Set-Cookie").Single(v => v.StartsWith("__Secure-rt=", StringComparison.Ordinal)));
+        Assert.Equal(HttpStatusCode.OK, (await auth.RefreshAsync(cookie2)).StatusCode);
+    }
+
+    [DatabaseFact]
+    public async Task A_loser_that_read_the_clock_before_the_winner_rotated_is_still_inside_the_grace_R_01()
+    {
+        // Re-test R-01 (2026-10-12): with a real clock the losing request reads "now" before the winner's rotation is
+        // stamped, so now < rotatedAt. That is the concurrent case itself and must be answered with the winner.
+        var (username, _, _) = await factory.SeedUserAsync();
+        var auth = new AuthClient(factory.CreateClient());
+        var (_, cookie1, _) = await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password);
+
+        factory.Clock.Advance(TimeSpan.FromMilliseconds(20));   // the winner rotates 20 ms later than the loser's clock reading
+        var winner = await auth.RefreshAsync(cookie1);
+        Assert.Equal(HttpStatusCode.OK, winner.StatusCode);
+        factory.Clock.Advance(TimeSpan.FromMilliseconds(-20));
+
+        var loser = await auth.RefreshAsync(cookie1);
+        Assert.Equal(HttpStatusCode.OK, loser.StatusCode);
+        Assert.False(loser.Headers.TryGetValues("Set-Cookie", out _), "a grace answer must leave the winner's cookie in place");
+        var cookie2 = AuthClient.CookieValue(winner.Headers.GetValues("Set-Cookie").Single(v => v.StartsWith("__Secure-rt=", StringComparison.Ordinal)));
+        Assert.Equal(HttpStatusCode.OK, (await auth.RefreshAsync(cookie2)).StatusCode);
+    }
+
+    [DatabaseFact]
+    public async Task The_previous_token_inside_the_grace_gets_the_current_session_without_a_new_cookie()
+    {
+        var (username, _, _) = await factory.SeedUserAsync();
+        var auth = new AuthClient(factory.CreateClient());
+        var (_, cookie1, _) = await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password);
+        var first = await auth.RefreshAsync(cookie1);
+        var cookie2 = AuthClient.CookieValue(first.Headers.GetValues("Set-Cookie").Single(v => v.StartsWith("__Secure-rt=", StringComparison.Ordinal)));
+        var firstToken = (await first.Content.ReadFromJsonAsync<AuthResponse>())!.AccessToken;
+        var successor = (await (await auth.MeAsync(firstToken)).Content.ReadFromJsonAsync<SessionResponse>())!.SessionId;
+
+        factory.Clock.Advance(TimeSpan.FromSeconds(3));   // inside the 5 s grace
+        var late = await auth.RefreshAsync(cookie1);
+        factory.Clock.Advance(TimeSpan.FromSeconds(-3));
+        Assert.Equal(HttpStatusCode.OK, late.StatusCode);
+        Assert.False(late.Headers.TryGetValues("Set-Cookie", out _), "a grace answer must leave the current cookie in place");
+        var lateToken = (await late.Content.ReadFromJsonAsync<AuthResponse>())!.AccessToken;
+        var me = (await (await auth.MeAsync(lateToken)).Content.ReadFromJsonAsync<SessionResponse>())!;
+        Assert.Equal(successor, me.SessionId);   // the access token names the live successor, not the rotated session
+
+        Assert.Equal(HttpStatusCode.OK, (await auth.RefreshAsync(cookie2)).StatusCode);
+    }
+
+    [DatabaseFact]
+    public async Task An_older_generation_inside_the_grace_is_still_reuse_and_revokes_the_family()
+    {
+        var (username, _, _) = await factory.SeedUserAsync();
+        var auth = new AuthClient(factory.CreateClient());
+        var (_, cookie1, _) = await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password);
+        var second = await auth.RefreshAsync(cookie1);
+        var cookie2 = AuthClient.CookieValue(second.Headers.GetValues("Set-Cookie").Single(v => v.StartsWith("__Secure-rt=", StringComparison.Ordinal)));
+        var third = await auth.RefreshAsync(cookie2);
+        var cookie3 = AuthClient.CookieValue(third.Headers.GetValues("Set-Cookie").Single(v => v.StartsWith("__Secure-rt=", StringComparison.Ordinal)));
+
+        var reuse = await auth.RefreshAsync(cookie1);   // its successor was rotated again: two generations old
+        Assert.Equal((HttpStatusCode.Unauthorized, ProblemCodes.RefreshTokenRejected), (reuse.StatusCode, await AuthClient.CodeOf(reuse)));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await auth.RefreshAsync(cookie3)).StatusCode);   // the whole family is revoked
+    }
+
+    [DatabaseFact]
+    public async Task A_user_who_must_change_the_password_reaches_only_the_password_change()
+    {
+        // C-04 (ORG-001 A13, 02 §6.1): enforced by the server, not only by the SPA's guard
+        var (username, _, userId) = await factory.SeedUserAsync(permissions: ["settings.view"]);
+        await using (var connection = new Npgsql.NpgsqlConnection(TestDatabase.OwnerConnection))
+        {
+            await connection.OpenAsync();
+            await using var command = new Npgsql.NpgsqlCommand("UPDATE identity.platform_users SET must_change_password = true WHERE id = @id", connection);
+            command.Parameters.AddWithValue("id", userId);
+            Assert.Equal(1, await command.ExecuteNonQueryAsync());
+        }
+
+        var auth = new AuthClient(factory.CreateClient());
+        var (body, cookie, _) = await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password);
+        Assert.True(body.Profile!.MustChangePassword);
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", body.AccessToken);
+        client.DefaultRequestHeaders.Add("X-Requested-With", "Platform");
+
+        var settings = await client.GetAsync("/api/v1/settings");
+        Assert.Equal((HttpStatusCode.Forbidden, AuthProblemCodes.PasswordChangeRequired), (settings.StatusCode, await AuthClient.CodeOf(settings)));
+        var audit = await client.GetAsync("/api/v1/audit/entries");
+        Assert.Equal((HttpStatusCode.Forbidden, AuthProblemCodes.PasswordChangeRequired), (audit.StatusCode, await AuthClient.CodeOf(audit)));
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/account/profile")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(AuthClient.MePath)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(AuthClient.ChallengePath)).StatusCode);
+        var refreshed = await auth.RefreshAsync(cookie);
+        Assert.Equal(HttpStatusCode.OK, refreshed.StatusCode);
+        Assert.True((await refreshed.Content.ReadFromJsonAsync<AuthResponse>())!.Profile!.MustChangePassword);
+
+        const string newPassword = "Changed-Password-2026!";
+        const string passwordPath = "/api/v1/account/password";
+        var challenge = await auth.ChallengeAsync();
+        var changed = await client.PostAsJsonAsync(passwordPath, new
+        {
+            currentPassword = TestSealer.Seal(challenge, "currentPassword", ApiFactory.Password, "POST " + passwordPath),
+            newPassword = TestSealer.Seal(challenge, "newPassword", newPassword, "POST " + passwordPath),
+        });
+        Assert.Equal(HttpStatusCode.NoContent, changed.StatusCode);
+
+        // released at once, with the same access token (the gate re-reads a cached "must change" before refusing)
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/settings")).StatusCode);
     }
 
     [DatabaseFact]
@@ -175,6 +339,109 @@ public sealed class AuthFlowTests(ApiFactory factory) : IClassFixture<ApiFactory
         Assert.Contains(signedOut.Headers.GetValues("Set-Cookie"), v => v.StartsWith("__Secure-rt=;", StringComparison.Ordinal) || v.Contains("expires=Thu, 01 Jan 1970", StringComparison.OrdinalIgnoreCase));
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await auth.RefreshAsync(cookie)).StatusCode);
+    }
+
+    [DatabaseFact]
+    public async Task The_cookie_of_a_signed_out_or_expired_session_is_refused_without_the_reuse_alarm_R2_06()
+    {
+        // Round 2 R2-06: a sign-out response cut off by a page navigation leaves the cookie in the browser; its next refresh
+        // was logged as REFRESH_REUSE_DETECTED (error). It is an ended session, not a theft.
+        var (username, _, userId) = await factory.SeedUserAsync();
+        var auth = new AuthClient(factory.CreateClient());
+        var (_, cookie1, _) = await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password);
+        var rotated = await auth.RefreshAsync(cookie1);
+        var cookie2 = AuthClient.CookieValue(rotated.Headers.GetValues("Set-Cookie").Single(v => v.StartsWith("__Secure-rt=", StringComparison.Ordinal)));
+        Assert.Equal(HttpStatusCode.NoContent, (await auth.SignOutAsync(cookie2)).StatusCode);
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var stale = await auth.RefreshAsync(cookie2);
+            Assert.Equal((HttpStatusCode.Unauthorized, ProblemCodes.RefreshTokenRejected), (stale.StatusCode, await AuthClient.CodeOf(stale)));
+        }
+
+        var events = await SecurityEventsOfAsync(userId);
+        Assert.DoesNotContain(events, row => row.Name == "REFRESH_REUSE_DETECTED");
+        Assert.Equal(2, events.Count(row => row == ("SESSION_CONTEXT_CHANGED", "info", "refresh_after_logout")));
+        Assert.All(await RevocationReasonsOfAsync(userId), reason => Assert.Equal("Logout", reason));   // the family is left as sign-out left it
+
+        // The same for a session that expired: refused at expiry, then refused again quietly.
+        var (otherName, _, otherId) = await factory.SeedUserAsync();
+        var (_, otherCookie, _) = await auth.SignInExpectingSuccessAsync(otherName, ApiFactory.Password);
+        factory.Clock.Advance(TimeSpan.FromHours(9));
+        try
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, (await auth.RefreshAsync(otherCookie)).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await auth.RefreshAsync(otherCookie)).StatusCode);
+        }
+        finally
+        {
+            factory.Clock.Advance(TimeSpan.FromHours(-9));
+        }
+
+        var otherEvents = await SecurityEventsOfAsync(otherId);
+        Assert.DoesNotContain(otherEvents, row => row.Name == "REFRESH_REUSE_DETECTED");
+        Assert.Contains(otherEvents, row => row == ("SESSION_CONTEXT_CHANGED", "info", "refresh_after_expired"));
+        Assert.Equal("Expired", Assert.Single(await RevocationReasonsOfAsync(otherId)));
+    }
+
+    [DatabaseFact]
+    public async Task A_rotated_token_presented_after_the_grace_is_still_reuse_with_the_alarm_and_the_family_revoked_R2_06()
+    {
+        var (username, _, userId) = await factory.SeedUserAsync();
+        var auth = new AuthClient(factory.CreateClient());
+        var (_, cookie1, _) = await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password);
+        var rotated = await auth.RefreshAsync(cookie1);
+        Assert.Equal(HttpStatusCode.OK, rotated.StatusCode);
+
+        factory.Clock.Advance(GraceElapsed);
+        try
+        {
+            var reuse = await auth.RefreshAsync(cookie1);
+            Assert.Equal((HttpStatusCode.Unauthorized, ProblemCodes.RefreshTokenRejected), (reuse.StatusCode, await AuthClient.CodeOf(reuse)));
+        }
+        finally
+        {
+            factory.Clock.Advance(-GraceElapsed);
+        }
+
+        var events = await SecurityEventsOfAsync(userId);
+        Assert.Contains(events, row => row.Name == "REFRESH_REUSE_DETECTED" && row.Severity == "error");
+        Assert.DoesNotContain(events, row => row.Detail is not null && row.Detail.StartsWith("refresh_after_", StringComparison.Ordinal));
+        var reasons = await RevocationReasonsOfAsync(userId);
+        Assert.Equal(2, reasons.Count);
+        Assert.All(reasons, reason => Assert.Equal("ReuseDetected", reason));
+    }
+
+    private static async Task<List<(string Name, string Severity, string? Detail)>> SecurityEventsOfAsync(Guid userId)
+    {
+        await using var connection = new NpgsqlConnection(TestDatabase.OwnerConnection);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("SELECT name, severity, detail FROM audit.security_events WHERE actor_user_id = @user ORDER BY at_utc, id", connection);
+        command.Parameters.AddWithValue("user", userId);
+        var rows = new List<(string, string, string?)>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)));
+        }
+
+        return rows;
+    }
+
+    private static async Task<List<string?>> RevocationReasonsOfAsync(Guid userId)
+    {
+        await using var connection = new NpgsqlConnection(TestDatabase.OwnerConnection);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("SELECT revocation_reason FROM identity.refresh_sessions WHERE platform_user_id = @user ORDER BY issued_at_utc", connection);
+        command.Parameters.AddWithValue("user", userId);
+        var reasons = new List<string?>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            reasons.Add(reader.IsDBNull(0) ? null : reader.GetString(0));
+        }
+
+        return reasons;
     }
 
     [DatabaseFact]
@@ -309,6 +576,40 @@ public sealed class AuthFlowTests(ApiFactory factory) : IClassFixture<ApiFactory
 
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
         Assert.Equal(ProblemCodes.SessionRevokedOrExpired, await AuthClient.CodeOf(me));
+    }
+
+    [DatabaseFact]
+    public async Task Recovery_by_mobile_finds_the_account_whichever_spelling_was_stored_or_typed()
+    {
+        // C-03: rows saved before the E.164 rule hold the national form; the lookup matches every spelling of the number
+        await SeedEgyptLikeCountryAsync();
+        var legacyNational = NewEgyptianNational();
+        var currentNational = NewEgyptianNational();
+        await factory.SeedUserAsync(mobile: "0" + legacyNational);
+        await factory.SeedUserAsync(mobile: "+20" + currentNational);
+        var auth = new AuthClient(factory.CreateClient());
+
+        var byE164 = await auth.Http.PostAsJsonAsync("/api/v1/auth/recovery/start", new StartPasswordRecoveryRequest("+20" + legacyNational, "en"));
+        Assert.Equal(HttpStatusCode.Accepted, byE164.StatusCode);
+        Assert.NotNull(factory.Notifications.LastTo("0" + legacyNational));
+
+        var byNational = await auth.Http.PostAsJsonAsync("/api/v1/auth/recovery/start", new StartPasswordRecoveryRequest("0" + currentNational, "en"));
+        Assert.Equal(HttpStatusCode.Accepted, byNational.StatusCode);
+        Assert.NotNull(factory.Notifications.LastTo("+20" + currentNational));
+    }
+
+    private static string NewEgyptianNational() =>
+        "10" + Random.Shared.NextInt64(10_000_000, 99_999_999).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>An active country with the dial code +20 and 10 national digits (ISO codes J? are this class's own).</summary>
+    private async Task SeedEgyptLikeCountryAsync()
+    {
+        var n = Interlocked.Increment(ref _isoCounter);
+        var iso = "J" + (char)('A' + (n % 26));
+        using var scope = factory.Services.CreateScope();
+        var country = Platform.Domain.PlatformAdmin.Country.Create(new Platform.Domain.PlatformAdmin.CountryData("Mobileland " + iso, "أرض " + iso, iso, "+20", "Pound", "EGP", "ar", "Africa/Cairo", 10, null, null));
+        scope.ServiceProvider.GetRequiredService<Platform.Application.PlatformAdmin.ICountryRepository>().Add(country);
+        await scope.ServiceProvider.GetRequiredService<Platform.Application.Abstractions.Persistence.IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
     }
 
     private static HttpResponseMessage Assert400(HttpResponseMessage response)

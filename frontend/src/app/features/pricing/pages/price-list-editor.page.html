@@ -74,7 +74,8 @@
 
   <app-section-card [padded]="false" class="grid-card">
     <app-toolbar>
-      <app-search-box toolbarFilters [placeholder]="i18n.t('pricing.editor.searchPlaceholder')" (searchChange)="onSearch($event)" />
+      <!-- the box shows the filter the grid applies, whoever set it (UAT B-05) -->
+      <app-search-box toolbarFilters [placeholder]="i18n.t('pricing.editor.searchPlaceholder')" [value]="facade.search()" (valueChange)="onSearch($event)" />
       <app-service-picker
         toolbarFilters
         *appCan="permissions.edit"
@@ -112,6 +113,9 @@
       [emptyMessage]="i18n.t('pricing.editor.emptyHint')"
       [caption]="title()"
       [rowClass]="rowClass"
+      [sort]="sort()"
+      [serverSort]="true"
+      (sortChange)="onSort($event)"
     >
       <ng-template appCell="code" [appCellOf]="pagedRows()" let-row>
         <span class="mono">{{ facade.names.code(row.serviceId) || '—' }}</span>
@@ -156,4 +160,4 @@
   </app-section-card>
 </div>
 
-<app-copy-list-dialog [(open)]="copyOpen" [source]="detail()" [pending]="facade.copy.pending()" [problem]="facade.copy.problem()" (confirmCopy)="runCopy($event)" />
+<app-copy-list-dialog [(open)]="copyOpen" [source]="detail()" [takenCodes]="copyTaken()" [pending]="facade.copy.pending()" [problem]="facade.copy.problem()" (confirmCopy)="runCopy($event)" />

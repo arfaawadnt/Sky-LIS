@@ -9,7 +9,8 @@ namespace Platform.Application.PlatformAdmin;
 // Write sides and projections of platform administration. The saas tables carry no tenant: every read here is
 // platform-wide, which is why every admin handler first checks the platform tenant (PlatformAdminScope, PLT-403).
 
-public sealed record ClientFilter(string? Search, TenantSource? Source, Guid? PlanId, TenantStatus? Status);
+/// <summary><see cref="Sort"/>: server order before paging (validation v0.5.0 B-03, <see cref="PlatformAdminSortKeys.Clients"/>); none = newest first.</summary>
+public sealed record ClientFilter(string? Search, TenantSource? Source, Guid? PlanId, TenantStatus? Status, ListSort Sort = default);
 
 public interface ITenantRepository : IRepository<Tenant>
 {
@@ -52,7 +53,7 @@ public interface ICountryRepository : IRepository<Country>
     /// <summary>INV-PLT-010: a governorate, a client or a wizard request references the country.</summary>
     Task<bool> IsReferencedAsync(Guid countryId, CancellationToken cancellationToken);
 
-    Task<Paged<CountryListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken);
+    Task<Paged<CountryListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<PublicCountry>> ListPublicAsync(CancellationToken cancellationToken);
 
@@ -64,7 +65,7 @@ public interface IGovernorateRepository : IRepository<Governorate>
 {
     Task<bool> NameExistsAsync(Guid countryId, string nameEn, Guid? exceptId, CancellationToken cancellationToken);
 
-    Task<Paged<GovernorateListItem>> ListAsync(Guid? countryId, string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken);
+    Task<Paged<GovernorateListItem>> ListAsync(Guid? countryId, string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<PublicGovernorate>> ListPublicAsync(Guid? countryId, CancellationToken cancellationToken);
 }
@@ -73,28 +74,28 @@ public interface INotificationTemplateRepository : IRepository<NotificationTempl
 {
     Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken);
 
-    Task<Paged<NotificationTemplateListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken);
+    Task<Paged<NotificationTemplateListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken);
 }
 
 public interface IAnalyserModelRepository : IRepository<AnalyserModel>
 {
     Task<bool> ExistsAsync(string vendor, string model, Guid? exceptId, CancellationToken cancellationToken);
 
-    Task<Paged<AnalyserModelListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken);
+    Task<Paged<AnalyserModelListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken);
 }
 
 public interface IPcrKitTemplateRepository : IRepository<PcrKitTemplate>
 {
     Task<bool> NameExistsAsync(string name, Guid? exceptId, CancellationToken cancellationToken);
 
-    Task<Paged<PcrKitListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken);
+    Task<Paged<PcrKitListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken);
 }
 
 public interface ICodeSystemRepository : IRepository<CodeSystem>
 {
     Task<bool> ExistsAsync(CodeSystemName name, string version, Guid? exceptId, CancellationToken cancellationToken);
 
-    Task<Paged<CodeSystemListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken);
+    Task<Paged<CodeSystemListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken);
 
     /// <summary>Every item of the code system, tracked and keyed by code, for an import (upsert by code).</summary>
     Task<IReadOnlyDictionary<string, CodeSystemItem>> LoadItemsAsync(Guid codeSystemId, CancellationToken cancellationToken);
@@ -108,7 +109,7 @@ public interface IRuleTemplateRepository : IRepository<RuleTemplate>
 {
     Task<bool> NameExistsAsync(string name, Guid? exceptId, CancellationToken cancellationToken);
 
-    Task<Paged<RuleTemplateListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken);
+    Task<Paged<RuleTemplateListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken);
 }
 
 public interface ISubscriptionRequestRepository : IRepository<SubscriptionRequest>;

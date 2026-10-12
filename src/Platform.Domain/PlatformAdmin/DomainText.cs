@@ -71,16 +71,17 @@ internal static class DomainText
     }
 
     /// <summary>
-    /// An amount a person typed (a wallet top-up or its request): more than two decimals is refused with <paramref name="code"/>
-    /// rather than rounded behind the user's back (validation 2026-10-11, C-19), then checked as <see cref="Money"/>.
+    /// An amount a person typed (a wallet top-up or its request, a plan's monthly fee): more than two decimals is refused with
+    /// <paramref name="code"/> rather than rounded behind the user's back (validation 2026-10-11, C-19 and C-05), then checked
+    /// as <see cref="Money"/>.
     /// </summary>
-    public static decimal EnteredMoney(decimal amount, string code, string field)
+    public static decimal EnteredMoney(decimal amount, string code, string field, bool allowZero = false)
     {
         if (decimal.Round(amount, 2) != amount)
         {
             throw new DomainException(code, $"{field} has at most two decimals.", DomainFault.Validation);
         }
 
-        return Money(amount, code, field, allowZero: false);
+        return Money(amount, code, field, allowZero);
     }
 }

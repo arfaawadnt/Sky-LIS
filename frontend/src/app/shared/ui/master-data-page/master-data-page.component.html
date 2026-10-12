@@ -27,7 +27,7 @@
     <p class="problem list-problem" role="alert">{{ loadErrorText() }}</p>
   }
 
-  <app-data-table [columns]="config().columns" [rows]="rows()" [rowId]="rowId()" [loading]="list.isLoading()" [cellTemplates]="cellTemplates()" [rowClass]="rowClass()" [caption]="text('title')" (rowActivate)="openEdit($event)">
+  <app-data-table [columns]="config().columns" [rows]="rows()" [rowId]="rowId()" [loading]="list.isLoading()" [cellTemplates]="cellTemplates()" [rowClass]="rowClass()" [caption]="text('title')" [sort]="sort()" [serverSort]="serverSorted()" (sortChange)="onSortChange($event)" (rowActivate)="openEdit($event)">
     <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
       @if (activation()) {
         <app-badge [status]="isActive()(row) ? 'Active' : 'Inactive'" />
@@ -61,7 +61,10 @@
 
 <app-drawer [(open)]="drawerOpen" [title]="drawerTitle()" [size]="config().drawerSize ?? 'md'" (closed)="onDrawerClosed()">
   @if (form(); as form) {
-    <form [id]="formId" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+    <form [id]="formId" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" (input)="onFormEdited()" (change)="onFormEdited()" novalidate>
+      @if (blocked()) {
+        <p class="problem" role="alert">{{ i18n.t('shared.masterData.invalid') }}</p>
+      }
       @if (saveProblem(); as problem) {
         <p class="problem" role="alert">{{ problemText(problem) }}</p>
       }
@@ -129,7 +132,11 @@
     </form>
   }
   <ng-container drawerFooter>
-    <button type="button" class="btn" (click)="closeDrawer()">{{ i18n.t('shared.masterData.cancel') }}</button>
-    <button type="button" class="btn primary" [disabled]="saving()" (click)="save()">{{ saving() ? i18n.t('shared.masterData.saving') : i18n.t('shared.masterData.save') }}</button>
+    @if (readOnly()) {
+      <button type="button" class="btn" (click)="closeDrawer()">{{ i18n.t('shared.drawer.close') }}</button>
+    } @else {
+      <button type="button" class="btn" (click)="closeDrawer()">{{ i18n.t('shared.masterData.cancel') }}</button>
+      <button type="button" class="btn primary" [disabled]="saving()" (click)="save()">{{ saving() ? i18n.t('shared.masterData.saving') : i18n.t('shared.masterData.save') }}</button>
+    }
   </ng-container>
 </app-drawer>

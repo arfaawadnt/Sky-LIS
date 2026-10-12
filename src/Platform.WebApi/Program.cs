@@ -60,6 +60,7 @@ foreach (var step in PipelineOrder.Sequence)
         case PipelineOrder.AuthOriginCheck: app.UseMiddleware<AuthOriginCheckMiddleware>(); break;
         case PipelineOrder.TenantResolution: app.UseMiddleware<TenantResolutionMiddleware>(); break;
         case PipelineOrder.MfaEnrollmentGate: app.UseMiddleware<MfaEnrollmentGateMiddleware>(); break;
+        case PipelineOrder.PasswordChangeGate: app.UseMiddleware<PasswordChangeGateMiddleware>(); break;
         case PipelineOrder.Authorization: app.UseAuthorization(); break;
         case PipelineOrder.Endpoints:
             app.MapControllers();

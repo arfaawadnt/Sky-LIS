@@ -21,10 +21,16 @@ public static class PasswordRecovery
     public const string OtpPurpose = "password-recovery";
     public const int MaxIdentifierLength = 64;
 
-    /// <summary>Finds the account by username first, then by mobile (normalised); <see langword="null"/> when neither matches.</summary>
-    public static async Task<PlatformUser?> FindAsync(IPlatformUserRepository users, string usernameOrMobile, CancellationToken cancellationToken)
+    /// <summary>
+    /// Finds the account by username first, then by mobile in any spelling it may be stored under (C-03: E.164 now, the
+    /// national form on rows saved before the rule); <see langword="null"/> when neither matches. When several accounts
+    /// hold the number in different spellings (possible only for rows saved before the rule), the one stored exactly as
+    /// typed is taken, otherwise none: a code is never sent to an ambiguous account.
+    /// </summary>
+    public static async Task<PlatformUser?> FindAsync(IPlatformUserRepository users, IUserMobileNumbers mobiles, string usernameOrMobile, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(users);
+        ArgumentNullException.ThrowIfNull(mobiles);
         var identifier = (usernameOrMobile ?? string.Empty).Trim();
         if (identifier.Length == 0)
         {
@@ -37,17 +43,19 @@ public static class PasswordRecovery
             return user;
         }
 
-        string? mobile;
-        try
-        {
-            mobile = PlatformUser.NormaliseMobile(identifier);
-        }
-        catch (DomainException)
+        var spellings = await mobiles.SpellingsAsync(identifier, cancellationToken);
+        if (spellings.Count == 0)
         {
             return null;
         }
 
-        return mobile is null ? null : await users.FindByMobileAsync(mobile, cancellationToken);
+        var holders = await users.ListByMobileSpellingsAsync(spellings, cancellationToken);
+        return holders.Count switch
+        {
+            0 => null,
+            1 => holders[0],
+            _ => holders.SingleOrDefault(holder => holder.Mobile == spellings[0]),
+        };
     }
 }
 
@@ -64,11 +72,11 @@ public sealed class StartPasswordRecoveryCommandValidator : AbstractValidator<St
     }
 }
 
-public sealed class StartPasswordRecoveryCommandHandler(IPlatformUserRepository users, IOtpService otp, ISecurityEventLog events) : ICommandHandler<StartPasswordRecoveryCommand>
+public sealed class StartPasswordRecoveryCommandHandler(IPlatformUserRepository users, IUserMobileNumbers mobiles, IOtpService otp, ISecurityEventLog events) : ICommandHandler<StartPasswordRecoveryCommand>
 {
     public async Task Handle(StartPasswordRecoveryCommand command, CancellationToken cancellationToken)
     {
-        var user = await PasswordRecovery.FindAsync(users, command.UsernameOrMobile, cancellationToken);
+        var user = await PasswordRecovery.FindAsync(users, mobiles, command.UsernameOrMobile, cancellationToken);
         if (user is null)
         {
             await events.WriteAsync(new SecurityEvent(SecurityEvents.PasswordRecoveryFailed, SecurityEvent.Warning, Detail: "unknown_account"), cancellationToken);
@@ -110,6 +118,7 @@ public sealed class CompletePasswordRecoveryCommandValidator : AbstractValidator
 
 public sealed class CompletePasswordRecoveryCommandHandler(
     IPlatformUserRepository users,
+    IUserMobileNumbers mobiles,
     IRefreshSessionRepository sessions,
     IOtpService otp,
     IPasswordHasher hasher,
@@ -120,7 +129,7 @@ public sealed class CompletePasswordRecoveryCommandHandler(
 {
     public async Task Handle(CompletePasswordRecoveryCommand command, CancellationToken cancellationToken)
     {
-        var user = await PasswordRecovery.FindAsync(users, command.UsernameOrMobile, cancellationToken);
+        var user = await PasswordRecovery.FindAsync(users, mobiles, command.UsernameOrMobile, cancellationToken);
         if (user is null || !user.IsActive || user.Mobile is null)
         {
             await events.WriteAsync(new SecurityEvent(SecurityEvents.PasswordRecoveryFailed, SecurityEvent.Warning, ActorUserId: user?.Id, Detail: user is null ? "unknown_account" : user.IsActive ? "no_mobile" : "inactive"), cancellationToken);

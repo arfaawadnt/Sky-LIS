@@ -1,13 +1,15 @@
-import { ChangeDetectionStrategy, Component, computed, contentChildren, effect, inject, input, linkedSignal, resource, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, Injector, computed, contentChildren, effect, inject, input, linkedSignal, resource, signal, untracked } from '@angular/core';
 import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { DEFAULT_PAGE_SIZE, type PageRequest, firstPage } from '../../../core/api/paging';
 import { type ProblemDetails, ProblemError, isProblem, ProblemCodes } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { type LocalizedTextGroup, localizedFromDto, localizedTextGroup, localizedToDto } from '../../forms/localized-text';
 import { markAllTouched } from '../../forms/mark-all-touched';
 import { problemMessage } from '../../forms/problem-text';
-import { problemToFormErrors } from '../../forms/problem-to-form-errors';
+import { clearLinkedServerErrors, problemToFormErrors } from '../../forms/problem-to-form-errors';
+import type { ServerSort } from '../../forms/paging';
 import { SaveShortcutDirective } from '../../forms/save-shortcut.directive';
 import { UppercaseDirective } from '../../forms/uppercase.directive';
 import { codeValidator, requiredText } from '../../forms/validators';
@@ -15,7 +17,7 @@ import { BadgeComponent } from '../badge/badge.component';
 import { CanDirective } from '../can.directive';
 import { CellTemplateDirective, RowActionsTemplateDirective } from '../data-table/cell-template.directive';
 import { DataTableComponent } from '../data-table/data-table.component';
-import { cellValue, defaultRowId } from '../data-table/data-table.types';
+import { type TableSort, cellValue, defaultRowId, serverSortKey } from '../data-table/data-table.types';
 import { ConfirmService } from '../dialog/confirm.service';
 import { DrawerComponent } from '../drawer/drawer.component';
 import { FormFieldComponent } from '../form-field/form-field.component';
@@ -70,6 +72,8 @@ export class MasterDataPageComponent<TItem, TDto> {
   protected readonly i18n = inject(I18nService);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly injector = inject(Injector);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
   readonly config = input.required<MasterDataConfig<TItem, TDto>>();
 
@@ -82,8 +86,29 @@ export class MasterDataPageComponent<TItem, TDto> {
   protected readonly page = linkedSignal<PageRequest>(() => firstPage(this.config().pageSize ?? DEFAULT_PAGE_SIZE));
   private readonly reloadTick = signal(0);
 
+  /** The column order the user chose in the table header (`null` = the list's own order). */
+  protected readonly sort = signal<TableSort | null>(null);
+
+  protected readonly serverSorted = computed(() => this.config().sortMode === 'server');
+
+  /** B-03: the server key and direction of the chosen column, per language (a bilingual name sorts by the shown language). */
+  private readonly serverSort = computed<ServerSort | null>(() => {
+    const sort = this.sort();
+    if (sort === null || !this.serverSorted()) {
+      return null;
+    }
+
+    const column = this.config().columns.find((candidate) => candidate.key === sort.key);
+    return column ? { key: serverSortKey(column, this.i18n.lang()), direction: sort.direction } : null;
+  });
+
+  private readonly listFilter = computed<MasterDataFilter>(() => {
+    const sort = this.serverSort();
+    return sort === null ? this.filter() : { ...this.filter(), sort };
+  });
+
   protected readonly list = resource({
-    params: () => ({ filter: this.filter(), page: this.page(), tick: this.reloadTick() }),
+    params: () => ({ filter: this.listFilter(), page: this.page(), tick: this.reloadTick() }),
     loader: ({ params, abortSignal }) => untracked(() => this.config().adapter).list(params.filter, params.page, abortSignal),
   });
 
@@ -121,9 +146,26 @@ export class MasterDataPageComponent<TItem, TDto> {
   protected readonly form = signal<DynamicForm | null>(null);
   protected readonly saving = signal(false);
   protected readonly saveProblem = signal<ProblemDetails | null>(null);
+  /** B-01: a save was refused by the form itself; the drawer says so (the fields are marked and the first one focused). */
+  protected readonly blocked = signal(false);
+  /** The form value when the server errors arrived: a linked field that differs from it clears them (B-01). */
+  private serverErrorSnapshot: Readonly<Record<string, unknown>> | null = null;
   protected readonly options = signal<Readonly<Record<string, readonly SelectOption[]>>>({});
 
-  protected readonly drawerTitle = computed(() => this.text(this.editing() === null ? 'add' : 'edit'));
+  /** The user may change an existing record: the config's `update` permission, or no gate at all (the server decides regardless). */
+  protected readonly canEdit = computed(() => {
+    const permission = this.permissions().update;
+    // resolved only for a gated config, like `*appCan` (an ungated page needs no session)
+    return permission === undefined || this.injector.get(PermissionsService).can(permission);
+  });
+
+  /**
+   * R-07: a row opened without the edit permission is a read-only view: every field disabled, no Save (nor F10), the
+   * title says "View". The list stays clickable so a reader can see the whole record.
+   */
+  protected readonly readOnly = computed(() => this.editing() !== null && !this.canEdit());
+
+  protected readonly drawerTitle = computed(() => this.text(this.editing() === null ? 'add' : this.readOnly() ? 'view' : 'edit'));
 
   protected readonly subtitle = computed(() => {
     const key = `${this.config().i18nPrefix}.subtitle`;
@@ -191,6 +233,31 @@ export class MasterDataPageComponent<TItem, TDto> {
     this.page.set(page);
   }
 
+  /** A header click: a server-sorted list starts again at page 1 of the new order (B-03). */
+  protected onSortChange(sort: TableSort | null): void {
+    this.sort.set(sort);
+    if (this.serverSorted()) {
+      this.page.update((current) => ({ ...current, page: 1 }));
+    }
+  }
+
+  /** Any edit in the drawer (bubbling `input` / `change`): stale linked server errors go, the notice follows the form. */
+  protected onFormEdited(): void {
+    const form = this.form();
+    if (form === null) {
+      return;
+    }
+
+    const groups = this.config().linkedFields ?? [];
+    if (this.serverErrorSnapshot !== null && groups.length > 0 && clearLinkedServerErrors(form, groups, this.serverErrorSnapshot)) {
+      this.serverErrorSnapshot = null;
+    }
+
+    if (this.blocked() && form.valid) {
+      this.blocked.set(false);
+    }
+  }
+
   reload(): void {
     this.reloadTick.update((tick) => tick + 1);
   }
@@ -198,14 +265,19 @@ export class MasterDataPageComponent<TItem, TDto> {
   openCreate(): void {
     this.editing.set(null);
     this.form.set(this.buildForm(null));
-    this.saveProblem.set(null);
+    this.resetDrawerState();
     this.drawerOpen.set(true);
   }
 
   openEdit(item: TItem): void {
     this.editing.set(item);
-    this.form.set(this.buildForm(item));
-    this.saveProblem.set(null);
+    const form = this.buildForm(item);
+    if (this.readOnly()) {
+      form.disable();
+    }
+
+    this.form.set(form);
+    this.resetDrawerState();
     this.drawerOpen.set(true);
   }
 
@@ -216,19 +288,30 @@ export class MasterDataPageComponent<TItem, TDto> {
   protected onDrawerClosed(): void {
     this.form.set(null);
     this.editing.set(null);
+    this.resetDrawerState();
+  }
+
+  private resetDrawerState(): void {
     this.saveProblem.set(null);
+    this.blocked.set(false);
+    this.serverErrorSnapshot = null;
   }
 
   async save(): Promise<void> {
     const form = this.form();
-    if (form === null || this.saving()) {
+    if (form === null || this.saving() || this.readOnly()) {
       return;
     }
 
+    // B-01: a refused save is never silent: every field shows its line, the first wrong one takes the focus and the
+    // drawer says the record was not saved.
     if (!markAllTouched(form)) {
+      this.blocked.set(true);
+      this.focusFirstInvalid();
       return;
     }
 
+    this.blocked.set(false);
     const item = this.editing();
     const value = this.readValue(form);
     const dto = (this.config().toDto ?? this.defaultToDto)(value, item);
@@ -293,12 +376,19 @@ export class MasterDataPageComponent<TItem, TDto> {
 
     if (isProblem(error, ProblemCodes.validationFailed)) {
       const unmatched = problemToFormErrors(error.problem, form);
+      this.serverErrorSnapshot = form.getRawValue() as Readonly<Record<string, unknown>>;
       if (Object.keys(unmatched).length === 0 && error.problem.errors && Object.keys(error.problem.errors).length > 0) {
         return;
       }
     }
 
     this.saveProblem.set(error.problem);
+  }
+
+  /** Focuses the first invalid field of the drawer in document order. */
+  private focusFirstInvalid(): void {
+    const selector = ['input', 'select', 'textarea'].map((tag) => `#${this.formId} ${tag}.ng-invalid:not([disabled])`).join(', ');
+    this.host.ownerDocument.querySelector<HTMLElement>(selector)?.focus();
   }
 
   private buildForm(item: TItem | null): DynamicForm {

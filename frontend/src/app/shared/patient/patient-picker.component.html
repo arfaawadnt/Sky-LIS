@@ -3,7 +3,7 @@
     <app-icon name="user" [size]="18" />
     <div class="who">
       <span class="mono number">{{ patient.number }}</span>
-      <span class="name">{{ patient.fullName }}@if (patient.nameAr) { · <span dir="rtl" lang="ar">{{ patient.nameAr }}</span>}</span>
+      <span class="name">{{ patient.fullName || i18n.t('patients.vipMasked') }}@if (patient.nameAr) { · <span dir="rtl" lang="ar">{{ patient.nameAr }}</span>}</span>
       <span class="small muted">
         {{ i18n.t('patients.gender.' + patient.gender) }} · {{ ageText(patient) }}@if (patient.mobile) { · <span class="mono" dir="ltr">{{ patient.mobile }}</span>}
       </span>
@@ -34,7 +34,7 @@
           <li>
             <button type="button" class="result" [disabled]="stale()" (click)="choose(row)">
               <span class="mono number">{{ row.number }}</span>
-              <span class="name">{{ row.fullName }}@if (row.nameAr) { · <span dir="rtl" lang="ar">{{ row.nameAr }}</span>}</span>
+              <span class="name">{{ row.fullName || i18n.t('patients.vipMasked') }}@if (row.nameAr) { · <span dir="rtl" lang="ar">{{ row.nameAr }}</span>}</span>
               <span class="small muted">{{ i18n.t('patients.gender.' + row.gender) }} · {{ ageText(row) }}</span>
               <span class="small mono muted" dir="ltr">{{ row.mobile ?? '' }}</span>
               @if (row.isVip) {

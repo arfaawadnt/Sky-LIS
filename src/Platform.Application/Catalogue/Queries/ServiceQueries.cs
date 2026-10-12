@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Catalogue.Services;
 using Platform.Contracts.Catalogue;
@@ -14,7 +15,7 @@ namespace Platform.Application.Catalogue.Queries;
 // modules use. Enum filters travel as names and are validated here (VALIDATION-400 on an unknown name).
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
-public sealed record ListServicesQuery(string? Search, string? Type, Guid? ClinicalGroupId, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<ServiceListItem>>;
+public sealed record ListServicesQuery(string? Search, string? Type, Guid? ClinicalGroupId, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<ServiceListItem>>;
 
 public sealed class ListServicesValidator : AbstractValidator<ListServicesQuery>
 {
@@ -24,13 +25,15 @@ public sealed class ListServicesValidator : AbstractValidator<ListServicesQuery>
         RuleFor(query => query.Type).IsEnumName(typeof(ServiceType), caseSensitive: false).When(query => !string.IsNullOrEmpty(query.Type));
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(CatalogueSortKeys.Services);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
 public sealed class ListServicesHandler(IServiceRepository services) : IQueryHandler<ListServicesQuery, Paged<ServiceListItem>>
 {
     public Task<Paged<ServiceListItem>> Handle(ListServicesQuery query, CancellationToken cancellationToken) =>
-        services.ListAsync(new ServiceListFilter(query.Search, CatalogueAEnums.ServiceTypeOrNull(query.Type), query.ClinicalGroupId, query.IsActive), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        services.ListAsync(new ServiceListFilter(query.Search, CatalogueAEnums.ServiceTypeOrNull(query.Type), query.ClinicalGroupId, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Export)]
@@ -81,7 +84,7 @@ public sealed class ListServiceSequenceHandler(IServiceRepository services) : IQ
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
-public sealed record ListLabTestsQuery(string? Search, string? Type, Guid? ClinicalGroupId, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<LabTestListItem>>;
+public sealed record ListLabTestsQuery(string? Search, string? Type, Guid? ClinicalGroupId, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<LabTestListItem>>;
 
 public sealed class ListLabTestsValidator : AbstractValidator<ListLabTestsQuery>
 {
@@ -91,13 +94,15 @@ public sealed class ListLabTestsValidator : AbstractValidator<ListLabTestsQuery>
         RuleFor(query => query.Type).IsEnumName(typeof(LabTestType), caseSensitive: false).When(query => !string.IsNullOrEmpty(query.Type));
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(CatalogueSortKeys.LabTests);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
 public sealed class ListLabTestsHandler(ILabTestRepository tests) : IQueryHandler<ListLabTestsQuery, Paged<LabTestListItem>>
 {
     public Task<Paged<LabTestListItem>> Handle(ListLabTestsQuery query, CancellationToken cancellationToken) =>
-        tests.ListAsync(new LabTestListFilter(query.Search, CatalogueAEnums.TestTypeOrNull(query.Type), query.ClinicalGroupId, query.IsActive), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        tests.ListAsync(new LabTestListFilter(query.Search, CatalogueAEnums.TestTypeOrNull(query.Type), query.ClinicalGroupId, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Export)]

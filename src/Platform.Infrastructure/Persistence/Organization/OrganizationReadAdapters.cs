@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Organization;
 using Platform.Contracts.Common;
@@ -130,11 +131,11 @@ internal sealed class StaffDirectory(AppDbContext context) : IStaffDirectory
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var pattern = OrganizationReads.ContainsPattern(filter.Search);
-            query = query.Where(row => EF.Functions.ILike(row.user.Username, pattern)
-                                       || EF.Functions.ILike(row.membership.FullName.En, pattern)
-                                       || EF.Functions.ILike(row.membership.FullName.Ar, pattern)
-                                       || EF.Functions.ILike(row.user.Email, pattern)
-                                       || (row.user.Mobile != null && EF.Functions.ILike(row.user.Mobile, pattern)));
+            query = query.Where(row => EF.Functions.ILike(row.user.Username, pattern, OrganizationReads.Escape)
+                                       || EF.Functions.ILike(row.membership.FullName.En, pattern, OrganizationReads.Escape)
+                                       || EF.Functions.ILike(row.membership.FullName.Ar, pattern, OrganizationReads.Escape)
+                                       || EF.Functions.ILike(row.user.Email, pattern, OrganizationReads.Escape)
+                                       || (row.user.Mobile != null && EF.Functions.ILike(row.user.Mobile, pattern, OrganizationReads.Escape)));
         }
 
         if (filter.RoleId is { } roleId)
@@ -155,9 +156,14 @@ internal sealed class StaffDirectory(AppDbContext context) : IStaffDirectory
             _ => query,
         };
 
+        var sorts = SortsOf(query)
+            .Column("username", row => row.user.Username)
+            .Column("nameEn", row => row.membership.FullName.En)
+            .Column("nameAr", row => row.membership.FullName.Ar)
+            .ThenBy(row => row.user.Username);
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
         var rows = await (
-            from row in query.OrderBy(row => row.user.Username).Skip(page.Skip).Take(page.PageSize)
+            from row in sorts.Apply(query, filter.Sort, all => all.OrderBy(row => row.user.Username)).Skip(page.Skip).Take(page.PageSize)
             from role in context.Roles.AsNoTracking().Where(role => role.Id == row.membership.RoleId).DefaultIfEmpty()
             select new
             {
@@ -213,6 +219,9 @@ internal sealed class StaffDirectory(AppDbContext context) : IStaffDirectory
 
         return new Paged<UserListItem>(items, page.Page, page.PageSize, total);
     }
+
+    /// <summary>B-03: the sortable columns of the users register over the joined membership and user rows (the type is anonymous, hence inferred).</summary>
+    private static SortColumns<T> SortsOf<T>(IQueryable<T> _) => new(OrganizationSortKeys.Users);
 
     public async Task<StaffAccountView?> GetAsync(Guid platformUserId, CancellationToken cancellationToken)
     {

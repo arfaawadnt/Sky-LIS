@@ -1,13 +1,15 @@
+using Platform.Application.Abstractions.Persistence;
 using Platform.Domain.Catalogue;
 
 namespace Platform.Application.Catalogue;
 
 /// <summary>The filter of the simple catalogue-A registers: text search (code and names, ignoring case) and the active flag.</summary>
-public sealed record CatalogueAListFilter(string? Search, bool? IsActive);
+/// <remarks><see cref="Sort"/> is applied on the server before paging (validation v0.5.0 B-03; keys in <see cref="CatalogueSortKeys"/>).</remarks>
+public sealed record CatalogueAListFilter(string? Search, bool? IsActive, ListSort Sort = default);
 
-public sealed record ServiceListFilter(string? Search, ServiceType? Type, Guid? ClinicalGroupId, bool? IsActive);
+public sealed record ServiceListFilter(string? Search, ServiceType? Type, Guid? ClinicalGroupId, bool? IsActive, ListSort Sort = default);
 
-public sealed record LabTestListFilter(string? Search, LabTestType? Type, Guid? ClinicalGroupId, bool? IsActive);
+public sealed record LabTestListFilter(string? Search, LabTestType? Type, Guid? ClinicalGroupId, bool? IsActive, ListSort Sort = default);
 
 /// <summary>What a service member points at, as the member rules need it (CAT-027, CAT-026).</summary>
 public sealed record ServiceMemberState(Guid Id, ServiceType Type, bool IsActive);

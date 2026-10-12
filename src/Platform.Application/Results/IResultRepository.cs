@@ -23,7 +23,7 @@ public sealed record ResultVisibility(bool Unrestricted, IReadOnlyList<Guid> All
         || (GroupIdsByBranch.TryGetValue(branchId, out var groups) && groups.Contains(clinicalGroupId));
 }
 
-/// <summary>Filters of the worklist (CP-18, intake §14): collection window, group, test, analyser (its mapped tests), sample status, payer, statuses, delayed, search, branch.</summary>
+/// <summary>Filters of the worklist (CP-18, intake §14): collection window, group, test, analyser (its mapped tests), sample status, payer, statuses, delayed, search, branch; <c>Sort</c> orders the whole list before paging (validation v0.5.0 B-03, <see cref="ResultsSortKeys.Worklist"/>).</summary>
 public sealed record WorklistFilter(
     DateTimeOffset? CollectedFromUtc,
     DateTimeOffset? CollectedToUtc,
@@ -35,9 +35,10 @@ public sealed record WorklistFilter(
     IReadOnlyCollection<ResultStatus>? Statuses,
     bool DelayedOnly,
     string? Search,
-    Guid? BranchId);
+    Guid? BranchId,
+    ListSort Sort = default);
 
-/// <summary>A worklist row before the delay is computed: the result, its sample, patient, test and group as stored.</summary>
+/// <summary>A worklist row before the delay is computed: the result, its sample, patient, test and group as stored; <c>DateOfBirth</c> is the known date of birth or the one implied by the stated age.</summary>
 public sealed record WorklistRow(
     Guid ResultId,
     Guid VisitId,

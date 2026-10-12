@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Abstractions.Settings;
 using Platform.Contracts.Common;
@@ -15,7 +16,7 @@ namespace Platform.Application.Pricing.Queries;
 // Registers of the module (intake §14). Queries carry a policy like commands (D-04) and read projections only.
 
 [RequirePermissionPolicy(PermissionCatalog.Pricing, PermissionAction.View)]
-public sealed record ListPayersQuery(string? Search, string? Type, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<PayerListItem>>;
+public sealed record ListPayersQuery(string? Search, string? Type, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<PayerListItem>>;
 
 public sealed class ListPayersValidator : AbstractValidator<ListPayersQuery>
 {
@@ -25,6 +26,8 @@ public sealed class ListPayersValidator : AbstractValidator<ListPayersQuery>
         RuleFor(query => query.Type).IsEnumName(typeof(PayerType), caseSensitive: false).When(query => !string.IsNullOrEmpty(query.Type));
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(PricingSortKeys.Payers);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
@@ -34,7 +37,7 @@ public sealed class ListPayersHandler(IPayerRepository payers) : IQueryHandler<L
     {
         PayerType? type = string.IsNullOrEmpty(query.Type) ? null : Enum.Parse<PayerType>(query.Type, ignoreCase: true);
         var search = string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim();
-        return payers.ListAsync(new PayerFilter(search, type, query.IsActive), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        return payers.ListAsync(new PayerFilter(search, type, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
     }
 }
 
@@ -59,7 +62,7 @@ public sealed class ListTierOptionsHandler(IPayerRepository payers) : IQueryHand
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Pricing, PermissionAction.View)]
-public sealed record ListBasePriceListsQuery(string? Search, int? Year, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<BasePriceListItem>>;
+public sealed record ListBasePriceListsQuery(string? Search, int? Year, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<BasePriceListItem>>;
 
 public sealed class ListBasePriceListsValidator : AbstractValidator<ListBasePriceListsQuery>
 {
@@ -69,6 +72,8 @@ public sealed class ListBasePriceListsValidator : AbstractValidator<ListBasePric
         RuleFor(query => query.Year).InclusiveBetween(BasePriceList.MinYear, BasePriceList.MaxYear).When(query => query.Year is not null);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(PricingSortKeys.BasePriceLists);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
@@ -77,7 +82,7 @@ public sealed class ListBasePriceListsHandler(IBasePriceListRepository lists) : 
     public Task<Paged<BasePriceListItem>> Handle(ListBasePriceListsQuery query, CancellationToken cancellationToken)
     {
         var search = string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim();
-        return lists.ListAsync(new BasePriceListFilter(search, query.Year, query.IsActive), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        return lists.ListAsync(new BasePriceListFilter(search, query.Year, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
     }
 }
 

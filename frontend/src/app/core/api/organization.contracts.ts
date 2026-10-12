@@ -2,6 +2,7 @@
 
 import type { SettingKey } from './settings.contracts';
 
+import type { SortRequest } from './paging';
 export type { Paged } from './paging';
 
 export interface CreatedResource {
@@ -36,7 +37,7 @@ export interface CreateBranchRequest {
 
 export type UpdateBranchRequest = Omit<CreateBranchRequest, 'code'>;
 
-export interface BranchListFilter {
+export interface BranchListFilter extends SortRequest {
   readonly search: string;
   readonly isActive: boolean | null;
   readonly page: number;
@@ -147,7 +148,8 @@ export interface UpdateRoleRequest {
   readonly description: string | null;
 }
 
-export interface RoleListFilter {
+/** `sort`: `nameEn` or `nameAr` (B-03, server allow-list). */
+export interface RoleListFilter extends SortRequest {
   readonly search: string;
   readonly isActive: boolean | null;
   readonly page: number;
@@ -253,6 +255,8 @@ export interface CreateUserRequest {
   readonly shifts: readonly string[];
   readonly roleId: string | null;
   readonly branchIds: readonly string[];
+  /** B-02: `true` = every active branch (`branchIds` empty), `false` = only `branchIds` (at least one, else ORG-018). */
+  readonly allBranches?: boolean;
   readonly passwordExpiresAtUtc: string | null;
   readonly employeeCode: string | null;
   readonly preferredLanguage: string;
@@ -282,7 +286,8 @@ export interface SetUserOverridesRequest {
   readonly specialRights: SpecialRights | null;
 }
 
-export interface UserListFilter {
+/** `sort`: `username`, `nameEn` or `nameAr` (B-03, server allow-list). */
+export interface UserListFilter extends SortRequest {
   readonly search: string;
   readonly roleId: string | null;
   readonly status: UserStatus | null;
@@ -346,6 +351,7 @@ export const PARAMETER_GROUPS: readonly ParameterGroup[] = [
       { key: 'similarNameWarning', input: 'switch' },
       { key: 'discountCapPercent', input: 'number', min: 0, max: 100 },
       { key: 'accessionFormat', input: 'text', maxLength: 200 },
+      { key: 'timeZone', input: 'text', maxLength: 64 },
     ],
   },
   {

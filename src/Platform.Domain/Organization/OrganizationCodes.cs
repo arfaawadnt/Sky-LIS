@@ -26,6 +26,13 @@ public static class OrganizationCodes
 
     /// <summary>The governorate is unknown or belongs to another country than the branch's (field <c>governorateId</c>; UAT B-02).</summary>
     public const string GovernorateNotInCountry = "ORG-017";
+
+    /// <summary>
+    /// Validation v0.5.0 B-02: the request said "restricted to chosen branches" (<c>allBranches = false</c>) but named no
+    /// branch, or said "every branch" and named some (field <c>branchIds</c>). The stored empty list means every active
+    /// branch, so a restricted choice with no branch must never reach it.
+    /// </summary>
+    public const string BranchChoiceRequired = "ORG-018";
     public const string PasswordLength = "ORG-020";
     public const string PasswordContainsUsername = "ORG-021";
     public const string PasswordExpiryInvalid = "ORG-022";

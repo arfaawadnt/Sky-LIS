@@ -25,7 +25,7 @@
               <app-icon name="user" [size]="18" />
               <b>{{ name(saved.patient.fullName, saved.patient.nameAr) }}</b>
               <span class="mono">{{ saved.patient.number }}</span>
-              <span class="muted small">{{ saved.patient.gender ? i18n.t('registration.gender.' + saved.patient.gender) : '' }} · {{ saved.patient.ageYears }} {{ i18n.t('registration.years') }}</span>
+              <span class="muted small">{{ saved.patient.gender ? i18n.t('registration.gender.' + saved.patient.gender) : '' }} · {{ num(saved.patient.ageYears) }} {{ i18n.t('registration.years') }}</span>
               @if (saved.patient.mobile) {
                 <span class="mono small" dir="ltr">{{ saved.patient.mobile }}</span>
               }

@@ -22,7 +22,7 @@ public sealed class WebApiHardeningTests
     private static readonly string[] ExpectedPipeline =
     [
         "ForwardedHeaders", "Correlation", "SecurityHeaders", "ExceptionHandler", "Authentication", "CredentialAccountKey",
-        "RateLimiter", "AuthOriginCheck", "TenantResolution", "MfaEnrollmentGate", "Authorization", "Endpoints",
+        "RateLimiter", "AuthOriginCheck", "TenantResolution", "MfaEnrollmentGate", "PasswordChangeGate", "Authorization", "Endpoints",
     ];
     private static readonly string[] AllowedCustomHeaders = ["X-Requested-With", "X-Correlation-Id", "X-Forwarded", "Idempotency-Key", "X-Powered-By", "X-Frame-Options", "X-Content-Type-Options"];
 

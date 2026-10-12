@@ -5,11 +5,11 @@ using Platform.Domain.Pricing;
 
 namespace Platform.Application.Pricing;
 
-/// <summary>Filters of the payer register (CP-32): search over names and search key, type, active flag.</summary>
-public sealed record PayerFilter(string? Search, PayerType? Type, bool? IsActive);
+/// <summary>Filters of the payer register (CP-32): search over names and search key, type, active flag; <see cref="Sort"/> before paging (B-03, <see cref="PricingSortKeys.Payers"/>).</summary>
+public sealed record PayerFilter(string? Search, PayerType? Type, bool? IsActive, ListSort Sort = default);
 
-/// <summary>Filters of the base-list register (CP-33): search over code and names, year, active flag.</summary>
-public sealed record BasePriceListFilter(string? Search, int? Year, bool? IsActive);
+/// <summary>Filters of the base-list register (CP-33): search over code and names, year, active flag; <see cref="Sort"/> before paging (B-03, <see cref="PricingSortKeys.BasePriceLists"/>).</summary>
+public sealed record BasePriceListFilter(string? Search, int? Year, bool? IsActive, ListSort Sort = default);
 
 /// <summary>A tier's contract pricing as the CP-34 page and the review report read it.</summary>
 public sealed record ContractPricingView(

@@ -61,3 +61,35 @@ public sealed class RetimeResultsOnSampleCollectedPolicy(IResultRepository resul
         }
     }
 }
+
+/// <summary>
+/// BR-11 (validation A-02, 2026-10-11): when a result is verified, then the patient's open results of the same test in
+/// other visits re-check their delta against it, so the flag is on the result before anyone reviews or verifies it. The
+/// sign-off commands re-check again (the safety net); this only brings the flag forward. Idempotent.
+/// </summary>
+public sealed class RecheckDeltasOnResultVerifiedPolicy(IResultRepository results, ICatalogueLookup catalogue, IUnitOfWork unitOfWork, IClock clock) : IDomainEventHandler<ResultVerified>
+{
+    public async Task HandleAsync(ResultVerified domainEvent, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(domainEvent);
+        var verified = await results.ReadAsync(domainEvent.ResultId, cancellationToken);
+        if (verified is null || verified.NumericValue is null)
+        {
+            return;
+        }
+
+        var open = (await results.ListByPatientForUpdateAsync(verified.PatientId, cancellationToken))
+            .Where(result => result.TestId == verified.TestId && result.VisitId != verified.VisitId)
+            .ToList();
+        if (open.Count == 0)
+        {
+            return;
+        }
+
+        var changed = await ResultDeltaRecheck.RunAsync(results, catalogue, open, [], clock.UtcNow, cancellationToken);
+        if (changed.Count > 0)
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+    }
+}

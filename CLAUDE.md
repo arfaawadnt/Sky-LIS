@@ -135,7 +135,9 @@ PDF via `pdf.ps1`) and the detailed result files per area (defect ids `A-nn` cli
 `C-nn` Super Admin and public, `D-nn` backend cycle). `tests/validation/backend-cycle.mjs` (Node, no dependencies) provisions a
 client and drives a full laboratory cycle through the API with database assertions; secrets only from git-ignored files.
 The validation stack runs beside the installed service: launch configurations `validation-api` (API on 127.0.0.1:5102, via
-`--Kestrel:Endpoints:Http:Url`) and `validation-spa` (4300, proxy `frontend/proxy.validation.json`); browser sessions are per
+`--Kestrel:Endpoints:Http:Url`) and `validation-spa` (4300, proxy `frontend/proxy.validation.json`) or, to pin the build under test so working-tree edits cannot
+reach it, `validation-ui` (`tests/validation/serve-ui.mjs` serving the git-ignored copy `.local/validation/ui` of a release
+build on 4300, same proxy rules); browser sessions are per
 host name, so parallel testers use `127.0.0.1` and `localhost` (the built-in browser opens no other names).
 
 ### Requirements specification
@@ -216,7 +218,13 @@ QMS source is never read or copied (section 1); everything here is written from 
   (sign-in tenant selection); both are the only allow-listed `Elevate()` sites (gate in WebApiHardeningTests).
   WebApi: `PipelineOrder.Sequence` is walked by `Program` (ForwardedHeaders → Correlation → SecurityHeaders →
   ExceptionHandler → Authentication → CredentialAccountKey → RateLimiter → AuthOriginCheck → TenantResolution →
-  MfaEnrollmentGate → Authorization → Endpoints); `EncryptedSubjectEvents` decrypts `sub` and loads the session;
+  MfaEnrollmentGate → PasswordChangeGate → Authorization → Endpoints; `PasswordChangeGate` refuses every `/api` request but
+  `/api/v1/auth/**`, the own profile, password, preferences and privileges with `AUTH-016` while the user must change the
+  password, validation C-04); `EncryptedSubjectEvents` decrypts `sub` and loads the session;
+  refresh-token reuse allows a grace for the token just rotated (`Lis:Security:Session:RefreshReuseGrace`, default 5 s, max
+  30 s: the successor session gets an access token and no new cookie; older generations or later replays revoke the family,
+  validation C-02), and the SPA serialises refreshes across tabs with the Web Locks API (`core/auth/refresh-lock.ts`);
+  user mobiles are stored in E.164 and unique in every spelling (`IUserMobileNumbers`, validation C-03);
   `RefreshCookie` (`__Secure-rt; Path=/api/v1/auth; Secure; HttpOnly; SameSite=Strict`, `rt` only under
   `Lis:Security:AllowInsecureLocalDevelopment`); `AuthOriginCheckMiddleware` guards the two cookie endpoints with
   Sec-Fetch-Site + Origin + `X-Requested-With: Platform`; `CredentialTransportFilter` is a global action filter; rate
@@ -260,6 +268,16 @@ QMS source is never read or copied (section 1); everything here is written from 
   of the same session follow a profile change (`profile-changed` on the session channel, `profileChangeInterceptor` for
   `PROFILE_CHANGES` endpoints, `followProfileChanges()` in the shell). A sign-in revokes the session of the refresh cookie
   the browser presented (secret checked).
+  **Lists (validation v0.5.0, 2026-10-12)**: paged lists sort on the server before paging — `sort`/`direction` query
+  parameters, an allow-list per list (`<Module>SortKeys.cs` over `Abstractions/Persistence/ListSorting.cs`: `ListSort`,
+  `SortColumns<T>`, text keys case-insensitive via `lower()`, stable tie-breaker), VALIDATION-400 for anything else, and the
+  functional gate `Every_allow_listed_sort_key_of_every_register_is_served`; pages opt in with `sortMode: 'server'` /
+  `TableColumn.sortKey`; browser-paged lists call `sortRows` before slicing (`TableColumn.sortValue` when the cell text does
+  not order). Every `EF.Functions.ILike` passes its escape `"\\"` (gate `SearchPatternGateTests`). A master-data row opened
+  without the config's update permission is a read-only "View" drawer. The session profile carries the role and user names
+  in both languages (`roleNameAr`, `displayNameEn/Ar`; `core/auth/role-name.ts`, `display-name.ts`). VIP identity is
+  masked on the server for users without See-VIP (list, export, picker, similar check as a masked entry; assumption awaiting
+  the business owner, PAT Q8 / REG Q12).
   Every route-provided facade re-reads on each visit of its page (`refresh()` from the page constructor). **Validation
   messages**: `VALIDATION-400` problem details carry an optional `rules` entry per field (FluentValidation rule + numeric
   bounds, never request values); `shared/forms/problem-text.ts` renders them field by field in both languages. Commands in `frontend/`: `npm run build`,
@@ -311,8 +329,8 @@ QMS source is never read or copied (section 1); everything here is written from 
   module adapter wins), `IOtpService` over `identity.otp_challenges` (HMAC digests, 5 min, 5 attempts;
   `Lis:Security:Session:Otp{Length,Lifetime,MaxAttempts}`; the code is logged at Debug only under
   `AllowInsecureLocalDevelopment`); `PlatformUser.Mobile`; `POST /api/v1/auth/recovery/{start,complete}` (always 202 /
-  204 or `AUTH-013`). **Tenant settings** — `app.tenant_settings` + `Platform.Domain.Settings.SettingKeys` (25 typed
-  descriptors, `SET-001`/`SET-002`), `ITenantSettings.GetAsync(SettingKeys.X)` (loaded once per scope),
+  204 or `AUTH-013`). **Tenant settings** — `app.tenant_settings` + `Platform.Domain.Settings.SettingKeys` (26 typed
+  descriptors incl. `timeZone`, the laboratory zone without a client record, `SET-001`/`SET-002`), `ITenantSettings.GetAsync(SettingKeys.X)` (loaded once per scope),
   `GET/PUT /api/v1/settings` [settings.view / settings.manage]. Test host: `ApiFactory` disables the outbox loop
   (`Lis:Outbox:Enabled=false`, override per test) and replaces the sender with `RecordingNotificationSender`
   (`factory.Notifications`). Frontend: `core/api/{auth,audit,settings}.contracts.ts`, `AuthStore.currentBranch/branchIds/

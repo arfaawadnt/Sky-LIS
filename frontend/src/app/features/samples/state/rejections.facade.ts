@@ -7,6 +7,9 @@ import { SamplesApi } from '../data/samples.api';
 import { normalizeSampleNumber } from '../ui/sample-format';
 import { SampleLabelPrinter } from './sample-label-printer';
 import { SampleListExport } from './sample-list-export';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { sortParams } from '../../../shared/forms/paging';
+import { type SortKeyMap, type TableSort, serverSortOf } from '../../../shared/ui/data-table/data-table.types';
 
 export interface RejectedFilter {
   /** `yyyy-MM-dd` local dates bounding the time the samples were ordered, or null. */
@@ -16,6 +19,9 @@ export interface RejectedFilter {
   readonly pageSize: number;
 }
 
+/** The server keys of the sortable columns of the rejected samples (B-03, SamplesSortKeys.Samples). */
+export const REJECTION_SORT_KEYS: SortKeyMap = { sampleNumber: 'sampleNumber', accession: 'accession', rejectedAtUtc: 'rejectedAtUtc' };
+
 /**
  * CP-16 Reject / unreject (01 §6.3): look a tube up by barcode, reject it with a catalogue reason, and work the list
  * of rejected tubes (unreject when the tenant allows reinstatement, replace with a new barcode, BR-18). Every write
@@ -23,6 +29,7 @@ export interface RejectedFilter {
  */
 @Injectable()
 export class RejectionsFacade {
+  private readonly i18n = inject(I18nService);
   private readonly api = inject(SamplesApi);
   private readonly exporter = inject(SampleListExport);
   readonly labels = inject(SampleLabelPrinter);
@@ -35,6 +42,9 @@ export class RejectionsFacade {
   });
 
   readonly filter = signal<RejectedFilter>({ fromDate: null, toDate: null, page: 1, pageSize: 50 });
+
+  /** The column order chosen in the table header; the server sorts the whole list before paging (validation v0.5.0 B-03). */
+  readonly sort = signal<TableSort | null>(null);
 
   readonly listFilter = computed<SampleListFilter>(() => {
     const filter = this.filter();
@@ -49,6 +59,7 @@ export class RejectionsFacade {
       search: null,
       page: filter.page,
       pageSize: filter.pageSize,
+      ...sortParams(serverSortOf(this.sort(), REJECTION_SORT_KEYS, () => this.i18n.lang())),
     };
   });
 
@@ -104,6 +115,12 @@ export class RejectionsFacade {
 
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
+  }
+
+  /** A header click: the new order starts at page 1. */
+  setSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.filter.update((current) => ({ ...current, page: 1 }));
   }
 
   dismissReplacement(): void {

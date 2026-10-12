@@ -62,7 +62,7 @@ public sealed record OrderPlan(
             var alert = Warnings.First(warning => warning.Code == RegistrationCodes.WarningFrequency);
             throw new DomainException(
                 RegistrationCodes.FrequencyConfirmationRequired,
-                $"'{alert.ServiceCode}' was ordered for this patient within {alert.WindowDays} days ({alert.LastAccession}); confirm the repeat order to continue.",
+                $"'{alert.ServiceCode}' was ordered for this patient within {alert.WindowDays} days ({alert.LastAccession}); confirm the repeat order to continue.",   // the repeated test (A-11)
                 DomainFault.Conflict);
         }
     }
@@ -493,8 +493,17 @@ public sealed class OrderPlanner(ICatalogueLookup catalogue, IOrderRulesLookup r
                 continue;
             }
 
-            warnings.Add(new OrderWarning(RegistrationCodes.WarningFrequency, item.ServiceId, item.ServiceCode, item.ServiceNameEn, item.ServiceNameAr, test.Code, null, last.OrderedAtUtc, last.Accession, days));
+            // Validation A-11 (2026-10-11): the alert names the test that repeats; a member test of a profile or package
+            // carries the service it came through ("CREA (RENAL)"). The line is still identified by ServiceId.
+            warnings.Add(new OrderWarning(RegistrationCodes.WarningFrequency, item.ServiceId, RepeatedLabel(test, item.ServiceCode), item.ServiceNameEn, item.ServiceNameAr, test.Code, null, last.OrderedAtUtc, last.Accession, days));
         }
+    }
+
+    /// <summary>What a frequency alert names (BR-12): the repeated test, with the ordered service when the test came through it.</summary>
+    public static string RepeatedLabel(CatalogueTestInfo test, string? serviceCode)
+    {
+        ArgumentNullException.ThrowIfNull(test);
+        return string.IsNullOrEmpty(serviceCode) || string.Equals(test.Code, serviceCode, StringComparison.OrdinalIgnoreCase) ? test.Code : $"{test.Code} ({serviceCode})";
     }
 
     private static OrderWarning Warning(string code, CatalogueServiceInfo service, string? detail, string? detailAr) =>

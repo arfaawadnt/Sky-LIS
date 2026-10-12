@@ -1,5 +1,6 @@
 import type { Provider } from '@angular/core';
 
+import { REFRESH_LOCK, directRefreshLock } from './refresh-lock';
 import { SESSION_CHANNEL, type SessionChannel, type SessionMessage } from './session-channel';
 import { BROWSER_NAVIGATION, type BrowserNavigation } from './session-navigation';
 
@@ -43,5 +44,6 @@ export function provideSessionTesting(navigation: FakeBrowserNavigation, channel
   return [
     { provide: BROWSER_NAVIGATION, useValue: navigation },
     { provide: SESSION_CHANNEL, useValue: channel },
+    { provide: REFRESH_LOCK, useValue: directRefreshLock },   // deterministic: the request leaves synchronously
   ];
 }

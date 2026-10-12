@@ -1,19 +1,32 @@
-import { Injectable, inject, resource, signal } from '@angular/core';
+import { Injectable, computed, inject, resource, signal } from '@angular/core';
 
 import type { AnalyserDetail, AnalyserListFilter, SaveAnalyserRequest } from '../../../core/api/integration.contracts';
 import type { PageRequest } from '../../../core/api/paging';
 import { mutation } from '../../../core/state/mutation';
 import { IntegrationApi } from '../data/integration.api';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { sortParams } from '../../../shared/forms/paging';
+import { type SortKeyMap, type TableSort, localizedSortKey, serverSortOf } from '../../../shared/ui/data-table/data-table.types';
+
+/** The server keys of the sortable columns of the analysers table (B-03, IntegrationSortKeys.Analysers). */
+export const ANALYSER_SORT_KEYS: SortKeyMap = { code: 'code', name: localizedSortKey('name') };
 
 /** Analysers register and editor (CP-58): reads through `resource()`, writes through `mutation()`. Provided at the route. */
 @Injectable()
 export class AnalysersFacade {
   private readonly api = inject(IntegrationApi);
 
+  private readonly i18n = inject(I18nService);
+
   readonly filter = signal<AnalyserListFilter>({ search: '', isActive: null, siteAgentId: null, page: 1, pageSize: 50 });
 
+  /** The column order chosen in the table header; the server sorts the whole list before paging (validation v0.5.0 B-03). */
+  readonly sort = signal<TableSort | null>(null);
+
+  private readonly query = computed<AnalyserListFilter>(() => ({ ...this.filter(), ...sortParams(serverSortOf(this.sort(), ANALYSER_SORT_KEYS, () => this.i18n.lang())) }));
+
   readonly list = resource({
-    params: () => this.filter(),
+    params: () => this.query(),
     loader: ({ params, abortSignal }) => this.api.listAnalysers(params, abortSignal),
   });
 
@@ -62,5 +75,11 @@ export class AnalysersFacade {
 
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
+  }
+
+  /** A header click: the new order starts at page 1. */
+  setSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.filter.update((current) => ({ ...current, page: 1 }));
   }
 }

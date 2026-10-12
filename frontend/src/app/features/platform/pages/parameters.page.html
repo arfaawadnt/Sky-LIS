@@ -43,7 +43,7 @@
                         }
                       </select>
                     } @else {
-                      <input type="text" [formControlName]="item.key" dir="ltr" maxlength="200" autocomplete="off" />
+                      <input type="text" [formControlName]="item.key" dir="ltr" [attr.maxlength]="spec(item.key).maxLength ?? 200" autocomplete="off" />
                     }
                   </app-form-field>
                 }

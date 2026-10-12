@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sky LIS — Validation Report — LIS-VR-002 v1.0</title>
+<meta name="description" content="Second full validation of Sky LIS (v0.5.0): automated suites, both portals page by page, the backend cycle, and the verification of every fix.">
+<style>
+  :root{--bad:#C8102E;--bad-soft:#FBE7EA;--bg:#F3F6FB;--blue-soft:#E8F1FE;--blue:#2A7DF5;--grad:linear-gradient(90deg,#2A7DF5,#6E3BE4);--ink:#14213A;--line-soft:#EAEFF6;--line:#DCE3EE;--muted:#6B7A90;--navy:#0B2A5B;--ok-soft:#E3F5EC;--ok:#13865A;--paper:#fff;--violet-soft:#EFE9FD;--violet:#6E3BE4;--warn-soft:#FFF3DF;--warn:#B26B00}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+  .page{max-width:1180px;margin:0 auto;padding:32px 16px 64px}
+  header.doc{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:28px 32px;position:relative;overflow:hidden}
+  header.doc::before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:var(--grad)}
+  h1{margin:0 0 6px;font-size:28px;letter-spacing:-.01em;color:var(--navy)}
+  .sub{margin:0;color:var(--muted)}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 24px;margin-top:18px;font-size:13px}
+  .meta b{display:block;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:11px}
+  h2{font-size:20px;color:var(--navy);margin:40px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+  h3{font-size:16px;margin:22px 0 8px}
+  p{margin:8px 0}
+  .lead{color:var(--muted)}
+  .verdict{background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--ok);border-radius:12px;padding:18px 22px;margin:18px 0}
+  .verdict h3{margin:0 0 6px;color:var(--ok)}
+  .verdict.orig{border-left-color:var(--warn)} .verdict.orig h3{color:var(--warn)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:18px 0}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card .n{font-size:28px;font-weight:700;color:var(--navy);line-height:1.1}
+  .card .n.ok{color:var(--ok)} .card .n.bad{color:var(--bad)}
+  .card .l{color:var(--muted);font-size:13px;margin-top:6px}
+  .box{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin:16px 0}
+  table{width:100%;border-collapse:collapse;margin:12px 0 4px;font-size:13.5px;background:var(--paper)}
+  th,td{border:1px solid var(--line);padding:7px 9px;vertical-align:top;text-align:left}
+  th{background:var(--line-soft);font-weight:600;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td.id{font-family:Consolas,monospace;font-size:12.5px;white-space:nowrap;color:var(--navy)}
+  tr.total td{font-weight:700;background:var(--line-soft)}
+  code{font-family:Consolas,monospace;font-size:12.5px;background:var(--line-soft);padding:1px 5px;border-radius:4px}
+  .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .s1{background:var(--bad-soft);color:var(--bad)} .s2{background:var(--warn-soft);color:var(--warn)}
+  .s3{background:var(--blue-soft);color:var(--blue)} .s4{background:var(--line-soft);color:var(--muted)}
+  .pass{background:var(--ok-soft);color:var(--ok)} .fail{background:var(--bad-soft);color:var(--bad)} .open{background:var(--violet-soft);color:var(--violet)}
+  ul.tight{margin:6px 0;padding-left:20px} ul.tight li{margin:3px 0}
+  footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+  @media (max-width:720px){table{display:block;overflow-x:auto}header.doc{padding:22px 18px}}
+  @media print{body{background:#fff;font-size:11.5px}.page{max-width:none;padding:0}.box,.card,.verdict,header.doc{break-inside:avoid;border-color:#bbb}h2{break-after:avoid}tr{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="doc">
+  <h1>Sky LIS — Validation Report</h1>
+  <p class="sub">Second full validation: the automated suites, every Release-1 page and function of the client portal and the Super Admin portal, the public pages, the backend cycle from the screen to the database, and the verification of every fix.</p>
+  <div class="meta">
+    <div><b>Document</b>LIS-VR-002 · v1.0</div>
+    <div><b>Validation dates</b>2026-10-11 and 2026-10-12</div>
+    <div><b>Release under test</b>v0.5.0 (commit <code>7a2f6ea</code>); fixes verified on v0.6.0, github.com/arfaawadnt/Sky-LIS</div>
+    <div><b>Environment</b>WIN-9S2KO4FA64L: validation stack (API 127.0.0.1:5102, pinned SPA build on :4300) and the installed site https://192.168.80.38:5443; database <code>lis</code> (PostgreSQL 17, :5433)</div>
+    <div><b>Previous campaign</b>LIS-VR-001 (v0.3.8), <code>docs/validation/2026-10-11/</code></div>
+  </div>
+</header>
+
+<div class="verdict">
+  <h3>Status after the fixes: all 30 defects fixed and verified; released as v0.6.0</h3>
+  <p>Every one of the 30 distinct defects was fixed with a test and re-tested in the browser and in the database. The re-tests raised 24 further findings: one of severity 3, where the similar-patient warning dropped VIP files, and 23 of severity 4. All of them were fixed and verified in three more rounds. The last round found nothing new. The automated suites grew from 1,873 to 2,057 tests, all passing, and the backend cycle passes 36 of 36 steps on the fixed build.</p>
+  <p>One rule needs the business owner's confirmation: VIP masking (A-03). The stricter rule was applied and both intakes mark it as an assumption. The points in section 6 also need decisions; none of them blocks use.</p>
+</div>
+
+<div class="verdict orig">
+  <h3>Verdict on v0.5.0: validated for daily use, with one data-entry defect of severity 2</h3>
+  <p>Every Release-1 workflow of both portals worked end to end on v0.5.0. Every save checked in the database matched the screen, and the outbox processed every event of the run. The audit trail had no gap and its hash chain verified. Every defect of the previous campaign stayed fixed: 64 earlier items were re-checked.</p>
+  <p>The campaign found 32 defects, 30 of them distinct. None is of severity 1. The single severity-2 defect could duplicate a visit and its payment: after a save, the registration page could bring the saved draft back. Ten defects are of severity 3. They concern sessions in two tabs, a clinical check that could be skipped, the VIP mask, the export permission, mobile numbers, the forced password change, a branch choice and two silent form refusals. Twenty-one are of severity 4.</p>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="n ok">1,873</div><div class="l">automated tests on v0.5.0, all passing (backend 1,267 · frontend 606)</div></div>
+  <div class="card"><div class="n">506</div><div class="l">manual test cases on both portals; 488 executed, <b>460 passed</b> (94 %)</div></div>
+  <div class="card"><div class="n ok">36 / 36</div><div class="l">backend-cycle steps on the validation API; 5 / 5 on the installed site</div></div>
+  <div class="card"><div class="n ok">54</div><div class="l">database verifications after screen saves, all matching</div></div>
+  <div class="card"><div class="n bad">30</div><div class="l">distinct defects: 0 × S1 · 1 × S2 · 9 × S3 · 20 × S4</div></div>
+</div>
+
+<h2>1. Scope and method</h2>
+<div class="box">
+  <ul class="tight">
+    <li><b>Automated layer.</b> The full solution build, the five backend suites (domain, architecture gates, application, integration on a real PostgreSQL, functional through the real API), the frontend lint with module boundaries, the frontend unit tests and the production build.</li>
+    <li><b>Manual layer.</b> Three testers covered the Release-1 menu of both portals and the public pages. They tested every list, editor, row action, dialog, permission of each persona, and the Arabic right-to-left view. Each tester worked on a separate host name (<code>127.0.0.1</code> or <code>localhost</code>), so their sessions never mixed. Expected results came from the business SRS (LIS-SRS-001), the module intakes and the UAT scripts.</li>
+    <li><b>Pinned build.</b> During the run, another working session changed the registration page and released it as v0.5.0. The browser site was then switched from the hot-reloading development server to a pinned copy of the v0.5.0 build (<code>tests/validation/serve-ui.mjs</code>), so later edits could not reach the code under test. The Super Admin tester finished on the development server. Its pages are identical in v0.4.1 and v0.5.0, because v0.5.0 changed only the registration page. The client operations tester re-ran the whole registration page on the pinned build.</li>
+    <li><b>Backend cycle.</b> After every save the testers queried the database read-only. The script <code>tests/validation/backend-cycle.mjs</code> drove a full laboratory cycle through the API with database assertions, on the validation API and on the installed site.</li>
+    <li><b>Release-1 scope only.</b> Release-2 pages hidden by the release switch were tested only for being refused.</li>
+  </ul>
+</div>
+
+<h2>2. Results by layer</h2>
+<h3>2.1 Automated suites on v0.5.0</h3>
+<table>
+  <thead><tr><th>Suite</th><th>What it proves</th><th class="num">Passed</th><th class="num">Failed</th></tr></thead>
+  <tbody>
+    <tr><td>Backend build (warnings as errors)</td><td>the solution compiles cleanly under the analyzers</td><td class="num">0 warnings</td><td class="num">0 errors</td></tr>
+    <tr><td>Domain unit tests</td><td>aggregates, transitions, invariants, segregation of duties</td><td class="num">727</td><td class="num">0</td></tr>
+    <tr><td>Architecture tests</td><td>layer rules, request policies, migrations, versioning, deployment package</td><td class="num">100</td><td class="num">0</td></tr>
+    <tr><td>Application unit tests</td><td>handlers, security primitives, configuration guards</td><td class="num">232</td><td class="num">0</td></tr>
+    <tr><td>Integration tests (real PostgreSQL)</td><td>persistence, row-level security, audit chain, outbox</td><td class="num">117</td><td class="num">0</td></tr>
+    <tr><td>Functional tests (real API and database)</td><td>flows over HTTP</td><td class="num">91</td><td class="num">0</td></tr>
+    <tr><td>Frontend lint and boundaries</td><td>code rules and feature isolation</td><td class="num">clean</td><td class="num">0</td></tr>
+    <tr><td>Frontend unit tests (130 files)</td><td>facades, pages, interceptors, guards, shared kit</td><td class="num">606</td><td class="num">0</td></tr>
+    <tr><td>Frontend production build</td><td>the shipped bundle</td><td class="num">built</td><td class="num">0 warnings</td></tr>
+    <tr class="total"><td colspan="2">Total automated tests</td><td class="num">1,873</td><td class="num">0</td></tr>
+  </tbody>
+</table>
+
+<h3>2.2 Manual validation of the portals</h3>
+<table>
+  <thead><tr><th>Area</th><th>Pages covered</th><th class="num">Cases</th><th class="num">Executed</th><th class="num">Passed</th><th class="num">Failed</th><th class="num">Blocked</th><th class="num">Not tested</th><th>Defects</th></tr></thead>
+  <tbody>
+    <tr><td>A · Client operations (demo laboratory)</td><td>dashboard, the redesigned registration page, visit editor, search registrations and row actions, documents, price query, patients, worklist, results by accession, payments, void, refunds, treasury access, profile, sessions</td><td class="num">152</td><td class="num">146</td><td class="num">139</td><td class="num">7</td><td class="num">1</td><td class="num">5</td><td>1 S2 · 3 S3 · 7 S4</td></tr>
+    <tr><td>B · Client set-up (Walk-through Laboratory)</td><td>branches, roles and privileges, users, catalogue (groups, sample types, units, tests of every kind, services, profiles, packages, preparations, comments, doctors, microbiology), payers, price lists, treasuries and access; a proof run from a new user and role to registration, payment and result entry</td><td class="num">213</td><td class="num">210</td><td class="num">201</td><td class="num">9</td><td class="num">0</td><td class="num">3</td><td>3 S3 · 6 S4</td></tr>
+    <tr><td>C · Super Admin portal and public pages</td><td>home, dashboard, roles, admin users, clients and provisioning, subscriptions and wallets, sessions, audit log and chain, master data, countries, governorates, parameters, notification templates, profile; public site, subscription wizard, sign-in, recovery; portal isolation</td><td class="num">141</td><td class="num">132</td><td class="num">120</td><td class="num">12</td><td class="num">3</td><td class="num">6</td><td>4 S3 · 8 S4</td></tr>
+    <tr class="total"><td colspan="2">Total</td><td class="num">506</td><td class="num">488</td><td class="num">460</td><td class="num">28</td><td class="num">4</td><td class="num">14</td><td>1 S2 · 10 S3 · 21 S4</td></tr>
+  </tbody>
+</table>
+<p class="lead">Two defects were found twice: A-04 is the same as C-02 (two tabs signing each other out), and B-04 is the same as C-07 (the forced-change banner). That leaves 30 distinct defects.</p>
+
+<h3>2.3 Backend cycle (API to database)</h3>
+<table>
+  <thead><tr><th>Run</th><th>Content</th><th class="num">Steps</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td>Full cycle, validation API</td><td>a new client is provisioned, then set up (users, role, catalogue, price list, payers, treasury). A patient is registered and pays, results are entered, reviewed, verified and amended, then a line is cancelled and refunded. Negative checks cover validation, duplicates, concurrency, missing permission, another laboratory, row-level security, the audit chain, the append-only and truncate guards, and that no secret reaches the audit or the outbox.</td><td class="num">36 / 36</td><td><span class="pill pass">pass</span></td></tr>
+    <tr><td>Installed site</td><td>https://192.168.80.38:5443 through IIS and the service: sign-in, list, create, database check</td><td class="num">5 / 5</td><td><span class="pill pass">pass</span></td></tr>
+  </tbody>
+</table>
+
+<h2>3. Data persistence evidence</h2>
+<div class="box">
+  <table>
+    <thead><tr><th>Area</th><th class="num">Database checks</th><th>Outbox during the run</th><th>Audit</th></tr></thead>
+    <tbody>
+      <tr><td>A · Client operations</td><td class="num">14</td><td>94 events of 26 types, all processed, none dead-lettered</td><td>trail sequences 375–468, no gap</td></tr>
+      <tr><td>B · Client set-up</td><td class="num">20</td><td>156 events, all processed, none dead-lettered, no retry</td><td>trail 151–306, no gap; no password, hash or security stamp in field changes or payloads</td></tr>
+      <tr><td>C · Super Admin and public</td><td class="num">20</td><td>296 events, all processed, none dead-lettered</td><td>platform chain verified (137 of 137)</td></tr>
+      <tr class="total"><td>Total</td><td class="num">54</td><td>546 events, 0 dead letters</td><td>no gap, chain verified</td></tr>
+    </tbody>
+  </table>
+  <p>Every check matched what the screen saved: the row, its tenant, its links, the child rows, the audit entries and the processing of the transaction's events. Client provisioning copied every active global catalogue item with its references remapped and skipped inactive ones (BR-25).</p>
+</div>
+
+<h2>4. Previous defects re-checked</h2>
+<div class="box">
+  <table>
+    <thead><tr><th>Area</th><th class="num">Earlier items re-checked</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>A · Client operations</td><td class="num">22</td><td>the 15 defects of the v0.3.8 run and R3-01 to R3-05 all still fixed</td></tr>
+      <tr><td>B · Client set-up</td><td class="num">14</td><td>all still fixed; the Release-2 "Contract pricing" action is gone</td></tr>
+      <tr><td>C · Super Admin and public</td><td class="num">28</td><td>all still fixed, including the stale-tab identity check tested with dropped broadcasts. Three small items had never been fixed: the wizard mobile text, the stale recovery error and the banner in the changing tab. They were raised again as C-08, C-06 and C-07.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>5. Defect register</h2>
+<p class="lead">Severity: S1 blocks or corrupts, S2 loses or duplicates data, S3 breaks a rule or a function with a work-around, S4 cosmetic or minor. The last column shows the state after the fixes (section 10).</p>
+<table>
+  <thead><tr><th>Id</th><th>Sev</th><th>Finding</th><th>Fix</th><th>State</th></tr></thead>
+  <tbody>
+    <tr><td class="id">A-01</td><td><span class="pill s2">S2</span></td><td>After a save, "Open the visit" or "Collect on the Payments page" and then a new registration brought the saved draft back, ready to save again: a duplicate visit and payment.</td><td>The draft is cleared right after a successful save; every exit starts empty.</td><td><span class="pill pass">fixed · verified</span><br><span class="lead">(residue RC-01 fixed in round 2)</span></td></tr>
+    <tr><td class="id">A-02</td><td><span class="pill s3">S3</span></td><td>The delta check (BR-11) ran only at entry. When the previous result was verified later, a 66.7 % creatinine change verified with no flag.</td><td>The delta is re-checked at review and verification, and when a previous result is verified. A new flag blocks verification until acknowledged.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">A-03</td><td><span class="pill s3">S3</span></td><td>A VIP patient masked in Search registrations was shown in full in the Patients list, its export and the picker.</td><td>Masked on the server for users without the See-VIP right: name, mobile, national ID, e-mail and address in the register, export, picker and similar check. Name and mobile search exclude VIP files; full number or national ID still finds them. <b>Assumption awaiting the business owner.</b></td><td><span class="pill pass">fixed · verified</span><br><span class="lead">(similar check and sort completed in round 2)</span></td></tr>
+    <tr><td class="id">A-04 / C-02</td><td><span class="pill s3">S3</span></td><td>Two tabs refreshing at the same moment tripped token-reuse detection and signed every tab out.</td><td>Tabs take turns to refresh (Web Locks). The server accepts the token it has just replaced for 5 seconds; older tokens and later replays still revoke the session.</td><td><span class="pill pass">fixed · verified</span><br><span class="lead">(server grace completed in round 2: 40 of 40)</span></td></tr>
+    <tr><td class="id">A-05</td><td><span class="pill s4">S4</span></td><td>Worklist age empty for patients registered by age.</td><td>The worklist reads the recorded age like the patient file.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">A-06</td><td><span class="pill s4">S4</span></td><td>Raw key <code>results.loading</code> on the first visit.</td><td>Results, Patients and Account load their dictionary before the first page renders.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">A-07</td><td><span class="pill s4">S4</span></td><td>Latin digits in the Arabic registration checklist and bar.</td><td>One digit set on the whole page.</td><td><span class="pill pass">fixed · verified</span><br><span class="lead">(ages, paginator and counts completed in rounds 2–4)</span></td></tr>
+    <tr><td class="id">A-08</td><td><span class="pill s4">S4</span></td><td>A blocked save did not mark the services card.</td><td>The services card and entry are marked.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">A-09</td><td><span class="pill s4">S4</span></td><td>Stale picker results stayed clickable for about 0.3 s.</td><td>Results of an older text are disabled until the new search answers.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">A-10</td><td><span class="pill s4">S4</span></td><td>The dashboard accepted a future day; clearing the date kept the old day.</td><td>Future days are refused on the server (<code>ACC-030</code>) and in the form; an empty date returns to today.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">A-11</td><td><span class="pill s4">S4</span></td><td>The repeat-order message named the profile instead of the repeated test.</td><td>It names the test and the profile it came through, for example "CREA (RENAL)".</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">B-01</td><td><span class="pill s3">S3</span></td><td>After a refusal on the governorate, correcting the country left a stale error and Save did nothing.</td><td>Linked fields clear each other's server error. A blocked save on any master-data page marks the fields, focuses the first one and shows a notice.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">B-02</td><td><span class="pill s3">S3</span></td><td>Add user with "Every active branch" unticked and no branch created a user with every branch.</td><td>Refused in the form and on the server (<code>ORG-018</code>).</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">B-03</td><td><span class="pill s4">S4</span></td><td>Sorting reordered only the loaded page.</td><td>Paged lists sort on the server before paging, with an allow-list of columns per list; browser-paged lists sort before slicing.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">B-04 / C-07</td><td><span class="pill s4">S4</span></td><td>After a forced password change, the changing tab kept the banner.</td><td>The tab goes to its portal home and passes the guards again.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">B-05</td><td><span class="pill s3">S3</span></td><td>Picking a service already on a price list left a hidden filter on the grid.</td><td>The search box always shows the filter the grid applies.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">B-06</td><td><span class="pill s4">S4</span></td><td>The copy dialog proposed an existing code.</td><td>It proposes a free code; a duplicate is shown under the field.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">B-07</td><td><span class="pill s4">S4</span></td><td>Base price lists had no export and no year filter.</td><td>Year filter and CSV export of what the page shows.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">B-08</td><td><span class="pill s4">S4</span></td><td>Treasury search did not find the Arabic name in the English UI.</td><td>Server search on code, English and Arabic name.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">B-09</td><td><span class="pill s4">S4</span></td><td>The Arabic shell showed the role name in English.</td><td>The session profile carries both names; the shell shows the current language.</td><td><span class="pill pass">fixed · verified</span><br><span class="lead">(user name in Arabic added in round 2)</span></td></tr>
+    <tr><td class="id">C-01</td><td><span class="pill s3">S3</span></td><td>Roles and Admin users lost their CSV export: no existing role held the new export permissions, and nobody could grant them.</td><td>Migration <code>GrantExportPermissions</code> gives each export key to the roles holding the module's view and manage keys, and every catalogue key to the Platform Administrator. A gate keeps the Platform Administrator complete.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">C-03</td><td><span class="pill s3">S3</span></td><td>Admin-user mobiles were stored as typed; recovery matched only that spelling; one number could be registered twice.</td><td>Mobiles are stored in international form, unique in every spelling, and recovery finds any spelling.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">C-04</td><td><span class="pill s3">S3</span></td><td>A user who had to change the password could use the whole API with the temporary password.</td><td>The server refuses every request except sign-in, the own profile and the password change (<code>AUTH-016</code>).</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">C-05</td><td><span class="pill s4">S4</span></td><td>A plan fee of 14.145 was saved as 14.15.</td><td>More than two decimals are refused.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">C-06</td><td><span class="pill s4">S4</span></td><td>A stale recovery error stayed after a new request.</td><td>Cleared on a new request and on Back.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">C-08</td><td><span class="pill s4">S4</span></td><td>The wizard's mobile errors were generic.</td><td>The digit count is named, as on Add client.</td><td><span class="pill pass">fixed · verified</span><br><span class="lead">(language switch fixed in round 3)</span></td></tr>
+    <tr><td class="id">C-09</td><td><span class="pill s4">S4</span></td><td>A dial code without "+" passed the form and the refusal showed at the top.</td><td>Checked before saving; the server refusal shows under the field.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">C-10</td><td><span class="pill s4">S4</span></td><td>A view-only user saw "Edit template".</td><td>"View template" without the manage right.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">C-11</td><td><span class="pill s4">S4</span></td><td>A client administrator's password reset showed no client in the audit log.</td><td>Linked to the client the user administers, in the column and the filter.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+    <tr><td class="id">C-12</td><td><span class="pill s4">S4</span></td><td>The platform audit hint named client-portal entities.</td><td>Platform entities in the platform log.</td><td><span class="pill pass">fixed · verified</span></td></tr>
+  </tbody>
+</table>
+
+<h3>Observations fixed with the defects</h3>
+<ul class="tight">
+  <li><b>O-9 (set-up):</b> a technician without billing rights saw the day's collected cash on the dashboard. The amount is now sent and shown only to users with the billing right.</li>
+  <li><b>O-1 (set-up):</b> activating a price list now asks for confirmation; it changes what cash patients pay.</li>
+  <li><b>Search with "_" or "%":</b> found during the fixes. Several searches found nothing for a typed underscore or percent sign, because the database was told to use no escape character. Every search now passes it, and an architecture gate refuses the faulty form.</li>
+  <li><b>Plural wording:</b> Results says "1 result saved" instead of "1 results saved".</li>
+</ul>
+
+<h2>6. Points for the business owner</h2>
+<div class="box">
+  <p>These are not defects of the build. Each needs a decision or a data check before go-live.</p>
+  <ul class="tight">
+    <li><b>VIP masking (A-03).</b> The PAT and REG intakes disagreed. The stricter rule was applied (see the register) and both intakes mark it as an assumption. Please confirm. The results worklist still shows VIP names, because it was outside the decision.</li>
+    <li><b>eGFR formula.</b> The demo catalogue computes eGFR without the age and sex factors of MDRD. This is catalogue data; check the formula of the real catalogue.</li>
+    <li><b>Biohazard mark.</b> Sample labels carry the urgent mark but no biohazard mark for a biohazard visit.</li>
+    <li><b>Failed attempts.</b> A wrong current password in "change password" counts toward lock-out. The security spec should say whether it must.</li>
+    <li><b>Normal and Critical on one list value</b> are both allowed (O-2).</li>
+    <li><b>Test-level duplicates (O-3).</b> A test inside a profile inside a package can be ordered again as its own service. Confirm whether "refuses duplicates" means services only.</li>
+    <li><b>Treasury access across branches (O-4).</b> The request picker offers treasuries of branches the user is not assigned to.</li>
+    <li><b>Trail events for edits (O-5).</b> Payer, tier, treasury and price-list name edits write field changes but no trail event.</li>
+    <li><b>Release-2 modules in the privilege matrix (O-7)</b> can be granted, and the clinical group's "Report template" field has no option (O-8).</li>
+    <li><b>Shared device id (O-10).</b> Treasury approvals follow the browser profile, not the person.</li>
+    <li><b>Known open points</b> carried from the remaining-points list: no decision reason on treasury-access rows (D-05), the Egypt mobile rule of 10 digits without the trunk 0, and the SMS and e-mail gateway that blocks three cases.</li>
+  </ul>
+</div>
+
+<h2>7. Not tested or blocked, and why</h2>
+<table>
+  <thead><tr><th>Item</th><th>Reason</th></tr></thead>
+  <tbody>
+    <tr><td>Wizard completion, recovery completion, the inactive-template fallback</td><td>no SMS or e-mail gateway on this host (blocked)</td></tr>
+    <tr><td>Branch selection at sign-in</td><td>every persona of the demo laboratory has one branch (blocked)</td></tr>
+    <tr><td>Session timeout and screen lock, logo and signature upload</td><td>not reached in the time box</td></tr>
+    <tr><td>Delay colours, restricted-list and text results</td><td>no qualifying row in the demo data of the run</td></tr>
+    <tr><td>Forced API requests from the page</td><td>no token is placed in the page; refusals were checked where pages offer the action</td></tr>
+    <tr><td>Paging on Branches and Users, rejecting a treasury request with a reason</td><td>too few rows, or no pending request of another user left; both tested in the previous campaign</td></tr>
+    <tr><td>Keyboard shortcuts</td><td>saves used the buttons; the save key changed to F10 during the campaign (user decision)</td></tr>
+  </tbody>
+</table>
+
+<h2>8. Test data and housekeeping</h2>
+<div class="box">
+  <ul class="tight">
+    <li>All data is invented and prefixed V14: a validation client, branches, roles, users, catalogue items, payers, price lists, treasuries, patients, visits, receipts and refunds. The detailed files list every record.</li>
+    <li>Shared records changed during the tests were restored: language settings, a branch deactivated and reactivated, a role permission.</li>
+    <li>Passwords of the accounts created stay only in the git-ignored credentials file of the host. No password appears in this report or the result files.</li>
+    <li>Note for testers of the Walk-through Laboratory: the price list V14-PL26 is now the cash default list. Its prices are identical copies of V11-PL26.</li>
+  </ul>
+</div>
+
+<h2>9. Detailed results</h2>
+<table>
+  <thead><tr><th>File</th><th>Content</th></tr></thead>
+  <tbody>
+    <tr><td><code>client-operations.md</code></td><td>tester A: coverage, 152 cases, 14 database checks, defect log A-01…A-11, previous defects, data created</td></tr>
+    <tr><td><code>client-setup.md</code></td><td>tester B: coverage, 213 cases, 20 database checks, defect log B-01…B-09, observations O-1…O-11, data created</td></tr>
+    <tr><td><code>super-admin-and-public.md</code></td><td>tester C: coverage, 141 cases, 20 database checks, defect log C-01…C-12, previous defects, data created. Its title names v0.4.1: the run started on that build, and its pages are unchanged in v0.5.0.</td></tr>
+    <tr><td><code>tests/validation/backend-cycle.mjs</code>, <code>serve-ui.mjs</code></td><td>the backend-cycle script, and the server that pins a release build for a campaign</td></tr>
+    <tr><td><code>retest-client.md</code>, <code>retest-admin.md</code></td><td>re-test round 1: every finding re-run on both portals, regression smoke of every page in English and Arabic</td></tr>
+    <tr><td><code>retest-round2.md</code>, <code>retest-round3.md</code>, <code>retest-round4.md</code></td><td>re-test rounds 2 to 4: the findings of the previous round, spot checks and regression smoke</td></tr>
+  </tbody>
+</table>
+
+<h2>10. Fix verification</h2>
+<div class="box">
+  <p>Findings were assigned by area to engineers with separate files and separate build databases. Each fix carries a test: domain, application, integration, functional or architecture tests for the server, and page, facade or helper specs for the browser. After each round the whole solution was built and tested together. Then a tester re-ran the original steps in the browser on a pinned build of the fixed code, checked the database and smoke-tested every page.</p>
+  <table>
+    <thead><tr><th>Round</th><th>Fixes</th><th>Browser re-test</th><th>Findings raised</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>The 30 defects plus O-1 and O-9, by area: sessions and identity; permissions, platform and audit; results, patients and dashboard; organization, lists and shell; pricing and treasury; list sorting. The four registration-page defects were fixed in the user's registration session and released in v0.5.1. The migration <code>GrantExportPermissions</code> was applied after a verified backup.</td><td>client portal: 23 of 24 fixed, 1 partly (A-03) · Super Admin: 13 of 14 fixed, 1 partly (the server half of C-02) · regression smoke of every page in both languages: clean</td><td>14: 1 × S3 (the similar check dropped VIP files), 13 × S4</td></tr>
+      <tr><td>2</td><td>The 14 findings: masked similar entries and their sort, picker reset, digits, one Arabic term, read-only views without the edit right, lookups the persona may read, case-insensitive sorting, names in both languages, the laboratory's day, the delta dialog, the refresh grace at the clock boundary, and the wizard messages.</td><td>12 of 15 fixed, 2 partly, 1 not fixed (the wizard messages)</td><td>7 × S4</td></tr>
+      <tr><td>3</td><td>The 8 open items: the wizard messages, a <code>timeZone</code> parameter (default Africa/Cairo) for laboratories without a client record, digits, the Super Admin greeting, a patients endpoint for conditions, a quiet sign-out, no false reuse alarm after a sign-out, and singular wording.</td><td>8 of 8 fixed</td><td>3 × S4</td></tr>
+      <tr><td>4</td><td>The 3 items, plus a shared form-field fix: a field whose control arrived after the first render showed no message.</td><td>3 of 3 fixed; nine editors checked for the form-field change, all passing; smoke of every page clean</td><td>none</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Changes worth knowing</h3>
+  <ul class="tight">
+    <li><b>Sessions.</b> Tabs take turns to refresh, and the server accepts the token it has just rotated for 5 seconds (<code>Lis:Security:Session:RefreshReuseGrace</code>). A replay after that still revokes the session and raises the alarm. A forced password change is enforced by the server (<code>AUTH-016</code>). The cookie of a session ended by sign-out is refused without a false alarm.</li>
+    <li><b>Lists.</b> Every paged list sorts on the server before paging, from an allow-list of columns, case-insensitively. Every text search treats "_" and "%" literally; an architecture gate enforces it.</li>
+    <li><b>Data.</b> One migration, <code>GrantExportPermissions</code>, is data only. One new tenant parameter, <code>timeZone</code>. New endpoint <code>GET /api/v1/patients/conditions</code>.</li>
+    <li><b>Minor observations left.</b> The unknown-zone message is generic, though it shows on the right field. Full-page editors mark the fields of a blocked save but show no notice. "1 tube(s) were issued." still reads in the plural form. Results by accession keeps Latin digits in its dates, as on the printed reports; the business owner may choose one digit rule.</li>
+  </ul>
+
+  <h3>Final numbers</h3>
+  <table>
+    <thead><tr><th>Layer</th><th class="num">v0.5.0</th><th class="num">v0.6.0</th></tr></thead>
+    <tbody>
+      <tr><td>Domain / architecture / application unit tests</td><td class="num">727 / 100 / 232</td><td class="num">732 / 102 / 256</td></tr>
+      <tr><td>Integration / functional tests (real PostgreSQL and API)</td><td class="num">117 / 91</td><td class="num">124 / 115</td></tr>
+      <tr><td>Frontend unit tests</td><td class="num">606</td><td class="num">728</td></tr>
+      <tr><td>Total automated tests, all passing</td><td class="num">1,873</td><td class="num">2,057</td></tr>
+      <tr><td>Backend build and frontend production build</td><td class="num">0 warnings</td><td class="num">0 warnings</td></tr>
+      <tr><td>Backend cycle (API to database)</td><td class="num">36 / 36</td><td class="num">36 / 36</td></tr>
+      <tr class="total"><td>Open defects of severity 1, 2 or 3</td><td class="num">10</td><td class="num">0</td></tr>
+    </tbody>
+  </table>
+  <!--INSTALL-->
+</div>
+
+<footer>LIS-VR-002 v1.0 · 2026-10-12 · Sky LIS, National Technology · Validation of release v0.5.0 and verification of its fixes. Defect ids are stable and match the detailed result files.</footer>
+</div>
+</body>
+</html>

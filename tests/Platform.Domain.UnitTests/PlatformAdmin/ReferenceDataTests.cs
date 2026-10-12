@@ -135,11 +135,19 @@ public sealed class ReferenceDataTests
         Assert.Equal(PlatformAdminCodes.PlanLimitsInvalid, Assert.Throws<DomainException>(() => Plan.Create("NEG", negativeFee)).Code);
     }
 
+    /// <summary>Validation 2026-10-11 C-05: a fee with more than two decimals is refused (PLN-002), never rounded; trailing zeros are two decimals.</summary>
     [Fact]
-    public void A_plan_fee_is_rounded_to_two_decimals()
+    public void A_plan_fee_with_more_than_two_decimals_is_refused_not_rounded()
     {
         var plan = Starter();
-        plan.Update(new PlanTerms(new LocalizedText("Starter", "الأساسية"), 1499.995m, "egp", 2, 6, 600, 2));
-        Assert.Equal((1500.00m, 2, 6), (plan.MonthlyFee, plan.MaxBranches, plan.MaxUsers));
+        var threeDecimals = new PlanTerms(new LocalizedText("Starter", "الأساسية"), 14.145m, "egp", 2, 6, 600, 2);
+        Assert.Equal(PlatformAdminCodes.PlanLimitsInvalid, Assert.Throws<DomainException>(() => plan.Update(threeDecimals)).Code);
+        Assert.Equal(PlatformAdminCodes.PlanLimitsInvalid, Assert.Throws<DomainException>(() => Plan.Create("V14PLAN", threeDecimals)).Code);
+        Assert.Equal(1500m, plan.MonthlyFee);
+
+        plan.Update(new PlanTerms(new LocalizedText("Starter", "الأساسية"), 14.150m, "egp", 2, 6, 600, 2));
+        Assert.Equal((14.15m, 2, 6), (plan.MonthlyFee, plan.MaxBranches, plan.MaxUsers));
+        plan.Update(new PlanTerms(new LocalizedText("Free", "مجانية"), 0m, "egp", 2, 6, 600, 2));
+        Assert.Equal(0m, plan.MonthlyFee);
     }
 }

@@ -25,6 +25,8 @@ export class PatientFileFacade {
 
   /** The documents tab and its read need `files.view` (the server refuses the list without it; UAT A-03). */
   readonly canSeeDocuments = computed(() => this.permissions.can(PATIENTS_PERMISSIONS.filesView));
+  /** The visits tab and its read need `registration.view` (round 2 R2-04: the register of visits refuses others with 403). */
+  readonly canSeeVisits = computed(() => this.permissions.can(PATIENTS_PERMISSIONS.registrationView));
   /** Visits load when their tab is first opened. */
   readonly visitsRequested = signal(false);
   readonly mergeQuery = signal('');
@@ -45,7 +47,7 @@ export class PatientFileFacade {
   readonly visits = resource({
     params: () => {
       const id = this.patientId();
-      return id !== null && this.visitsRequested() ? id : undefined;
+      return id !== null && this.visitsRequested() && this.canSeeVisits() ? id : undefined;
     },
     loader: ({ params, abortSignal }) => this.api.visits(params, abortSignal),
   });

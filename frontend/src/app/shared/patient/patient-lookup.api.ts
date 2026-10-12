@@ -81,7 +81,7 @@ export class PatientLookupApi {
   }
 
   conditions(): Promise<readonly ConditionOption[]> {
-    this.conditionsCache ??= this.list(PATIENTS_API.conditions, toCondition, { isActive: true });
+    this.conditionsCache ??= this.list(PATIENTS_API.conditions, toCondition);
     return this.conditionsCache;
   }
 

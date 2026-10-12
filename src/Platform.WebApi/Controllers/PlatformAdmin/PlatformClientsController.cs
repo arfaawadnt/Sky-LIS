@@ -20,8 +20,8 @@ public sealed class PlatformClientsController(ISender sender) : ControllerBase
         [FromQuery] string? status,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
-        CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListClientsQuery(search, source, planId, status, page, pageSize), cancellationToken));
+        [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListClientsQuery(search, source, planId, status, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ClientDetail>> Get(Guid id, CancellationToken cancellationToken) =>

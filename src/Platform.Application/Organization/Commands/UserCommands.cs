@@ -36,7 +36,8 @@ public sealed record CreateUserCommand(
     IReadOnlyList<Guid>? BranchIds,
     DateTimeOffset? PasswordExpiresAtUtc,
     string? EmployeeCode,
-    string? PreferredLanguage) : ICommand<CreatedResource>;
+    string? PreferredLanguage,
+    bool? AllBranches = null) : ICommand<CreatedResource>;
 
 public sealed class CreateUserValidator : AbstractValidator<CreateUserCommand>
 {
@@ -65,6 +66,7 @@ public sealed class CreateUserHandler(
     ITenantSettings settings,
     IUserPrivileges privileges,
     ICurrentTenant tenant,
+    IUserMobileNumbers mobiles,
     IUnitOfWork unitOfWork,
     IClock clock) : ICommandHandler<CreateUserCommand, CreatedResource>
 {
@@ -85,8 +87,9 @@ public sealed class CreateUserHandler(
             throw new DomainException(OrganizationCodes.EmailExists, "Another account uses this e-mail address.", DomainFault.Conflict);
         }
 
-        var mobile = PlatformUser.NormaliseMobile(command.Mobile);
-        if (mobile is not null && await users.FindByMobileAsync(mobile, cancellationToken) is not null)
+        // E.164 by the country rules, unique across every spelling a number may be stored under (validation C-03).
+        var mobile = await mobiles.CanonicalAsync(command.Mobile, tenantId, cancellationToken);
+        if (mobile is not null && await mobiles.IsTakenAsync(mobile, null, cancellationToken))
         {
             throw new DomainException(OrganizationCodes.MobileExists, "Another account uses this mobile number.", DomainFault.Conflict);
         }
@@ -107,6 +110,7 @@ public sealed class CreateUserHandler(
             OrganizationGuards.EnsureGrantable(privileges, role.PermissionKeys);   // assigning a role grants its keys (INV-ORG-011)
         }
 
+        OrganizationGuards.EnsureBranchChoice(command.AllBranches, command.BranchIds);   // B-02: restricted with no branch is not "every branch"
         var branchIds = await OrganizationGuards.RequireUsableBranchesAsync(branches, command.BranchIds, cancellationToken);
         var name = new LocalizedText(command.FullNameEn, command.FullNameAr);
 
@@ -170,6 +174,7 @@ public sealed class UpdateUserHandler(
     IPrincipalCacheInvalidator principals,
     ICurrentUser currentUser,
     ICurrentTenant tenant,
+    IUserMobileNumbers mobiles,
     IUnitOfWork unitOfWork,
     IClock clock) : ICommandHandler<UpdateUserCommand>
 {
@@ -184,8 +189,12 @@ public sealed class UpdateUserHandler(
             ?? throw new DomainException(OrganizationCodes.UserNotFound, "User not found.", DomainFault.NotFound);
 
         var email = PlatformUser.NormaliseEmail(command.Email);
-        var mobile = PlatformUser.NormaliseMobile(command.Mobile);
-        var accountChanged = email != user.Email || mobile != user.Mobile || command.PasswordExpiresAtUtc != user.PasswordExpiresAtUtc || command.MustChangePassword != user.MustChangePassword;
+        // E.164 by the country rules (validation C-03). A row saved before the rule may hold the same number in another
+        // spelling: that is not a change (a user of several organisations keeps it; a sole-tenancy save normalises it).
+        var mobile = await mobiles.CanonicalAsync(command.Mobile, tenantId, cancellationToken);
+        var mobileChanged = mobile != user.Mobile
+            && !(mobile is not null && user.Mobile is not null && (await mobiles.SpellingsAsync(user.Mobile, cancellationToken)).Contains(mobile));
+        var accountChanged = email != user.Email || mobileChanged || command.PasswordExpiresAtUtc != user.PasswordExpiresAtUtc || command.MustChangePassword != user.MustChangePassword;
         var soleTenancy = !await OrganizationGuards.BelongsToOtherTenantsAsync(directory, user.Id, tenantId, cancellationToken);
         if (accountChanged && !soleTenancy)
         {
@@ -202,7 +211,7 @@ public sealed class UpdateUserHandler(
             throw new DomainException(OrganizationCodes.EmailExists, "Another account uses this e-mail address.", DomainFault.Conflict);
         }
 
-        if (mobile is not null && mobile != user.Mobile && await users.FindByMobileAsync(mobile, cancellationToken) is not null)
+        if (mobile is not null && mobileChanged && await mobiles.IsTakenAsync(mobile, user.Id, cancellationToken))
         {
             throw new DomainException(OrganizationCodes.MobileExists, "Another account uses this mobile number.", DomainFault.Conflict);
         }
@@ -224,7 +233,8 @@ public sealed class UpdateUserHandler(
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Identity, PermissionAction.Edit)]
-public sealed record AssignUserBranchesCommand(Guid UserId, IReadOnlyList<Guid> BranchIds) : ICommand;
+/// <summary><see cref="AllBranches"/>: true = every active branch (the list must be empty), false = the listed branches (at least one; ORG-018), null = the older contract (empty = every branch).</summary>
+public sealed record AssignUserBranchesCommand(Guid UserId, IReadOnlyList<Guid> BranchIds, bool? AllBranches = null) : ICommand;
 
 public sealed class AssignUserBranchesValidator : AbstractValidator<AssignUserBranchesCommand>
 {
@@ -251,6 +261,7 @@ public sealed class AssignUserBranchesHandler(
         var membership = await memberships.FindByPlatformUserAsync(command.UserId, cancellationToken)
             ?? throw new DomainException(OrganizationCodes.UserNotFound, "User not found.", DomainFault.NotFound);
 
+        OrganizationGuards.EnsureBranchChoice(command.AllBranches, command.BranchIds);
         membership.AssignBranches(await OrganizationGuards.RequireUsableBranchesAsync(branches, command.BranchIds, cancellationToken));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await principals.EvictUserAsync(command.UserId, cancellationToken);

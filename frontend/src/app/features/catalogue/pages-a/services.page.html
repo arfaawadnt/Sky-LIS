@@ -39,7 +39,7 @@
     <p class="problem list-problem" role="alert">{{ i18n.t('catalogue-a.loadError') }}</p>
   }
 
-  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.list.isLoading()" [emptyTitle]="i18n.t('catalogue-a.services.empty')" [caption]="i18n.t('catalogue-a.services.title')" (rowActivate)="open($event)">
+  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.list.isLoading()" [emptyTitle]="i18n.t('catalogue-a.services.empty')" [caption]="i18n.t('catalogue-a.services.title')" [sort]="facade.sort()" [serverSort]="true" (sortChange)="facade.setSort($event)" (rowActivate)="open($event)">
     <ng-template appCell="type" [appCellOf]="rows()" let-row><app-badge tone="info">{{ typeLabel(row.type) }}</app-badge></ng-template>
     <ng-template appCell="status" [appCellOf]="rows()" let-row><app-badge [status]="row.isActive ? 'Active' : 'Inactive'" /></ng-template>
   </app-data-table>

@@ -4,7 +4,9 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { CATALOGUE_B_API, CATALOGUE_B_LOOKUP_API } from '../../../core/api/catalogue-b.contracts';
+import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { CatalogueBApi, fileNameOf, localFileName } from './catalogue-b.api';
 import { ListedFilter } from './listed-filter';
 import { CatalogueBLookups, optionsOf, recordsOf, toSelectOption } from './catalogue-b-lookups';
@@ -13,9 +15,18 @@ const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve,
 
 describe('Catalogue B lookups and API helpers', () => {
   let backend: HttpTestingController;
+  let granted: Set<string>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting()] });
+    granted = new Set(['catalogue.view', 'pricing.view']);
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+      ],
+    });
     backend = TestBed.inject(HttpTestingController);
   });
 
@@ -47,6 +58,32 @@ describe('Catalogue B lookups and API helpers', () => {
       { id: 't2', nameEn: 'Orphan' },
     ]);
     expect(await tiers).toEqual([{ id: 't1', payerId: 'p1', payerNameEn: 'Cash', payerNameAr: 'نقدي', nameEn: 'Default', nameAr: 'افتراضي' }]);
+    backend.verify();
+  });
+
+  it('reads the branch register only with organization.view, else the selectable branches of the session (validation v0.5.0 R-08)', async () => {
+    const lookups = TestBed.inject(CatalogueBLookups);
+
+    // reception: catalogue.view without organization.view → never GET /organization/branches (it answered 403)
+    const selectable = lookups.branches();
+    backend.expectNone((request) => request.url === CATALOGUE_B_LOOKUP_API.branches);
+    backend.expectOne(ORGANIZATION_API.selectableBranches).flush({ currentBranchId: 'b1', branches: [{ id: 'b1', code: 'MAIN', nameEn: 'Main', nameAr: 'الرئيسي' }] });
+    expect(await selectable).toEqual([{ id: 'b1', code: 'MAIN', nameEn: 'Main', nameAr: 'الرئيسي' }]);
+
+    granted.add('organization.view');
+    const register = lookups.branches();
+    backend.expectNone(ORGANIZATION_API.selectableBranches);
+    const request = backend.expectOne((candidate) => candidate.url === CATALOGUE_B_LOOKUP_API.branches);
+    expect(request.request.params.get('pageSize')).toBe('200');
+    request.flush({ items: [{ id: 'b1', code: 'MAIN', nameEn: 'Main', nameAr: 'الرئيسي', isActive: true }, { id: 'b2', code: 'EAST', nameEn: 'East', nameAr: 'الشرق', isActive: false }], page: 1, pageSize: 200, totalCount: 2, totalPages: 1 });
+    expect((await register).map((branch) => branch.code)).toEqual(['MAIN', 'EAST']);
+    backend.verify();
+  });
+
+  it('asks no tier options without pricing.view (R-08)', async () => {
+    granted.delete('pricing.view');
+    expect(await TestBed.inject(CatalogueBLookups).tiers()).toEqual([]);
+    backend.expectNone((request) => request.url === CATALOGUE_B_LOOKUP_API.tierOptions);
     backend.verify();
   });
 

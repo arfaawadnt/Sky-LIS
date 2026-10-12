@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
 import { PATIENTS_API, type PatientDetail, type PatientDocumentItem } from '../../../core/api/patients.contracts';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { PatientFileFacade } from '../state/patient-file.facade';
 import { PatientFilePage } from './patient-file.page';
@@ -124,7 +125,7 @@ describe('PatientFilePage (CP-11 file, documents, visits, merge)', () => {
   });
 
   it('offers no Documents tab without files.view (UAT A-03)', async () => {
-    granted = new Set(['patients.view']);
+    granted = new Set(['patients.view', 'registration.view']);
     const host = await render();
     const tabs = [...host.querySelectorAll<HTMLElement>('app-tabs [role="tab"]')].map((button) => button.textContent?.trim() ?? '');
     expect(tabs.some((label) => label.includes('patients.tab.documents'))).toBe(false);
@@ -144,7 +145,7 @@ describe('PatientFilePage (CP-11 file, documents, visits, merge)', () => {
   });
 
   it('shows the visits tab as unavailable until the registration module answers', async () => {
-    granted = new Set(['patients.view']);
+    granted = new Set(['patients.view', 'registration.view']);
     const host = await render();
 
     tab(host, 1).click();   // without files.view there is no Documents tab: Visits is the second (UAT A-03)
@@ -153,6 +154,37 @@ describe('PatientFilePage (CP-11 file, documents, visits, merge)', () => {
     await flush();
 
     expect(host.textContent).toContain('patients.visit.unavailable');
+  });
+
+  it('offers no Visits tab and reads no visits or catalogue list for a patients reader without registration.view (round 2 R2-04)', async () => {
+    granted = new Set(['patients.view']);
+    const host = await render();
+    const tabs = [...host.querySelectorAll<HTMLElement>('app-tabs [role="tab"]')].map((button) => button.textContent?.trim() ?? '');
+    expect(tabs.some((label) => label.includes('patients.tab.visits'))).toBe(false);
+    backend.expectNone((r) => r.url === PATIENTS_API.visits);
+    backend.expectNone((r) => r.url.startsWith('/api/v1/catalogue/'));
+  });
+
+  it('shows a visit row in Arabic: Arabic branch name, translated status and Arabic-Indic count (round 3 R3-01)', async () => {
+    granted = new Set(['patients.view', 'registration.view']);
+    TestBed.inject(I18nService).setLanguage('ar');
+    try {
+      const host = await render();
+      tab(host, 1).click();
+      await flush();
+      backend.expectOne((r) => r.url === PATIENTS_API.visits).flush({
+        items: [{ id: 'v-1', accession: 'ACC-2026-00001', registeredAtUtc: '2026-10-01T09:00:00Z', status: 'Open', branchNameEn: 'Main Branch', branchNameAr: 'الفرع الرئيسي', servicesCount: 12 }],
+      });
+      await flush();
+      const row = host.querySelector('app-data-table tbody tr')?.textContent ?? '';
+      expect(row).toContain('الفرع الرئيسي');
+      expect(row).not.toContain('Main Branch');
+      expect(row).toContain('١٢');
+      expect(row).toContain('shared.status.Open');
+      expect(row).not.toMatch(/(^|[^.])Open/);
+    } finally {
+      TestBed.inject(I18nService).setLanguage('en');
+    }
   });
 
   it('shows a merged file read-only with a link to its survivor', async () => {
@@ -168,5 +200,29 @@ describe('PatientFilePage (CP-11 file, documents, visits, merge)', () => {
     expect(host.querySelector('.merged a')?.getAttribute('href')).toBe('/patients/p-9');
     expect(host.textContent).not.toContain('patients.merge.open');
     expect(host.querySelector('app-page-header .btn.primary')).toBeNull();
+  });
+
+  it('shows the dates and the Documents count in Arabic-Indic digits on an Arabic page (round 2 R2-02)', async () => {
+    granted = new Set(['patients.view', 'files.view']);
+    TestBed.inject(I18nService).setLanguage('ar');
+    try {
+      const host = await render({ ...detail, dateOfBirthIsEstimated: true });
+      const text = host.textContent ?? '';
+      expect(text).not.toContain('1990-05-01');
+      expect(text).not.toContain('2026-10-01');
+      expect(text).toContain('١٩٩٠');
+      expect(text).toContain('٢٠٢٦');
+      expect(host.querySelector('app-tabs .count')?.textContent?.trim()).toBe('١');
+    } finally {
+      TestBed.inject(I18nService).setLanguage('en');
+    }
+  });
+
+  it('shows the dates as days of the calendar in English, never shifted by the time zone (round 2 R2-02)', async () => {
+    granted = new Set(['patients.view', 'files.view']);
+    const host = await render();
+    expect(host.textContent).toContain('1 May 1990');
+    expect(host.textContent).toContain('1 Oct 2026');
+    expect(host.querySelector('app-tabs .count')?.textContent?.trim()).toBe('1');
   });
 });

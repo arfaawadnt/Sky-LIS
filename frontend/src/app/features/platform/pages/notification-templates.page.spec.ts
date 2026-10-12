@@ -73,4 +73,18 @@ describe('Notification templates dialog follows the user rights (UAT R4-02)', ()
     expect(text?.disabled).toBe(false);
     expect(root.querySelector('button[type="submit"][form="platform-template-form"]')).not.toBeNull();
   });
+
+  it('C-10: the row action reads "View template" for a viewer and "Edit template" for a manager', async () => {
+    const viewer = await open(false);
+    const viewLabels = Array.from(viewer.querySelectorAll<HTMLButtonElement>('button.row-btn')).map((button) => button.getAttribute('aria-label'));
+    expect(viewLabels).toContain('platform.templates.viewAction');
+    expect(viewLabels).not.toContain('platform.templates.edit');
+    TestBed.resetTestingModule();
+    document.body.innerHTML = '';
+
+    const manager = await open(true);
+    const editLabels = Array.from(manager.querySelectorAll<HTMLButtonElement>('button.row-btn')).map((button) => button.getAttribute('aria-label'));
+    expect(editLabels).toContain('platform.templates.edit');
+    expect(editLabels).not.toContain('platform.templates.viewAction');
+  });
 });

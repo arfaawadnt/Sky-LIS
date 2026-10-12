@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Abstractions.Settings;
 using Platform.Application.Catalogue;
@@ -34,7 +35,9 @@ public sealed record GetWorklistQuery(
     string? Search,
     bool BranchOnly,
     int? Page,
-    int? PageSize) : IQuery<WorklistPage>;
+    int? PageSize,
+    string? Sort = null,
+    string? Direction = null) : IQuery<WorklistPage>;
 
 public sealed class GetWorklistValidator : AbstractValidator<GetWorklistQuery>
 {
@@ -46,6 +49,8 @@ public sealed class GetWorklistValidator : AbstractValidator<GetWorklistQuery>
         RuleFor(query => query.Search).MaximumLength(60);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(ResultsSortKeys.Worklist);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
@@ -136,7 +141,8 @@ internal static class Worklists
             query.Statuses is { Count: > 0 } statuses ? [.. statuses.Select(status => Enum.Parse<ResultStatus>(status, ignoreCase: true))] : null,
             query.DelayedOnly,
             string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim(),
-            query.BranchOnly ? user.BranchId : null);
+            query.BranchOnly ? user.BranchId : null,
+            ListSort.Of(query.Sort, query.Direction));
     }
 
     public static WorklistItem Item(WorklistRow row, DateTimeOffset nowUtc, int warnPercent, int latePercent)

@@ -10,7 +10,9 @@ namespace Platform.Infrastructure.Persistence.Audit;
 /// <summary>
 /// The "client" of the platform tenant's audit log (SA-09; UAT C-18). The platform's own trail records actions on the
 /// laboratories: a client record (<c>Tenant</c>, its id is the client's tenant id), its wallet and the wallet's movements
-/// (by wallet id), and events whose payload names the client (<c>tenantId</c>). This helper derives the client of each
+/// (by wallet id), the client's administrator user (<c>PlatformUser</c> recorded as the client's <c>AdministratorUserId</c>,
+/// e.g. SA-04 "reset administrator password": validation 2026-10-11 C-11) and events whose payload names the client
+/// (<c>tenantId</c>). This helper derives the client of each
 /// entry of a page, adds the client's names, and narrows the two audit sources to one client for the filter. Only the
 /// platform tenant's log has clients: a laboratory's log is its own and the helper leaves it untouched.
 /// </summary>
@@ -20,6 +22,7 @@ internal static class AuditClients
     // field changes of the client record itself then lost their client (UAT C-18, re-test 2026-10-11).
     private const string TenantEntity = nameof(Platform.Domain.PlatformAdmin.Tenant);
     private const string WalletEntity = nameof(Wallet);
+    private const string PlatformUserEntity = nameof(Platform.Domain.Identity.PlatformUser);
     private const string TenantIdField = "TenantId";
     private const string WalletIdField = "WalletId";
 
@@ -51,15 +54,21 @@ internal static class AuditClients
         var walletIdAfter = ChangeJson(WalletIdField, walletId, after: true);
         var walletIdPayload = JsonSerializer.Serialize(new Dictionary<string, string> { ["walletId"] = walletId });
 
+        // C-11: the client's administrator user, when that user administers this client only (FillAsync labels it the same way).
+        var administrator = await AdministratorOfAsync(context, clientTenantId, cancellationToken).ConfigureAwait(false);
+        var administratorId = administrator?.ToString("D") ?? "-";
+
         changes = changes.Where(change =>
             (change.EntityType == TenantEntity && change.EntityId == client)
             || (change.EntityType == WalletEntity && change.EntityId == walletId)
+            || (change.EntityType == PlatformUserEntity && change.EntityId == administratorId)
             || EF.Functions.JsonContains(change.Changes, tenantIdAfter)
             || EF.Functions.JsonContains(change.Changes, tenantIdBefore)
             || EF.Functions.JsonContains(change.Changes, walletIdAfter));
         trail = trail.Where(entry =>
             (entry.AggregateType == TenantEntity && entry.AggregateId == client)
             || (entry.AggregateType == WalletEntity && entry.AggregateId == walletId)
+            || (entry.AggregateType == PlatformUserEntity && entry.AggregateId == administratorId)
             || EF.Functions.JsonContains(entry.Payload, tenantIdPayload)
             || EF.Functions.JsonContains(entry.Payload, walletIdPayload));
         return (changes, trail);
@@ -75,9 +84,21 @@ internal static class AuditClients
             : await context.Set<Wallet>().AsNoTracking().Where(wallet => walletIds.Contains(wallet.Id))
                 .ToDictionaryAsync(wallet => wallet.Id, wallet => wallet.TenantId, cancellationToken).ConfigureAwait(false);
 
+        var administratorIds = candidates.Select(candidate => candidate.Reference.AdministratorUserId).OfType<Guid>().Distinct().ToArray();
+        var administeredTenants = administratorIds.Length == 0
+            ? new Dictionary<Guid, Guid>()
+            : (await context.Set<ClientTenant>().AsNoTracking()
+                .Where(tenant => tenant.AdministratorUserId != null && administratorIds.Contains(tenant.AdministratorUserId.Value))
+                .Select(tenant => new { UserId = tenant.AdministratorUserId!.Value, tenant.Id })
+                .ToListAsync(cancellationToken).ConfigureAwait(false))
+                .GroupBy(row => row.UserId)
+                .Where(group => group.Count() == 1)   // a user administering several clients names none of them
+                .ToDictionary(group => group.Key, group => group.Single().Id);
+
         var resolved = candidates
             .Select(candidate => (candidate.Item, TenantId: candidate.Reference.TenantId
-                ?? (candidate.Reference.WalletId is { } wallet && walletTenants.TryGetValue(wallet, out var owner) ? owner : (Guid?)null)))
+                ?? (candidate.Reference.WalletId is { } wallet && walletTenants.TryGetValue(wallet, out var owner) ? owner : (Guid?)null)
+                ?? (candidate.Reference.AdministratorUserId is { } user && administeredTenants.TryGetValue(user, out var administered) ? administered : (Guid?)null)))
             .Select(candidate => (candidate.Item, TenantId: candidate.TenantId is { } id && !TenantIds.IsPlatform(id) && id != Guid.Empty ? candidate.TenantId : null))
             .ToList();
 
@@ -101,14 +122,19 @@ internal static class AuditClients
             .ToList();
     }
 
-    /// <summary>What an entry says about the client: a tenant id directly, or a wallet whose owner is the client.</summary>
-    internal static (Guid? TenantId, Guid? WalletId) ReferenceOf(AuditEntryItem item)
+    /// <summary>
+    /// What an entry says about the client: a tenant id directly, a wallet whose owner is the client, or a platform user who
+    /// may be a client's administrator (C-11).
+    /// </summary>
+    internal static (Guid? TenantId, Guid? WalletId, Guid? AdministratorUserId) ReferenceOf(AuditEntryItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
         if (item.EntityType == TenantEntity && Guid.TryParse(item.EntityId, out var tenant))
         {
-            return (tenant, null);
+            return (tenant, null, null);
         }
+
+        Guid? userId = item.EntityType == PlatformUserEntity && Guid.TryParse(item.EntityId, out var user) ? user : null;
 
         Guid? walletId = item.EntityType == WalletEntity && Guid.TryParse(item.EntityId, out var wallet) ? wallet : null;
         if (item.Changes is { Count: > 0 } changes)
@@ -116,7 +142,7 @@ internal static class AuditClients
             var tenantChange = changes.FirstOrDefault(change => change.Field == TenantIdField);
             if (Guid.TryParse(tenantChange?.After ?? tenantChange?.Before, out var changed))
             {
-                return (changed, null);
+                return (changed, null, null);
             }
 
             var walletChange = changes.FirstOrDefault(change => change.Field == WalletIdField);
@@ -131,13 +157,27 @@ internal static class AuditClients
             var (payloadTenant, payloadWallet) = PayloadIds(item.Payload);
             if (payloadTenant is not null)
             {
-                return (payloadTenant, null);
+                return (payloadTenant, null, null);
             }
 
             walletId ??= payloadWallet;
         }
 
-        return (null, walletId);
+        return (null, walletId, userId);
+    }
+
+    /// <summary>The administrator user of the client, unless that user also administers another client (then the entries name no client).</summary>
+    private static async Task<Guid?> AdministratorOfAsync(AppDbContext context, Guid clientTenantId, CancellationToken cancellationToken)
+    {
+        var administrator = await context.Set<ClientTenant>().AsNoTracking().Where(tenant => tenant.Id == clientTenantId)
+            .Select(tenant => tenant.AdministratorUserId).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        if (administrator is not { } userId)
+        {
+            return null;
+        }
+
+        var administered = await context.Set<ClientTenant>().AsNoTracking().CountAsync(tenant => tenant.AdministratorUserId == userId, cancellationToken).ConfigureAwait(false);
+        return administered == 1 ? userId : null;
     }
 
     private static (Guid? TenantId, Guid? WalletId) PayloadIds(string payload)

@@ -52,6 +52,19 @@ describe('CollectionFacade (CP-14)', () => {
     backend.verify();
   });
 
+  it("B-03: sorts today's samples on the server from page 1", async () => {
+    await flushInitialLoads();
+    facade.setPage({ page: 2, pageSize: 50 });
+    await runEffects();
+    backend.expectOne((request) => request.url === SAMPLES_API.samples).flush(page([]));
+
+    facade.setSort({ key: 'status', direction: 'asc' });
+    await runEffects();
+    const sorted = backend.expectOne((request) => request.url === SAMPLES_API.samples);
+    expect([sorted.request.params.get('sort'), sorted.request.params.get('direction'), sorted.request.params.get('page')]).toEqual(['status', 'asc', '1']);
+    sorted.flush(page([]));
+  });
+
   it("loads today's samples of the session branch and narrows them by status", async () => {
     await runEffects();
     const first = backend.expectOne((request) => request.url === SAMPLES_API.samples);

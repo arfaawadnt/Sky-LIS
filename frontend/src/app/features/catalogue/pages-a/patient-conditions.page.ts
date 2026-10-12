@@ -4,6 +4,8 @@ import { CATALOGUE_A_PERMISSIONS, type PatientConditionListItem, type PatientCon
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
 import { CanDirective } from '../../../shared/ui/can.directive';
+import { sortParams } from '../../../shared/forms/paging';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { MasterDataConfig, MasterDataFilter } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueAApi } from '../data-a/catalogue-a.api';
@@ -32,12 +34,13 @@ export class PatientConditionsPage {
 
   protected readonly config: MasterDataConfig<PatientConditionListItem, PatientConditionRequest> = {
     i18nPrefix: 'catalogue-a.conditions',
-    columns: [{ key: 'name', header: 'catalogue-a.conditions.column.name', sortable: true, value: (row) => localizedPick({ en: row.nameEn, ar: row.nameAr }, this.i18n.lang()) }],
+    sortMode: 'server',
+    columns: [{ key: 'name', header: 'catalogue-a.conditions.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (row) => localizedPick({ en: row.nameEn, ar: row.nameAr }, this.i18n.lang()) }],
     fields: [{ name: 'name', kind: 'localizedText', required: true, maxLength: 200 }],
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listPatientConditions({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+        return this.api.listPatientConditions({ ...sortParams(filter.sort), search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
       },
       create: (dto) => this.api.createPatientCondition(dto),
       update: (id, dto) => this.api.updatePatientCondition(id, dto),

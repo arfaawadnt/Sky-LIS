@@ -13,8 +13,8 @@ namespace Platform.WebApi.Controllers.Integration;
 public sealed class SiteAgentsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<SiteAgentListItem>>> List([FromQuery] string? search, [FromQuery] Guid? branchId, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListSiteAgentsQuery(search, branchId, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<SiteAgentListItem>>> List([FromQuery] string? search, [FromQuery] Guid? branchId, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListSiteAgentsQuery(search, branchId, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SiteAgentDetail>> Get(Guid id, CancellationToken cancellationToken) =>

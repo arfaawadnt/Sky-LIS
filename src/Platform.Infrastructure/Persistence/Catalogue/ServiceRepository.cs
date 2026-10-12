@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Catalogue;
 using Platform.Contracts.Catalogue;
 using Platform.Contracts.Common;
@@ -8,6 +9,13 @@ namespace Platform.Infrastructure.Persistence.Catalogue;
 
 internal sealed class ServiceRepository(AppDbContext context) : Repository<Service>(context), IServiceRepository
 {
+    private static readonly SortColumns<Service> Sorts = new SortColumns<Service>(CatalogueSortKeys.Services)
+        .Column("sequence", service => service.Sequence)
+        .Column("code", service => service.Code)
+        .Column("nameEn", service => service.Name.En)
+        .Column("nameAr", service => service.Name.Ar)
+        .ThenBy(service => service.Code);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken)
     {
         var cleaned = (code ?? string.Empty).Trim().ToUpperInvariant();
@@ -44,8 +52,19 @@ internal sealed class ServiceRepository(AppDbContext context) : Repository<Servi
     {
         var query = Filtered(filter);
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await ProjectAsync(query.OrderBy(service => service.Sequence).ThenBy(service => service.Code).Skip(page.Skip).Take(page.PageSize), cancellationToken).ConfigureAwait(false);
-        return new Paged<ServiceListItem>(items, page.Page, page.PageSize, total);
+        if (filter.Sort.Key is null)
+        {
+            var items = await ProjectAsync(query.OrderBy(service => service.Sequence).ThenBy(service => service.Code).Skip(page.Skip).Take(page.PageSize), cancellationToken).ConfigureAwait(false);
+            return new Paged<ServiceListItem>(items, page.Page, page.PageSize, total);
+        }
+
+        // B-03: the page of the requested order is chosen on the server; the projection joins re-order nothing, so the
+        // rows are put back in the order of the ids.
+        var ids = await Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(service => service.Sequence)).Skip(page.Skip).Take(page.PageSize)
+            .Select(service => service.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var projected = await ProjectAsync(Set.AsNoTracking().Where(service => ids.Contains(service.Id)), cancellationToken).ConfigureAwait(false);
+        var position = ids.Select((id, index) => (id, index)).ToDictionary(entry => entry.id, entry => entry.index);
+        return new Paged<ServiceListItem>(projected.OrderBy(item => position[item.Id]).ToList(), page.Page, page.PageSize, total);
     }
 
     public Task<IReadOnlyList<ServiceListItem>> ExportAsync(ServiceListFilter filter, CancellationToken cancellationToken) =>

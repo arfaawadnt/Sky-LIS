@@ -13,6 +13,8 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { type LocalizedText, localizedPick } from '../../../shared/forms/localized-text';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CellTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
+import { sortParams } from '../../../shared/forms/paging';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { FormValue, MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueBApi } from '../data-b/catalogue-b.api';
@@ -76,8 +78,9 @@ export class ReportTemplatesPage {
 
   protected readonly config: MasterDataConfig<ReportTemplateListItem, ReportTemplateRequest> = {
     i18nPrefix: 'catalogue-b.reportTemplates',
+    sortMode: 'server',
     columns: [
-      { key: 'name', header: 'catalogue-b.reportTemplates.column.name', sortable: true, value: (item) => localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang()) },
+      { key: 'name', header: 'catalogue-b.reportTemplates.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (item) => localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang()) },
       { key: 'type', header: 'catalogue-b.reportTemplates.column.type', sortable: true, width: '150px', value: (item) => this.i18n.t(`catalogue-b.templateType.${item.type}`) },
       { key: 'language', header: 'catalogue-b.reportTemplates.column.language', width: '120px', value: (item) => this.i18n.t(`catalogue-b.templateLanguage.${item.language}`) },
       { key: 'assets', header: 'catalogue-b.reportTemplates.column.assets', secondary: true },
@@ -103,7 +106,7 @@ export class ReportTemplatesPage {
       { name: 'footerText', kind: 'localizedText', required: false, maxLength: 400 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.reportTemplates.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.reportTemplates.list({ ...this.listed.track(filter), ...sortParams(filter.sort), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.reportTemplates.create(dto),
       update: (id, dto) => this.api.reportTemplates.update(id, dto),
       setActive: (id, active) => this.api.reportTemplates.setActive(id, active),

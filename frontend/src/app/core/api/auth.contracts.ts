@@ -6,9 +6,14 @@
 
 export interface AuthProfile {
   readonly userId: string;
+  /** The name in the user's preferred language; `displayNameEn` / `displayNameAr` the member's full name in each language (validation v0.5.0 R-12). Pick with `displayNameFor`. */
   readonly displayName: string;
+  readonly displayNameEn?: string | null;
+  readonly displayNameAr?: string | null;
   readonly tenantId: string | null;
+  /** The role's English name; `roleNameAr` its Arabic name (validation v0.5.0 B-09). Pick with `roleNameFor`. */
   readonly roleName: string | null;
+  readonly roleNameAr?: string | null;
   readonly permissions: readonly string[];
   readonly language: string;
   readonly scope: string;

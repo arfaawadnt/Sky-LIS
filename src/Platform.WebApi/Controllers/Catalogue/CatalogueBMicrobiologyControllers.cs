@@ -15,8 +15,8 @@ namespace Platform.WebApi.Controllers.Catalogue;
 public sealed class DrugTypesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<DrugTypeListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListDrugTypesQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<DrugTypeListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListDrugTypesQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<DrugTypeListItem>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -65,8 +65,8 @@ public sealed class DrugTypesController(ISender sender) : ControllerBase
 public sealed class CommercialNamesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<CommercialNameListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? drugTypeId, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListCommercialNamesQuery(search, isActive, drugTypeId, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<CommercialNameListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? drugTypeId, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListCommercialNamesQuery(search, isActive, drugTypeId, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<CommercialNameListItem>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -115,8 +115,8 @@ public sealed class CommercialNamesController(ISender sender) : ControllerBase
 public sealed class AntibioticsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<AntibioticListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListAntibioticsQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<AntibioticListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListAntibioticsQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<AntibioticListItem>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -165,8 +165,8 @@ public sealed class AntibioticsController(ISender sender) : ControllerBase
 public sealed class OrganismsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<OrganismListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListOrganismsQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<OrganismListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListOrganismsQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<OrganismListItem>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -215,8 +215,8 @@ public sealed class OrganismsController(ISender sender) : ControllerBase
 public sealed class SensitivityValuesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<SensitivityValueListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListSensitivityValuesQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<SensitivityValueListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListSensitivityValuesQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SensitivityValueListItem>> Get(Guid id, CancellationToken cancellationToken) =>

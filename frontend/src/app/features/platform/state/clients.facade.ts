@@ -9,18 +9,30 @@ import type {
   ProvisionClientRequest,
   UpdateClientRequest,
 } from '../../../core/api/platform.contracts';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { mutation } from '../../../core/state/mutation';
+import { sortParams } from '../../../shared/forms/paging';
+import { type SortKeyMap, type TableSort, localizedSortKey, serverSortOf } from '../../../shared/ui/data-table/data-table.types';
 import { PlatformApi } from '../data/platform.api';
 
-/** SA-04 state: the filtered, paged client list, the reference lists of the drawer, and the life-cycle actions. */
+/** The server keys of the sortable columns of the clients table (B-03, PlatformAdminSortKeys.Clients). */
+export const CLIENT_SORT_KEYS: SortKeyMap = { name: localizedSortKey('name'), planCode: 'planCode', walletBalance: 'walletBalance', createdAtUtc: 'createdAtUtc' };
+
+/** SA-04 state: the filtered, server-sorted, paged client list, the reference lists of the drawer, and the life-cycle actions. */
 @Injectable()
 export class ClientsFacade {
   private readonly api = inject(PlatformApi);
+  private readonly i18n = inject(I18nService);
 
   readonly filter = signal<ClientFilter>({ search: null, source: null, planId: null, status: null, page: 1, pageSize: 50 });
 
+  /** The column order chosen in the table header; the server sorts the whole list before paging (validation v0.5.0 B-03). */
+  readonly sort = signal<TableSort | null>(null);
+
+  private readonly query = computed<ClientFilter>(() => ({ ...this.filter(), ...sortParams(serverSortOf(this.sort(), CLIENT_SORT_KEYS, () => this.i18n.lang())) }));
+
   readonly clients = resource({
-    params: () => this.filter(),
+    params: () => this.query(),
     loader: ({ params, abortSignal }) => this.api.listClients(params, abortSignal),
   });
 
@@ -81,6 +93,12 @@ export class ClientsFacade {
 
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
+  }
+
+  /** A header click: the new order starts at page 1. */
+  setSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.filter.update((current) => ({ ...current, page: 1 }));
   }
 
   /** Every client matching the filter, for the CSV export. */

@@ -63,7 +63,13 @@ public sealed class AuthController(ISender sender) : ControllerBase
 
         if (fromCookie is not null)
         {
-            RefreshCookie.Write(HttpContext, result.RefreshToken);
+            // C-02: a grace answer (another tab rotated this token a moment ago) carries no refresh token; the cookie the
+            // other tab's response set is the current one and stays untouched.
+            if (result.RefreshToken is not null)
+            {
+                RefreshCookie.Write(HttpContext, result.RefreshToken);
+            }
+
             return Ok(new AuthResponse(AuthResponse.StepSignedIn, result.AccessToken.Token, result.AccessToken.ExpiresAtUtc, null, result.Profile, null));
         }
 

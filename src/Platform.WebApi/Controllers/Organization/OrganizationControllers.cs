@@ -13,8 +13,8 @@ namespace Platform.WebApi.Controllers.Organization;
 public sealed class OrganizationBranchesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<BranchListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListBranchesQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<BranchListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListBranchesQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     /// <summary>The branches the current session may select (any authenticated actor).</summary>
     [HttpGet("selectable")]
@@ -62,8 +62,8 @@ public sealed class OrganizationBranchesController(ISender sender) : ControllerB
 public sealed class OrganizationRolesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<RoleListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListRolesQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<RoleListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListRolesQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<RoleDetail>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -130,8 +130,8 @@ public sealed class OrganizationRolesController(ISender sender) : ControllerBase
 public sealed class OrganizationUsersController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<UserListItem>>> List([FromQuery] string? search, [FromQuery] Guid? roleId, [FromQuery] string? status, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListUsersQuery(search, roleId, status, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<UserListItem>>> List([FromQuery] string? search, [FromQuery] Guid? roleId, [FromQuery] string? status, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListUsersQuery(search, roleId, status, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<UserDetail>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -157,7 +157,8 @@ public sealed class OrganizationUsersController(ISender sender) : ControllerBase
                 request.BranchIds,
                 request.PasswordExpiresAtUtc,
                 request.EmployeeCode,
-                request.PreferredLanguage),
+                request.PreferredLanguage,
+                request.AllBranches),
             cancellationToken);
         return Created($"/api/v1/organization/users/{created.Id}", created);
     }
@@ -184,7 +185,7 @@ public sealed class OrganizationUsersController(ISender sender) : ControllerBase
     public async Task<IActionResult> AssignBranches(Guid id, [FromBody] AssignUserBranchesRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        await sender.Send(new AssignUserBranchesCommand(id, request.BranchIds ?? []), cancellationToken);
+        await sender.Send(new AssignUserBranchesCommand(id, request.BranchIds ?? [], request.AllBranches), cancellationToken);
         return NoContent();
     }
 

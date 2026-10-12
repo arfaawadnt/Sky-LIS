@@ -23,6 +23,22 @@ public sealed class SessionPolicy
 
     public TimeSpan StepUpMaxAge { get; init; } = TimeSpan.FromMinutes(5);
 
+    /// <summary>The ceiling of <see cref="RefreshReuseGrace"/>; a configured value above it is clamped.</summary>
+    public static readonly TimeSpan MaxRefreshReuseGrace = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Validation 2026-10-11 C-02: how long after a rotation the <b>immediately previous</b> refresh token of a browser session
+    /// is still answered with the session that replaced it, instead of being treated as reuse. The tabs of one browser share
+    /// the refresh cookie, so two tabs refreshing at the same moment present the same token twice; the second request must
+    /// not revoke the family. Outside the window, or for an older generation, presenting a rotated token is reuse (02 §4.3).
+    /// <c>Lis:Security:Session:RefreshReuseGrace</c>; zero disables it; clamped to <see cref="MaxRefreshReuseGrace"/>.
+    /// </summary>
+    public TimeSpan RefreshReuseGrace { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary><see cref="RefreshReuseGrace"/> bounded to [0, <see cref="MaxRefreshReuseGrace"/>].</summary>
+    public TimeSpan EffectiveRefreshReuseGrace =>
+        RefreshReuseGrace <= TimeSpan.Zero ? TimeSpan.Zero : RefreshReuseGrace > MaxRefreshReuseGrace ? MaxRefreshReuseGrace : RefreshReuseGrace;
+
     /// <summary>One-time codes of the platform's own flows (CP-02, CP-03): digits, lifetime and attempts (02 §4.5 as a capability).</summary>
     public int OtpLength { get; init; } = 6;
 

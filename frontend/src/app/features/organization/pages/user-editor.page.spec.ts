@@ -8,6 +8,7 @@ import { NO_SPECIAL_RIGHTS, ORGANIZATION_API, type UserDetail } from '../../../c
 import { AuthStore } from '../../../core/auth/auth.store';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
+import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { UserEditorFacade } from '../state/users.facade';
 import { UserEditorPage, fromDateInput, parseShifts, toDateInput } from './user-editor.page';
 
@@ -129,7 +130,50 @@ describe('UserEditorPage (CP-38)', () => {
     submit?.click();
     await flush();
     const post = backend.expectOne({ method: 'POST', url: ORGANIZATION_API.users });
-    expect(post.request.body).toMatchObject({ username: 'mona.adel', password: 'a long secret', email: 'mona@lab.example', shifts: ['Morning', 'Night'], mustChangePassword: true, branchIds: [] });
+    expect(post.request.body).toMatchObject({ username: 'mona.adel', password: 'a long secret', email: 'mona@lab.example', shifts: ['Morning', 'Night'], mustChangePassword: true, branchIds: [], allBranches: true });
+  });
+
+  it('B-02: refuses to create a user restricted to no branch, then posts the chosen branch as a restricted choice', async () => {
+    const fixture = TestBed.createComponent(UserEditorPage);
+    await flush();
+    backend.match((request) => request.url === ORGANIZATION_API.branches).forEach((request) =>
+      request.flush({ ...page, items: [{ id: 'b1', code: 'MAIN', nameEn: 'Main', nameAr: 'الرئيسي', countryId: null, governorateId: null, phone: null, email: null, currency: 'EGP', isActive: true }], totalCount: 1, totalPages: 1 }),
+    );
+    flushPickers();
+    await flush();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const set = (name: string, value: string): void => {
+      const control = host.querySelector<HTMLInputElement>(`[formcontrolname="${name}"]`);
+      if (control) {
+        control.value = value;
+        control.dispatchEvent(new Event('input'));
+      }
+    };
+    set('username', 'mona.adel');
+    set('password', 'a long secret');
+    set('confirm', 'a long secret');
+    set('email', 'mona@lab.example');
+    host.querySelectorAll<HTMLInputElement>('app-localized-text-input input').forEach((input, index) => {
+      input.value = index === 0 ? 'Mona Adel' : 'منى عادل';
+      input.dispatchEvent(new Event('input'));
+    });
+    const everyBranch = host.querySelector<HTMLInputElement>('fieldset.branches input[type="checkbox"]');
+    everyBranch?.click();
+    await flush();
+
+    const submit = host.querySelector<HTMLButtonElement>('form button[type="submit"]');
+    submit?.click();
+    await flush();
+    backend.expectNone({ method: 'POST', url: ORGANIZATION_API.users });
+    expect(TestBed.inject(ToastService).toasts().map((toast) => toast.text)).toContain('organization.users.pickBranch');
+
+    host.querySelector<HTMLInputElement>('fieldset.branches .branch-list input[type="checkbox"]')?.click();
+    await flush();
+    submit?.click();
+    await flush();
+    const post = backend.expectOne({ method: 'POST', url: ORGANIZATION_API.users });
+    expect(post.request.body).toMatchObject({ branchIds: ['b1'], allBranches: false });
   });
 
   it('shows the overrides against the role and hides access actions on the actor own account', async () => {
@@ -179,7 +223,7 @@ describe('UserEditorPage (CP-38)', () => {
     await flush();
     backend.match(`${ORGANIZATION_API.users}/user-1`).forEach((request) => request.flush({ ...mona, roleId: 'role-2' }));
     const branches = backend.expectOne({ method: 'PUT', url: `${ORGANIZATION_API.users}/user-1/branches` });
-    expect(branches.request.body).toEqual({ branchIds: [] });
+    expect(branches.request.body).toEqual({ branchIds: [], allBranches: true });
     branches.flush(null, { status: 204, statusText: 'No Content' });
     await saving;
   });

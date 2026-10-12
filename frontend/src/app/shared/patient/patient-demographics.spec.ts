@@ -1,4 +1,4 @@
-import { ageBetween, ageParts, birthDateFromAge, defaultGender, fileSize, isValidAge, isValidMobile, normalizeMobile, parseIso, todayIso } from './patient-demographics';
+import { ageBetween, ageParts, ageText, birthDateFromAge, defaultGender, fileSize, isValidAge, isValidMobile, localDigits, normalizeMobile, parseIso, todayIso } from './patient-demographics';
 
 describe('patient demographics (the server rules, mirrored)', () => {
   it('computes the age exactly like PatientAge.Between', () => {
@@ -64,5 +64,18 @@ describe('patient demographics (the server rules, mirrored)', () => {
     expect(fileSize(512)).toBe('512 B');
     expect(fileSize(2048)).toBe('2.0 KB');
     expect(fileSize(3 * 1024 * 1024)).toBe('3.0 MB');
+  });
+
+  it('writes the age numbers in the digits of the language (validation R-02)', () => {
+    const units: Readonly<Record<string, string>> = { 'patients.age.years': '{value} سنة', 'patients.age.months': '{value} شهر', 'patients.age.days': '{value} يوم' };
+    const arabic = (key: string, params: Readonly<Record<string, string | number>>): string => (units[key] ?? key).replace('{value}', String(params['value']));
+    const english = (key: string, params: Readonly<Record<string, string | number>>): string => `${String(params['value'])} ${key.slice(key.lastIndexOf('.') + 1)}`;
+
+    expect(ageText({ years: 52, months: 0, days: 0 }, 'ar', arabic)).toBe('٥٢ سنة');
+    expect(ageText({ years: 36, months: 5, days: 8 }, 'ar', arabic)).toBe('٣٦ سنة ٥ شهر');
+    expect(ageText({ years: 0, months: 0, days: 10 }, 'ar', arabic)).toBe('١٠ يوم');
+    expect(ageText({ years: 52, months: 0, days: 0 }, 'en', english)).toBe('52 years');
+    expect(localDigits(1974, 'ar')).toBe('١٩٧٤');   // never grouped
+    expect(localDigits(1974, 'en')).toBe('1974');
   });
 });

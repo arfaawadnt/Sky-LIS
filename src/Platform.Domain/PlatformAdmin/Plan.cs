@@ -110,7 +110,7 @@ public sealed record PlanTerms(LocalizedText Name, decimal MonthlyFee, string Cu
 
         return this with
         {
-            MonthlyFee = DomainText.Money(MonthlyFee, PlatformAdminCodes.PlanLimitsInvalid, "The monthly fee", allowZero: true),
+            MonthlyFee = DomainText.EnteredMoney(MonthlyFee, PlatformAdminCodes.PlanLimitsInvalid, "The monthly fee", allowZero: true),   // C-05: refused, never rounded
             CurrencyCode = currency,
         };
     }

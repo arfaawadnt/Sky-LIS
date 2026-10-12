@@ -3,6 +3,7 @@ import { Injectable, computed, inject, resource, signal } from '@angular/core';
 import type { PageRequest } from '../../../core/api/paging';
 import type { ContractTierRequest, DefaultPayerIds, Paged, PayerListItem, PayerRequest } from '../../../core/api/pricing.contracts';
 import { mutation } from '../../../core/state/mutation';
+import { sortParams } from '../../../shared/forms/paging';
 import type { MasterDataFilter } from '../../../shared/ui/master-data-page/master-data.types';
 import { PricingApi } from '../data/pricing.api';
 
@@ -39,10 +40,10 @@ export class PayersFacade {
     then: () => this.afterTierChange(),
   });
 
-  /** The master-data adapter's `list`: provisions the cash payer once (a refusal is ignored), then pages the register. */
+  /** The master-data adapter's `list`: provisions the cash payer once (a refusal is ignored), then pages the register in the server order of the table (B-03). */
   async list(filter: MasterDataFilter, page: PageRequest, signal?: AbortSignal): Promise<Paged<PayerListItem>> {
     await this.ensureDefault();
-    return this.api.listPayers({ search: filter.search, type: null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+    return this.api.listPayers({ ...sortParams(filter.sort), search: filter.search, type: null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
   }
 
   create(request: PayerRequest): Promise<unknown> {

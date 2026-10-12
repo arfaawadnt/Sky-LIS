@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Contracts.Common;
 using Platform.Contracts.PlatformAdmin;
@@ -10,7 +11,8 @@ using Platform.SharedKernel.Primitives;
 namespace Platform.Application.PlatformAdmin.Queries;
 
 // Registers of the reference data: countries (SA-10), governorates (SA-11), notification templates (SA-20) and the
-// integration library (SA-15…SA-18). Every list takes a search text, the active filter and a page.
+// integration library (SA-15…SA-18). Every list takes a search text, the active filter, a page and an
+// allow-listed sort applied before paging (validation v0.5.0 B-03, PlatformAdminSortKeys).
 
 public sealed class ReferenceListValidator<TQuery> : AbstractValidator<TQuery>
     where TQuery : IReferenceListQuery
@@ -34,11 +36,16 @@ public interface IReferenceListQuery
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Tenancy, PermissionAction.View)]
-public sealed record ListCountriesQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<CountryListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
+public sealed record ListCountriesQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<CountryListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
 
 public sealed class ListCountriesValidator : AbstractValidator<ListCountriesQuery>
 {
-    public ListCountriesValidator() => Include(new ReferenceListValidator<ListCountriesQuery>());
+    public ListCountriesValidator()
+    {
+        Include(new ReferenceListValidator<ListCountriesQuery>());
+        RuleFor(query => query.Sort).SortKeyOf(PlatformAdminSortKeys.Countries);
+        RuleFor(query => query.Direction).SortDirection();
+    }
 }
 
 public sealed class ListCountriesHandler(ICountryRepository countries, ICurrentTenant currentTenant) : IQueryHandler<ListCountriesQuery, Paged<CountryListItem>>
@@ -46,18 +53,23 @@ public sealed class ListCountriesHandler(ICountryRepository countries, ICurrentT
     public Task<Paged<CountryListItem>> Handle(ListCountriesQuery query, CancellationToken cancellationToken)
     {
         PlatformAdminScope.Require(currentTenant);
-        return countries.ListAsync(Trim(query.Search), query.IsActive, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        return countries.ListAsync(Trim(query.Search), query.IsActive, ListSort.Of(query.Sort, query.Direction), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
     }
 
     private static string? Trim(string? search) => string.IsNullOrWhiteSpace(search) ? null : search.Trim();
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Tenancy, PermissionAction.View)]
-public sealed record ListGovernoratesQuery(Guid? CountryId, string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<GovernorateListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
+public sealed record ListGovernoratesQuery(Guid? CountryId, string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<GovernorateListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
 
 public sealed class ListGovernoratesValidator : AbstractValidator<ListGovernoratesQuery>
 {
-    public ListGovernoratesValidator() => Include(new ReferenceListValidator<ListGovernoratesQuery>());
+    public ListGovernoratesValidator()
+    {
+        Include(new ReferenceListValidator<ListGovernoratesQuery>());
+        RuleFor(query => query.Sort).SortKeyOf(PlatformAdminSortKeys.Governorates);
+        RuleFor(query => query.Direction).SortDirection();
+    }
 }
 
 public sealed class ListGovernoratesHandler(IGovernorateRepository governorates, ICurrentTenant currentTenant) : IQueryHandler<ListGovernoratesQuery, Paged<GovernorateListItem>>
@@ -65,16 +77,21 @@ public sealed class ListGovernoratesHandler(IGovernorateRepository governorates,
     public Task<Paged<GovernorateListItem>> Handle(ListGovernoratesQuery query, CancellationToken cancellationToken)
     {
         PlatformAdminScope.Require(currentTenant);
-        return governorates.ListAsync(query.CountryId, SearchText.Of(query.Search), query.IsActive, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        return governorates.ListAsync(query.CountryId, SearchText.Of(query.Search), query.IsActive, ListSort.Of(query.Sort, query.Direction), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
     }
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Notifications, PermissionAction.View)]
-public sealed record ListNotificationTemplatesQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<NotificationTemplateListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
+public sealed record ListNotificationTemplatesQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<NotificationTemplateListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
 
 public sealed class ListNotificationTemplatesValidator : AbstractValidator<ListNotificationTemplatesQuery>
 {
-    public ListNotificationTemplatesValidator() => Include(new ReferenceListValidator<ListNotificationTemplatesQuery>());
+    public ListNotificationTemplatesValidator()
+    {
+        Include(new ReferenceListValidator<ListNotificationTemplatesQuery>());
+        RuleFor(query => query.Sort).SortKeyOf(PlatformAdminSortKeys.NotificationTemplates);
+        RuleFor(query => query.Direction).SortDirection();
+    }
 }
 
 public sealed class ListNotificationTemplatesHandler(INotificationTemplateRepository templates, ICurrentTenant currentTenant) : IQueryHandler<ListNotificationTemplatesQuery, Paged<NotificationTemplateListItem>>
@@ -82,7 +99,7 @@ public sealed class ListNotificationTemplatesHandler(INotificationTemplateReposi
     public Task<Paged<NotificationTemplateListItem>> Handle(ListNotificationTemplatesQuery query, CancellationToken cancellationToken)
     {
         PlatformAdminScope.Require(currentTenant);
-        return templates.ListAsync(SearchText.Of(query.Search), query.IsActive, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        return templates.ListAsync(SearchText.Of(query.Search), query.IsActive, ListSort.Of(query.Sort, query.Direction), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
     }
 }
 
@@ -100,11 +117,16 @@ public sealed class GetTemplatePlaceholdersHandler(ICurrentTenant currentTenant)
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Integration, PermissionAction.View)]
-public sealed record ListAnalyserModelsQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<AnalyserModelListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
+public sealed record ListAnalyserModelsQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<AnalyserModelListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
 
 public sealed class ListAnalyserModelsValidator : AbstractValidator<ListAnalyserModelsQuery>
 {
-    public ListAnalyserModelsValidator() => Include(new ReferenceListValidator<ListAnalyserModelsQuery>());
+    public ListAnalyserModelsValidator()
+    {
+        Include(new ReferenceListValidator<ListAnalyserModelsQuery>());
+        RuleFor(query => query.Sort).SortKeyOf(PlatformAdminSortKeys.AnalyserModels);
+        RuleFor(query => query.Direction).SortDirection();
+    }
 }
 
 public sealed class ListAnalyserModelsHandler(IAnalyserModelRepository models, ICurrentTenant currentTenant) : IQueryHandler<ListAnalyserModelsQuery, Paged<AnalyserModelListItem>>
@@ -112,16 +134,21 @@ public sealed class ListAnalyserModelsHandler(IAnalyserModelRepository models, I
     public Task<Paged<AnalyserModelListItem>> Handle(ListAnalyserModelsQuery query, CancellationToken cancellationToken)
     {
         PlatformAdminScope.Require(currentTenant);
-        return models.ListAsync(SearchText.Of(query.Search), query.IsActive, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        return models.ListAsync(SearchText.Of(query.Search), query.IsActive, ListSort.Of(query.Sort, query.Direction), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
     }
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Integration, PermissionAction.View)]
-public sealed record ListPcrKitsQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<PcrKitListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
+public sealed record ListPcrKitsQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<PcrKitListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
 
 public sealed class ListPcrKitsValidator : AbstractValidator<ListPcrKitsQuery>
 {
-    public ListPcrKitsValidator() => Include(new ReferenceListValidator<ListPcrKitsQuery>());
+    public ListPcrKitsValidator()
+    {
+        Include(new ReferenceListValidator<ListPcrKitsQuery>());
+        RuleFor(query => query.Sort).SortKeyOf(PlatformAdminSortKeys.PcrKits);
+        RuleFor(query => query.Direction).SortDirection();
+    }
 }
 
 public sealed class ListPcrKitsHandler(IPcrKitTemplateRepository kits, ICurrentTenant currentTenant) : IQueryHandler<ListPcrKitsQuery, Paged<PcrKitListItem>>
@@ -129,16 +156,21 @@ public sealed class ListPcrKitsHandler(IPcrKitTemplateRepository kits, ICurrentT
     public Task<Paged<PcrKitListItem>> Handle(ListPcrKitsQuery query, CancellationToken cancellationToken)
     {
         PlatformAdminScope.Require(currentTenant);
-        return kits.ListAsync(SearchText.Of(query.Search), query.IsActive, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        return kits.ListAsync(SearchText.Of(query.Search), query.IsActive, ListSort.Of(query.Sort, query.Direction), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
     }
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Integration, PermissionAction.View)]
-public sealed record ListCodeSystemsQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<CodeSystemListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
+public sealed record ListCodeSystemsQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<CodeSystemListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
 
 public sealed class ListCodeSystemsValidator : AbstractValidator<ListCodeSystemsQuery>
 {
-    public ListCodeSystemsValidator() => Include(new ReferenceListValidator<ListCodeSystemsQuery>());
+    public ListCodeSystemsValidator()
+    {
+        Include(new ReferenceListValidator<ListCodeSystemsQuery>());
+        RuleFor(query => query.Sort).SortKeyOf(PlatformAdminSortKeys.CodeSystems);
+        RuleFor(query => query.Direction).SortDirection();
+    }
 }
 
 public sealed class ListCodeSystemsHandler(ICodeSystemRepository codeSystems, ICurrentTenant currentTenant) : IQueryHandler<ListCodeSystemsQuery, Paged<CodeSystemListItem>>
@@ -146,7 +178,7 @@ public sealed class ListCodeSystemsHandler(ICodeSystemRepository codeSystems, IC
     public Task<Paged<CodeSystemListItem>> Handle(ListCodeSystemsQuery query, CancellationToken cancellationToken)
     {
         PlatformAdminScope.Require(currentTenant);
-        return codeSystems.ListAsync(SearchText.Of(query.Search), query.IsActive, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        return codeSystems.ListAsync(SearchText.Of(query.Search), query.IsActive, ListSort.Of(query.Sort, query.Direction), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
     }
 }
 
@@ -174,11 +206,16 @@ public sealed class ListCodeSystemItemsHandler(ICodeSystemRepository codeSystems
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Integration, PermissionAction.View)]
-public sealed record ListRuleTemplatesQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<RuleTemplateListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
+public sealed record ListRuleTemplatesQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<RuleTemplateListItem>>, IPlatformAdministrationRequest, IReferenceListQuery;
 
 public sealed class ListRuleTemplatesValidator : AbstractValidator<ListRuleTemplatesQuery>
 {
-    public ListRuleTemplatesValidator() => Include(new ReferenceListValidator<ListRuleTemplatesQuery>());
+    public ListRuleTemplatesValidator()
+    {
+        Include(new ReferenceListValidator<ListRuleTemplatesQuery>());
+        RuleFor(query => query.Sort).SortKeyOf(PlatformAdminSortKeys.RuleTemplates);
+        RuleFor(query => query.Direction).SortDirection();
+    }
 }
 
 public sealed class ListRuleTemplatesHandler(IRuleTemplateRepository rules, ICurrentTenant currentTenant) : IQueryHandler<ListRuleTemplatesQuery, Paged<RuleTemplateListItem>>
@@ -186,7 +223,7 @@ public sealed class ListRuleTemplatesHandler(IRuleTemplateRepository rules, ICur
     public Task<Paged<RuleTemplateListItem>> Handle(ListRuleTemplatesQuery query, CancellationToken cancellationToken)
     {
         PlatformAdminScope.Require(currentTenant);
-        return rules.ListAsync(SearchText.Of(query.Search), query.IsActive, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        return rules.ListAsync(SearchText.Of(query.Search), query.IsActive, ListSort.Of(query.Sort, query.Direction), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
     }
 }
 

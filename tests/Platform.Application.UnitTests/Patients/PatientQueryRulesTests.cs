@@ -73,6 +73,36 @@ public sealed class PatientQueryRulesTests
         Assert.Equal(new DateOnly(1996, 10, 9), stated.DateOfBirth);
     }
 
+    [Fact]
+    public void A03_a_VIP_row_is_listed_without_its_identity_for_a_user_without_the_See_VIP_right()
+    {
+        var vip = Row("Mona Hassan", "منى حسن", "01112223333", vip: true, birth: new DateOnly(1990, 5, 1)) with { NationalId = "29505050101234" };
+
+        var masked = PatientProjections.ToListItem(vip, Today, includeConfidential: true, canSeeVip: false);
+        Assert.True(masked.IdentityMasked);
+        Assert.True(masked is { FullName: "", NameAr: null, Mobile: null, NationalId: null });
+        Assert.Equal((vip.Number, true, 36), (masked.Number, masked.IsVip!.Value, masked.Age.Years));
+
+        var shown = PatientProjections.ToListItem(vip, Today, includeConfidential: false, canSeeVip: true);
+        Assert.Equal(("Mona Hassan", "01112223333", "29505050101234", false), (shown.FullName, shown.Mobile, shown.NationalId, shown.IdentityMasked));
+
+        var ordinary = PatientProjections.ToListItem(Row("Ali", null, "01000000000"), Today, includeConfidential: false, canSeeVip: false);
+        Assert.Equal(("Ali", false), (ordinary.FullName, ordinary.IdentityMasked));
+    }
+
+    [Fact]
+    public void R06_a_similar_VIP_file_is_listed_masked_with_its_match_for_a_user_without_the_See_VIP_right()
+    {
+        var vip = Row("Mona Hassan", "منى حسن", "01112223333", vip: true, birth: new DateOnly(1990, 5, 1)) with { NationalId = "29505050101234" };
+
+        var masked = PatientProjections.ToSimilar(vip, Today, SimilarMatch.Mobile, canSeeVip: false);
+        Assert.True(masked is { FullName: "", NameAr: null, Mobile: null, NationalId: null, IdentityMasked: true, Match: "Mobile" });
+        Assert.Equal((vip.Id, vip.Number, 36), (masked.Id, masked.Number, masked.Age.Years));
+
+        var shown = PatientProjections.ToSimilar(vip, Today, SimilarMatch.Exact, canSeeVip: true);
+        Assert.Equal(("Mona Hassan", "منى حسن", "01112223333", false), (shown.FullName, shown.NameAr, shown.Mobile, shown.IdentityMasked));
+    }
+
     [Theory]
     [InlineData(null, "")]
     [InlineData("Mona", "Mona")]

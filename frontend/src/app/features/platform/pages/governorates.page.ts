@@ -8,6 +8,8 @@ import type { MasterDataConfig, MasterDataFilter, SelectOption } from '../../../
 import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { fileStamp, pick } from '../ui/format';
+import { sortParams } from '../../../shared/forms/paging';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 
 /** SA-11 Governorates and districts, per country; the country is fixed once created and filters the list. */
 @Component({
@@ -52,9 +54,11 @@ export class GovernoratesPage {
 
   protected readonly config: MasterDataConfig<GovernorateListItem, GovernorateRequest> = {
     i18nPrefix: 'platform.governorates',
+    // B-03: the server sorts the whole register before paging (PlatformAdminSortKeys.Governorates)
+    sortMode: 'server',
     columns: [
-      { key: 'name', header: 'platform.governorates.column.name', sortable: true, value: (row) => pick(row.nameEn, row.nameAr, this.i18n.lang()) },
-      { key: 'country', header: 'platform.governorates.column.country', sortable: true, value: (row) => pick(row.countryNameEn, row.countryNameAr, this.i18n.lang()) },
+      { key: 'name', header: 'platform.governorates.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (row) => pick(row.nameEn, row.nameAr, this.i18n.lang()) },
+      { key: 'country', header: 'platform.governorates.column.country', sortable: true, sortKey: localizedSortKey('country'), value: (row) => pick(row.countryNameEn, row.countryNameAr, this.i18n.lang()) },
       { key: 'district', header: 'platform.governorates.column.district' },
       { key: 'remarks', header: 'platform.governorates.column.remarks', secondary: true },
     ],
@@ -76,7 +80,7 @@ export class GovernoratesPage {
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listGovernorates({ countryId: this.countryFilter(), search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+        return this.api.listGovernorates({ ...sortParams(filter.sort), countryId: this.countryFilter(), search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
       },
       create: (dto) => this.api.createGovernorate(dto),
       update: (id, dto) => this.api.updateGovernorate(id, dto),

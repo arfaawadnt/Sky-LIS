@@ -1,3 +1,4 @@
+using Platform.Application.Abstractions.Persistence;
 using Platform.Contracts.Common;
 using Platform.Contracts.Organization;
 using Platform.Domain.Organization;
@@ -50,7 +51,8 @@ public interface IPrincipalCacheInvalidator
     Task EvictRoleMembersAsync(Guid roleId, CancellationToken cancellationToken);
 }
 
-public sealed record StaffFilter(string? Search, Guid? RoleId, StaffStatus? Status);
+/// <summary><see cref="Sort"/>: server-side order before paging (validation v0.5.0 B-03; keys in <see cref="OrganizationSortKeys.Users"/>).</summary>
+public sealed record StaffFilter(string? Search, Guid? RoleId, StaffStatus? Status, ListSort Sort = default);
 
 /// <summary>The status shown on the users register, derived at read time.</summary>
 public enum StaffStatus

@@ -1,5 +1,7 @@
 /** Results module contracts mirrored from `Platform.Contracts.Results` (bootstrap until the OpenAPI generator lands, 01 §6.2). */
 
+import type { SortRequest } from './paging';
+
 export type { Paged } from './paging';
 
 /** The test track (intake LIS-INT-RES-001 §6). */
@@ -391,7 +393,8 @@ export interface WorklistPage {
 }
 
 /** Worklist filters (LDM §6): the collection window, group, test, analyser, sample status, payer, status boxes. */
-export interface WorklistQuery {
+/** `sort`: a key of the server allow-list (B-03, ResultsSortKeys.Worklist); absent = urgent first, then the expected time. */
+export interface WorklistQuery extends SortRequest {
   readonly from: string | null;
   readonly to: string | null;
   readonly clinicalGroupId: string | null;

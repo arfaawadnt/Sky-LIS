@@ -102,6 +102,8 @@ function listParams(filter: PatientListFilter, paged = true): HttpParams {
     status: filter.status,
     page: paged ? filter.page : null,
     pageSize: paged ? filter.pageSize : null,
+    sort: paged ? (filter.sort ?? null) : null,
+    direction: paged ? (filter.direction ?? null) : null,
   });
 }
 
@@ -132,6 +134,7 @@ function toVisit(value: Record<string, unknown>): PatientVisitItem | null {
     registeredAtUtc: text('registeredAtUtc') ?? text('createdAtUtc'),
     status: text('status'),
     branchName: text('branchNameEn') ?? text('branchName'),
+    branchNameAr: text('branchNameAr'),
     servicesCount: typeof value['servicesCount'] === 'number' ? value['servicesCount'] : Array.isArray(lines) ? lines.length : null,
   };
 }

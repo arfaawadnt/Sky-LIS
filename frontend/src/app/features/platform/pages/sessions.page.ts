@@ -73,7 +73,7 @@ export class SessionsPage {
   protected readonly columns: readonly TableColumn<AdminSessionItem>[] = [
     { key: 'user', header: 'platform.sessions.column.user', value: (row) => row.displayName, sortable: true },
     { key: 'ipAddress', header: 'platform.sessions.column.ip', mono: true },
-    { key: 'sinceUtc', header: 'platform.sessions.column.since', value: (row) => formatDateTime(row.sinceUtc, this.i18n.lang()), sortable: true },
+    { key: 'sinceUtc', header: 'platform.sessions.column.since', value: (row) => formatDateTime(row.sinceUtc, this.i18n.lang()), sortValue: (row) => row.sinceUtc, sortable: true },
     { key: 'lastSeenAtUtc', header: 'platform.sessions.column.lastSeen', value: (row) => formatDateTime(row.lastSeenAtUtc, this.i18n.lang()), secondary: true },
     { key: 'status', header: 'platform.sessions.column.status', width: '110px' },
   ];

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Treasury;
 using Platform.Contracts.Common;
 using Platform.Contracts.Treasury;
@@ -14,16 +15,30 @@ internal sealed class TreasuryRepository(AppDbContext context) : Repository<Doma
         return Set.AnyAsync(treasury => treasury.Code == cleaned, cancellationToken);
     }
 
-    public async Task<Paged<TreasuryListItem>> ListAsync(bool? isActive, PageRequest page, CancellationToken cancellationToken)
+    private static readonly SortColumns<Domain.Treasury.Treasury> Sorts = new SortColumns<Domain.Treasury.Treasury>(TreasurySortKeys.Treasuries)
+        .Column("code", treasury => treasury.Code)
+        .Column("nameEn", treasury => treasury.Name.En)
+        .Column("nameAr", treasury => treasury.Name.Ar)
+        .ThenBy(treasury => treasury.Code)
+        .ThenBy(treasury => treasury.Id);
+
+    public async Task<Paged<TreasuryListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken)
     {
         var query = Set.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            // UAT B-08: code and both names, whatever the UI language (an Arabic name is found from the English UI)
+            var pattern = ContainsPattern(search);
+            query = query.Where(treasury => EF.Functions.ILike(treasury.Code, pattern, LikeEscape) || EF.Functions.ILike(treasury.Name.En, pattern, LikeEscape) || EF.Functions.ILike(treasury.Name.Ar, pattern, LikeEscape));
+        }
+
         if (isActive is { } active)
         {
             query = query.Where(treasury => treasury.IsActive == active);
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await query.OrderBy(treasury => treasury.Code)
+        var items = await Sorts.Apply(query, sort, treasuries => treasuries.OrderBy(treasury => treasury.Code))
             .Skip(page.Skip)
             .Take(page.PageSize)
             .Select(treasury => new TreasuryListItem(treasury.Id, treasury.Code, treasury.Name.En, treasury.Name.Ar, treasury.BranchId, treasury.IsActive, null, null, null))
@@ -31,6 +46,19 @@ internal sealed class TreasuryRepository(AppDbContext context) : Repository<Doma
             .ConfigureAwait(false);
 
         return new Paged<TreasuryListItem>(items, page.Page, page.PageSize, total);
+    }
+
+    /// <summary>
+    /// The escape character of <see cref="ContainsPattern"/>. Passed explicitly: without it Npgsql translates
+    /// <c>ILike</c> with <c>ESCAPE ''</c>, and an escaped <c>_</c> would match nothing.
+    /// </summary>
+    private const string LikeEscape = "\\";
+
+    /// <summary><c>%text%</c> with the LIKE wildcards of the text escaped (a typed <c>_</c> or <c>%</c> is literal).</summary>
+    private static string ContainsPattern(string search)
+    {
+        var escaped = search.Trim().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
+        return "%" + escaped + "%";
     }
 
     public Task<TreasuryListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken) =>

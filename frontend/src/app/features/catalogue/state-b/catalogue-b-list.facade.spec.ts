@@ -4,7 +4,8 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { CATALOGUE_B_API, type Paged, type PreparationListItem } from '../../../core/api/catalogue-b.contracts';
-import { PreparationsFacade, TestRulesFacade, toQuery } from './catalogue-b-list.facade';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { DoctorsFacade, PreparationsFacade, TestRulesFacade, toQuery } from './catalogue-b-list.facade';
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -29,7 +30,7 @@ describe('Catalogue B list facades (01 §6.3)', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), PreparationsFacade, TestRulesFacade],
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), PreparationsFacade, TestRulesFacade, DoctorsFacade],
     });
     backend = TestBed.inject(HttpTestingController);
   });
@@ -39,6 +40,52 @@ describe('Catalogue B list facades (01 §6.3)', () => {
     TestBed.tick();
     await settle();
   }
+
+  it('B-03: sorts the whole register on the server from page 1, by the key of the column in the language on screen', async () => {
+    const facade = TestBed.inject(PreparationsFacade);
+    await runEffects();
+    backend.expectOne((request) => request.url === CATALOGUE_B_API.preparations).flush(page([]));
+
+    facade.setPage({ page: 3, pageSize: 20 });
+    await runEffects();
+    backend.expectOne((request) => request.url === CATALOGUE_B_API.preparations).flush(page([]));
+
+    facade.setSort({ key: 'question', direction: 'desc' });
+    await runEffects();
+    const sorted = backend.expectOne((request) => request.url === CATALOGUE_B_API.preparations);
+    expect([sorted.request.params.get('sort'), sorted.request.params.get('direction'), sorted.request.params.get('page')]).toEqual(['questionEn', 'desc', '1']);
+    sorted.flush(page([]));
+
+    TestBed.inject(I18nService).setLanguage('ar');
+    await runEffects();
+    const arabic = backend.expectOne((request) => request.url === CATALOGUE_B_API.preparations);
+    expect(arabic.request.params.get('sort')).toBe('questionAr');
+    arabic.flush(page([]));
+    backend.match(() => true).forEach((request) => request.flush({}));   // dictionaries of the language switch
+    TestBed.inject(I18nService).setLanguage('en');
+    await runEffects();
+    backend.match(() => true).forEach((request) => request.flush(page([])));
+
+    facade.setSort(null);
+    await runEffects();
+    expect(backend.expectOne((request) => request.url === CATALOGUE_B_API.preparations).request.params.has('sort')).toBe(false);
+  });
+
+  it('B-03: each register maps its own columns (doctors: the specialty; a column without a server key sends no sort)', async () => {
+    const doctors = TestBed.inject(DoctorsFacade);
+    await runEffects();
+    backend.expectOne((request) => request.url === CATALOGUE_B_API.doctors).flush(page([]));
+
+    doctors.setSort({ key: 'specialty', direction: 'asc' });
+    await runEffects();
+    const bySpecialty = backend.expectOne((request) => request.url === CATALOGUE_B_API.doctors);
+    expect([bySpecialty.request.params.get('sort'), bySpecialty.request.params.get('direction')]).toEqual(['specialty', 'asc']);
+    bySpecialty.flush(page([]));
+
+    doctors.setSort({ key: 'branches', direction: 'asc' });
+    await runEffects();
+    expect(backend.expectOne((request) => request.url === CATALOGUE_B_API.doctors).request.params.has('sort')).toBe(false);
+  });
 
   it('loads the active records first, then follows search, status, extra filters and paging', async () => {
     const facade = TestBed.inject(PreparationsFacade);

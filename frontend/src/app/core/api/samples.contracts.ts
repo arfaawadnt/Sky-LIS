@@ -1,5 +1,7 @@
 /** Samples module contracts mirrored from `Platform.Contracts.Samples` (bootstrap until the OpenAPI generator lands, 01 §6.2). */
 
+import type { SortRequest } from './paging';
+
 export type { Paged } from './paging';
 
 /** Status names as stored and filtered (intake LIS-INT-SMP-001 §6). */
@@ -189,7 +191,8 @@ export interface CreatedResource {
 }
 
 /** Filters of `GET /api/v1/samples`; dates are ISO instants bounding the time the sample was ordered. */
-export interface SampleListFilter {
+/** `sort`: `sampleNumber`, `accession`, `status` or `rejectedAtUtc` (B-03, server allow-list); absent = newest first. */
+export interface SampleListFilter extends SortRequest {
   readonly visitId: string | null;
   readonly accession: string | null;
   readonly status: SampleStatus | null;

@@ -1,4 +1,5 @@
 import type { PageRequest, Paged } from '../../../core/api/paging';
+import type { ServerSort } from '../../forms/paging';
 import type { TableColumn } from '../data-table/data-table.types';
 import type { IconName } from '../icon/icon.component';
 
@@ -6,6 +7,8 @@ import type { IconName } from '../icon/icon.component';
 export interface MasterDataFilter {
   readonly search: string;
   readonly active: boolean | null;
+  /** The server order of a `sortMode: 'server'` list (column key from `TableColumn.sortKey`); absent or null = the list's own order. */
+  readonly sort?: ServerSort | null;
 }
 
 /** The persistence the page talks to; every call returns a promise (the module's `*Api` service, `firstValueFrom`). */
@@ -94,6 +97,17 @@ export interface MasterDataConfig<TItem, TDto> {
   readonly pageSize?: number;
   /** Drawer width for wide forms. */
   readonly drawerSize?: 'md' | 'lg' | 'xl';
+  /**
+   * `server`: a sortable column sends its `sortKey` (default `key`) and the direction to the adapter (`filter.sort`), the
+   * list returns to page 1 and the server sorts before paging (validation v0.5.0 B-03). `client` (default, for adapters
+   * that do not forward the sort yet): the table orders the rows of the loaded page only.
+   */
+  readonly sortMode?: 'server' | 'client';
+  /**
+   * Groups of fields one server rule checks together (country + governorate, ORG-017): a server error on one member is
+   * cleared as soon as any member changes, so correcting either field unblocks the save (validation v0.5.0 B-01).
+   */
+  readonly linkedFields?: readonly (readonly string[])[];
   /** Show the active/inactive filter and the activation actions (default: when the adapter has `setActive`). */
   readonly activation?: boolean;
 }

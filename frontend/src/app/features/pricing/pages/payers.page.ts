@@ -12,6 +12,7 @@ import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.direc
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { CellTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
 import { EmptyStateComponent } from '../../../shared/ui/empty-state/empty-state.component';
@@ -77,8 +78,10 @@ export class PayersPage {
 
   protected readonly config: MasterDataConfig<PayerListItem, PayerRequest> = {
     i18nPrefix: 'pricing.payers',
+    // B-03: the server sorts the whole register before paging (PricingSortKeys.Payers); the type sorts by its stored name
+    sortMode: 'server',
     columns: [
-      { key: 'name', header: 'pricing.payers.column.name', sortable: true, value: (payer) => localizedPick({ en: payer.nameEn, ar: payer.nameAr }, this.i18n.lang()) },
+      { key: 'name', header: 'pricing.payers.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (payer) => localizedPick({ en: payer.nameEn, ar: payer.nameAr }, this.i18n.lang()) },
       { key: 'searchKey', header: 'pricing.payers.column.searchKey', mono: true, sortable: true, width: '130px' },
       { key: 'type', header: 'pricing.payers.column.type', sortable: true, width: '120px', value: (payer) => this.typeLabel(payer.type) },
       { key: 'tiers', header: 'pricing.payers.column.tiers', value: (payer) => payer.tiers.map((tier) => this.tierName(tier)).join(', ') },

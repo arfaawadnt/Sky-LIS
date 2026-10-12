@@ -1,5 +1,7 @@
 /** Patients module contracts mirrored from `Platform.Contracts.Patients` (bootstrap until the OpenAPI generator lands, 01 §6.2). Dates of birth are ISO dates (`yyyy-MM-dd`). */
 
+import type { SortRequest } from './paging';
+
 export type { Paged } from './paging';
 
 export type PatientTitle = 'Mr' | 'Mrs' | 'Miss' | 'Ms' | 'Dr' | 'Master' | 'Baby' | 'Prof';
@@ -57,6 +59,7 @@ export interface PatientListItem {
   readonly id: string;
   readonly number: string;
   readonly title: PatientTitle;
+  /** Empty when `identityMasked`. */
   readonly fullName: string;
   readonly nameAr: string | null;
   readonly gender: PatientGender;
@@ -78,6 +81,11 @@ export interface PatientListItem {
   readonly visitCount?: number;
   /** CP-11 "last visit": the latest visit's registration instant (UTC), `null` without visits. */
   readonly lastVisitAtUtc?: string | null;
+  /**
+   * A VIP file listed for a user without the See-VIP special right (validation A-03): the server sends no name, Arabic
+   * name, mobile or national id; show `patients.vipMasked` instead. Opening the file shows the real identity.
+   */
+  readonly identityMasked?: boolean;
 }
 
 export interface PatientMergeView {
@@ -141,6 +149,11 @@ export interface SimilarPatient {
   readonly mobile: string | null;
   readonly nationalId: string | null;
   readonly match: SimilarMatch;
+  /**
+   * A VIP file found for a user without the See-VIP special right (validation R-06): listed so no duplicate file is
+   * created, with the number and the match; no name, Arabic name, mobile or national id. Show `patients.vipMasked`.
+   */
+  readonly identityMasked?: boolean;
 }
 
 /** At most 10 candidates; `warningEnabled` is the tenant parameter `similarNameWarning`. */
@@ -185,7 +198,8 @@ export interface DeactivatePatientDocumentRequest {
   readonly reason: string;
 }
 
-export interface PatientListFilter {
+/** `sort`: `number` or `name` (B-03, server allow-list); absent = newest files first. */
+export interface PatientListFilter extends SortRequest {
   readonly q: string;
   readonly gender: PatientGender | null;
   /** Sent only by users holding `patients.viewConfidential` (PAT-031 otherwise). */
@@ -232,7 +246,7 @@ export interface GovernorateOption {
   readonly countryId?: string | null;
 }
 
-/** A patient condition of the catalogue (`/api/v1/catalogue/patient-conditions`, agent `cat`). */
+/** An active patient condition (`GET /api/v1/patients/conditions`, `patients.view`; round 2 R2-04: the catalogue's own list needs `catalogue.view`). */
 export interface ConditionOption {
   readonly id: string;
   readonly nameEn: string;
@@ -246,6 +260,8 @@ export interface PatientVisitItem {
   readonly registeredAtUtc: string | null;
   readonly status: string | null;
   readonly branchName: string | null;
+  /** The branch's Arabic name when the registration API sent it (validation re-test R3-01). */
+  readonly branchNameAr?: string | null;
   readonly servicesCount: number | null;
 }
 
@@ -254,7 +270,7 @@ export const PATIENTS_API = {
   documents: '/api/v1/patients/documents',
   countries: '/api/v1/public/countries',
   governorates: '/api/v1/public/governorates',
-  conditions: '/api/v1/catalogue/patient-conditions',
+  conditions: '/api/v1/patients/conditions',
   visits: '/api/v1/registration/visits',
 } as const;
 

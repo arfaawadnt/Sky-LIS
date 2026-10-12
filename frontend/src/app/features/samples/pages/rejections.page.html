@@ -77,7 +77,7 @@
       <p class="problem list-problem" role="alert">{{ i18n.t('samples.loadError') }}</p>
     }
 
-    <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.rejected.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('samples.rejections.empty')" [caption]="i18n.t('samples.rejections.listTitle')">
+    <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.rejected.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('samples.rejections.empty')" [caption]="i18n.t('samples.rejections.listTitle')" [sort]="facade.sort()" [serverSort]="true" (sortChange)="facade.setSort($event)">
       <ng-template appCell="sampleNumber" [appCellOf]="rows()" let-row>
         <a class="mono link" [routerLink]="links.track(row.sampleNumber)">{{ row.sampleNumber }}</a>
       </ng-template>

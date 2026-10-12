@@ -15,7 +15,7 @@
             <li>
               <button type="button" class="candidate" role="option" [attr.aria-selected]="selected()?.id === candidate.id" [class.selected]="selected()?.id === candidate.id" (click)="choose(candidate)">
                 <span class="mono">{{ candidate.number }}</span>
-                <span class="name">{{ candidate.fullName }}</span>
+                <span class="name">{{ candidate.identityMasked ? i18n.t('patients.vipMasked') : candidate.fullName }}</span>
                 <span class="small muted">{{ i18n.t('patients.gender.' + candidate.gender) }} · {{ ageText(candidate.age) }}</span>
                 <span class="small mono muted" dir="ltr">{{ candidate.mobile ?? '' }}</span>
               </button>
@@ -42,7 +42,7 @@
           <app-badge tone="bad">{{ i18n.t('patients.merge.duplicate') }}</app-badge>
           <dl class="kv">
             <dt>{{ i18n.t('patients.column.number') }}</dt><dd class="mono">{{ duplicate.number }}</dd>
-            <dt>{{ i18n.t('patients.column.name') }}</dt><dd>{{ duplicate.fullName }}</dd>
+            <dt>{{ i18n.t('patients.column.name') }}</dt><dd>{{ duplicate.identityMasked ? i18n.t('patients.vipMasked') : duplicate.fullName }}</dd>
             <dt>{{ i18n.t('patients.column.gender') }}</dt><dd>{{ i18n.t('patients.gender.' + duplicate.gender) }}</dd>
             <dt>{{ i18n.t('patients.column.age') }}</dt><dd>{{ ageText(duplicate.age) }}</dd>
             <dt>{{ i18n.t('patients.column.mobile') }}</dt><dd class="mono" dir="ltr">{{ duplicate.mobile ?? '—' }}</dd>

@@ -229,6 +229,8 @@ export const ACCOUNT_PERMISSIONS = {
   walletView: 'wallet.view',
   walletCreate: 'wallet.create',
   dashboardView: 'dashboard.view',
+  /** The collected-money tile (validation observation O-9): payments are seen only with the billing right. */
+  billingView: 'billing.view',
   auditView: 'audit.view',
   auditExport: 'audit.export',
 } as const;

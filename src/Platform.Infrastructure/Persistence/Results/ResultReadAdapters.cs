@@ -110,7 +110,7 @@ internal sealed class ResultReferenceLookup(AppDbContext context) : IResultRefer
         {
             var upper = search.Trim().ToUpperInvariant();
             var pattern = "%" + search.Trim().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
-            query = query.Where(template => template.ShortName.StartsWith(upper) || EF.Functions.ILike(template.Text.En, pattern) || EF.Functions.ILike(template.Text.Ar, pattern));
+            query = query.Where(template => template.ShortName.StartsWith(upper) || EF.Functions.ILike(template.Text.En, pattern, "\\") || EF.Functions.ILike(template.Text.Ar, pattern, "\\"));
         }
 
         return await query.OrderBy(template => template.ShortName)
@@ -181,7 +181,7 @@ internal sealed class ResultReferenceLookup(AppDbContext context) : IResultRefer
         {
             var upper = search.Trim().ToUpperInvariant();
             var pattern = "%" + search.Trim().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
-            query = query.Where(test => test.Code.StartsWith(upper) || EF.Functions.ILike(test.Name.En, pattern) || EF.Functions.ILike(test.Name.Ar, pattern));
+            query = query.Where(test => test.Code.StartsWith(upper) || EF.Functions.ILike(test.Name.En, pattern, "\\") || EF.Functions.ILike(test.Name.Ar, pattern, "\\"));
         }
 
         return await query.OrderBy(test => test.Code).Take(Math.Clamp(take, 1, 200))

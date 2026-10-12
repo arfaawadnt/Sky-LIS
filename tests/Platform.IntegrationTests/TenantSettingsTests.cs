@@ -29,7 +29,7 @@ public sealed class TenantSettingsTests(DatabaseFixture fixture)
             var settings = fresh.ServiceProvider.GetRequiredService<ITenantSettings>();
             Assert.Equal(1, await settings.GetAsync(SettingKeys.LabelCopies, CancellationToken.None));
             Assert.True(await settings.GetAsync(SettingKeys.AutoCollect, CancellationToken.None));
-            Assert.Equal(25, (await settings.GetAllAsync(CancellationToken.None)).Count);
+            Assert.Equal(26, (await settings.GetAllAsync(CancellationToken.None)).Count);   // timeZone joined in round 2 (R2-01)
         }
 
         using (var writer = fixture.AppScope(tenant, actor, "Lab Admin"))

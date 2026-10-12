@@ -322,7 +322,8 @@ export class SubscriptionsPage {
     return new FormGroup({
       code: new FormControl({ value: plan?.code ?? '', disabled: plan !== null }, { nonNullable: true, validators: [requiredText, codeValidator, Validators.maxLength(20)] }),
       name: localizedTextGroup({ en: plan?.nameEn ?? '', ar: plan?.nameAr ?? '' }, { required: true, maxLength: 100 }),
-      monthlyFee: new FormControl<number | null>(plan?.monthlyFee ?? 0, { validators: [Validators.required, Validators.min(0)] }),
+      // C-05: the fee is refused with more than two decimals (PLN-002 on the server), never rounded.
+      monthlyFee: new FormControl<number | null>(plan?.monthlyFee ?? 0, { validators: [Validators.required, Validators.min(0), Validators.max(100_000_000), maxTwoDecimals(() => this.i18n.t('platform.plans.validation.twoDecimals'))] }),
       currencyCode: new FormControl(plan?.currencyCode ?? 'EGP', { nonNullable: true, validators: [requiredText, Validators.pattern(/^[A-Za-z]{3}$/)] }),
       maxBranches: new FormControl<number | null>(plan?.maxBranches ?? 1, { validators: [Validators.required, Validators.min(1)] }),
       maxUsers: new FormControl<number | null>(plan?.maxUsers ?? 5, { validators: [Validators.required, Validators.min(1)] }),

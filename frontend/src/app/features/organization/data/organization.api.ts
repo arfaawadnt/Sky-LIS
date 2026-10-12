@@ -44,7 +44,7 @@ export class OrganizationApi {
   // ---- branches ----------------------------------------------------------------------------------------------
 
   listBranches(filter: BranchListFilter, signal?: AbortSignal): Promise<Paged<BranchListItem>> {
-    const params = toHttpParams({ search: filter.search, isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize });
+    const params = toHttpParams({ search: filter.search, isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize, sort: filter.sort ?? null, direction: filter.direction ?? null });
     return firstValueFrom(this.http.get<Paged<BranchListItem>>(ORGANIZATION_API.branches, { params }), { defaultValue: emptyPage<BranchListItem>() }).then(abortable(signal));
   }
 
@@ -73,7 +73,7 @@ export class OrganizationApi {
   // ---- roles -------------------------------------------------------------------------------------------------
 
   listRoles(filter: RoleListFilter, signal?: AbortSignal): Promise<Paged<RoleListItem>> {
-    const params = toHttpParams({ search: filter.search, isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize });
+    const params = toHttpParams({ search: filter.search, isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize, sort: filter.sort ?? null, direction: filter.direction ?? null });
     return firstValueFrom(this.http.get<Paged<RoleListItem>>(ORGANIZATION_API.roles, { params }), { defaultValue: emptyPage<RoleListItem>() }).then(abortable(signal));
   }
 
@@ -118,7 +118,7 @@ export class OrganizationApi {
   // ---- users -------------------------------------------------------------------------------------------------
 
   listUsers(filter: UserListFilter, signal?: AbortSignal): Promise<Paged<UserListItem>> {
-    const params = toHttpParams({ search: filter.search, roleId: filter.roleId, status: filter.status, page: filter.page, pageSize: filter.pageSize });
+    const params = toHttpParams({ search: filter.search, roleId: filter.roleId, status: filter.status, page: filter.page, pageSize: filter.pageSize, sort: filter.sort ?? null, direction: filter.direction ?? null });
     return firstValueFrom(this.http.get<Paged<UserListItem>>(ORGANIZATION_API.users, { params }), { defaultValue: emptyPage<UserListItem>() }).then(abortable(signal));
   }
 
@@ -138,8 +138,9 @@ export class OrganizationApi {
     return firstValueFrom(this.http.put<void>(`${this.user(id)}/role`, { roleId }), { defaultValue: undefined }).then(noContent);
   }
 
-  assignUserBranches(id: string, branchIds: readonly string[]): Promise<void> {
-    return firstValueFrom(this.http.put<void>(`${this.user(id)}/branches`, { branchIds }), { defaultValue: undefined }).then(noContent);
+  /** `allBranches` says what an empty list means (B-02): the server refuses "restricted" with no branch (ORG-018). */
+  assignUserBranches(id: string, branchIds: readonly string[], allBranches: boolean): Promise<void> {
+    return firstValueFrom(this.http.put<void>(`${this.user(id)}/branches`, { branchIds, allBranches }), { defaultValue: undefined }).then(noContent);
   }
 
   setUserOverrides(id: string, request: SetUserOverridesRequest): Promise<void> {

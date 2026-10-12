@@ -8,6 +8,7 @@ import type { FormValue, MasterDataConfig, MasterDataFilter } from '../../../sha
 import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { fileStamp } from '../ui/format';
+import { sortParams } from '../../../shared/forms/paging';
 
 /** SA-18 Rule templates: reusable medical-rule patterns (name, clinical group, formula, description) laboratories adapt on CP-64. */
 @Component({
@@ -30,6 +31,8 @@ export class RuleTemplatesPage {
 
   protected readonly config: MasterDataConfig<RuleTemplateListItem, RuleTemplateRequest> = {
     i18nPrefix: 'platform.ruleTemplates',
+    // B-03: the server sorts the whole library before paging (PlatformAdminSortKeys.RuleTemplates)
+    sortMode: 'server',
     columns: [
       { key: 'name', header: 'platform.ruleTemplates.column.name', sortable: true },
       { key: 'clinicalGroupName', header: 'platform.ruleTemplates.column.clinicalGroup', sortable: true },
@@ -45,7 +48,7 @@ export class RuleTemplatesPage {
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listRuleTemplates({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+        return this.api.listRuleTemplates({ ...sortParams(filter.sort), search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
       },
       create: (dto) => this.api.saveRuleTemplate(null, dto),
       update: (id, dto) => this.api.saveRuleTemplate(id, dto),

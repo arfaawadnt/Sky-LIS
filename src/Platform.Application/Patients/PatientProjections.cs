@@ -32,23 +32,39 @@ public static class PatientProjections
 
     public static PatientAgeView View(PatientAge age) => new(age.Years, age.Months, age.Days);
 
+    /// <summary>
+    /// The VIP identity mask of the lists (validation A-03, 2026-10-11; PAT intake Q8 and REG intake Q12 aligned, an
+    /// assumption awaiting the business owner): for a user without the See-VIP special right the name, the Arabic name,
+    /// the mobile and the national id of a VIP file are withheld in the patient register, its export, the patient picker
+    /// and the similar-file check (listed there masked with its match, so no duplicate file is created: validation R-06),
+    /// exactly as the visit register (CP-10) withholds them. Opening the file (and the printed
+    /// documents) keeps the real identity: reception still registers the patient.
+    /// </summary>
+    public static bool IsIdentityMasked(PatientRow row, bool canSeeVip)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        return row.IsVip && !canSeeVip;
+    }
+
     /// <param name="visits">The file's visit figures from Registration (CP-11; UAT A-09); none when absent.</param>
-    public static PatientListItem ToListItem(PatientRow row, DateOnly today, bool includeConfidential, PatientVisitFigures? visits = null)
+    /// <param name="canSeeVip">The See-VIP special right; without it a VIP row is masked (<see cref="IsIdentityMasked"/>).</param>
+    public static PatientListItem ToListItem(PatientRow row, DateOnly today, bool includeConfidential, PatientVisitFigures? visits = null, bool canSeeVip = true)
     {
         ArgumentNullException.ThrowIfNull(row);
         var figures = visits ?? PatientVisitFigures.None;
+        var masked = IsIdentityMasked(row, canSeeVip);
         return new PatientListItem(
             row.Id,
             row.Number,
             row.Title.ToString(),
-            row.FullName,
-            row.NameAr,
+            masked ? string.Empty : row.FullName,
+            masked ? null : row.NameAr,
             row.Gender.ToString(),
             BirthOf(row),
             row.DateOfBirth is null,
             AgeOf(row, today),
-            row.Mobile,
-            row.NationalId,
+            masked ? null : row.Mobile,
+            masked ? null : row.NationalId,
             row.PatientConditionId,
             includeConfidential ? row.IsVip : null,
             row.Status.ToString(),
@@ -56,7 +72,8 @@ public static class PatientProjections
             row.MergedIntoNumber,
             row.RegisteredOn,
             figures.VisitCount,
-            figures.LastVisitAtUtc);
+            figures.LastVisitAtUtc,
+            masked);
     }
 
     public static PatientDetail ToDetail(PatientRow row, DateOnly today, bool includeConfidential, string? mergedByName, IReadOnlyList<MergedPatientReference> mergedFiles)
@@ -100,10 +117,25 @@ public static class PatientProjections
             row.RowVersion);
     }
 
-    public static SimilarPatient ToSimilar(PatientRow row, DateOnly today, SimilarMatch match)
+    /// <param name="canSeeVip">The See-VIP special right; without it a VIP candidate is listed masked (<see cref="IsIdentityMasked"/>, validation R-06).</param>
+    public static SimilarPatient ToSimilar(PatientRow row, DateOnly today, SimilarMatch match, bool canSeeVip = true)
     {
         ArgumentNullException.ThrowIfNull(row);
-        return new SimilarPatient(row.Id, row.Number, row.Title.ToString(), row.FullName, row.NameAr, row.Gender.ToString(), BirthOf(row), row.DateOfBirth is null, AgeOf(row, today), row.Mobile, row.NationalId, match.ToString());
+        var masked = IsIdentityMasked(row, canSeeVip);
+        return new SimilarPatient(
+            row.Id,
+            row.Number,
+            row.Title.ToString(),
+            masked ? string.Empty : row.FullName,
+            masked ? null : row.NameAr,
+            row.Gender.ToString(),
+            BirthOf(row),
+            row.DateOfBirth is null,
+            AgeOf(row, today),
+            masked ? null : row.Mobile,
+            masked ? null : row.NationalId,
+            match.ToString(),
+            masked);
     }
 
     public static PatientSummary ToSummary(PatientRow row, DateOnly today, Guid? survivorId)

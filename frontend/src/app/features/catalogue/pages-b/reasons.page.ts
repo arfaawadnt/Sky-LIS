@@ -6,6 +6,8 @@ import { localizedPick } from '../../../shared/forms/localized-text';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import type { BadgeTone } from '../../../shared/ui/badge/status-tones';
 import { CellTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
+import { sortParams } from '../../../shared/forms/paging';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { MasterDataConfig } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueBApi } from '../data-b/catalogue-b.api';
@@ -47,9 +49,10 @@ export class ReasonsPage {
 
   protected readonly config: MasterDataConfig<ReasonListItem, ReasonRequest> = {
     i18nPrefix: 'catalogue-b.reasons',
+    sortMode: 'server',
     columns: [
       { key: 'kind', header: 'catalogue-b.reasons.column.kind', sortable: true, width: '160px', value: (item) => this.i18n.t(`catalogue-b.reasonKind.${item.kind}`) },
-      { key: 'name', header: 'catalogue-b.reasons.column.name', sortable: true, value: (item) => localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang()) },
+      { key: 'name', header: 'catalogue-b.reasons.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (item) => localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang()) },
     ],
     fields: [
       {
@@ -63,7 +66,7 @@ export class ReasonsPage {
       { name: 'name', kind: 'localizedText', required: true, maxLength: 200 },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.reasons.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.reasons.list({ ...this.listed.track(filter), ...sortParams(filter.sort), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.reasons.create(dto),
       update: (id, dto) => this.api.reasons.update(id, dto),
       setActive: (id, active) => this.api.reasons.setActive(id, active),

@@ -41,7 +41,7 @@
   }
 
   <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.clients.isLoading()" [emptyTitle]="i18n.t('platform.clients.empty')"
-                  [caption]="i18n.t('platform.clients.title')" (rowActivate)="openEdit($event)">
+                  [caption]="i18n.t('platform.clients.title')" [sort]="facade.sort()" [serverSort]="true" (sortChange)="facade.setSort($event)" (rowActivate)="openEdit($event)">
     <ng-template appCell="name" [appCellOf]="facade.rows()" let-row>
       <strong>{{ name(row) }}</strong>
       <div class="small muted mono">{{ row.portalUrl }}</div>

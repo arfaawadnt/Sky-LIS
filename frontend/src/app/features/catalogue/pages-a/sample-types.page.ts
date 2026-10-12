@@ -5,6 +5,8 @@ import { ProblemError, type ProblemDetails } from '../../../core/api/problem-det
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
 import { CanDirective } from '../../../shared/ui/can.directive';
+import { sortParams } from '../../../shared/forms/paging';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { MasterDataConfig, MasterDataFilter } from '../../../shared/ui/master-data-page/master-data.types';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
@@ -46,10 +48,11 @@ export class SampleTypesPage {
 
   protected readonly config: MasterDataConfig<SampleTypeListItem, SampleTypeRequest> = {
     i18nPrefix: 'catalogue-a.sampleTypes',
+    sortMode: 'server',
     columns: [
       { key: 'code', header: 'catalogue-a.sampleTypes.column.code', mono: true, sortable: true, width: '120px' },
       { key: 'shortName', header: 'catalogue-a.sampleTypes.column.shortName', width: '120px' },
-      { key: 'name', header: 'catalogue-a.sampleTypes.column.name', sortable: true, value: (row) => localizedPick({ en: row.nameEn, ar: row.nameAr }, this.i18n.lang()) },
+      { key: 'name', header: 'catalogue-a.sampleTypes.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (row) => localizedPick({ en: row.nameEn, ar: row.nameAr }, this.i18n.lang()) },
       { key: 'activeConditionCount', header: 'catalogue-a.sampleTypes.column.conditions', align: 'end', width: '120px' },
     ],
     fields: [
@@ -60,7 +63,7 @@ export class SampleTypesPage {
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listSampleTypes({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+        return this.api.listSampleTypes({ ...sortParams(filter.sort), search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
       },
       create: (dto) => this.api.createSampleType(dto),
       update: (id, dto) => this.api.updateSampleType(id, dto),

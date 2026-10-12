@@ -20,8 +20,8 @@ public sealed class LabTestsController(ISender sender) : ControllerBase
         [FromQuery] bool? isActive,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
-        CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListLabTestsQuery(search, type, clinicalGroupId, isActive, page, pageSize), cancellationToken));
+        [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListLabTestsQuery(search, type, clinicalGroupId, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("export")]
     public async Task<ActionResult<IReadOnlyList<LabTestListItem>>> Export([FromQuery] string? search, [FromQuery] string? type, [FromQuery] Guid? clinicalGroupId, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>

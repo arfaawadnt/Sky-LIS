@@ -1,10 +1,13 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
+import { ORGANIZATION_PERMISSIONS } from '../../../core/api/organization.contracts';
 import { type CreateTreasuryRequest, TREASURY_PERMISSIONS, type TreasuryListItem } from '../../../core/api/treasury.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
+import { sortParams } from '../../../shared/forms/paging';
 import { CanDirective } from '../../../shared/ui/can.directive';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { MasterDataConfig, MasterDataFilter, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
 import { allPages, csvFileName, downloadCsv, toCsv } from '../data/csv-export';
@@ -40,7 +43,7 @@ export class TreasuriesPage {
     i18nPrefix: 'treasury.catalogue',
     columns: [
       { key: 'code', header: 'treasury.catalogue.column.code', mono: true, sortable: true, width: '140px' },
-      { key: 'name', header: 'treasury.catalogue.column.name', sortable: true, value: (item) => this.name(item) },
+      { key: 'name', header: 'treasury.catalogue.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (item) => this.name(item) },
       { key: 'branchId', header: 'treasury.catalogue.column.branch', secondary: true, value: (item) => this.branchLabel(item) },
     ],
     fields: [
@@ -51,15 +54,17 @@ export class TreasuriesPage {
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listTreasuriesPage({ isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+        return this.api.listTreasuriesPage({ ...sortParams(filter.sort), search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
       },
       create: (dto) => this.api.createTreasury(dto),
       update: (id, dto) => this.api.renameTreasury(id, { nameEn: dto.nameEn, nameAr: dto.nameAr }),
       setActive: (id, active) => (active ? this.api.reactivateTreasury(id) : this.api.deactivateTreasury(id)),
     },
     permissions: { create: TREASURY_PERMISSIONS.manage, update: TREASURY_PERMISSIONS.manage, activate: TREASURY_PERMISSIONS.manage },
-    // the list endpoint has no text search yet (ListTreasuriesQuery: isActive, page, pageSize)
-    searchMode: 'client',
+    // the server searches the code and both names, so an Arabic name is found from the English UI (UAT B-08)
+    searchMode: 'server',
+    // B-03: the server sorts the whole catalogue before paging (TreasurySortKeys.Treasuries)
+    sortMode: 'server',
   };
 
   constructor() {
@@ -69,10 +74,8 @@ export class TreasuriesPage {
   /** CSV of the treasuries of the current status filter and search, in the grid's formats (UAT B-10). */
   protected readonly exportCsv = async (): Promise<void> => {
     const filter = this.filter;
-    const all = await allPages((page, pageSize) => this.api.listTreasuriesPage({ isActive: filter.active, page, pageSize }));
-    // the grid searches the loaded rows by their visible text (searchMode 'client'); the export keeps the same rows
-    const search = filter.search.trim().toLowerCase();
-    const rows = search === '' ? all : all.filter((item) => [item.code, this.name(item), this.branchLabel(item)].some((text) => text.toLowerCase().includes(search)));
+    // the same server search as the grid (code and both names, UAT B-08), every page of it
+    const rows = await allPages((page, pageSize) => this.api.listTreasuriesPage({ search: filter.search, isActive: filter.active, page, pageSize }));
     const t = (key: string): string => this.i18n.t(`treasury.${key}`);
     downloadCsv(
       csvFileName('treasuries'),
@@ -90,13 +93,17 @@ export class TreasuriesPage {
     return localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang());
   }
 
-  /** The branch picker of the form: only managers create treasuries, so nobody else reads the branch register (UAT A-04). */
+  /**
+   * The branch picker of the form: only managers create treasuries, so nobody else reads the branch register (UAT A-04);
+   * a manager without `organization.view` picks among the branches of the session instead of meeting a 403 (R-08).
+   */
   private async branchOptions(): Promise<readonly SelectOption[]> {
     if (!this.access.can(TREASURY_PERMISSIONS.manage)) {
       return [];
     }
 
-    return (await this.api.activeBranches()).map((branch) => ({ value: branch.id, label: `${branch.code} · ${branch.nameEn}`, labelAr: `${branch.code} · ${branch.nameAr}` }));
+    const branches = this.access.can(ORGANIZATION_PERMISSIONS.view) ? await this.api.activeBranches() : await this.api.selectableBranches();
+    return branches.map((branch) => ({ value: branch.id, label: `${branch.code} · ${branch.nameEn}`, labelAr: `${branch.code} · ${branch.nameAr}` }));
   }
 
   /** `CODE · name` from the list itself (the server reads the branch for every reader, UAT A-04); the id only when the branch is unknown. */

@@ -1,5 +1,6 @@
 /** Catalogue half A contracts mirrored from `Platform.Contracts.Catalogue` (bootstrap until the OpenAPI generator lands, 01 §6.2). */
 
+import type { SortRequest } from './paging';
 export type { Paged } from './paging';
 
 export type ServiceType = 'Test' | 'Profile' | 'Package' | 'Culture' | 'TextReport' | 'Additional';
@@ -24,7 +25,8 @@ export interface CreatedResource {
 }
 
 /** The filter of every catalogue-A register; `isActive: null` = all. */
-export interface CatalogueListFilter {
+/** The list query of a catalogue-A register; `sort`/`direction` (B-03) are optional allow-listed keys of the server. */
+export interface CatalogueListFilter extends SortRequest {
   readonly search: string;
   readonly isActive: boolean | null;
   readonly page: number;

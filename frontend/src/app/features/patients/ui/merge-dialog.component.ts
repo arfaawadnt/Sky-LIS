@@ -10,7 +10,7 @@ import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { DialogComponent } from '../../../shared/ui/dialog/dialog.component';
 import { FormFieldComponent } from '../../../shared/ui/form-field/form-field.component';
 import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.component';
-import { ageParts } from '../../../shared/patient/patient-demographics';
+import { ageText } from '../../../shared/patient/patient-demographics';
 
 /**
  * Merge a duplicate into this file (CP-11 "merge duplicates (right)", T3): search the duplicate, compare the two files
@@ -91,9 +91,7 @@ export class MergeDialogComponent {
   }
 
   protected ageText(age: { readonly years: number; readonly months: number; readonly days: number }): string {
-    return ageParts(age)
-      .map((part) => this.i18n.tf(`patients.age.${part.unit}`, { value: part.value }))
-      .join(' ');
+    return ageText(age, this.i18n.lang(), (key, params) => this.i18n.tf(key, params));
   }
 
   private clear(): void {

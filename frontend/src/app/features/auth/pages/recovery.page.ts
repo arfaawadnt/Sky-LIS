@@ -82,6 +82,8 @@ export class RecoveryPage {
 
   protected readonly start = mutation((identifier: string) => this.auth.startPasswordRecovery(identifier, this.i18n.lang()), {
     then: () => {
+      // C-06: a new request starts a clean code step; the previous attempt's refusal (AUTH-013) must not show on it
+      this.complete.reset();
       this.armResend();
       this.step.set(2);
     },
@@ -146,6 +148,12 @@ export class RecoveryPage {
   }
 
   protected back(): void {
+    if (this.step() === 2) {
+      // C-06: back to the identifier: the code step's refusal belonged to that attempt
+      this.complete.reset();
+      this.code.reset();
+    }
+
     this.step.update((step) => (step === 3 ? 2 : 1));
   }
 

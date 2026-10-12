@@ -20,8 +20,8 @@ public sealed class AnalysersController(ISender sender) : ControllerBase
         [FromQuery] Guid? siteAgentId,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
-        CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListAnalysersQuery(search, isActive, clinicalGroupId, siteAgentId, page, pageSize), cancellationToken));
+        [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListAnalysersQuery(search, isActive, clinicalGroupId, siteAgentId, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<AnalyserDetail>> Get(Guid id, CancellationToken cancellationToken) =>

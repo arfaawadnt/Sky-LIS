@@ -1,7 +1,7 @@
 <app-page-header [title]="i18n.t('account.dashboard.title')" [subtitle]="subtitle()">
   <label pageActions class="date">
     <span class="visually-hidden">{{ i18n.t('account.dashboard.date') }}</span>
-    <input class="inp" type="date" [value]="facade.query().date" (change)="onDate($event)" />
+    <input class="inp" type="date" [value]="facade.query().date" [attr.max]="facade.maxDate()" (change)="onDate($event)" />
   </label>
   <button pageActions type="button" class="btn ghost" (click)="facade.refresh()"><app-icon name="refresh" [size]="15" />{{ i18n.t('account.refresh') }}</button>
 </app-page-header>

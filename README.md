@@ -234,7 +234,67 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Validation of v0.5.0: every finding fixed** (report `docs/validation/2026-10-11-v0.5.0/Sky-LIS_Validation_Report.html`,
+  LIS-VR-002). 30 distinct defects (1 × S2, 9 × S3, 20 × S4) from three browser testers plus the backend cycle; each fix
+  has a test and was re-tested in the browser and in the database.
+- **Two tabs no longer sign each other out (C-02/A-04).** Tabs of one browser take turns to refresh (Web Locks), and the
+  server accepts the refresh token it has just rotated for a grace window (`Lis:Security:Session:RefreshReuseGrace`,
+  default 5 s, at most 30 s): the successor session gets an access token and no new cookie. Older generations and later
+  replays still revoke the whole family. New key in the production template.
+- **A forced password change is enforced by the server (C-04).** While a user must change the password, every `/api`
+  request except the auth endpoints, the own profile, password, preferences and privileges is refused with
+  `403 AUTH-016` (new pipeline step `PasswordChangeGate`). The changing tab now leaves the forced-change view (C-07).
+- **Export permissions granted to existing roles (C-01).** Migration `GrantExportPermissions` gives
+  `organization.export` / `treasury.export` to every role holding the module's view and manage keys and every catalogue
+  key to the Platform Administrator role; a gate keeps that role complete.
+- **User mobiles in international form (C-03).** Admin and laboratory user mobiles are stored in E.164 by the country
+  rules, are unique in every spelling, and password recovery finds the account whichever spelling was stored or typed.
+- **Clinical delta check re-run at sign-off (A-02).** Review and verification re-check the delta against the latest
+  verified previous result, and verifying a result refreshes the patient's open results of the same test (BR-11).
+- **VIP identity masked everywhere for users without the See-VIP right (A-03).** Patient register, export, picker and
+  similar-file check mask name, mobile, national ID, e-mail and address; name and mobile search exclude VIP files, the full
+  number or national ID still finds them. Recorded as an assumption awaiting the business owner in the PAT and REG intakes.
+- **Registration draft cleared after a save (A-01, S2)**, one digit set in Arabic (A-07), the services card marked on a
+  blocked save (A-08), stale patient-picker results disabled (A-09) — released earlier in v0.5.1; verified here.
+- **Sorting covers the whole list (B-03).** Every paged list sorts on the server before paging (`sort` and
+  `direction` query parameters with an allow-list per list, VALIDATION-400 otherwise); lists paged in the browser sort
+  before slicing. A functional gate serves every allowed key in both directions.
+- **Set-up fixes.** Linked fields clear each other's server error and a blocked master-data save marks the fields and says
+  so (B-01); a restricted user without a branch is refused (`ORG-018`, B-02); the price grid filter is always visible
+  (B-05); the copy dialog proposes a free code (B-06); base price lists get a year filter and CSV export (B-07); treasury
+  search matches code and both names on the server (B-08); the shell shows the role name in Arabic (B-09); activating a
+  price list asks for confirmation.
+- **Smaller fixes.** Worklist age for patients registered by age (A-05); dictionaries load before Results, Patients and
+  Account pages (A-06); the dashboard refuses a future day (`ACC-030`) and returns to today (A-10); the repeat-order
+  warning names the repeated test (A-11); collected money only for users with `billing.view`; "1 result saved"
+  wording; plan fees refused beyond two decimals (C-05); recovery error cleared (C-06); wizard mobile messages (C-08);
+  dial code checked under the field (C-09); "View template" for viewers (C-10); client of an administrator's password
+  reset in the audit log (C-11); platform entity hint (C-12); the sessions list sorts by time.
+- **Re-test round.** The similar-patient warning keeps VIP files as masked entries, so a duplicate is still warned, and
+  masked rows sort after named ones; the patient picker starts empty after a save; ages, the paginator and the dashboard
+  chart use the language's digits and singular; one Arabic term for the accession ("رقم الزيارة"); a master-data row opened
+  without the edit right is a read-only view; reception reads selectable branches instead of a refused list; text columns
+  sort without regard to case; the user's own name follows the language (`displayNameEn/Ar` in the session profile);
+  a patient registered by age is dated by the laboratory's local day; Verify refused for a refreshed delta opens the
+  acknowledgement dialog; the refresh grace also covers a request that read the clock just before the other tab rotated;
+  the wizard's mobile messages follow a language switch.
+- **Re-test round 2.** A laboratory without a client record (the demo laboratory) dates registrations and ages by the new
+  tenant parameter `timeZone` (IANA, validated; the laboratory's value, else the platform's, else Africa/Cairo) instead of
+  the UTC day, and the patient screens show ages for the laboratory's day; patient conditions are read from
+  `GET /api/v1/patients/conditions` (`patients.view`), so a patients reader without `catalogue.view` gets no 403, and the
+  file's Visits tab needs `registration.view`; signing out sends no request before `/login` loads; the refresh of a session
+  that ended by sign-out, administrator or expiry is refused without the reuse alarm (`SESSION_CONTEXT_CHANGED`, info,
+  `refresh_after_<reason>`); the patient file's dates, tab counts and the Visits column use the language's digits; the
+  Super Admin greeting and the wizard's mobile messages follow a language switch; "1 report unit · 1 result".
+- **Re-test round 3.** A form field now re-binds to its control when the control arrives after the first render (a
+  `formControlName` inside a control-flow block): such fields showed no validation message at all; a blocked save on
+  Platform parameters says so, a refused value appears under its field, and the time zone is limited to 64 characters;
+  the patient file's visits show the Arabic branch name, the translated status and Arabic-Indic counts; the matching-visits
+  count of Results by accession uses the language's digits (its dates keep the Latin digits of the printed reports).
+- **Searches with `_` or `%` match literally.** Every `EF.Functions.ILike` passes its escape character; a new
+  architecture gate (`SearchPatternGateTests`) refuses the two-argument form.
+- **Validation tooling.** `tests/validation/serve-ui.mjs` and the `validation-ui` launch configuration pin a release
+  build for a validation campaign, so working-tree edits cannot reach the code under test.
 
 ### v0.5.3 — 2026-10-11
 

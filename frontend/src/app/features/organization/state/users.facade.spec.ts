@@ -4,6 +4,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { NO_SPECIAL_RIGHTS, ORGANIZATION_API, type Paged, type UserDetail, type UserListItem } from '../../../core/api/organization.contracts';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { DEFAULT_PASSWORD_MIN_LENGTH, UserEditorFacade, UsersFacade } from './users.facade';
 
@@ -92,6 +93,37 @@ describe('Users facades (CP-38)', () => {
     expect(filtered.request.params.get('status')).toBe('Locked');
     filtered.flush(page<UserListItem>([]));
     backend.verify();
+  });
+
+  it('B-03: sorts the register on the server from page 1, by the name of the language on screen', async () => {
+    const facade = TestBed.inject(UsersFacade);
+    await runEffects();
+    backend.expectOne((request) => request.url === ORGANIZATION_API.users).flush(page<UserListItem>([]));
+    backend.expectOne((request) => request.url === ORGANIZATION_API.roles).flush(page([]));
+
+    facade.setPage({ page: 3, pageSize: 20 });
+    await runEffects();
+    backend.expectOne((request) => request.url === ORGANIZATION_API.users).flush(page<UserListItem>([]));
+
+    facade.setSort({ key: 'name', direction: 'desc' });
+    await runEffects();
+    const sorted = backend.expectOne((request) => request.url === ORGANIZATION_API.users);
+    expect([sorted.request.params.get('sort'), sorted.request.params.get('direction'), sorted.request.params.get('page')]).toEqual(['nameEn', 'desc', '1']);
+    sorted.flush(page<UserListItem>([]));
+
+    TestBed.inject(I18nService).setLanguage('ar');
+    await runEffects();
+    const arabic = backend.expectOne((request) => request.url === ORGANIZATION_API.users);
+    expect(arabic.request.params.get('sort')).toBe('nameAr');
+    arabic.flush(page<UserListItem>([]));
+
+    facade.setSort(null);
+    await runEffects();
+    const unsorted = backend.expectOne((request) => request.url === ORGANIZATION_API.users);
+    expect(unsorted.request.params.has('sort')).toBe(false);
+    unsorted.flush(page<UserListItem>([]));
+    backend.match(() => true).forEach((request) => request.flush({}));   // dictionaries of the language switch
+    TestBed.inject(I18nService).setLanguage('en');
   });
 
   it('reads the password minimum from the parameters, and falls back to 8 without the permission', async () => {

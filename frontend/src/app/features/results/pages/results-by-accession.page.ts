@@ -21,6 +21,7 @@ import { ProblemError } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { problemMessage } from '../../../shared/forms/problem-text';
+import { localDigits } from '../../../shared/patient/patient-demographics';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
@@ -44,6 +45,9 @@ import { type DraftChange, ResultGridComponent } from '../ui/result-grid.compone
 import { ResultHistoryComponent } from '../ui/result-history.component';
 import { ResultTextDialogComponent } from '../ui/text-dialog.component';
 import { type TextReportRequest, TextReportDialogComponent } from '../ui/text-report-dialog.component';
+
+/** The server's refusal of a verification whose delta flag is not acknowledged (BR-11; `ResultsCodes.DeltaNotAcknowledged`). */
+const DELTA_NOT_ACKNOWLEDGED = 'RES-015';
 
 /**
  * CP-19 Results by accession (WF-06 steps 2–5; LDM §5.2–§5.7): the query panel (accession, patient number, name with
@@ -310,10 +314,33 @@ export class ResultsByAccessionPage {
 
     const deltas = this.facade.unacknowledgedDeltas(unit);
     if (deltas.length === 0) {
-      this.report(await this.facade.verify.execute(ids), 'verified', this.facade.verify.problem());
+      const outcome = await this.facade.verify.execute(ids);
+      const deltaRefused = new Set(outcome?.refused.filter((refusal) => refusal.code === DELTA_NOT_ACKNOWLEDGED).map((refusal) => refusal.resultId) ?? []);
+      if (outcome === null || deltaRefused.size === 0) {
+        this.report(outcome, 'verified', this.facade.verify.problem());
+        return;
+      }
+
+      // A-02: the server re-checked the delta at verification (an older result was verified after this one was reviewed)
+      // and refused with RES-015. The click is not wasted: the case is re-read and the delta dialog opens with the
+      // refreshed flags, so "Acknowledge and verify" signs the refused rows.
+      this.report({ changed: outcome.changed, refused: outcome.refused.filter((refusal) => !deltaRefused.has(refusal.resultId)) }, 'verified', null);
+      const refreshed = (await this.facade.whenCaseSettled())?.units.find((candidate) => candidate.key === unit.key) ?? null;
+      const flagged = refreshed === null ? [] : this.facade.unacknowledgedDeltas(refreshed).filter((row) => deltaRefused.has(row.id));
+      if (flagged.length === 0) {
+        this.toast.warn(this.countText('results.case.refusedCount', deltaRefused.size));
+        return;
+      }
+
+      await this.acknowledgeAndVerify(flagged, flagged.map((row) => row.id));
       return;
     }
 
+    await this.acknowledgeAndVerify(deltas, ids);
+  }
+
+  /** The delta dialog (BR-11): lists the flags; "Acknowledge and verify" acknowledges them and verifies `verifyIds`. */
+  private async acknowledgeAndVerify(deltas: readonly ResultRowView[], verifyIds: readonly string[]): Promise<void> {
     const lines = deltas.map((row) => `${this.testName(row)}: ${row.textValue ?? '—'} (Δ ${row.delta?.percent ?? '—'}%, ${this.i18n.t('results.case.previous')} ${row.delta?.previousValue ?? '—'})`).join('\n');
     const confirmed = await this.confirm.confirm({
       title: this.i18n.t('results.case.deltaTitle'),
@@ -325,7 +352,7 @@ export class ResultsByAccessionPage {
       return;
     }
 
-    const outcome = await this.facade.acknowledgeAndVerify.execute({ deltaIds: deltas.map((row) => row.id), verifyIds: ids, comment: null });
+    const outcome = await this.facade.acknowledgeAndVerify.execute({ deltaIds: deltas.map((row) => row.id), verifyIds, comment: null });
     this.report(outcome, 'verified', this.facade.acknowledgeAndVerify.problem());
   }
 
@@ -520,12 +547,27 @@ export class ResultsByAccessionPage {
     }
 
     if (outcome.changed.length > 0) {
-      this.toast.success(this.i18n.tf(`results.case.${key}`, { count: outcome.changed.length }));
+      this.toast.success(this.countText(`results.case.${key}`, outcome.changed.length));
     }
 
     if (outcome.refused.length > 0) {
-      this.toast.warn(this.i18n.tf('results.case.refusedCount', { count: outcome.refused.length }));
+      this.toast.warn(this.countText('results.case.refusedCount', outcome.refused.length));
     }
+  }
+
+  /** One result reads in the singular ("1 result saved"), more in the plural (validation run 2026-10-11). */
+  protected countText(key: string, count: number): string {
+    return count === 1 ? this.i18n.t(`${key}One`) : this.i18n.tf(key, { count: localDigits(count, this.i18n.lang()) });
+  }
+
+  /** The heading count in the language's digits (round 3 R3-02); dates keep the Latin digits of the printed reports. */
+  protected matchingCount(): string {
+    return localDigits(this.visitsTotal(), this.i18n.lang());
+  }
+
+  /** The matching-list line "1 report unit · 2 results": each count takes its own singular (round 2 R2-07). */
+  protected unitsLine(item: Pick<ResultVisitListItem, 'units' | 'results'>): string {
+    return `${this.countText('results.case.unitsPart', item.units)} · ${this.countText('results.case.resultsPart', item.results)}`;
   }
 
   private afterRowAction(problem: { code: string } | null, key: string, close: () => void): void {
@@ -550,6 +592,6 @@ export class ResultsByAccessionPage {
     }
 
     close();
-    this.toast.success(this.i18n.tf('results.case.saved', { count: 1 }));
+    this.toast.success(this.countText('results.case.saved', 1));
   }
 }

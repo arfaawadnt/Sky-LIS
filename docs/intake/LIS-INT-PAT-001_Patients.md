@@ -54,7 +54,7 @@ Out of scope (other modules or later intakes):
 | Title (Mr, Mrs, Miss, Ms, Dr, Master, Baby, Prof) | `PatientTitle`; sets the **default** gender in the UI (Mr/Master → Male; Mrs/Miss/Ms → Female; Dr/Prof/Baby → none) |
 | Name (English/Latin) / Arabic name | `FullName` (required) / `NameAr` (optional); search keys `NameKey` / `NameArKey` (normalised, §13) |
 | Sex / gender | `Gender` Male / Female |
-| Birth date ↔ age (D M Y) | `DateOfBirth` (when known) **or** age at registration `AgeYears/AgeMonths/AgeDays` + `RegisteredOn`; the age shown is always computed for "today" |
+| Birth date ↔ age (D M Y) | `DateOfBirth` (when known) **or** age at registration `AgeYears/AgeMonths/AgeDays` + `AgeRecordedOn`; the age shown is always computed for "today". `RegisteredOn` and `AgeRecordedOn` are the laboratory's calendar day: the date in the time zone of the country of the laboratory's client record, else the tenant parameter `timeZone` (the laboratory's, else the platform's value, default Africa/Cairo) (`ILaboratoryTimeZone`), not the UTC date (validation v0.5.0 R-11: a file created at 01:57 in Cairo on 12 Oct was dated 11 Oct; round 2 R2-01: the demo laboratory has no client record). The age shown is computed for the laboratory's day as well |
 | Patient condition (pregnant, diabetic…) | `PatientConditionId` → catalogue `app.patient_conditions` (agent `cat`, same wave; reference by id, no FK) |
 | Governorate / City / Address | `GovernorateId` → `saas.governorates` (agent `plat`, by id, no FK), `City`, `Address` |
 | VIP | `IsVip`; confidential: visible and editable only with `patients.viewConfidential` |
@@ -190,7 +190,7 @@ provenance is kept and no outbox delivery is needed (§16 Q7).
 | Tenant setting | `similarNameWarning` (`SettingKeys.SimilarNameWarning`) | true | the similar query always answers; the flag tells the UI whether to show the warning |
 | Host configuration | `Lis:Files:Root` | `E:\LIS\.local\files` (dev); production `E:\lis-data\files` | `LocalFileStore` root, created on demand |
 | Platform lists | `/api/v1/platform/countries`, `/api/v1/platform/governorates` (agent `plat`) | — | nationality and governorate pickers; mobile length per country when published |
-| Catalogue | `app.patient_conditions` (agent `cat`), `GET /api/v1/catalogue/patient-conditions` | — | condition picker (hidden when the list is unavailable) |
+| Catalogue | `app.patient_conditions` (agent `cat`) through the port `IPatientConditionOptions`, served as `GET /api/v1/patients/conditions` (`patients.view`; round 2 R2-04: the catalogue's own list needs `catalogue.view`) | — | condition picker and the condition shown in the register and the file |
 
 Name normalisation for search and similarity (`PatientNameNormalizer`, unit-tested): Unicode decomposition with
 diacritics removed (Latin accents, Arabic harakat, superscript alef), tatweel removed, alef forms (أ إ آ ٱ) → ا, yaa
@@ -205,9 +205,9 @@ at most 10, ordered Exact → Mobile → Name → newest.
 
 | Register | Filters | Columns | Who |
 | --- | --- | --- | --- |
-| Patients (CP-11) | `q` (number prefix, name tokens in Latin or Arabic, mobile digits, national id), gender, VIP (with the right), status (default Active in the UI), page | number, name (+ Arabic), gender, age, mobile, national id, condition, VIP (with the right), status | `patients.view` |
+| Patients (CP-11) | `q` (number prefix, name tokens in Latin or Arabic, mobile digits, national id; a VIP file only by its full number or national id without the See-VIP right, Q8), gender, VIP (with the right), status (default Active in the UI), page; sort by number or name (sorted by name without the See-VIP right, masked rows sort as if their name were empty: after every named row in either direction, by number, validation R-05) | number, name (+ Arabic), gender, age, mobile, national id, condition, VIP (with the right), status; `identityMasked` VIP rows without the See-VIP right (Q8) | `patients.view` |
 | Patient file | — | every field, computed age, estimated-DOB flag, survivor (for Merged), files merged into it, created/modified by and at, row version | `patients.view` |
-| Similar candidates | name, mobile | number, names, gender, age, mobile, national id, match | `patients.view` |
+| Similar candidates | name, mobile | number, names, gender, age, mobile, national id, match; `identityMasked` VIP candidates without the See-VIP right (number, gender, age and match only; Q8, validation R-06) | `patients.view` |
 | Documents of a file | include inactive | file name, type, size, note, uploaded by/at, active, deactivated by/at/reason, original file number | `files.view` |
 | CSV export | same as the register (max 10 000 rows, else PAT-050) | number, title, names, gender, DOB, age, mobile, national id, nationality, e-mail, city, status, (VIP with the right), registered on | `patients.export` |
 
@@ -293,7 +293,7 @@ Open questions (assumed answers let the build proceed; confirm or change):
 | Q5 | SoD on merge (creator of a file ≠ merger)? | None. |
 | Q6 | Step-up re-authentication for the merge? | Not required. |
 | Q7 | Are documents moved to the survivor on merge? | Not moved: the survivor's register shows them with their original file number (provenance kept). |
-| Q8 | Must VIP files be hidden entirely from users without the VIP right (LDM rights `Vip`, `Print Vip`)? | No: only the flag is hidden; printing rules for VIP belong to Results. |
+| Q8 | Must VIP files be hidden entirely from users without the VIP right (LDM rights `Vip`, `Print Vip`)? | **Aligned with REG Q12 — assumption, awaiting the business owner (validation A-03, 2026-10-11).** Not hidden, masked: for a user without the See-VIP special right (`SpecialRights.CanSeeVip`, CP-37, the right the visit register uses) a VIP file is listed in the patient register (CP-11), its CSV export, the patient picker and the similar-file check without its name, Arabic name, mobile and national id (the export also drops e-mail and address); name, mobile, partial-number and partial-national-id searches never match it; the full patient number or the full national id still finds it (masked) so reception can register the patient. The similar-file check warns with a masked entry (validation R-06, 2026-10-12): a VIP file that resembles the typed name or mobile is listed as "VIP patient" with its number, sex, age and match reason (Exact / Mobile / Name), so a duplicate file is not created, and the clerk may use that file (choosing it by its number is allowed by this rule). Sorted by name, masked rows sort as if their name were empty, after every named row in either direction, by number (validation R-05). Opening the file and the printed documents keep the real identity (operational need). The masking is applied by the server in the projections. The VIP flag itself stays governed by `patients.viewConfidential` (INV-PAT-007). Printing rules for VIP belong to Results. Previous assumed answer: only the flag is hidden. |
 | Q9 | Retention period of patient files and documents? | Life of the tenant's medical records (≥ 10 years after the last visit); no purge in this module. |
 | Q10 | Mobile validation "by country" (REG-001) | Server: 8–15 digits with optional `+`; client: the country's length when the platform list publishes it. |
 | Q11 | Patient number format (OQ-07 tenant-configurable formats) | `PAT-yyyy-nnnnn` per tenant and year (MODULES.md §1); the legacy `P0004912` style is a later configuration change. |

@@ -42,6 +42,19 @@ public sealed class TreasuryAccessFlowTests(ApiFactory factory) : IClassFixture<
         var listed = await readerClient.GetFromJsonAsync<Paged<TreasuryListItem>>(Treasuries);
         var item = Assert.Single(listed!.Items);
         Assert.Equal((branchId, "NORTH", "North", "الشمال"), (item.BranchId, item.BranchCode, item.BranchNameEn, item.BranchNameAr));
+
+        // UAT B-08: the server searches the code and both names, whatever the language of the UI
+        Assert.Equal(HttpStatusCode.Created, (await managerClient.PostAsJsonAsync(Treasuries, new CreateTreasuryRequest("EAST_1", "East drawer", "خزينة الشرق", branchId))).StatusCode);
+        async Task<string[]> CodesFor(string search) =>
+            [.. (await readerClient.GetFromJsonAsync<Paged<TreasuryListItem>>($"{Treasuries}?search={Uri.EscapeDataString(search)}"))!.Items.Select(found => found.Code)];
+
+        Assert.Equal(["EAST_1"], await CodesFor("الشرق"));
+        Assert.Equal(["EAST_1"], await CodesFor("east"));
+        Assert.Equal(["NORTH-CASH"], await CodesFor("north-c"));
+        Assert.Equal(["EAST_1", "NORTH-CASH"], await CodesFor("خزينة"));
+        Assert.Equal(["EAST_1"], await CodesFor("_"));
+        Assert.Empty(await CodesFor("%"));
+        Assert.Equal(HttpStatusCode.BadRequest, (await readerClient.GetAsync($"{Treasuries}?search={new string('x', 101)}")).StatusCode);
     }
 
     [DatabaseFact]

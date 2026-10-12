@@ -6,11 +6,12 @@ import { provideRouter } from '@angular/router';
 
 import { AUTH_API, type AuthResponse } from '../core/api/auth.contracts';
 import { AuthStore } from '../core/auth/auth.store';
+import { I18nService } from '../core/i18n/i18n.service';
 import { FakeBrowserNavigation, FakeSessionChannel, provideSessionTesting } from '../core/auth/session-testing';
 import { PLATFORM_TENANT_ID } from '../core/tenancy/tenant-ids';
 import { ShellComponent } from './shell.component';
 
-async function signIn(tenantId: string, permissions: readonly string[]): Promise<void> {
+async function signIn(tenantId: string, permissions: readonly string[], roleNameAr: string | null = null, names: { readonly displayNameEn?: string; readonly displayNameAr?: string } = {}): Promise<void> {
   const store = TestBed.inject(AuthStore);
   const backend = TestBed.inject(HttpTestingController);
   const pending = store.signIn('mona', 'pw', null);
@@ -19,7 +20,7 @@ async function signIn(tenantId: string, permissions: readonly string[]): Promise
     accessToken: 't',
     expiresAtUtc: null,
     refreshToken: null,
-    profile: { userId: 'u1', displayName: 'Mona Adel', tenantId, roleName: 'Cashier', permissions, language: 'en', scope: 'full' },
+    profile: { userId: 'u1', displayName: 'Mona Adel', ...names, tenantId, roleName: 'Cashier', roleNameAr, permissions, language: 'en', scope: 'full' },
     tenants: null,
   } satisfies AuthResponse);
   await pending;
@@ -132,5 +133,37 @@ describe('ShellComponent', () => {
     expect(host.querySelector('[role="menu"]')).toBeNull();
 
     host.remove();
+  });
+
+  it('names the role in the language of the page, in the sidebar and the top bar (validation v0.5.0 B-09)', async () => {
+    await signIn('11111111-1111-1111-1111-111111111111', ['treasury.view'], 'أمين الصندوق');
+    const fixture = TestBed.createComponent(ShellComponent);
+    await fixture.whenStable();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('aside.sidebar')?.textContent).toContain('Cashier');
+
+    TestBed.inject(I18nService).setLanguage('ar');
+    await fixture.whenStable();
+
+    expect(host.querySelector('aside.sidebar')?.textContent).toContain('أمين الصندوق');
+    expect(host.querySelector('aside.sidebar')?.textContent).not.toContain('Cashier');
+    expect(host.textContent?.split('أمين الصندوق').length).toBeGreaterThan(2);   // the top bar too
+  });
+
+  it('names the user in the language of the page in the top bar (validation v0.5.0 R-12)', async () => {
+    await signIn('11111111-1111-1111-1111-111111111111', ['treasury.view'], 'أمين الصندوق', { displayNameEn: 'Mona Adel', displayNameAr: 'منى عادل' });
+    const fixture = TestBed.createComponent(ShellComponent);
+    await fixture.whenStable();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.who b')?.textContent?.trim()).toBe('Mona Adel');
+
+    TestBed.inject(I18nService).setLanguage('ar');
+    await fixture.whenStable();
+    expect(host.querySelector('.who b')?.textContent?.trim()).toBe('منى عادل');
+    expect(host.textContent).not.toContain('Mona Adel');
+
+    TestBed.inject(I18nService).setLanguage('en');
+    await fixture.whenStable();
+    expect(host.querySelector('.who b')?.textContent?.trim()).toBe('Mona Adel');
   });
 });

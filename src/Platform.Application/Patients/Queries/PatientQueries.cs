@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Abstractions.Settings;
 using Platform.Contracts.Common;
@@ -18,7 +19,7 @@ namespace Platform.Application.Patients.Queries;
 
 /// <summary><paramref name="Q"/>: number, name, mobile or national id; <paramref name="Vip"/> needs <c>patients.viewConfidential</c> (PAT-031).</summary>
 [RequirePermissionPolicy(PermissionCatalog.Patients, PermissionAction.View)]
-public sealed record ListPatientsQuery(string? Q, string? Gender, bool? Vip, string? Status, int? Page, int? PageSize) : IQuery<Paged<PatientListItem>>;
+public sealed record ListPatientsQuery(string? Q, string? Gender, bool? Vip, string? Status, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<PatientListItem>>;
 
 public sealed class ListPatientsValidator : AbstractValidator<ListPatientsQuery>
 {
@@ -29,21 +30,28 @@ public sealed class ListPatientsValidator : AbstractValidator<ListPatientsQuery>
         RuleFor(query => query.Status).IsEnumName(typeof(PatientStatus), caseSensitive: false).When(query => !string.IsNullOrEmpty(query.Status));
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(PatientSortKeys.Patients);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
-/// <summary>The register page with each file's visit count and last visit from Registration (CP-11; UAT A-09).</summary>
-public sealed class ListPatientsHandler(IPatientRepository patients, IPatientVisitStatistics visits, IUserPrivileges privileges, IClock clock) : IQueryHandler<ListPatientsQuery, Paged<PatientListItem>>
+/// <summary>
+/// The register page with each file's visit count and last visit from Registration (CP-11; UAT A-09). Without the See-VIP
+/// special right VIP files are found only by their full number or national id and listed masked (validation A-03); the
+/// patient picker reads this page too.
+/// </summary>
+public sealed class ListPatientsHandler(IPatientRepository patients, IPatientVisitStatistics visits, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, IClock clock) : IQueryHandler<ListPatientsQuery, Paged<PatientListItem>>
 {
     public async Task<Paged<PatientListItem>> Handle(ListPatientsQuery query, CancellationToken cancellationToken)
     {
         var confidential = privileges.Has(PatientPermissions.ViewConfidential);
-        var filter = PatientFilters.From(query.Q, query.Gender, query.Vip, query.Status, confidential);
+        var canSeeVip = privileges.SpecialRights.CanSeeVip;
+        var filter = PatientFilters.From(query.Q, query.Gender, query.Vip, query.Status, confidential, canSeeVip) with { Sort = ListSort.Of(query.Sort, query.Direction) };
         var page = await patients.SearchAsync(filter, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
-        var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+        var today = Patient.LocalDate(clock.UtcNow, await laboratoryZone.FindAsync(cancellationToken));   // the laboratory's day (R2-01)
         var figures = await visits.ForPatientsAsync([.. page.Items.Select(row => row.Id)], cancellationToken);
         return new Paged<PatientListItem>(
-            page.Items.Select(row => PatientProjections.ToListItem(row, today, confidential, figures.GetValueOrDefault(row.Id))).ToList(),
+            page.Items.Select(row => PatientProjections.ToListItem(row, today, confidential, figures.GetValueOrDefault(row.Id), canSeeVip)).ToList(),
             page.Page,
             page.PageSize,
             page.TotalCount);
@@ -53,14 +61,14 @@ public sealed class ListPatientsHandler(IPatientRepository patients, IPatientVis
 [RequirePermissionPolicy(PermissionCatalog.Patients, PermissionAction.View)]
 public sealed record GetPatientQuery(Guid PatientId) : IQuery<PatientDetail>;
 
-public sealed class GetPatientHandler(IPatientRepository patients, IUserPrivileges privileges, IClock clock) : IQueryHandler<GetPatientQuery, PatientDetail>
+public sealed class GetPatientHandler(IPatientRepository patients, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, IClock clock) : IQueryHandler<GetPatientQuery, PatientDetail>
 {
     public async Task<PatientDetail> Handle(GetPatientQuery query, CancellationToken cancellationToken)
     {
         var row = await patients.GetRowAsync(query.PatientId, cancellationToken)
             ?? throw new DomainException(PatientCodes.PatientNotFound, "Patient file not found.", DomainFault.NotFound);
         var mergedFiles = await patients.ListMergedIntoAsync(row.Id, cancellationToken);
-        var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+        var today = Patient.LocalDate(clock.UtcNow, await laboratoryZone.FindAsync(cancellationToken));
 
         // The merger's display name as of the action is the modifier stamp of the merge (the last change of a frozen file).
         var mergedByName = row.Status == PatientStatus.Merged ? row.ModifiedByName : null;
@@ -68,7 +76,11 @@ public sealed class GetPatientHandler(IPatientRepository patients, IUserPrivileg
     }
 }
 
-/// <summary>Similar existing files while the clerk types (BR-01, REG-002): always answered; the setting tells the UI whether to warn.</summary>
+/// <summary>
+/// Similar existing files while the clerk types (BR-01, REG-002): always answered; the setting tells the UI whether to
+/// warn. For a user without the See-VIP special right a VIP file still takes part (a duplicate file is the worse harm) but
+/// is listed masked: number, sex, age and the match reason only (validation A-03, R-06).
+/// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Patients, PermissionAction.View)]
 public sealed record FindSimilarPatientsQuery(string? Name, string? Mobile) : IQuery<SimilarPatientsResponse>;
 
@@ -81,7 +93,7 @@ public sealed class FindSimilarPatientsValidator : AbstractValidator<FindSimilar
     }
 }
 
-public sealed class FindSimilarPatientsHandler(IPatientRepository patients, ITenantSettings settings, IClock clock) : IQueryHandler<FindSimilarPatientsQuery, SimilarPatientsResponse>
+public sealed class FindSimilarPatientsHandler(IPatientRepository patients, ITenantSettings settings, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, IClock clock) : IQueryHandler<FindSimilarPatientsQuery, SimilarPatientsResponse>
 {
     public const int MaxCandidates = 10;
     private const int PreFilterLimit = 200;
@@ -97,15 +109,16 @@ public sealed class FindSimilarPatientsHandler(IPatientRepository patients, ITen
             return new SimilarPatientsResponse(warn, []);
         }
 
+        var canSeeVip = privileges.SpecialRights.CanSeeVip;
         var rows = await patients.FindSimilarCandidatesAsync(tokens, mobile, PreFilterLimit, cancellationToken);
-        var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+        var today = Patient.LocalDate(clock.UtcNow, await laboratoryZone.FindAsync(cancellationToken));
         var candidates = rows
             .Select(row => (Row: row, Match: Classify(key, mobile, row)))
             .Where(candidate => candidate.Match is not null)
             .OrderBy(candidate => candidate.Match)
             .ThenByDescending(candidate => candidate.Row.CreatedAtUtc)
             .Take(MaxCandidates)
-            .Select(candidate => PatientProjections.ToSimilar(candidate.Row, today, candidate.Match!.Value))
+            .Select(candidate => PatientProjections.ToSimilar(candidate.Row, today, candidate.Match!.Value, canSeeVip))
             .ToList();
         return new SimilarPatientsResponse(warn, candidates);
     }
@@ -151,6 +164,19 @@ public sealed class GetPatientFormSettingsHandler(ITenantSettings settings) : IQ
             await settings.GetAsync(SettingKeys.SimilarNameWarning, cancellationToken));
 }
 
+/// <summary>
+/// The active patient conditions for the patient screens (round 2 R2-04): a patients reader sees the condition of a file and
+/// a creator picks one without the catalogue right the catalogue's own list requires.
+/// </summary>
+[RequirePermissionPolicy(PermissionCatalog.Patients, PermissionAction.View)]
+public sealed record ListPatientConditionOptionsQuery : IQuery<IReadOnlyList<PatientConditionOption>>;
+
+public sealed class ListPatientConditionOptionsHandler(IPatientConditionOptions conditions) : IQueryHandler<ListPatientConditionOptionsQuery, IReadOnlyList<PatientConditionOption>>
+{
+    public Task<IReadOnlyList<PatientConditionOption>> Handle(ListPatientConditionOptionsQuery query, CancellationToken cancellationToken) =>
+        conditions.ListActiveAsync(cancellationToken);
+}
+
 /// <summary>A generated file (CSV) the controller streams with its name and type.</summary>
 public sealed record ExportFile(string FileName, string ContentType, byte[] Content);
 
@@ -168,14 +194,18 @@ public sealed class ExportPatientsValidator : AbstractValidator<ExportPatientsQu
     }
 }
 
-public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPrivileges privileges, IClock clock) : IQueryHandler<ExportPatientsQuery, ExportFile>
+public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, IClock clock) : IQueryHandler<ExportPatientsQuery, ExportFile>
 {
     public const int MaxRows = 10_000;
+
+    /// <summary>The name cell of a masked VIP row (the export is English-headed).</summary>
+    public const string MaskedName = "VIP patient";
 
     public async Task<ExportFile> Handle(ExportPatientsQuery query, CancellationToken cancellationToken)
     {
         var confidential = privileges.Has(PatientPermissions.ViewConfidential);
-        var filter = PatientFilters.From(query.Q, query.Gender, query.Vip, query.Status, confidential);
+        var canSeeVip = privileges.SpecialRights.CanSeeVip;
+        var filter = PatientFilters.From(query.Q, query.Gender, query.Vip, query.Status, confidential, canSeeVip);
         var rows = await patients.SearchAllAsync(filter, MaxRows + 1, cancellationToken);
         if (rows.Count > MaxRows)
         {
@@ -183,7 +213,7 @@ public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPriv
         }
 
         var now = clock.UtcNow;
-        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var today = Patient.LocalDate(now, await laboratoryZone.FindAsync(cancellationToken));
         var csv = new StringBuilder();
         var header = new List<string> { "Number", "Title", "Name", "Arabic name", "Gender", "Date of birth", "Estimated", "Age (years)", "Mobile", "National id", "Nationality", "E-mail", "City", "Address", "Status", "Merged into", "Registered on" };
         if (confidential)
@@ -194,22 +224,25 @@ public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPriv
         AppendLine(csv, header);
         foreach (var row in rows)
         {
+            // Validation A-03: a VIP file is exported without its identity (name, Arabic name, mobile, national id, e-mail,
+            // address) for a user without the See-VIP special right; the number still leads to the file.
+            var masked = PatientProjections.IsIdentityMasked(row, canSeeVip);
             var cells = new List<string?>
             {
                 row.Number,
                 row.Title.ToString(),
-                row.FullName,
-                row.NameAr,
+                masked ? MaskedName : row.FullName,
+                masked ? null : row.NameAr,
                 row.Gender.ToString(),
                 PatientProjections.BirthOf(row)?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 row.DateOfBirth is null ? "yes" : "no",
                 PatientProjections.AgeOf(row, today).Years.ToString(CultureInfo.InvariantCulture),
-                row.Mobile,
-                row.NationalId,
+                masked ? null : row.Mobile,
+                masked ? null : row.NationalId,
                 row.Nationality,
-                row.Email,
+                masked ? null : row.Email,
                 row.City,
-                row.Address,
+                masked ? null : row.Address,
                 row.Status.ToString(),
                 row.MergedIntoNumber,
                 row.RegisteredOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
@@ -244,7 +277,7 @@ public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPriv
 /// <summary>The register filter from query parameters; the VIP filter is refused without the confidential right (PAT-031).</summary>
 internal static class PatientFilters
 {
-    public static PatientSearchFilter From(string? q, string? gender, bool? vip, string? status, bool confidential)
+    public static PatientSearchFilter From(string? q, string? gender, bool? vip, string? status, bool confidential, bool canSeeVip)
     {
         if (vip is not null && !confidential)
         {
@@ -255,6 +288,7 @@ internal static class PatientFilters
             PatientSearchTerms.Parse(q),
             string.IsNullOrEmpty(gender) ? null : Enum.Parse<PatientGender>(gender, ignoreCase: true),
             vip,
-            string.IsNullOrEmpty(status) ? null : Enum.Parse<PatientStatus>(status, ignoreCase: true));
+            string.IsNullOrEmpty(status) ? null : Enum.Parse<PatientStatus>(status, ignoreCase: true),
+            canSeeVip);
     }
 }

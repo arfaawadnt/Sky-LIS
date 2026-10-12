@@ -23,7 +23,7 @@ import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { CellTemplateDirective, RowActionsTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
 import { DataTableComponent } from '../../../shared/ui/data-table/data-table.component';
-import type { TableColumn } from '../../../shared/ui/data-table/data-table.types';
+import { type TableColumn, type TableSort, sortRows } from '../../../shared/ui/data-table/data-table.types';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { EmptyStateComponent } from '../../../shared/ui/empty-state/empty-state.component';
 import { FormFieldComponent } from '../../../shared/ui/form-field/form-field.component';
@@ -180,10 +180,19 @@ export class ContractPricingPage {
     { key: 'flags', header: 'pricing.grid.flags', width: '150px' },
   ];
 
+  /** The column order chosen in the header: the grid holds every price, so the whole list is sorted before the page is cut (B-03). */
+  protected readonly sort = signal<TableSort | null>(null);
+
   protected readonly pagedPrices = computed(() => {
     const { page, pageSize } = this.page();
-    return this.facade.visiblePrices().slice((page - 1) * pageSize, page * pageSize);
+    return sortRows(this.facade.visiblePrices(), this.columns, this.sort(), this.i18n.lang()).slice((page - 1) * pageSize, page * pageSize);
   });
+
+  /** A header click sorts every price (the table shows the slice as given) and goes back to page 1. */
+  protected onSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.page.update((current) => ({ ...current, page: 1 }));
+  }
 
   protected readonly searchService = (term: string): Promise<readonly ServiceLabel[]> => this.catalog.search(term);
 

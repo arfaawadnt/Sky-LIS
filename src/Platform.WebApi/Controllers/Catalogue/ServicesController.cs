@@ -20,8 +20,10 @@ public sealed class ServicesController(ISender sender) : ControllerBase
         [FromQuery] bool? isActive,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
+        [FromQuery] string? sort,
+        [FromQuery] string? direction,
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListServicesQuery(search, type, clinicalGroupId, isActive, page, pageSize), cancellationToken));
+        Ok(await sender.Send(new ListServicesQuery(search, type, clinicalGroupId, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("export")]
     public async Task<ActionResult<IReadOnlyList<ServiceListItem>>> Export([FromQuery] string? search, [FromQuery] string? type, [FromQuery] Guid? clinicalGroupId, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>

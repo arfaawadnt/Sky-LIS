@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Abstractions.Settings;
 using Platform.Contracts.Common;
@@ -25,7 +26,9 @@ public sealed record ListSamplesQuery(
     Guid? ClinicalGroupId,
     string? Search,
     int? Page,
-    int? PageSize) : IQuery<Paged<SampleListItem>>;
+    int? PageSize,
+    string? Sort = null,
+    string? Direction = null) : IQuery<Paged<SampleListItem>>;
 
 public sealed class ListSamplesValidator : AbstractValidator<ListSamplesQuery>
 {
@@ -37,6 +40,8 @@ public sealed class ListSamplesValidator : AbstractValidator<ListSamplesQuery>
         RuleFor(query => query.To).GreaterThanOrEqualTo(query => query.From).When(query => query.From is not null && query.To is not null);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(SamplesSortKeys.Samples);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
@@ -53,7 +58,8 @@ public sealed class ListSamplesHandler(ISampleRepository samples) : IQueryHandle
             query.To,
             query.BranchId,
             query.ClinicalGroupId,
-            string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim().ToUpperInvariant());
+            string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim().ToUpperInvariant(),
+            ListSort.Of(query.Sort, query.Direction));
         return samples.ListAsync(filter, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
     }
 }

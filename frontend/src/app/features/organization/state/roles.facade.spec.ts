@@ -40,6 +40,26 @@ describe('Roles facades (CP-37)', () => {
     await settle();
   }
 
+  it('B-03: sorts the roles on the server from page 1 by the name of the language on screen', async () => {
+    const facade = TestBed.inject(RolesFacade);
+    await runEffects();
+    backend.expectOne((request) => request.url === ORGANIZATION_API.roles).flush(page<RoleListItem>([]));
+
+    facade.setPage({ page: 2, pageSize: 20 });
+    await runEffects();
+    backend.expectOne((request) => request.url === ORGANIZATION_API.roles).flush(page<RoleListItem>([]));
+
+    facade.setSort({ key: 'name', direction: 'desc' });
+    await runEffects();
+    const sorted = backend.expectOne((request) => request.url === ORGANIZATION_API.roles);
+    expect([sorted.request.params.get('sort'), sorted.request.params.get('direction'), sorted.request.params.get('page')]).toEqual(['nameEn', 'desc', '1']);
+    sorted.flush(page<RoleListItem>([]));
+
+    facade.setSort(null);
+    await runEffects();
+    expect(backend.expectOne((request) => request.url === ORGANIZATION_API.roles).request.params.has('sort')).toBe(false);
+  });
+
   it('lists roles for the filter and narrows to a status and a search', async () => {
     const facade = TestBed.inject(RolesFacade);
     await runEffects();

@@ -13,8 +13,8 @@ namespace Platform.WebApi.Controllers.Integration;
 public sealed class PcrKitsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<PcrKitListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? analyserId, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListPcrKitsQuery(search, isActive, analyserId, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<PcrKitListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? analyserId, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListPcrKitsQuery(search, isActive, analyserId, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PcrKitDetail>> Get(Guid id, CancellationToken cancellationToken) =>

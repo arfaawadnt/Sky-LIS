@@ -3,6 +3,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { CATALOGUE_B_PERMISSIONS, type SendingLabListItem, type SendingLabRequest } from '../../../core/api/catalogue-b.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { type LocalizedText, localizedPick, localizedToDto } from '../../../shared/forms/localized-text';
+import { sortParams } from '../../../shared/forms/paging';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { FormValue, MasterDataConfig, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueBApi } from '../data-b/catalogue-b.api';
@@ -38,8 +40,9 @@ export class SendingLabsPage {
 
   protected readonly config: MasterDataConfig<SendingLabListItem, SendingLabRequest> = {
     i18nPrefix: 'catalogue-b.sendingLabs',
+    sortMode: 'server',
     columns: [
-      { key: 'name', header: 'catalogue-b.sendingLabs.column.name', sortable: true, value: (item) => localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang()) },
+      { key: 'name', header: 'catalogue-b.sendingLabs.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (item) => localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang()) },
       { key: 'contract', header: 'catalogue-b.sendingLabs.column.contract', value: (item) => this.tierLabel(item.contractTierId) },
       { key: 'courier', header: 'catalogue-b.sendingLabs.column.courier', value: (item) => localizedPick({ en: item.courierEn, ar: item.courierAr }, this.i18n.lang()) },
       { key: 'phone', header: 'catalogue-b.sendingLabs.column.phone', mono: true, secondary: true },
@@ -53,7 +56,7 @@ export class SendingLabsPage {
       { name: 'doctorId', kind: 'select', options: async () => (await this.lookups.doctors()).map(toSelectOption) },
     ],
     adapter: {
-      list: (filter, page, signal) => this.api.sendingLabs.list({ ...this.listed.track(filter), page: page.page, pageSize: page.pageSize }, signal),
+      list: (filter, page, signal) => this.api.sendingLabs.list({ ...this.listed.track(filter), ...sortParams(filter.sort), page: page.page, pageSize: page.pageSize }, signal),
       create: (dto) => this.api.sendingLabs.create(dto),
       update: (id, dto) => this.api.sendingLabs.update(id, dto),
       setActive: (id, active) => this.api.sendingLabs.setActive(id, active),

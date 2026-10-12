@@ -95,6 +95,9 @@ export class NotificationTemplatesPage {
   /** Without notifications.manage the dialog only shows a template (UAT R4-02): read-only fields, no token chips, no Save. */
   protected readonly canManage = computed(() => this.access.can(PLATFORM_PERMISSIONS.notificationsManage));
 
+  /** Validation 2026-10-11 C-10: the row action names what the dialog will allow (edit, or only view). */
+  protected readonly rowActionLabel = computed(() => (this.canManage() ? 'platform.templates.edit' : 'platform.templates.viewAction'));
+
   protected readonly permissions = PLATFORM_PERMISSIONS;
   protected readonly channels = TEMPLATE_CHANNELS;
 

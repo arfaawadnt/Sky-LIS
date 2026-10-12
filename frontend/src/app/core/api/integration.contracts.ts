@@ -3,6 +3,8 @@
  * (machine credentials) — hand-written until the OpenAPI generator lands (01 §6.2). Intake LIS-INT-INT-001.
  */
 
+import type { SortRequest } from './paging';
+
 export type { Paged } from './paging';
 
 export interface CreatedResource {
@@ -117,7 +119,8 @@ export interface AnalyserModelItem {
   readonly physicalLink: string | null;
 }
 
-export interface AnalyserListFilter {
+/** `sort`: `code`, `nameEn` or `nameAr` (B-03, server allow-list). */
+export interface AnalyserListFilter extends SortRequest {
   readonly search: string;
   readonly isActive: boolean | null;
   readonly siteAgentId: string | null;

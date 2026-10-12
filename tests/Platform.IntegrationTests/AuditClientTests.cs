@@ -2,9 +2,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Account;
 using Platform.Application.Audit;
+using Platform.Application.Identity;
 using Platform.Application.PlatformAdmin;
 using Platform.Contracts.Audit;
 using Platform.Contracts.Common;
+using Platform.Domain.Identity;
 using Platform.Domain.PlatformAdmin;
 using Platform.IntegrationTests.Support;
 using Platform.SharedKernel.Localization;
@@ -35,6 +37,8 @@ public sealed class AuditClientTests(DatabaseFixture fixture)
             ClientProfile.Create("Audit Lab", "مختبر التدقيق", country, governorate.Id, "Street 1", "01012345678", null, "Manager", "01112223333", null),
             country, governorate, plan, "audit" + suffix[..6], TenantSource.Manual, "en", 14, Now);
         var wallet = Wallet.Open(tenant.Id, country.CurrencyCode, Now.AddMonths(1));
+        var administrator = PlatformUser.Register("audit.admin." + suffix[..8], $"audit.admin.{suffix[..8]}@lab.example", "Audit Lab admin", "$argon2id$v=19$m=65536,t=3,p=1$c2FsdA$aGFzaA", Now);
+        tenant.AttachAdministrator(administrator.Id, administrator.Username);
 
         using (var scope = fixture.AppScope(TenantIds.Platform, Guid.CreateVersion7()))
         {
@@ -43,6 +47,7 @@ public sealed class AuditClientTests(DatabaseFixture fixture)
             scope.ServiceProvider.GetRequiredService<IPlanRepository>().Add(plan);
             scope.ServiceProvider.GetRequiredService<ITenantRepository>().Add(tenant);
             scope.ServiceProvider.GetRequiredService<IWalletRepository>().Add(wallet);
+            scope.ServiceProvider.GetRequiredService<IPlatformUserRepository>().Add(administrator);
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
         }
 
@@ -61,6 +66,14 @@ public sealed class AuditClientTests(DatabaseFixture fixture)
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
         }
 
+        // C-11: SA-04 "reset administrator password" changes the client administrator's user record in the platform's log.
+        using (var scope = fixture.AppScope(TenantIds.Platform, Guid.CreateVersion7()))
+        {
+            var stored = (await scope.ServiceProvider.GetRequiredService<IPlatformUserRepository>().GetForUpdateAsync(administrator.Id, CancellationToken.None))!;
+            stored.ResetPasswordByAdministrator("$argon2id$v=19$m=65536,t=3,p=1$c2FsdDI$aGFzaDI", mustChange: true, Now.AddMinutes(15));
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        }
+
         using var platform = fixture.AppScope(TenantIds.Platform, Guid.CreateVersion7());
         var reader = platform.ServiceProvider.GetRequiredService<IAuditReader>();
         var all = (await reader.ListAsync(new AuditEntryFilter(null, null, null, null, null), PageRequest.Normalized(1, 200), CancellationToken.None)).Items;
@@ -72,6 +85,8 @@ public sealed class AuditClientTests(DatabaseFixture fixture)
         Assert.Contains(aboutClient, item => item.Action == nameof(TenantProvisioned));                   // an event naming it
         Assert.Contains(aboutClient, item => item.EntityType == nameof(Wallet));                          // its wallet
         Assert.Contains(aboutClient, item => item.Action == nameof(WalletToppedUp));
+        Assert.Contains(aboutClient, item => item.Kind == AuditEntryItem.KindFieldChange && item.EntityType == nameof(PlatformUser) && item.Action == "Modified"
+            && item.Changes!.Any(change => change.Field == nameof(PlatformUser.MustChangePassword)));   // C-11: its administrator's password reset
         Assert.All(aboutClient, item => Assert.Equal(("Audit Lab", "مختبر التدقيق"), (item.ClientNameEn, item.ClientNameAr)));
         Assert.All(all.Where(item => item.EntityType is nameof(Plan) or nameof(Country) or nameof(Governorate)), item => Assert.Null(item.ClientTenantId));
 
@@ -84,6 +99,8 @@ public sealed class AuditClientTests(DatabaseFixture fixture)
         Assert.Equal(aboutClient.Count, exported.Count);
         Assert.Contains(exported, item => item.Kind == AuditEntryItem.KindFieldChange && item.EntityType == nameof(Tenant) && item.Action == "Modified" && item.ClientNameEn == "Audit Lab");
         Assert.Contains(filtered.Items, item => item.Kind == AuditEntryItem.KindFieldChange && item.EntityType == nameof(Tenant) && item.Action == "Modified");
+        Assert.Contains(filtered.Items, item => item.Kind == AuditEntryItem.KindFieldChange && item.EntityType == nameof(PlatformUser) && item.Action == "Modified");
+        Assert.Contains(exported, item => item.EntityType == nameof(PlatformUser) && item.ClientNameEn == "Audit Lab");
 
         var clients = await reader.ClientsAsync(CancellationToken.None);
         Assert.Equal(("Audit Lab", "مختبر التدقيق"), clients.Where(client => client.TenantId == tenant.Id).Select(client => (client.NameEn, client.NameAr)).Single());

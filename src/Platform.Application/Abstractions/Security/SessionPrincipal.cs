@@ -42,6 +42,17 @@ public sealed record SessionPrincipal(
 
     public Guid? RoleId { get; init; }
 
+    /// <summary>The Arabic name of the role (<c>RoleName</c> is the English one); validation v0.5.0 B-09.</summary>
+    public string? RoleNameAr { get; init; }
+
+    /// <summary>
+    /// The member's full name in English and in Arabic (membership <c>FullName</c>; validation v0.5.0 R-12), so the shell names
+    /// the user in the language of the page. <c>DisplayName</c> stays the name in the preferred language. Null without a membership.
+    /// </summary>
+    public string? DisplayNameEn { get; init; }
+
+    public string? DisplayNameAr { get; init; }
+
     public bool IsPrimaryAdministrator { get; init; }
 
     /// <summary>The next sign-in must change the password (CP-38); the sign-in flow and the change-password page enforce it.</summary>

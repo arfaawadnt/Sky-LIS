@@ -40,12 +40,22 @@ export class DashboardFacade {
     return (this.branches.hasValue() ? this.branches.value() : []).find((branch) => branch.id === id) ?? null;
   });
 
-  setDate(date: string): void {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      const [year, month, day] = date.split('-').map(Number);
-      const offset = utcOffsetMinutes(new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1, 12));
-      this.query.set({ date, utcOffsetMinutes: offset });
-    }
+  /**
+   * Shows a day and returns the day actually shown: a past day or today as picked; an empty, malformed or future day
+   * returns to today (validation A-10: the server refuses a future day with ACC-030).
+   */
+  setDate(date: string): string {
+    const today = localDay();
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today ? date : today;
+    const [year, month, dayOfMonth] = day.split('-').map(Number);
+    const offset = utcOffsetMinutes(new Date(year ?? 1970, (month ?? 1) - 1, dayOfMonth ?? 1, 12));
+    this.query.set({ date: day, utcOffsetMinutes: offset });
+    return day;
+  }
+
+  /** The latest day the date box offers: the user's today. */
+  maxDate(): string {
+    return localDay();
   }
 
   /** Re-reads the day, the branch names and the activity when the page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01/C-13). A load in flight is left alone. */

@@ -105,6 +105,35 @@ describe('Sign-in and password recovery (CP-03, CP-04 entry)', () => {
       expect(toast).toHaveBeenCalled();
       expect(router.navigate).toHaveBeenCalledWith(['/login'], { queryParams: { username: 'lab.admin' } });
     });
+    it('clears the previous refusal when the user goes back and asks for a new code (C-06)', async () => {
+      type(root, 'input[autocomplete=username]', 'lab.admin');
+      submit();
+      await render();
+      backend.expectOne(AUTH_API.recoveryStart).flush(null, { status: 202, statusText: 'Accepted' });
+      await render();
+      type(root, 'input.otp', '123456');
+      submit();
+      await render();
+      type(root, 'input[formcontrolname=password]', 'a quiet morning walk');
+      type(root, 'input[formcontrolname=confirmation]', 'a quiet morning walk');
+      submit();
+      await render();
+      backend.expectOne(AUTH_API.recoveryComplete).flush({ code: 'AUTH-013', title: 'Rejected', status: 401 }, { status: 401, statusText: 'Unauthorized' });
+      await render();
+      expect(root.querySelector('[role=alert]')).not.toBeNull();
+
+      (root.querySelector('.actions button[type=button]') as HTMLButtonElement).click();   // Back
+      await render();
+      expect(root.querySelector('input.otp')).toBeNull();
+      type(root, 'input[autocomplete=username]', 'other.user');
+      submit();
+      await render();
+      backend.expectOne(AUTH_API.recoveryStart).flush(null, { status: 202, statusText: 'Accepted' });
+      await render();
+      expect(root.querySelector('input.otp')).not.toBeNull();
+      expect(root.querySelector('[role=alert]')).toBeNull();
+      expect((root.querySelector('input.otp') as HTMLInputElement).value).toBe('');
+    });
   });
 
   it('sends a laboratory session without a branch to branch selection after sign-in', async () => {

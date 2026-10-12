@@ -58,6 +58,7 @@ public sealed class RegisterPatientHandler(
     IReferenceNumbers numbers,
     ITenantSettings settings,
     IUserPrivileges privileges,
+    ILaboratoryTimeZone laboratoryZone,
     IUnitOfWork unitOfWork,
     IClock clock) : ICommandHandler<RegisterPatientCommand, CreatedPatient>
 {
@@ -71,10 +72,11 @@ public sealed class RegisterPatientHandler(
         var rules = await PatientShape.ReadRulesAsync(settings, cancellationToken);
         var demographics = PatientShape.Demographics(command.Title, command.FullName, command.NameAr, command.Gender, command.DateOfBirth, command.Age, command.PatientConditionId, command.Mobile, command.NationalId, command.Nationality, command.Email, command.GovernorateId, command.City, command.Address, command.Comments);
         var now = clock.UtcNow;
-        Patient.Check(demographics, rules, now);   // refuse before drawing a number (numbers are never reused)
+        var zone = await laboratoryZone.FindAsync(cancellationToken);   // the laboratory's day, not the UTC one (validation R-11)
+        Patient.Check(demographics, rules, now, zone);   // refuse before drawing a number (numbers are never reused)
 
         var number = await numbers.NextAsync(Patient.NumberKind, Patient.NumberPrefix, now, cancellationToken);
-        var patient = Patient.Register(number, demographics, rules, command.IsVip ?? false, now);
+        var patient = Patient.Register(number, demographics, rules, command.IsVip ?? false, now, zone);
         patients.Add(patient);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -127,6 +129,7 @@ public sealed class UpdatePatientHandler(
     IPatientRepository patients,
     ITenantSettings settings,
     IUserPrivileges privileges,
+    ILaboratoryTimeZone laboratoryZone,
     IUnitOfWork unitOfWork,
     IClock clock) : ICommandHandler<UpdatePatientCommand>
 {
@@ -148,7 +151,7 @@ public sealed class UpdatePatientHandler(
 
         var rules = await PatientShape.ReadRulesAsync(settings, cancellationToken);
         var demographics = PatientShape.Demographics(command.Title, command.FullName, command.NameAr, command.Gender, command.DateOfBirth, command.Age, command.PatientConditionId, command.Mobile, command.NationalId, command.Nationality, command.Email, command.GovernorateId, command.City, command.Address, command.Comments);
-        patient.Update(demographics, rules, command.IsVip, clock.UtcNow);
+        patient.Update(demographics, rules, command.IsVip, clock.UtcNow, await laboratoryZone.FindAsync(cancellationToken));
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }

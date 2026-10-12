@@ -1,10 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 
 import type { AccountLanguage, MyAccountProfile } from '../../../core/api/account.contracts';
 import type { ProblemDetails } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { PortalService } from '../../../core/portal/portal.service';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
@@ -34,6 +36,8 @@ export class ProfilePage {
   protected readonly i18n = inject(I18nService);
   protected readonly facade = inject(ProfileFacade);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
+  private readonly portal = inject(PortalService);
 
   readonly mustChange = input<string | undefined>();
 
@@ -116,6 +120,11 @@ export class ProfilePage {
     this.passwords.reset();
     if (done !== null) {
       this.toast.success(this.i18n.t('account.profile.passwordUpdated'));
+      if (this.mustChange() !== undefined) {
+        // C-07: the tab that made the forced change is released like the other tabs (followProfileChanges): it leaves
+        // ?mustChange=1 for its portal home, through the guards again (the cached profile was dropped by the facade).
+        await this.router.navigateByUrl(this.portal.homePath(), { replaceUrl: true });
+      }
     }
   }
 

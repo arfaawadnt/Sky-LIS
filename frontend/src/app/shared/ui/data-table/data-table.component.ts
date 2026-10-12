@@ -5,14 +5,15 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { EmptyStateComponent } from '../empty-state/empty-state.component';
 import { IconComponent, type IconName } from '../icon/icon.component';
 import { CellTemplateDirective, RowActionsTemplateDirective } from './cell-template.directive';
-import { type RowId, type SelectionMode, type TableColumn, type TableSort, cellValue, compareCells, defaultRowId } from './data-table.types';
+import { type RowId, type SelectionMode, type TableColumn, type TableSort, cellValue, defaultRowId, sortRows } from './data-table.types';
 
 /**
  * `<app-data-table [columns]="columns" [rows]="rows()" [loading]="…" (rowActivate)="open($event)">` with optional
  * `<ng-template appCell="key" let-row>` cells and one `<ng-template appRowActions let-row>`.
  *
  * - Typed columns (`key`, i18n `header`, `width`, `align`, `sortable`, `value`), sticky header, zebra rows.
- * - Sorting is client-side unless `serverSort`; `sortChange` always emits so a facade can sort on the server.
+ * - Sorting is client-side (over the rows given) unless `serverSort`; `sortChange` always emits so a paged list sorts
+ *   on the server before paging (validation v0.5.0 B-03: sorting a server page here would reorder that page only).
  * - Keyboard: the rows are a roving tab stop; Arrow Up/Down move, Home/End jump, Enter activates
  *   (`rowActivate`), Space toggles selection. A click emits `rowClick` and `rowActivate`.
  * - Selection: `selection="single|multi"` with `[(selected)]` holding row ids (`rowId`, default `row.id`).
@@ -61,22 +62,7 @@ export class DataTableComponent<T> {
   protected readonly focusedIndex = signal(-1);
 
   /** The rows as shown: sorted here unless the server did. */
-  protected readonly view = computed<readonly T[]>(() => {
-    const rows = this.rows();
-    const sort = this.sort();
-    if (sort === null || this.serverSort()) {
-      return rows;
-    }
-
-    const column = this.columns().find((candidate) => candidate.key === sort.key);
-    if (!column) {
-      return rows;
-    }
-
-    const direction = sort.direction === 'asc' ? 1 : -1;
-    const lang = this.i18n.lang();
-    return [...rows].sort((a, b) => compareCells(cellValue(column, a), cellValue(column, b), lang) * direction);
-  });
+  protected readonly view = computed<readonly T[]>(() => (this.serverSort() ? this.rows() : sortRows(this.rows(), this.columns(), this.sort(), this.i18n.lang())));
 
   protected readonly columnCount = computed(() => this.columns().length + (this.selection() === 'multi' ? 1 : 0) + (this.actions() ? 1 : 0));
 

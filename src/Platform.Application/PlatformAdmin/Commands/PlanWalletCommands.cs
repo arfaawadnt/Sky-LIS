@@ -24,7 +24,8 @@ public sealed class CreatePlanValidator : AbstractValidator<CreatePlanCommand>
         RuleFor(command => command.Code).NotEmpty().MaximumLength(Plan.MaxCodeLength);
         RuleFor(command => command.NameEn).NotEmpty().MaximumLength(Plan.MaxNameLength);
         RuleFor(command => command.NameAr).NotEmpty().MaximumLength(Plan.MaxNameLength);
-        RuleFor(command => command.MonthlyFee).GreaterThanOrEqualTo(0);
+        RuleFor(command => command.MonthlyFee).GreaterThanOrEqualTo(0).LessThanOrEqualTo(100_000_000m)
+            .Must(fee => decimal.Round(fee, 2) == fee).WithMessage("The monthly fee has at most two decimals.");   // C-05: refused, never rounded
         RuleFor(command => command.CurrencyCode).NotEmpty().Length(3);
         RuleFor(command => command.MaxBranches).InclusiveBetween(1, Plan.MaxLimit);
         RuleFor(command => command.MaxUsers).InclusiveBetween(1, Plan.MaxLimit);
@@ -62,7 +63,8 @@ public sealed class UpdatePlanValidator : AbstractValidator<UpdatePlanCommand>
         RuleFor(command => command.PlanId).NotEmpty();
         RuleFor(command => command.NameEn).NotEmpty().MaximumLength(Plan.MaxNameLength);
         RuleFor(command => command.NameAr).NotEmpty().MaximumLength(Plan.MaxNameLength);
-        RuleFor(command => command.MonthlyFee).GreaterThanOrEqualTo(0);
+        RuleFor(command => command.MonthlyFee).GreaterThanOrEqualTo(0).LessThanOrEqualTo(100_000_000m)
+            .Must(fee => decimal.Round(fee, 2) == fee).WithMessage("The monthly fee has at most two decimals.");   // C-05: refused, never rounded
         RuleFor(command => command.CurrencyCode).NotEmpty().Length(3);
         RuleFor(command => command.MaxBranches).InclusiveBetween(1, Plan.MaxLimit);
         RuleFor(command => command.MaxUsers).InclusiveBetween(1, Plan.MaxLimit);

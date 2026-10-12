@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Organization;
 using Platform.Contracts.Common;
 using Platform.Contracts.Organization;
@@ -10,6 +11,9 @@ namespace Platform.Infrastructure.Persistence.Organization;
 internal static class OrganizationReads
 {
     /// <summary>An <c>ILIKE</c> pattern matching <paramref name="search"/> anywhere, with the wildcards of the input escaped.</summary>
+    /// <summary>The escape character of <see cref="ContainsPattern"/>; passed to every <c>ILike</c> (Npgsql sends <c>ESCAPE ''</c> without it, so an escaped "_" or "%" would never match).</summary>
+    public const string Escape = "\\";
+
     public static string ContainsPattern(string search)
     {
         var escaped = search.Trim().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
@@ -25,6 +29,11 @@ internal static class OrganizationReads
 
 internal sealed class RoleRepository(AppDbContext context) : Repository<Role>(context), IRoleRepository
 {
+    private static readonly SortColumns<Role> Sorts = new SortColumns<Role>(OrganizationSortKeys.Roles)
+        .Column("nameEn", role => role.Name.En)
+        .Column("nameAr", role => role.Name.Ar)
+        .ThenBy(role => role.Id);
+
     public Task<Role?> FindByNameAsync(string nameEn, CancellationToken cancellationToken)
     {
         var trimmed = (nameEn ?? string.Empty).Trim();
@@ -49,11 +58,11 @@ internal sealed class RoleRepository(AppDbContext context) : Repository<Role>(co
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var pattern = OrganizationReads.ContainsPattern(filter.Search);
-            query = query.Where(role => EF.Functions.ILike(role.Name.En, pattern) || EF.Functions.ILike(role.Name.Ar, pattern));
+            query = query.Where(role => EF.Functions.ILike(role.Name.En, pattern, OrganizationReads.Escape) || EF.Functions.ILike(role.Name.Ar, pattern, OrganizationReads.Escape));
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await query.OrderBy(role => role.Name.En).ThenBy(role => role.Id)
+        var items = await Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(role => role.Name.En).ThenBy(role => role.Id))
             .Skip(page.Skip)
             .Take(page.PageSize)
             .Select(role => new RoleListItem(
@@ -96,6 +105,12 @@ internal sealed class RoleRepository(AppDbContext context) : Repository<Role>(co
 
 internal sealed class BranchRepository(AppDbContext context) : Repository<Branch>(context), IBranchRepository
 {
+    private static readonly SortColumns<Branch> Sorts = new SortColumns<Branch>(OrganizationSortKeys.Branches)
+        .Column("code", branch => branch.Code)
+        .Column("nameEn", branch => branch.Name.En)
+        .Column("nameAr", branch => branch.Name.Ar)
+        .ThenBy(branch => branch.Code);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken)
     {
         var cleaned = (code ?? string.Empty).Trim().ToUpperInvariant();
@@ -122,11 +137,11 @@ internal sealed class BranchRepository(AppDbContext context) : Repository<Branch
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var pattern = OrganizationReads.ContainsPattern(filter.Search);
-            query = query.Where(branch => EF.Functions.ILike(branch.Code, pattern) || EF.Functions.ILike(branch.Name.En, pattern) || EF.Functions.ILike(branch.Name.Ar, pattern));
+            query = query.Where(branch => EF.Functions.ILike(branch.Code, pattern, OrganizationReads.Escape) || EF.Functions.ILike(branch.Name.En, pattern, OrganizationReads.Escape) || EF.Functions.ILike(branch.Name.Ar, pattern, OrganizationReads.Escape));
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await query.OrderBy(branch => branch.Code)
+        var items = await Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(branch => branch.Code))
             .Skip(page.Skip)
             .Take(page.PageSize)
             .Select(branch => new BranchListItem(branch.Id, branch.Code, branch.Name.En, branch.Name.Ar, branch.CountryId, branch.GovernorateId, branch.Phone, branch.Email, branch.Currency, branch.IsActive))

@@ -13,8 +13,8 @@ namespace Platform.WebApi.Controllers.Treasury;
 public sealed class TreasuriesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<TreasuryListItem>>> List([FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListTreasuriesQuery(isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<TreasuryListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListTreasuriesQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<CreatedResource>> Create([FromBody] CreateTreasuryRequest request, CancellationToken cancellationToken)

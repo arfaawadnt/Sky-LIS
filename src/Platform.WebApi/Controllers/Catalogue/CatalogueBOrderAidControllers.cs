@@ -16,8 +16,8 @@ namespace Platform.WebApi.Controllers.Catalogue;
 public sealed class PreparationsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<PreparationListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? answerType, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListPreparationsQuery(search, isActive, answerType, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<PreparationListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? answerType, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListPreparationsQuery(search, isActive, answerType, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PreparationListItem>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -66,8 +66,8 @@ public sealed class PreparationsController(ISender sender) : ControllerBase
 public sealed class DiagnosesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<DiagnosisListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListDiagnosesQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<DiagnosisListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListDiagnosesQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<DiagnosisListItem>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -116,8 +116,8 @@ public sealed class DiagnosesController(ISender sender) : ControllerBase
 public sealed class ShortcutSetsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<ShortcutSetListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListShortcutSetsQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<ShortcutSetListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListShortcutSetsQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ShortcutSetListItem>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -166,8 +166,8 @@ public sealed class ShortcutSetsController(ISender sender) : ControllerBase
 public sealed class TestRulesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<TestRuleListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? clinicalGroupId, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListTestRulesQuery(search, isActive, clinicalGroupId, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<TestRuleListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? clinicalGroupId, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListTestRulesQuery(search, isActive, clinicalGroupId, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<TestRuleListItem>> Get(Guid id, CancellationToken cancellationToken) =>

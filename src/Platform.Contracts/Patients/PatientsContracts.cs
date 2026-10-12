@@ -60,6 +60,9 @@ public sealed record MergePatientsRequest(Guid MergedPatientId, string Reason, b
 /// <see cref="DateOfBirthIsEstimated"/>); <see cref="Age"/> is computed for today. <see cref="IsVip"/> is
 /// <see langword="null"/> for users without <c>patients.viewConfidential</c>. <see cref="VisitCount"/> and
 /// <see cref="LastVisitAtUtc"/> come from Registration (CP-11 "visit count, last visit"; UAT A-09).
+/// <see cref="IdentityMasked"/>: a VIP file listed for a user without the See-VIP special right; <see cref="FullName"/> is
+/// then empty and <see cref="NameAr"/>, <see cref="Mobile"/> and <see cref="NationalId"/> are <see langword="null"/>
+/// (validation A-03); clients show a "VIP patient" text instead.
 /// </summary>
 public sealed record PatientListItem(
     Guid Id,
@@ -80,7 +83,8 @@ public sealed record PatientListItem(
     string? MergedIntoNumber,
     DateOnly RegisteredOn,
     int VisitCount,
-    DateTimeOffset? LastVisitAtUtc);
+    DateTimeOffset? LastVisitAtUtc,
+    bool IdentityMasked = false);
 
 public sealed record PatientMergeView(Guid SurvivorId, string SurvivorNumber, DateTimeOffset MergedAtUtc, Guid MergedByUserId, string? MergedByName, string Reason);
 
@@ -119,7 +123,12 @@ public sealed record PatientDetail(
     string? ModifiedByName,
     uint RowVersion);
 
-/// <summary>A similar existing file (BR-01, REG-002). Match: Exact (name and mobile), Mobile (same mobile), Name (similar name).</summary>
+/// <summary>
+/// A similar existing file (BR-01, REG-002). Match: Exact (name and mobile), Mobile (same mobile), Name (similar name).
+/// <see cref="IdentityMasked"/>: a VIP file found for a user without the See-VIP special right (validation v0.5.0 R-06):
+/// it is listed so no duplicate file is created, with the number and the match kept, <see cref="FullName"/> empty and
+/// <see cref="NameAr"/>, <see cref="Mobile"/> and <see cref="NationalId"/> <see langword="null"/>, as in the register.
+/// </summary>
 public sealed record SimilarPatient(
     Guid Id,
     string Number,
@@ -132,10 +141,14 @@ public sealed record SimilarPatient(
     PatientAgeView Age,
     string? Mobile,
     string? NationalId,
-    string Match);
+    string Match,
+    bool IdentityMasked = false);
 
 /// <summary>The candidates (at most 10) and whether the tenant shows the warning (<c>similarNameWarning</c>).</summary>
 public sealed record SimilarPatientsResponse(bool WarningEnabled, IReadOnlyList<SimilarPatient> Candidates);
+
+/// <summary>A patient condition a file may carry, as the patient screens show and offer it (<c>GET /api/v1/patients/conditions</c>, round 2 R2-04).</summary>
+public sealed record PatientConditionOption(Guid Id, string NameEn, string NameAr);
 
 /// <summary>The tenant parameters a patient form honours (CP-57).</summary>
 public sealed record PatientFormSettings(bool MandatoryMobile, bool MandatoryNationalId, bool SimilarNameWarning);

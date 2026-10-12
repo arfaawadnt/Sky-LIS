@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, resource, signal } from '@angular/core';
+import { Injectable, Injector, computed, effect, inject, resource, signal, untracked } from '@angular/core';
 
 import { ProblemError } from '../../../core/api/problem-details';
 import type {
@@ -31,6 +31,7 @@ export type { HistoryTab };
 @Injectable()
 export class ResultsCaseFacade {
   private readonly api = inject(ResultsApi);
+  private readonly injector = inject(Injector);
 
   /** The last query run from the panel; null until the first run. */
   readonly query = signal<ResultVisitQuery | null>(null);
@@ -205,6 +206,31 @@ export class ResultsCaseFacade {
       this.log.reload();
       this.previous.reload();
     }
+  }
+
+  /**
+   * The case once its current load has finished (the re-read a bulk transition starts, or none): validation v0.5.0 A-02,
+   * the page waits for the refreshed delta flags after a refused Verify. `null` when the case could not be read.
+   */
+  whenCaseSettled(): Promise<ResultCaseView | null> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const watcher = effect(
+        () => {
+          if (settled || this.caseView.isLoading()) {
+            return;
+          }
+
+          settled = true;
+          const view = this.current();
+          untracked(() => {
+            queueMicrotask(() => watcher.destroy());
+            resolve(view);
+          });
+        },
+        { injector: this.injector, manualCleanup: true },
+      );
+    });
   }
 
   setDraft(row: ResultRowView, value: string): void {

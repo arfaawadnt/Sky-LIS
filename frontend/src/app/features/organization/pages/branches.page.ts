@@ -6,6 +6,8 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { CanDirective } from '../../../shared/ui/can.directive';
+import { sortParams } from '../../../shared/forms/paging';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { FormValue, MasterDataConfig, MasterDataFilter, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
 import { allPages, csvFileName, downloadCsv, toCsv } from '../data/csv-export';
@@ -50,9 +52,10 @@ export class BranchesPage {
 
   protected readonly config: MasterDataConfig<BranchListItem, CreateBranchRequest> = {
     i18nPrefix: 'organization.branches',
+    sortMode: 'server',
     columns: [
       { key: 'code', header: 'organization.branches.column.code', mono: true, sortable: true, width: '130px' },
-      { key: 'name', header: 'organization.branches.column.name', sortable: true, value: (item) => localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang()) },
+      { key: 'name', header: 'organization.branches.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (item) => localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang()) },
       { key: 'phone', header: 'organization.branches.column.phone', secondary: true },
       { key: 'email', header: 'organization.branches.column.email', secondary: true },
       { key: 'currency', header: 'organization.branches.column.currency', mono: true, width: '100px' },
@@ -69,7 +72,7 @@ export class BranchesPage {
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listBranches({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+        return this.api.listBranches({ ...sortParams(filter.sort), search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
       },
       create: (dto) => this.onField(this.api.createBranch(dto)),
       update: (id, dto) =>
@@ -77,6 +80,8 @@ export class BranchesPage {
       setActive: (id, active) => this.api.setBranchActive(id, active),
     },
     toDto: (value) => toBranchRequest(value),
+    // B-01: ORG-017 judges the pair; correcting either field clears the error so the next save re-checks it.
+    linkedFields: [['countryId', 'governorateId']],
     permissions: { create: ORGANIZATION_PERMISSIONS.create, update: ORGANIZATION_PERMISSIONS.edit, activate: ORGANIZATION_PERMISSIONS.manage },
   };
 

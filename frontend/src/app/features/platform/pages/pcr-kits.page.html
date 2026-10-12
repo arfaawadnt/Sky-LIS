@@ -22,7 +22,7 @@
   }
 
   <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.kits.isLoading()" [emptyTitle]="i18n.t('platform.pcrKits.empty')"
-                  [caption]="i18n.t('platform.pcrKits.title')" (rowActivate)="openEdit($event)">
+                  [caption]="i18n.t('platform.pcrKits.title')" [sort]="facade.sort()" [serverSort]="true" (sortChange)="facade.setSort($event)" (rowActivate)="openEdit($event)">
     <ng-template appCell="status" [appCellOf]="facade.rows()" let-row>
       <app-badge [status]="row.isActive ? 'Active' : 'Inactive'">{{ i18n.t(row.isActive ? 'platform.status.Active' : 'platform.status.Inactive') }}</app-badge>
     </ng-template>

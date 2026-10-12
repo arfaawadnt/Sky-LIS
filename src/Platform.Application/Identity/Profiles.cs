@@ -21,7 +21,10 @@ public static class Profiles
             ScopeNames.Of(scope),
             principal.BranchId,
             principal.BranchIds,
-            principal.MustChangePassword);
+            principal.MustChangePassword,
+            principal.RoleNameAr,
+            principal.DisplayNameEn,
+            principal.DisplayNameAr);
     }
 
     public static SessionResponse ToSession(SessionPrincipal principal)

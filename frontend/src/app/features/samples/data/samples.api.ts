@@ -37,6 +37,8 @@ export class SamplesApi {
       search: filter.search,
       page: filter.page,
       pageSize: filter.pageSize,
+      sort: filter.sort ?? null,
+      direction: filter.direction ?? null,
     });
     return firstValueFrom(this.http.get<Paged<SampleListItem>>(SAMPLES_API.samples, { params }), { defaultValue: emptyPage<SampleListItem>() }).then(abortable(signal));
   }

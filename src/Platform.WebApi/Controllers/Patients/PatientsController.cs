@@ -29,8 +29,8 @@ public sealed class PatientsController(ISender sender) : ControllerBase
         [FromQuery] string? status,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
-        CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListPatientsQuery(q, gender, vip, status, page, pageSize), cancellationToken));
+        [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListPatientsQuery(q, gender, vip, status, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("export")]
     public async Task<IActionResult> Export([FromQuery] string? q, [FromQuery] string? gender, [FromQuery] bool? vip, [FromQuery] string? status, CancellationToken cancellationToken)
@@ -46,6 +46,11 @@ public sealed class PatientsController(ISender sender) : ControllerBase
     [HttpGet("form-settings")]
     public async Task<ActionResult<PatientFormSettings>> FormSettings(CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetPatientFormSettingsQuery(), cancellationToken));
+
+    /// <summary>The active patient conditions, readable with <c>patients.view</c> (round 2 R2-04).</summary>
+    [HttpGet("conditions")]
+    public async Task<ActionResult<IReadOnlyList<PatientConditionOption>>> Conditions(CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListPatientConditionOptionsQuery(), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PatientDetail>> Get(Guid id, CancellationToken cancellationToken) =>

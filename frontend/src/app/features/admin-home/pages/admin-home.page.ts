@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, resource } from '@angular/core';
 
 import { AuthStore } from '../../../core/auth/auth.store';
+import { displayNameFor } from '../../../core/auth/display-name';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
@@ -26,6 +27,8 @@ export class AdminHomePage {
   protected readonly i18n = inject(I18nService);
   protected readonly auth = inject(AuthStore);
   private readonly api = inject(AdminHomeApi);
+  /** The user's name in the language on screen (validation v0.5.0 R-12): from the profile, which carries both names (round 2 R2-03). */
+  protected readonly userName = computed(() => displayNameFor(this.auth.profile(), this.i18n.lang()));
 
   /** Read only with the dashboard's permission; without it the tiles read "—" (the server decides regardless). */
   private readonly counts = resource({

@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Contracts.Common;
 using Platform.Contracts.Organization;
@@ -13,7 +14,7 @@ namespace Platform.Application.Organization.Queries;
 // Registers of branches and roles (intake LIS-INT-ORG-001 §14). Queries carry a policy like commands (D-04) and read projections only.
 
 [RequirePermissionPolicy(PermissionCatalog.Organization, PermissionAction.View)]
-public sealed record ListBranchesQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<BranchListItem>>;
+public sealed record ListBranchesQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<BranchListItem>>;
 
 public sealed class ListBranchesValidator : AbstractValidator<ListBranchesQuery>
 {
@@ -22,13 +23,15 @@ public sealed class ListBranchesValidator : AbstractValidator<ListBranchesQuery>
         RuleFor(query => query.Search).MaximumLength(100);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(OrganizationSortKeys.Branches);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
 public sealed class ListBranchesHandler(IBranchRepository branches) : IQueryHandler<ListBranchesQuery, Paged<BranchListItem>>
 {
     public Task<Paged<BranchListItem>> Handle(ListBranchesQuery query, CancellationToken cancellationToken) =>
-        branches.ListAsync(new BranchFilter(query.Search, query.IsActive), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        branches.ListAsync(new BranchFilter(query.Search, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Organization, PermissionAction.View)]
@@ -71,7 +74,7 @@ public sealed class ListSelectableBranchesHandler(ICurrentUser currentUser, ISes
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Organization, PermissionAction.View)]
-public sealed record ListRolesQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<RoleListItem>>;
+public sealed record ListRolesQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<RoleListItem>>;
 
 public sealed class ListRolesValidator : AbstractValidator<ListRolesQuery>
 {
@@ -80,13 +83,15 @@ public sealed class ListRolesValidator : AbstractValidator<ListRolesQuery>
         RuleFor(query => query.Search).MaximumLength(100);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(OrganizationSortKeys.Roles);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
 public sealed class ListRolesHandler(IRoleRepository roles) : IQueryHandler<ListRolesQuery, Paged<RoleListItem>>
 {
     public Task<Paged<RoleListItem>> Handle(ListRolesQuery query, CancellationToken cancellationToken) =>
-        roles.ListAsync(new RoleFilter(query.Search, query.IsActive), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        roles.ListAsync(new RoleFilter(query.Search, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Organization, PermissionAction.View)]

@@ -30,6 +30,9 @@
     [loading]="facade.list.isLoading()"
     [emptyTitle]="i18n.t('organization.roles.empty')"
     [caption]="i18n.t('organization.roles.title')"
+    [sort]="facade.sort()"
+    [serverSort]="true"
+    (sortChange)="facade.setSort($event)"
     (rowActivate)="open($event)">
     <ng-template appCell="name" [appCellOf]="rows()" let-row>
       <strong>{{ name(row) }}</strong>

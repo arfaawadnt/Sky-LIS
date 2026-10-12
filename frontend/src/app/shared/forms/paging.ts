@@ -1,6 +1,6 @@
 import { HttpParams } from '@angular/common/http';
 
-import { DEFAULT_PAGE_SIZE, type PageRequest } from '../../core/api/paging';
+import { DEFAULT_PAGE_SIZE, type PageRequest, type SortDirection } from '../../core/api/paging';
 
 /** A list filter that carries its page (the shape every facade's `filter` signal takes). */
 export type PagedFilter<F extends object> = F & PageRequest;
@@ -37,4 +37,15 @@ export function toHttpParams(filter: Readonly<Record<string, FilterValue>>): Htt
   }
 
   return new HttpParams({ fromObject });
+}
+
+/** A server sort chosen in a table: the server key of the column and the direction (`null` = the list's own order). */
+export interface ServerSort {
+  readonly key: string;
+  readonly direction: SortDirection;
+}
+
+/** `sortParams({ key: 'nameAr', direction: 'desc' })` → `{ sort: 'nameAr', direction: 'desc' }`; `null` → both `null` (dropped by `toHttpParams`). */
+export function sortParams(sort: ServerSort | null | undefined): { sort: string | null; direction: SortDirection | null } {
+  return sort ? { sort: sort.key, direction: sort.direction } : { sort: null, direction: null };
 }

@@ -100,8 +100,11 @@ public sealed record CreateUserRequest
 
     public Guid? RoleId { get; init; }
 
-    /// <summary>Empty or null = every active branch of the tenant.</summary>
+    /// <summary>Empty or null = every active branch of the tenant (unless <see cref="AllBranches"/> is false).</summary>
     public IReadOnlyList<Guid>? BranchIds { get; init; }
+
+    /// <summary>Validation v0.5.0 B-02: true = every active branch (<see cref="BranchIds"/> empty), false = only <see cref="BranchIds"/> (at least one, else ORG-018), null = the older contract.</summary>
+    public bool? AllBranches { get; init; }
 
     public DateTimeOffset? PasswordExpiresAtUtc { get; init; }
 
@@ -133,8 +136,8 @@ public sealed record ResetUserPasswordRequest
 
 public sealed record AssignUserRoleRequest(Guid RoleId);
 
-/// <summary>Empty = every active branch of the tenant.</summary>
-public sealed record AssignUserBranchesRequest(IReadOnlyList<Guid> BranchIds);
+/// <summary>Empty = every active branch of the tenant; <paramref name="AllBranches"/> false with no branch is refused ORG-018 (validation v0.5.0 B-02).</summary>
+public sealed record AssignUserBranchesRequest(IReadOnlyList<Guid> BranchIds, bool? AllBranches = null);
 
 /// <summary>BR-17 per-user overrides; <see cref="SpecialRights"/> null = the role's special rights apply.</summary>
 public sealed record SetUserOverridesRequest(IReadOnlyList<string> AddedPermissionKeys, IReadOnlyList<string> RemovedPermissionKeys, SpecialRightsDto? SpecialRights);

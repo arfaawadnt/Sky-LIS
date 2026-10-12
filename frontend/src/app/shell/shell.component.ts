@@ -4,6 +4,7 @@ import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 
 import { AuthStore } from '../core/auth/auth.store';
+import { roleNameFor } from '../core/auth/role-name';
 import { I18nService } from '../core/i18n/i18n.service';
 import { PermissionsService } from '../core/permissions/permissions.service';
 import { PortalService } from '../core/portal/portal.service';
@@ -73,7 +74,8 @@ export class ShellComponent {
 
   protected readonly portalLabel = computed(() => this.i18n.t(this.portal.portal() === 'admin' ? 'shell.portal.admin' : 'shell.portal.client'));
 
-  protected readonly roleName = computed(() => this.auth.profile()?.roleName ?? null);
+  /** B-09: the role in the language of the page. */
+  protected readonly roleName = computed(() => roleNameFor(this.auth.profile(), this.i18n.lang()));
 
   constructor() {
     followProfileChanges(); // R2-01: a password changed in another tab ends this tab's forced change

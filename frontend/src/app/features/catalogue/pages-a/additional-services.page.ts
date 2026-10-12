@@ -4,6 +4,8 @@ import { CATALOGUE_A_PERMISSIONS, type CreateServiceRequest, type ServiceGeneral
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
 import { CanDirective } from '../../../shared/ui/can.directive';
+import { sortParams } from '../../../shared/forms/paging';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
 import type { FormValue, MasterDataConfig, MasterDataFilter } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueAApi } from '../data-a/catalogue-a.api';
@@ -47,10 +49,11 @@ export class AdditionalServicesPage {
 
   protected readonly config: MasterDataConfig<ServiceListItem, AdditionalServiceForm> = {
     i18nPrefix: 'catalogue-a.additional',
+    sortMode: 'server',
     columns: [
       { key: 'code', header: 'catalogue-a.additional.column.code', mono: true, sortable: true, width: '120px' },
       { key: 'shortName', header: 'catalogue-a.additional.column.shortName', width: '140px' },
-      { key: 'name', header: 'catalogue-a.additional.column.name', sortable: true, value: (row) => localizedPick({ en: row.nameEn, ar: row.nameAr }, this.i18n.lang()) },
+      { key: 'name', header: 'catalogue-a.additional.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (row) => localizedPick({ en: row.nameEn, ar: row.nameAr }, this.i18n.lang()) },
       { key: 'shortcutNo', header: 'catalogue-a.additional.column.shortcutNo', align: 'end', mono: true, width: '110px' },
       { key: 'isOrderable', header: 'catalogue-a.additional.column.isOrderable', width: '110px', secondary: true },
     ],
@@ -65,7 +68,7 @@ export class AdditionalServicesPage {
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listServices({ search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize, type: 'Additional', clinicalGroupId: null }, signal);
+        return this.api.listServices({ ...sortParams(filter.sort), search: filter.search, isActive: filter.active, page: page.page, pageSize: page.pageSize, type: 'Additional', clinicalGroupId: null }, signal);
       },
       create: (form) => this.api.createService(createRequest(form)),
       update: async (id, form) => {

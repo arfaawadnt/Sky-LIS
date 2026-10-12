@@ -296,12 +296,20 @@ export class UserEditorPage {
         return;
       }
 
+      // B-02: "not every branch" with no branch ticked would be stored as the empty list, i.e. every branch; refused as
+      // the editor's branches tab refuses it (the server refuses it too, ORG-018).
+      if (!this.allBranches() && this.branchChoice().size === 0) {
+        this.toast.warn(this.i18n.t('organization.users.pickBranch'));
+        return;
+      }
+
       const created = await this.facade.create.execute({
         ...common,
         username: value.username.trim().toLowerCase(),
         password: value.password,
         roleId: value.roleId === '' ? null : value.roleId,
         branchIds: this.allBranches() ? [] : [...this.branchChoice()],
+        allBranches: this.allBranches(),
         employeeCode: value.employeeCode.trim() === '' ? null : value.employeeCode.trim(),
         preferredLanguage: value.language,
       });
@@ -385,7 +393,7 @@ export class UserEditorPage {
       this.toast.warn(this.i18n.t('organization.users.roleNotAssigned'));
     }
 
-    if ((await this.facade.assignBranches.execute(branchIds)) !== null) {
+    if ((await this.facade.assignBranches.execute({ branchIds, allBranches: this.allBranches() })) !== null) {
       this.toast.success(this.i18n.t('organization.users.branchesSaved'));
     }
   }

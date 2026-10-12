@@ -31,6 +31,18 @@ internal sealed class PlatformUserRepository(AppDbContext context) : Repository<
         return normalised is null ? Task.FromResult<PlatformUser?>(null) : Set.FirstOrDefaultAsync(user => user.Mobile == normalised, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<PlatformUser>> ListByMobileSpellingsAsync(IReadOnlyCollection<string> spellings, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(spellings);
+        if (spellings.Count == 0)
+        {
+            return [];
+        }
+
+        var values = spellings.Distinct(StringComparer.Ordinal).ToList();
+        return await Set.Where(user => user.Mobile != null && values.Contains(user.Mobile)).Take(10).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private static string Normalise(string value) => (value ?? string.Empty).Trim().ToLowerInvariant();
 }
 
@@ -47,4 +59,7 @@ internal sealed class RefreshSessionRepository(AppDbContext context) : Repositor
         await Set.Where(session => session.PlatformUserId == platformUserId && !session.IsRevoked && session.RotatedAtUtc == null)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+    public Task<RefreshSession?> FindCommittedAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        Set.AsNoTracking().FirstOrDefaultAsync(session => session.Id == sessionId, cancellationToken);
 }

@@ -48,10 +48,17 @@
     [emptyTitle]="i18n.t('patients.empty')"
     [emptyMessage]="i18n.t('patients.emptyHint')"
     [caption]="i18n.t('patients.title')"
+    [sort]="facade.sort()"
+    [serverSort]="true"
+    (sortChange)="facade.setSort($event)"
     (rowActivate)="open($event)"
   >
     <ng-template appCell="name" [appCellOf]="rows()" let-row>
-      <span class="name">{{ row.fullName }}</span>
+      @if (row.identityMasked) {
+        <span class="name muted">{{ i18n.t('patients.vipMasked') }}</span>
+      } @else {
+        <span class="name">{{ row.fullName }}</span>
+      }
       @if (row.nameAr) {
         <span class="name-ar muted" dir="rtl" lang="ar">{{ row.nameAr }}</span>
       }

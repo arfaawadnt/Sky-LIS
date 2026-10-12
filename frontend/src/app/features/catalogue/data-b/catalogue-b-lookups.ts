@@ -3,6 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { CATALOGUE_B_LOOKUP_API, type LinkedServiceView } from '../../../core/api/catalogue-b.contracts';
+import { ORGANIZATION_API, ORGANIZATION_PERMISSIONS, type SelectableBranchesResponse } from '../../../core/api/organization.contracts';
+import { PRICING_PERMISSIONS } from '../../../core/api/pricing.contracts';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import type { SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueBApi } from './catalogue-b.api';
 
@@ -90,6 +93,7 @@ export function toSelectOption(option: CatalogueBOption): SelectOption {
 export class CatalogueBLookups {
   private readonly http = inject(HttpClient);
   private readonly api = inject(CatalogueBApi);
+  private readonly access = inject(PermissionsService);
 
   /** Active services matching the text (Catalogue A's picker endpoint, at most 50). */
   async searchServices(search: string): Promise<readonly CatalogueBOption[]> {
@@ -102,13 +106,28 @@ export class CatalogueBLookups {
     return optionsOf(await firstValueFrom(this.http.get<unknown>(CATALOGUE_B_LOOKUP_API.clinicalGroups, { params })));
   }
 
+  /**
+   * The branches of the laboratory: the branch register for a user who may read it (`organization.view`), else the
+   * branches the session may select (CP-04, open to every signed-in user). A reader of the catalogue without the
+   * organization right (reception) no longer meets a 403 on every visit of Doctors (validation v0.5.0 R-08).
+   */
   async branches(): Promise<readonly CatalogueBOption[]> {
+    if (!this.access.can(ORGANIZATION_PERMISSIONS.view)) {
+      const selectable = await firstValueFrom(this.http.get<SelectableBranchesResponse>(ORGANIZATION_API.selectableBranches));
+      return (selectable?.branches ?? []).map((branch) => ({ id: branch.id, code: branch.code, nameEn: branch.nameEn, nameAr: branch.nameAr || branch.nameEn }));
+    }
+
     const params = new HttpParams({ fromObject: { pageSize: 200 } });
     return optionsOf(await firstValueFrom(this.http.get<unknown>(CATALOGUE_B_LOOKUP_API.branches, { params })));
   }
 
-  /** Active contract tiers of active payers (Pricing's tier options). */
+  /** Active contract tiers of active payers (Pricing's tier options); none without `pricing.view`. */
   async tiers(): Promise<readonly CatalogueBTierOption[]> {
+    // the tier options are Pricing's (`pricing.view`); a catalogue reader without it gets none instead of a 403 (R-08)
+    if (!this.access.can(PRICING_PERMISSIONS.view)) {
+      return [];
+    }
+
     const params = new HttpParams({ fromObject: { activeOnly: true } });
     const body = await firstValueFrom(this.http.get<unknown>(CATALOGUE_B_LOOKUP_API.tierOptions, { params }));
     return recordsOf(body)

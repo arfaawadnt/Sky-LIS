@@ -114,6 +114,18 @@
       ],
       "port": 5110,
       "url": "http://127.0.0.1:5110"
+    },
+    {
+      "name": "validation-ui",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "tests/validation/serve-ui.mjs",
+        ".local/validation/ui",
+        "4300",
+        "http://127.0.0.1:5102"
+      ],
+      "port": 4300,
+      "url": "http://127.0.0.1:4300"
     }
   ]
 }

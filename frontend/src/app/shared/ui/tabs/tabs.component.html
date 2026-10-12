@@ -16,7 +16,7 @@
     >
       {{ tab.label }}
       @if (tab.badge !== null && tab.badge !== undefined) {
-        <span class="count">{{ tab.badge }}</span>
+        <span class="count">{{ badgeText(tab.badge) }}</span>
       }
     </button>
   }

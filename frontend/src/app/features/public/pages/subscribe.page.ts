@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -52,10 +52,10 @@ export class SubscribePage {
     countryId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     governorateId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     address: new FormControl('', { nonNullable: true, validators: [requiredText, Validators.maxLength(300)] }),
-    mobile: new FormControl('', { nonNullable: true, validators: [requiredText, countryMobileValidator(() => this.facade.country())] }),
+    mobile: new FormControl('', { nonNullable: true, validators: [requiredText, countryMobileValidator(() => this.facade.country(), (country) => this.mobileMessage('public.wizard.validation.mobileLength', country))] }),
     licenceNo: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64)] }),
     managerName: new FormControl('', { nonNullable: true, validators: [requiredText, Validators.maxLength(200)] }),
-    managerMobile: new FormControl('', { nonNullable: true, validators: [requiredText, countryMobileValidator(() => this.facade.country())] }),
+    managerMobile: new FormControl('', { nonNullable: true, validators: [requiredText, countryMobileValidator(() => this.facade.country(), (country) => this.mobileMessage('public.wizard.validation.managerMobileLength', country))] }),
     email: new FormControl('', { nonNullable: true, validators: [Validators.email, Validators.maxLength(254)] }),
   });
 
@@ -89,6 +89,27 @@ export class SubscribePage {
 
   constructor() {
     void this.i18n.load('public');
+    // The digit-count messages are rendered text: re-validate the two mobiles when the language changes, so a shown
+    // message follows the switch like every other message on the page (re-test R-02, 2026-10-12). Reading the two keys
+    // makes the effect run again once the new language's dictionary has arrived; the status change is emitted (round 2
+    // RA-02), because the form field redraws its message from the control's events and `emitEvent: false` left it stale.
+    effect(() => {
+      this.i18n.lang();
+      this.i18n.t('public.wizard.validation.mobileLength');
+      this.i18n.t('public.wizard.validation.managerMobileLength');
+      untracked(() => {
+        for (const control of [this.details.controls.mobile, this.details.controls.managerMobile]) {
+          if (control.errors !== null) {
+            control.updateValueAndValidity();
+          }
+        }
+      });
+    });
+  }
+
+  /** C-08: the same digit-count message as the Add client form of the Super Admin portal. */
+  private mobileMessage(key: string, country: { readonly mobileLength: number; readonly dialCode: string }): string {
+    return this.i18n.tf(key, { length: country.mobileLength, dial: country.dialCode });
   }
 
   protected name(item: { readonly nameEn: string; readonly nameAr: string }): string {

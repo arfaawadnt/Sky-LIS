@@ -292,7 +292,7 @@ function exportParams(filter: CatalogueExportFilter): Record<string, string | bo
 }
 
 function listParams(filter: CatalogueListFilter): Record<string, string | number | boolean | null> {
-  return { search: filter.search, isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize };
+  return { search: filter.search, isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize, sort: filter.sort ?? null, direction: filter.direction ?? null };
 }
 
 /** Resources pass an abort signal; a late result for an aborted load is dropped. */

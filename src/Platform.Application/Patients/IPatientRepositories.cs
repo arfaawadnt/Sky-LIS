@@ -5,8 +5,13 @@ using Platform.Domain.Patients;
 
 namespace Platform.Application.Patients;
 
-/// <summary>What the register filters on; <see cref="Terms"/> is the parsed search box (<see cref="PatientSearchTerms.Parse"/>).</summary>
-public sealed record PatientSearchFilter(PatientSearchTerms? Terms, PatientGender? Gender, bool? IsVip, PatientStatus? Status);
+/// <summary>
+/// What the register filters on; <see cref="Terms"/> is the parsed search box (<see cref="PatientSearchTerms.Parse"/>).
+/// <see cref="IncludeVip"/> false (no See-VIP right): VIP files match the search box only by their full patient number or
+/// full national id (validation A-03). <see cref="Sort"/>: the register order chosen in the table, applied before paging
+/// (validation v0.5.0 B-03; keys in <see cref="PatientSortKeys.Patients"/>); none = newest first.
+/// </summary>
+public sealed record PatientSearchFilter(PatientSearchTerms? Terms, PatientGender? Gender, bool? IsVip, PatientStatus? Status, bool IncludeVip = true, ListSort Sort = default);
 
 /// <summary>
 /// One flat projection of a patient file: every register, detail, export, similar candidate and lookup is built

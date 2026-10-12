@@ -1,5 +1,6 @@
 import type { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 
+import { ProblemCodes, ProblemError } from '../../../core/api/problem-details';
 import { SERVER_ERROR_KEY } from '../../../shared/forms/problem-to-form-errors';
 
 /** The password rule of the platform (decision 2026-10-09, 02 §6.1): 8–128 characters, no composition rules, not containing the username. */
@@ -118,6 +119,21 @@ export function countryMobileValidator(countryKey: string, countryOf: (id: strin
 
     return normaliseCountryMobile(value, country) === null ? { [SERVER_ERROR_KEY]: message(country) } : null;
   };
+}
+
+/** A country's dial code as the server accepts it (GEO-002, `Country` on the server): '+' and one to four digits, not starting with 0; spaces ignored. */
+export const DIAL_CODE_PATTERN = /^\+[1-9]\d{0,3}$/;
+
+export function isDialCodeValid(value: string): boolean {
+  return DIAL_CODE_PATTERN.test(value.trim().replace(/ /g, ''));
+}
+
+/**
+ * A `VALIDATION-400` problem naming one field: thrown from a master-data adapter, the page shows `message` under that control
+ * instead of at the top of the dialog (validation 2026-10-11 C-09).
+ */
+export function fieldProblem(field: string, message: string): ProblemError {
+  return new ProblemError({ type: 'about:blank', title: message, status: 400, code: ProblemCodes.validationFailed, traceId: null, correlationId: null, errors: { [field]: [message] } }, 400);
 }
 
 /** Validation 2026-10-11 C-19: a money amount has at most two decimals (WAL-001 on the server); the value is never rounded. */

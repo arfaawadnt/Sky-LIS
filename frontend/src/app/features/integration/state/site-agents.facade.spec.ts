@@ -31,6 +31,15 @@ describe('SiteAgentsFacade (CP-61)', () => {
     await runEffects();
   }
 
+  it('B-03: sorts the agents on the server by name', async () => {
+    await initial();
+    facade.setSort({ key: 'name', direction: 'desc' });
+    await runEffects();
+    const sorted = backend.expectOne((request) => request.url === INTEGRATION_API.siteAgents);
+    expect([sorted.request.params.get('sort'), sorted.request.params.get('direction'), sorted.request.params.get('page')]).toEqual(['name', 'desc', '1']);
+    sorted.flush(page([]));
+  });
+
   it('creates an agent and hands back the secret shown once', async () => {
     await initial();
     const secret = { agentId: 'ag-2', credentialId: 'mc-2', clientId: 'lis-ff', clientSecret: 's3cr3t', expiresAtUtc: '2027-10-10T00:00:00Z' };

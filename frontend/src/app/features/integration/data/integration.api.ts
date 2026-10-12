@@ -38,7 +38,7 @@ import {
   type UpdateSiteAgentRequest,
 } from '../../../core/api/integration.contracts';
 import { emptyPage } from '../../../core/api/paging';
-import { toHttpParams } from '../../../shared/forms/paging';
+import { type ServerSort, sortParams, toHttpParams } from '../../../shared/forms/paging';
 
 /** Typed calls of the Integration module; URLs are built with `HttpParams` and encoded ids, never by hand (pitfall P-60). */
 @Injectable({ providedIn: 'root' })
@@ -48,7 +48,7 @@ export class IntegrationApi {
   // ---- analysers (CP-58)
 
   listAnalysers(filter: AnalyserListFilter, signal?: AbortSignal): Promise<Paged<AnalyserListItem>> {
-    const params = toHttpParams({ search: filter.search, isActive: filter.isActive, siteAgentId: filter.siteAgentId, page: filter.page, pageSize: filter.pageSize });
+    const params = toHttpParams({ search: filter.search, isActive: filter.isActive, siteAgentId: filter.siteAgentId, page: filter.page, pageSize: filter.pageSize, sort: filter.sort ?? null, direction: filter.direction ?? null });
     return this.get<Paged<AnalyserListItem>>(INTEGRATION_API.analysers, params, signal, emptyPage<AnalyserListItem>());
   }
 
@@ -135,8 +135,9 @@ export class IntegrationApi {
 
   // ---- site agents (CP-61)
 
-  listAgents(search: string, isActive: boolean | null, page: number, pageSize: number, signal?: AbortSignal): Promise<Paged<SiteAgentListItem>> {
-    return this.get<Paged<SiteAgentListItem>>(INTEGRATION_API.siteAgents, toHttpParams({ search, isActive, page, pageSize }), signal, emptyPage<SiteAgentListItem>());
+  /** `sort`: the server order of the register (B-03, `name`); null = by name. */
+  listAgents(search: string, isActive: boolean | null, page: number, pageSize: number, signal?: AbortSignal, sort: ServerSort | null = null): Promise<Paged<SiteAgentListItem>> {
+    return this.get<Paged<SiteAgentListItem>>(INTEGRATION_API.siteAgents, toHttpParams({ search, isActive, page, pageSize, ...sortParams(sort) }), signal, emptyPage<SiteAgentListItem>());
   }
 
   getAgent(id: string): Promise<SiteAgentDetail> {
@@ -179,8 +180,9 @@ export class IntegrationApi {
 
   // ---- PCR kits (CP-62)
 
-  listKits(search: string, isActive: boolean | null, page: number, pageSize: number, signal?: AbortSignal): Promise<Paged<PcrKitListItem>> {
-    return this.get<Paged<PcrKitListItem>>(INTEGRATION_API.pcrKits, toHttpParams({ search, isActive, page, pageSize }), signal, emptyPage<PcrKitListItem>());
+  /** `sort`: the server order of the register (B-03, `name`); null = by name. */
+  listKits(search: string, isActive: boolean | null, page: number, pageSize: number, signal?: AbortSignal, sort: ServerSort | null = null): Promise<Paged<PcrKitListItem>> {
+    return this.get<Paged<PcrKitListItem>>(INTEGRATION_API.pcrKits, toHttpParams({ search, isActive, page, pageSize, ...sortParams(sort) }), signal, emptyPage<PcrKitListItem>());
   }
 
   getKit(id: string): Promise<PcrKitDetail> {

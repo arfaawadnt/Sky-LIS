@@ -101,7 +101,7 @@ internal sealed class AgentLogStore(AppDbContext context) : IAgentLogStore
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var pattern = SearchPattern.Contains(filter.Search);
-            query = query.Where(row => EF.Functions.ILike(row.Message, pattern) || (row.SampleNumber != null && EF.Functions.ILike(row.SampleNumber, pattern)) || (row.AnalyserCode != null && EF.Functions.ILike(row.AnalyserCode, pattern)));
+            query = query.Where(row => EF.Functions.ILike(row.Message, pattern, "\\") || (row.SampleNumber != null && EF.Functions.ILike(row.SampleNumber, pattern, "\\")) || (row.AnalyserCode != null && EF.Functions.ILike(row.AnalyserCode, pattern, "\\")));
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
@@ -148,7 +148,7 @@ internal sealed class ResultIntakeLog(AppDbContext context) : IResultIntakeLog
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var pattern = SearchPattern.Contains(filter.Search);
-            query = query.Where(row => EF.Functions.ILike(row.SampleNumber, pattern) || EF.Functions.ILike(row.AnalyserTestCode, pattern) || EF.Functions.ILike(row.AnalyserCode, pattern));
+            query = query.Where(row => EF.Functions.ILike(row.SampleNumber, pattern, "\\") || EF.Functions.ILike(row.AnalyserTestCode, pattern, "\\") || EF.Functions.ILike(row.AnalyserCode, pattern, "\\"));
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);

@@ -18,8 +18,10 @@ import type {
   UpdateShortcutSetRequest,
   ValidateTestRuleRequest,
 } from '../../../core/api/catalogue-b.contracts';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { mutation } from '../../../core/state/mutation';
-import type { FilterValue } from '../../../shared/forms/paging';
+import { type FilterValue, sortParams } from '../../../shared/forms/paging';
+import { type SortKeyMap, type TableSort, localizedSortKey, serverSortOf } from '../../../shared/ui/data-table/data-table.types';
 import { CatalogueBApi, type CatalogueBQuery, type CatalogueBResource } from '../data-b/catalogue-b.api';
 
 /** The register filter of a hand-written Catalogue B page: search, active flag (`null` = both), page, list-specific extras. */
@@ -49,13 +51,23 @@ export function toQuery(state: CatalogueBListState, paged = true): CatalogueBQue
  */
 @Injectable()
 export abstract class CatalogueBListFacade<TItem, TCreate, TUpdate> {
+  private readonly i18n = inject(I18nService);
+
   protected abstract readonly endpoint: CatalogueBResource<TItem, TCreate, TUpdate>;
+
+  /** The server keys of the list's sortable columns (validation v0.5.0 B-03); a column absent here keeps the list's own order. */
+  protected abstract readonly sortKeys: SortKeyMap;
 
   readonly filter = signal<CatalogueBListState>(INITIAL_CATALOGUE_B_STATE);
 
+  /** The column order chosen in the table header; the server sorts the whole list before paging. */
+  readonly sort = signal<TableSort | null>(null);
+
+  private readonly query = computed(() => ({ ...toQuery(this.filter()), ...sortParams(serverSortOf(this.sort(), this.sortKeys, () => this.i18n.lang())) }));
+
   readonly list = resource({
-    params: () => this.filter(),
-    loader: ({ params, abortSignal }) => this.endpoint.list(toQuery(params), abortSignal),
+    params: () => this.query(),
+    loader: ({ params, abortSignal }) => this.endpoint.list(params, abortSignal),
   });
 
   readonly rows = computed<readonly TItem[]>(() => (this.list.hasValue() ? this.list.value().items : []));
@@ -90,26 +102,36 @@ export abstract class CatalogueBListFacade<TItem, TCreate, TUpdate> {
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
   }
+
+  /** A header click: the new order starts at page 1. */
+  setSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.filter.update((current) => ({ ...current, page: 1 }));
+  }
 }
 
 @Injectable()
 export class PreparationsFacade extends CatalogueBListFacade<PreparationListItem, CreatePreparationRequest, UpdatePreparationRequest> {
   protected readonly endpoint = inject(CatalogueBApi).preparations;
+  protected readonly sortKeys: SortKeyMap = { code: 'code', question: localizedSortKey('question') };
 }
 
 @Injectable()
 export class DoctorsFacade extends CatalogueBListFacade<DoctorListItem, CreateDoctorRequest, UpdateDoctorRequest> {
   protected readonly endpoint = inject(CatalogueBApi).doctors;
+  protected readonly sortKeys: SortKeyMap = { code: 'code', name: localizedSortKey('name'), specialty: 'specialty' };
 }
 
 @Injectable()
 export class DiagnosesFacade extends CatalogueBListFacade<DiagnosisListItem, CreateDiagnosisRequest, UpdateDiagnosisRequest> {
   protected readonly endpoint = inject(CatalogueBApi).diagnoses;
+  protected readonly sortKeys: SortKeyMap = { icdCode: 'icdCode', name: localizedSortKey('name') };
 }
 
 @Injectable()
 export class ShortcutSetsFacade extends CatalogueBListFacade<ShortcutSetListItem, CreateShortcutSetRequest, UpdateShortcutSetRequest> {
   protected readonly endpoint = inject(CatalogueBApi).shortcutSets;
+  protected readonly sortKeys: SortKeyMap = { code: 'code', name: localizedSortKey('name') };
 }
 
 @Injectable()
@@ -117,6 +139,7 @@ export class TestRulesFacade extends CatalogueBListFacade<TestRuleListItem, Test
   private readonly api = inject(CatalogueBApi);
 
   protected readonly endpoint = this.api.testRules;
+  protected readonly sortKeys: SortKeyMap = { name: localizedSortKey('name') };
 
   /** "Check rule" (CP-52 validate): errors and warnings without saving. */
   readonly validate = mutation((request: ValidateTestRuleRequest) => this.api.validateTestRule(request));

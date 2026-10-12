@@ -150,16 +150,27 @@ public sealed class Patient : AggregateRoot, ITenantScoped
 
     public bool DateOfBirthIsEstimated => DateOfBirth is null;
 
+    /// <summary>
+    /// The laboratory's calendar day at <paramref name="nowUtc"/>: the date in <paramref name="zone"/> (the time zone of the
+    /// laboratory's country), the UTC date when none is known. The registration day and the day an age was stated are
+    /// local days (validation v0.5.0 R-11: a file created at 01:57 in Cairo on 12 Oct got the age date 11 Oct).
+    /// </summary>
+    public static DateOnly LocalDate(DateTimeOffset nowUtc, TimeZoneInfo? zone) =>
+        DateOnly.FromDateTime(zone is null ? nowUtc.UtcDateTime : TimeZoneInfo.ConvertTime(nowUtc, zone).DateTime);
+
     /// <summary>Runs the field rules of T1/T2 without creating anything, so a handler refuses before it draws a number.</summary>
-    public static void Check(PatientDemographics demographics, PatientFieldRules rules, DateTimeOffset nowUtc)
+    public static void Check(PatientDemographics demographics, PatientFieldRules rules, DateTimeOffset nowUtc, TimeZoneInfo? zone = null)
     {
         ArgumentNullException.ThrowIfNull(demographics);
         ArgumentNullException.ThrowIfNull(rules);
-        _ = Clean(demographics, rules, DateOnly.FromDateTime(nowUtc.UtcDateTime));
+        _ = Clean(demographics, rules, LocalDate(nowUtc, zone));
     }
 
-    /// <summary>T1 Register (<c>patients.create</c>). The handler draws the number, reads the field rules from the tenant settings and decides who may set the VIP flag.</summary>
-    public static Patient Register(string number, PatientDemographics demographics, PatientFieldRules rules, bool isVip, DateTimeOffset nowUtc)
+    /// <summary>
+    /// T1 Register (<c>patients.create</c>). The handler draws the number, reads the field rules from the tenant settings and
+    /// decides who may set the VIP flag. <paramref name="zone"/> is the laboratory's time zone (see <see cref="LocalDate"/>).
+    /// </summary>
+    public static Patient Register(string number, PatientDemographics demographics, PatientFieldRules rules, bool isVip, DateTimeOffset nowUtc, TimeZoneInfo? zone = null)
     {
         ArgumentNullException.ThrowIfNull(demographics);
         ArgumentNullException.ThrowIfNull(rules);
@@ -167,7 +178,7 @@ public sealed class Patient : AggregateRoot, ITenantScoped
         var cleanedNumber = number.Trim();
         ArgumentOutOfRangeException.ThrowIfGreaterThan(cleanedNumber.Length, MaxNumberLength, nameof(number));
 
-        var today = DateOnly.FromDateTime(nowUtc.UtcDateTime);
+        var today = LocalDate(nowUtc, zone);
         var patient = new Patient(Guid.CreateVersion7(), cleanedNumber, today);
         patient.Apply(Clean(demographics, rules, today));
         patient.IsVip = isVip;
@@ -178,15 +189,16 @@ public sealed class Patient : AggregateRoot, ITenantScoped
     /// <summary>
     /// T2 Update (<c>patients.edit</c>): Active only (PAT-020); the same field rules as T1; <paramref name="isVip"/>
     /// <see langword="null"/> keeps the flag. Raises <see cref="PatientUpdated"/> only when something changed. A stated
-    /// age equal to the age computed today keeps the original statement (no artificial change).
+    /// age equal to the age computed today keeps the original statement (no artificial change). "Today" is the laboratory's
+    /// day in <paramref name="zone"/> (see <see cref="LocalDate"/>).
     /// </summary>
-    public void Update(PatientDemographics demographics, PatientFieldRules rules, bool? isVip, DateTimeOffset nowUtc)
+    public void Update(PatientDemographics demographics, PatientFieldRules rules, bool? isVip, DateTimeOffset nowUtc, TimeZoneInfo? zone = null)
     {
         ArgumentNullException.ThrowIfNull(demographics);
         ArgumentNullException.ThrowIfNull(rules);
         RequireActive("update");
 
-        var today = DateOnly.FromDateTime(nowUtc.UtcDateTime);
+        var today = LocalDate(nowUtc, zone);
         var before = Current();
         var cleaned = Clean(demographics, rules, today);
         if (cleaned.DateOfBirth is null && DateOfBirth is null && cleaned.StatedAge is { } stated && stated == AgeOn(today))

@@ -17,6 +17,7 @@ import type { FormValue, MasterDataConfig, MasterDataFilter } from '../../../sha
 import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { fileStamp } from '../ui/format';
+import { sortParams } from '../../../shared/forms/paging';
 
 /** SA-15 Analyser models of the integration library: vendor, model, discipline, protocol, physical link, modes, driver. */
 @Component({
@@ -39,6 +40,8 @@ export class AnalyserModelsPage {
 
   protected readonly config: MasterDataConfig<AnalyserModelListItem, AnalyserModelRequest> = {
     i18nPrefix: 'platform.analyserModels',
+    // B-03: the server sorts the whole library before paging (PlatformAdminSortKeys.AnalyserModels)
+    sortMode: 'server',
     columns: [
       { key: 'vendor', header: 'platform.analyserModels.column.vendor', sortable: true },
       { key: 'model', header: 'platform.analyserModels.column.model', sortable: true },
@@ -60,7 +63,7 @@ export class AnalyserModelsPage {
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listAnalyserModels({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+        return this.api.listAnalyserModels({ ...sortParams(filter.sort), search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
       },
       create: (dto) => this.api.saveAnalyserModel(null, dto),
       update: (id, dto) => this.api.saveAnalyserModel(id, dto),

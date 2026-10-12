@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Identity.MachineCredentials;
 using Platform.Contracts.Common;
@@ -14,7 +15,7 @@ namespace Platform.Application.Integration.Queries;
 // Site agents (CP-61): the register with derived status and heartbeat age, the detail, the agent log and the result intake log.
 
 [RequirePermissionPolicy(PermissionCatalog.Integration, PermissionAction.View)]
-public sealed record ListSiteAgentsQuery(string? Search, Guid? BranchId, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<SiteAgentListItem>>;
+public sealed record ListSiteAgentsQuery(string? Search, Guid? BranchId, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<SiteAgentListItem>>;
 
 [RequirePermissionPolicy(PermissionCatalog.Integration, PermissionAction.View)]
 public sealed record GetSiteAgentQuery(Guid AgentId) : IQuery<SiteAgentDetail>;
@@ -33,6 +34,8 @@ public sealed class ListSiteAgentsValidator : AbstractValidator<ListSiteAgentsQu
         RuleFor(query => query.Search).MaximumLength(100);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(IntegrationSortKeys.SiteAgents);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
@@ -74,7 +77,7 @@ public sealed class ListSiteAgentsHandler(
     {
         var tenantId = MachineCredentialIssuance.RequireTenant(tenant);
         var now = clock.UtcNow;
-        var page = await agents.ListAsync(new SiteAgentFilter(string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim(), query.BranchId, query.IsActive), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        var page = await agents.ListAsync(new SiteAgentFilter(string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim(), query.BranchId, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
         var ids = page.Items.Select(item => item.Id).ToList();
         var states = await telemetry.AgentStatesAsync(ids, cancellationToken);
         var counts = await analysers.CountByAgentAsync(ids, cancellationToken);

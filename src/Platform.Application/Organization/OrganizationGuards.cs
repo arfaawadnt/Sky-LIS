@@ -117,6 +117,26 @@ public static class OrganizationGuards
         return ids;
     }
 
+    /// <summary>
+    /// Validation v0.5.0 B-02 (INV-ORG-017): the stored empty list means <b>every</b> active branch, so the request says
+    /// which it means. <paramref name="allBranches"/> <see langword="false"/> (restricted) with no branch, or
+    /// <see langword="true"/> with branches, is refused ORG-018 instead of widening the access to every branch.
+    /// <see langword="null"/> keeps the older contract (empty = every branch).
+    /// </summary>
+    public static void EnsureBranchChoice(bool? allBranches, IEnumerable<Guid>? branchIds)
+    {
+        var any = (branchIds ?? []).Any(id => id != Guid.Empty);
+        if (allBranches == false && !any)
+        {
+            throw new DomainException(OrganizationCodes.BranchChoiceRequired, "Choose at least one branch, or every branch.", DomainFault.Validation);
+        }
+
+        if (allBranches == true && any)
+        {
+            throw new DomainException(OrganizationCodes.BranchChoiceRequired, "Choose either every branch or a list of branches, not both.", DomainFault.Validation);
+        }
+    }
+
     public static SpecialRights ToDomain(SpecialRightsDto dto)
     {
         ArgumentNullException.ThrowIfNull(dto);

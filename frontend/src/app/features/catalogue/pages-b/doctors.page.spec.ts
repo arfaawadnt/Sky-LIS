@@ -4,6 +4,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { CATALOGUE_B_API, CATALOGUE_B_LOOKUP_API, type DoctorListItem, type Paged } from '../../../core/api/catalogue-b.contracts';
+import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { DoctorsFacade } from '../state-b/catalogue-b-list.facade';
 import { DoctorsPage } from './doctors.page';
@@ -38,8 +39,11 @@ function setValue(element: HTMLInputElement | null | undefined, value: string): 
 
 describe('DoctorsPage (CP-48)', () => {
   let backend: HttpTestingController;
+  /** `null` = every permission (the manager); a set = exactly those (the reception persona of validation v0.5.0). */
+  let granted: Set<string> | null;
 
   beforeEach(async () => {
+    granted = null;
     await TestBed.configureTestingModule({
       imports: [DoctorsPage],
       providers: [
@@ -47,7 +51,7 @@ describe('DoctorsPage (CP-48)', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         DoctorsFacade,
-        { provide: PermissionsService, useValue: { can: () => true } satisfies Pick<PermissionsService, 'can'> },
+        { provide: PermissionsService, useValue: { can: (key: string) => granted === null || granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
       ],
     }).compileComponents();
     backend = TestBed.inject(HttpTestingController);
@@ -111,5 +115,35 @@ describe('DoctorsPage (CP-48)', () => {
 
     backend.expectNone((request) => request.method === 'PUT');
     expect(dialog?.querySelectorAll('app-form-field .error').length).toBe(2);
+  });
+
+  it('reception (catalogue.view only) reads the selectable branches, never the register, and a row opens read-only (R-07, R-08)', async () => {
+    granted = new Set(['catalogue.view']);
+    const fixture = TestBed.createComponent(DoctorsPage);
+    TestBed.tick();
+    await settle();
+    backend.expectNone((request) => request.url === CATALOGUE_B_LOOKUP_API.branches);
+    backend.expectOne(ORGANIZATION_API.selectableBranches).flush({ currentBranchId: 'b1', branches: [{ id: 'b1', code: 'MAIN', nameEn: 'Main branch', nameAr: 'الفرع الرئيسي' }] });
+    backend.expectOne((request) => request.method === 'GET' && request.url === CATALOGUE_B_API.doctors).flush(page([doctor]));
+    await settle();
+    await fixture.whenStable();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('tbody tr[data-row="d1"]')?.textContent).toContain('MAIN');
+    expect(host.querySelector('tbody tr[data-row="d1"] .row-btn')).toBeNull();
+
+    host.querySelector<HTMLTableRowElement>('tbody tr[data-row="d1"]')?.click();
+    await fixture.whenStable();
+    const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.textContent).toContain('catalogue-b.common.view');
+    expect(dialog?.querySelector<HTMLInputElement>('input[lang="en"]')?.value).toBe('Dr. Amal');
+    const controls = [...(dialog?.querySelectorAll<HTMLInputElement>('form input') ?? [])];
+    expect(controls.length).toBeGreaterThan(0);
+    expect(controls.every((control) => control.disabled)).toBe(true);
+    expect(dialog?.querySelector('.foot .btn.primary')).toBeNull();
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', bubbles: true }));
+    await settle();
+    backend.expectNone((request) => request.method === 'PUT');
+    backend.verify();
   });
 });

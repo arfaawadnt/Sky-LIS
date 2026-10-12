@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Samples;
 using Platform.Contracts.Common;
@@ -48,6 +49,14 @@ internal sealed class SampleRepository(AppDbContext context, ITenantContextAcces
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+    private static readonly SortColumns<Sample> Sorts = new SortColumns<Sample>(SamplesSortKeys.Samples)
+        .Column("sampleNumber", sample => sample.SampleNumber)
+        .Column("accession", sample => sample.Accession)
+        .Column("status", sample => sample.Status == SampleStatus.Ordered ? 0 : sample.Status == SampleStatus.Collected ? 1 : sample.Status == SampleStatus.Received ? 2 : sample.Status == SampleStatus.Rejected ? 3 : sample.Status == SampleStatus.Cancelled ? 4 : 5)
+        .Column("rejectedAtUtc", sample => sample.Rejection != null ? sample.Rejection.AtUtc : (DateTimeOffset?)null)
+        .ThenBy(sample => sample.SampleNumber)
+        .ThenBy(sample => sample.Id);
+
     public async Task<Paged<SampleListItem>> ListAsync(SampleFilter filter, PageRequest page, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(filter);
@@ -94,10 +103,10 @@ internal sealed class SampleRepository(AppDbContext context, ITenantContextAcces
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await query
-            .OrderByDescending(sample => sample.OrderedAtUtc)
-            .ThenBy(sample => sample.Accession)
-            .ThenBy(sample => sample.SampleNumber)
+        var rows = await Sorts.Apply(query, filter.Sort, samples => samples
+                .OrderByDescending(sample => sample.OrderedAtUtc)
+                .ThenBy(sample => sample.Accession)
+                .ThenBy(sample => sample.SampleNumber))
             .Skip(page.Skip)
             .Take(page.PageSize)
             .ToListAsync(cancellationToken)

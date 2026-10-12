@@ -25,7 +25,7 @@
       }
     }
 
-    <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.list.isLoading()" [emptyTitle]="i18n.t('integration.agents.empty')" [caption]="i18n.t('integration.agents.title')" (rowActivate)="openDetail($event)">
+    <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.list.isLoading()" [emptyTitle]="i18n.t('integration.agents.empty')" [caption]="i18n.t('integration.agents.title')" [sort]="facade.sort()" [serverSort]="true" (sortChange)="facade.setSort($event)" (rowActivate)="openDetail($event)">
       <ng-template appCell="status" [appCellOf]="rows()" let-row>
         <app-badge [tone]="tone(row.status)">{{ i18n.t('integration.agentStatus.' + row.status) }}</app-badge>
       </ng-template>

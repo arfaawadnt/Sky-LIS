@@ -45,7 +45,7 @@
           </select>
         </app-form-field>
       }
-      <app-form-field [label]="i18n.t('account.audit.entity')" [hint]="i18n.t('account.audit.entityHint')">
+      <app-form-field [label]="i18n.t('account.audit.entity')" [hint]="i18n.t(isPlatform() ? 'account.audit.entityHintPlatform' : 'account.audit.entityHint')">
         <input type="text" formControlName="entityType" list="audit-entity-types" maxlength="200" autocomplete="off" />
       </app-form-field>
       <app-form-field [label]="i18n.t('account.audit.entityId')">

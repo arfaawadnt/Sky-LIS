@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { CATALOGUE_A_API, type LabTestDetail, type Paged, type ServiceDetail, type ServiceLookupItem, type ServiceSequenceRow } from '../../../core/api/catalogue-a.contracts';
 import { ServicesListFacade, TestsListFacade } from './catalogue-lists.facade';
 import { ServiceEditorFacade } from './service-editor.facade';
@@ -62,6 +63,43 @@ describe('catalogue A facades (01 §6.3)', () => {
     expect(filtered.request.params.has('isActive')).toBe(false);
     filtered.flush(page([]));
     backend.verify();
+  });
+
+  it('B-03: the services and tests registers sort on the server from page 1, the name by the language on screen', async () => {
+    const services = TestBed.inject(ServicesListFacade);
+    const tests = TestBed.inject(TestsListFacade);
+    await runEffects();
+    backend.expectOne((request) => request.url === CATALOGUE_A_API.services).flush(page([]));
+    backend.expectOne((request) => request.url === CATALOGUE_A_API.tests).flush(page([]));
+
+    services.setPage({ page: 4, pageSize: 20 });
+    await runEffects();
+    backend.expectOne((request) => request.url === CATALOGUE_A_API.services).flush(page([]));
+
+    services.setSort({ key: 'sequence', direction: 'desc' });
+    tests.setSort({ key: 'name', direction: 'asc' });
+    await runEffects();
+    const sortedServices = backend.expectOne((request) => request.url === CATALOGUE_A_API.services);
+    expect([sortedServices.request.params.get('sort'), sortedServices.request.params.get('direction'), sortedServices.request.params.get('page')]).toEqual(['sequence', 'desc', '1']);
+    sortedServices.flush(page([]));
+    const sortedTests = backend.expectOne((request) => request.url === CATALOGUE_A_API.tests);
+    expect([sortedTests.request.params.get('sort'), sortedTests.request.params.get('direction')]).toEqual(['nameEn', 'asc']);
+    sortedTests.flush(page([]));
+
+    TestBed.inject(I18nService).setLanguage('ar');
+    await runEffects();
+    const arabic = backend.expectOne((request) => request.url === CATALOGUE_A_API.tests);
+    expect(arabic.request.params.get('sort')).toBe('nameAr');
+    arabic.flush(page([]));
+    backend.expectNone((request) => request.url === CATALOGUE_A_API.services);   // sorted by sequence: the language does not matter
+    backend.match(() => true).forEach((request) => request.flush({}));   // dictionaries of the language switch
+    TestBed.inject(I18nService).setLanguage('en');
+    await runEffects();
+    backend.match(() => true).forEach((request) => request.flush(page([])));
+
+    tests.setSort(null);
+    await runEffects();
+    expect(backend.expectOne((request) => request.url === CATALOGUE_A_API.tests).request.params.has('sort')).toBe(false);
   });
 
   it('TestsListFacade searches by text, type and group', async () => {

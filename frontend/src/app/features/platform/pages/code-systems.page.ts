@@ -27,6 +27,7 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { fileStamp, formatDateTime, formatNumber } from '../ui/format';
+import { sortParams } from '../../../shared/forms/paging';
 
 const NAME_LABELS: Readonly<Record<CodeSystemName, string>> = { Loinc: 'LOINC', Cpt: 'CPT', Icd10: 'ICD-10', Snomed: 'SNOMED CT' };
 
@@ -95,6 +96,8 @@ export class CodeSystemsPage {
 
   protected readonly config: MasterDataConfig<CodeSystemListItem, CodeSystemRequest> = {
     i18nPrefix: 'platform.codeSystems',
+    // B-03: the server sorts the whole library before paging (PlatformAdminSortKeys.CodeSystems; the name by its stored code)
+    sortMode: 'server',
     columns: [
       { key: 'name', header: 'platform.codeSystems.column.name', sortable: true, value: (row) => this.label(row.name) },
       { key: 'version', header: 'platform.codeSystems.column.version', mono: true, sortable: true },
@@ -110,7 +113,7 @@ export class CodeSystemsPage {
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listCodeSystems({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+        return this.api.listCodeSystems({ ...sortParams(filter.sort), search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
       },
       create: (dto) => this.api.saveCodeSystem(null, dto),
       update: (id, dto) => this.api.saveCodeSystem(id, dto),

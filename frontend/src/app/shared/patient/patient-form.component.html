@@ -15,7 +15,7 @@
           <li class="similar-item">
             <div class="who">
               <span class="mono">{{ candidate.number }}</span>
-              <span class="name">{{ candidate.fullName }}@if (candidate.nameAr) { · <span dir="rtl" lang="ar">{{ candidate.nameAr }}</span>}</span>
+              <span class="name">{{ candidate.fullName || i18n.t('patients.vipMasked') }}@if (candidate.nameAr) { · <span dir="rtl" lang="ar">{{ candidate.nameAr }}</span>}</span>
               <span class="small muted">
                 {{ i18n.t('patients.gender.' + candidate.gender) }} · {{ ageText(candidate.age) }}@if (candidate.mobile) { · <span class="mono" dir="ltr">{{ candidate.mobile }}</span>}
               </span>

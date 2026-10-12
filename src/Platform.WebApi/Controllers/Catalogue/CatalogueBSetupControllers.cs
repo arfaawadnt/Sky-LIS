@@ -15,8 +15,8 @@ namespace Platform.WebApi.Controllers.Catalogue;
 public sealed class CommentTemplatesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<CommentTemplateListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? clinicalGroupId, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListCommentTemplatesQuery(search, isActive, clinicalGroupId, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<CommentTemplateListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? clinicalGroupId, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListCommentTemplatesQuery(search, isActive, clinicalGroupId, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<CommentTemplateListItem>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -66,8 +66,8 @@ public sealed class DoctorsController(ISender sender) : ControllerBase
 {
     /// <summary><paramref name="branchId"/>: the doctors offered in that branch (registration picker).</summary>
     [HttpGet]
-    public async Task<ActionResult<Paged<DoctorListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? branchId, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListDoctorsQuery(search, isActive, branchId, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<DoctorListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? branchId, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListDoctorsQuery(search, isActive, branchId, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<DoctorListItem>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -116,8 +116,8 @@ public sealed class DoctorsController(ISender sender) : ControllerBase
 public sealed class SendingLabsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<SendingLabListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? payerId, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListSendingLabsQuery(search, isActive, payerId, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<SendingLabListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] Guid? payerId, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListSendingLabsQuery(search, isActive, payerId, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SendingLabListItem>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -167,8 +167,8 @@ public sealed class SendingLabsController(ISender sender) : ControllerBase
 public sealed class ReasonsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<ReasonListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? kind, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListReasonsQuery(search, isActive, kind, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<ReasonListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? kind, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListReasonsQuery(search, isActive, kind, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ReasonListItem>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -217,8 +217,8 @@ public sealed class ReasonsController(ISender sender) : ControllerBase
 public sealed class ReportTemplatesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<ReportTemplateListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? type, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListReportTemplatesQuery(search, isActive, type, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<ReportTemplateListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? type, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListReportTemplatesQuery(search, isActive, type, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ReportTemplateListItem>> Get(Guid id, CancellationToken cancellationToken) =>

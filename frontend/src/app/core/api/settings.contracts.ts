@@ -70,6 +70,7 @@ export const SETTING_KEYS = {
   defaultCurrency: 'defaultCurrency',
   defaultLanguage: 'defaultLanguage',
   masterDataUpdatePolicy: 'masterDataUpdatePolicy',
+  timeZone: 'timeZone',
 } as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];

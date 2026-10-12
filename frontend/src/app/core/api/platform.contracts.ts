@@ -4,6 +4,8 @@
  * E.164; amounts are numbers with two decimals.
  */
 
+import type { SortRequest } from './paging';
+
 export type { Paged } from './paging';
 
 export interface CreatedResource {
@@ -77,7 +79,8 @@ export interface ClientDetail {
   readonly users: number;
 }
 
-export interface ClientFilter {
+/** `sort`: `nameEn`, `nameAr`, `planCode`, `walletBalance` or `createdAtUtc` (B-03, server allow-list); absent = newest first. */
+export interface ClientFilter extends SortRequest {
   readonly search: string | null;
   readonly source: ClientSource | null;
   readonly planId: string | null;
@@ -389,7 +392,8 @@ export interface RuleTemplateRequest {
 }
 
 /** Shared list query of the reference registers. */
-export interface ReferenceListFilter {
+/** `sort`: a key of the list's server allow-list (B-03, PlatformAdminSortKeys); absent = the list's own order. */
+export interface ReferenceListFilter extends SortRequest {
   readonly search: string | null;
   readonly isActive: boolean | null;
   readonly page: number;

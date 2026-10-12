@@ -20,7 +20,7 @@
     <p class="problem list-problem" role="alert">{{ problemText(problem.code) }}</p>
   }
 
-  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.list.isLoading()" [emptyTitle]="i18n.t('integration.kits.empty')" [caption]="i18n.t('integration.kits.title')" (rowActivate)="edit($event)">
+  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.list.isLoading()" [emptyTitle]="i18n.t('integration.kits.empty')" [caption]="i18n.t('integration.kits.title')" [sort]="facade.sort()" [serverSort]="true" (sortChange)="facade.setSort($event)" (rowActivate)="edit($event)">
     <ng-template appCell="status" [appCellOf]="rows()" let-row>
       <app-badge [tone]="tone(row.isActive ? 'Active' : 'Inactive')">{{ i18n.t(row.isActive ? 'integration.active' : 'integration.inactive') }}</app-badge>
     </ng-template>

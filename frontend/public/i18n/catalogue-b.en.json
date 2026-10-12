@@ -179,6 +179,7 @@
   "common.deactivate": "Deactivate",
   "common.deactivated": "Deactivated.",
   "common.edit": "Edit",
+  "common.view": "View",
   "common.empty": "No records match the filter.",
   "common.export": "Export CSV",
   "common.exportError": "The file could not be exported.",

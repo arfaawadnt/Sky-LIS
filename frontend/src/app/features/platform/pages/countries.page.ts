@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, viewChild } from '@angular/core';
 
 import { type CountryListItem, type CountryRequest, PLATFORM_PERMISSIONS } from '../../../core/api/platform.contracts';
+import { isProblem } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
@@ -10,7 +11,9 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { fileStamp, pick } from '../ui/format';
-import { ianaTimeZones } from '../ui/validators';
+import { fieldProblem, ianaTimeZones, isDialCodeValid } from '../ui/validators';
+import { sortParams } from '../../../shared/forms/paging';
+import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 
 /**
  * SA-10 Countries: the validation data of a laboratory's details (dial code, currency, language, time zone, mobile
@@ -41,8 +44,10 @@ export class CountriesPage {
 
   protected readonly config: MasterDataConfig<CountryListItem, CountryRequest> = {
     i18nPrefix: 'platform.countries',
+    // B-03: the server sorts the whole register before paging (PlatformAdminSortKeys.Countries)
+    sortMode: 'server',
     columns: [
-      { key: 'name', header: 'platform.countries.column.name', sortable: true, value: (row) => `${row.flag ?? ''} ${pick(row.nameEn, row.nameAr, this.i18n.lang())}`.trim() },
+      { key: 'name', header: 'platform.countries.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (row) => `${row.flag ?? ''} ${pick(row.nameEn, row.nameAr, this.i18n.lang())}`.trim() },
       { key: 'isoCode', header: 'platform.countries.column.isoCode', mono: true, width: '80px', sortable: true },
       { key: 'dialCode', header: 'platform.countries.column.dialCode', mono: true, width: '100px' },
       { key: 'currencyCode', header: 'platform.countries.column.currency', value: (row) => `${row.currencyCode} · ${row.currency}` },
@@ -66,10 +71,10 @@ export class CountriesPage {
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;
-        return this.api.listCountries({ search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
+        return this.api.listCountries({ ...sortParams(filter.sort), search: filter.search || null, isActive: filter.active, page: page.page, pageSize: page.pageSize }, signal);
       },
-      create: (dto) => this.api.createCountry(dto),
-      update: (id, dto) => this.api.updateCountry(id, dto),
+      create: (dto) => this.save(dto, () => this.api.createCountry(dto)),
+      update: (id, dto) => this.save(dto, () => this.api.updateCountry(id, dto)),
       setActive: (id, active) => this.api.setCountryActive(id, active),
     },
     permissions: { create: PLATFORM_PERMISSIONS.tenancyManage, update: PLATFORM_PERMISSIONS.tenancyManage, activate: PLATFORM_PERMISSIONS.tenancyManage },
@@ -100,6 +105,23 @@ export class CountriesPage {
 
   constructor() {
     void this.i18n.load('platform');
+  }
+
+  /**
+   * C-09: the dial code is checked before anything is sent (the hint states the rule), and the server's own refusal (GEO-002)
+   * is shown under the field as well, never only at the top of the dialog.
+   */
+  private async save(dto: CountryRequest, send: () => Promise<unknown>): Promise<unknown> {
+    const message = (): string => this.i18n.t('platform.countries.error.GEO-002');
+    if (!isDialCodeValid(dto.dialCode)) {
+      throw fieldProblem('dialCode', message());
+    }
+
+    try {
+      return await send();
+    } catch (error: unknown) {
+      throw isProblem(error, 'GEO-002') ? fieldProblem('dialCode', message()) : error;
+    }
   }
 
   private async delete(row: CountryListItem): Promise<void> {

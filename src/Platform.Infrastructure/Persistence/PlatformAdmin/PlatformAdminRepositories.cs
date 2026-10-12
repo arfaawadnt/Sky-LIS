@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.PlatformAdmin;
 using Platform.Contracts.Common;
 using Platform.Contracts.PlatformAdmin;
@@ -58,8 +59,14 @@ internal sealed class TenantRepository(AppDbContext context) : Repository<Tenant
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
+
+        // B-03: the page of the requested order (newest first without one) is chosen on the server; the joins below keep
+        // no order, so the rows are put back in the order of the ids.
+        var ids = await ClientSorts().Apply(query, filter.Sort, tenants => tenants.OrderByDescending(tenant => tenant.CreatedAtUtc).ThenBy(tenant => tenant.Id))
+            .Skip(page.Skip).Take(page.PageSize).Select(tenant => tenant.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var position = ids.Select((id, index) => (id, index)).ToDictionary(entry => entry.id, entry => entry.index);
         var rows = await (
-            from tenant in query.OrderByDescending(tenant => tenant.CreatedAtUtc).ThenBy(tenant => tenant.Id).Skip(page.Skip).Take(page.PageSize)
+            from tenant in Set.AsNoTracking().Where(tenant => ids.Contains(tenant.Id))
             join country in Context.Set<Country>().AsNoTracking() on tenant.CountryId equals country.Id
             join governorate in Context.Set<Governorate>().AsNoTracking() on tenant.GovernorateId equals governorate.Id
             join plan in Context.Set<Plan>().AsNoTracking() on tenant.PlanId equals plan.Id
@@ -91,7 +98,7 @@ internal sealed class TenantRepository(AppDbContext context) : Repository<Tenant
             }).ToListAsync(cancellationToken).ConfigureAwait(false);
 
         var items = rows
-            .OrderByDescending(row => row.CreatedAtUtc).ThenBy(row => row.Id)
+            .OrderBy(row => position[row.Id])
             .Select(row => new ClientListItem(
                 row.Id, row.NameEn, row.NameAr, row.PortalSlug, Tenant.BuildPortalUrl(row.PortalSlug, portalDomain), row.CountryId, row.CountryEn, row.CountryAr,
                 row.GovernorateId, row.GovernorateEn, row.GovernorateAr, row.ManagerName, row.ManagerMobile, row.PlanId, row.PlanCode, row.PlanEn, row.PlanAr,
@@ -99,6 +106,15 @@ internal sealed class TenantRepository(AppDbContext context) : Repository<Tenant
             .ToList();
         return new Paged<ClientListItem>(items, page.Page, page.PageSize, total);
     }
+
+    /// <summary>B-03: the sortable columns of the clients register (SA-03); the plan code and the wallet balance are read through correlated sub-queries.</summary>
+    private SortColumns<Tenant> ClientSorts() => new SortColumns<Tenant>(PlatformAdminSortKeys.Clients)
+        .Column("nameEn", tenant => tenant.Name.En)
+        .Column("nameAr", tenant => tenant.Name.Ar)
+        .Column("planCode", tenant => Context.Set<Plan>().Where(plan => plan.Id == tenant.PlanId).Select(plan => plan.Code).FirstOrDefault())
+        .Column("walletBalance", tenant => Context.Set<Wallet>().Where(wallet => wallet.TenantId == tenant.Id).Select(wallet => (decimal?)wallet.Balance).FirstOrDefault() ?? 0m)
+        .Column("createdAtUtc", tenant => tenant.CreatedAtUtc)
+        .ThenBy(tenant => tenant.Id);
 
     public async Task<ClientDetail?> GetDetailAsync(Guid id, string portalDomain, CancellationToken cancellationToken)
     {
@@ -246,7 +262,14 @@ internal sealed class CountryRepository(AppDbContext context) : Repository<Count
         await Context.Set<Governorate>().AnyAsync(governorate => governorate.CountryId == countryId, cancellationToken).ConfigureAwait(false)
         || await Context.Set<Tenant>().AnyAsync(tenant => tenant.CountryId == countryId, cancellationToken).ConfigureAwait(false);
 
-    public async Task<Paged<CountryListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken)
+    private static readonly SortColumns<Country> CountrySorts = new SortColumns<Country>(PlatformAdminSortKeys.Countries)
+        .Column("nameEn", country => country.Name.En)
+        .Column("nameAr", country => country.Name.Ar)
+        .Column("isoCode", country => country.IsoCode)
+        .ThenBy(country => country.Name.En)
+        .ThenBy(country => country.Id);
+
+    public async Task<Paged<CountryListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken)
     {
         var query = Set.AsNoTracking();
         if (search is { Length: > 0 })
@@ -261,7 +284,7 @@ internal sealed class CountryRepository(AppDbContext context) : Repository<Count
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await query.OrderBy(country => country.Name.En).Skip(page.Skip).Take(page.PageSize)
+        var items = await CountrySorts.Apply(query, sort, countries => countries.OrderBy(country => country.Name.En).ThenBy(country => country.Id)).Skip(page.Skip).Take(page.PageSize)
             .Select(country => new CountryListItem(
                 country.Id, country.Name.En, country.Name.Ar, country.IsoCode, country.DialCode, country.Currency, country.CurrencyCode, country.Language, country.TimeZone,
                 country.MobileLength, country.Flag, country.Remarks, country.IsActive, Context.Set<Governorate>().Count(governorate => governorate.CountryId == country.Id)))
@@ -292,7 +315,16 @@ internal sealed class GovernorateRepository(AppDbContext context) : Repository<G
         return Set.AnyAsync(governorate => governorate.CountryId == countryId && governorate.Name.En.ToLower() == value && (exceptId == null || governorate.Id != exceptId), cancellationToken);
     }
 
-    public async Task<Paged<GovernorateListItem>> ListAsync(Guid? countryId, string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken)
+    /// <summary>B-03: the sortable columns of the governorates register (SA-11); the country name is a correlated sub-query.</summary>
+    private SortColumns<Governorate> GovernorateSorts() => new SortColumns<Governorate>(PlatformAdminSortKeys.Governorates)
+        .Column("nameEn", governorate => governorate.Name.En)
+        .Column("nameAr", governorate => governorate.Name.Ar)
+        .Column("countryEn", governorate => Context.Set<Country>().Where(country => country.Id == governorate.CountryId).Select(country => country.Name.En).FirstOrDefault())
+        .Column("countryAr", governorate => Context.Set<Country>().Where(country => country.Id == governorate.CountryId).Select(country => country.Name.Ar).FirstOrDefault())
+        .ThenBy(governorate => governorate.Name.En)
+        .ThenBy(governorate => governorate.Id);
+
+    public async Task<Paged<GovernorateListItem>> ListAsync(Guid? countryId, string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken)
     {
         var query = Set.AsNoTracking();
         if (countryId is { } country)
@@ -312,12 +344,18 @@ internal sealed class GovernorateRepository(AppDbContext context) : Repository<G
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
+
+        // B-03: the page of the requested order is chosen on the server; the join keeps no order, so the rows are put
+        // back in the order of the ids.
+        var ids = await GovernorateSorts().Apply(query, sort, governorates => governorates.OrderBy(governorate => governorate.Name.En).ThenBy(governorate => governorate.Id))
+            .Skip(page.Skip).Take(page.PageSize).Select(governorate => governorate.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var position = ids.Select((id, index) => (id, index)).ToDictionary(entry => entry.id, entry => entry.index);
         var items = await (
-            from governorate in query.OrderBy(governorate => governorate.Name.En).Skip(page.Skip).Take(page.PageSize)
+            from governorate in Set.AsNoTracking().Where(governorate => ids.Contains(governorate.Id))
             join owner in Context.Set<Country>().AsNoTracking() on governorate.CountryId equals owner.Id
             select new GovernorateListItem(governorate.Id, governorate.CountryId, owner.Name.En, owner.Name.Ar, governorate.Name.En, governorate.Name.Ar, governorate.District, governorate.Remarks, governorate.IsActive))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
-        return new Paged<GovernorateListItem>(items.OrderBy(item => item.NameEn, StringComparer.OrdinalIgnoreCase).ToList(), page.Page, page.PageSize, total);
+        return new Paged<GovernorateListItem>(items.OrderBy(item => position[item.Id]).ToList(), page.Page, page.PageSize, total);
     }
 
     public async Task<IReadOnlyList<PublicGovernorate>> ListPublicAsync(Guid? countryId, CancellationToken cancellationToken) =>
@@ -334,7 +372,11 @@ internal sealed class NotificationTemplateRepository(AppDbContext context) : Rep
         return Set.AnyAsync(template => template.Code == value, cancellationToken);
     }
 
-    public async Task<Paged<NotificationTemplateListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken)
+    private static readonly SortColumns<NotificationTemplate> TemplateSorts = new SortColumns<NotificationTemplate>(PlatformAdminSortKeys.NotificationTemplates)
+        .Column("code", template => template.Code)
+        .ThenBy(template => template.Id);
+
+    public async Task<Paged<NotificationTemplateListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken)
     {
         var query = Set.AsNoTracking();
         if (search is { Length: > 0 })
@@ -349,7 +391,7 @@ internal sealed class NotificationTemplateRepository(AppDbContext context) : Rep
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await query.OrderBy(template => template.Code).Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await TemplateSorts.Apply(query, sort, templates => templates.OrderBy(template => template.Code)).Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken).ConfigureAwait(false);
         var items = rows.Select(template => new NotificationTemplateListItem(template.Id, template.Code, template.Channel.ToString(), template.SubjectEn, template.SubjectAr, template.TextEn, template.TextAr, template.IsActive)).ToList();
         return new Paged<NotificationTemplateListItem>(items, page.Page, page.PageSize, total);
     }
@@ -360,7 +402,14 @@ internal sealed class AnalyserModelRepository(AppDbContext context) : Repository
     public Task<bool> ExistsAsync(string vendor, string model, Guid? exceptId, CancellationToken cancellationToken) =>
         Set.AnyAsync(row => row.Vendor.ToLower() == vendor.ToLower() && row.Model.ToLower() == model.ToLower() && (exceptId == null || row.Id != exceptId), cancellationToken);
 
-    public async Task<Paged<AnalyserModelListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken)
+    private static readonly SortColumns<AnalyserModel> ModelSorts = new SortColumns<AnalyserModel>(PlatformAdminSortKeys.AnalyserModels)
+        .Column("vendor", row => row.Vendor)
+        .Column("model", row => row.Model)
+        .ThenBy(row => row.Vendor)
+        .ThenBy(row => row.Model)
+        .ThenBy(row => row.Id);
+
+    public async Task<Paged<AnalyserModelListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken)
     {
         var query = Set.AsNoTracking();
         if (search is { Length: > 0 })
@@ -375,7 +424,7 @@ internal sealed class AnalyserModelRepository(AppDbContext context) : Repository
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await query.OrderBy(row => row.Vendor).ThenBy(row => row.Model).Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await ModelSorts.Apply(query, sort, models => models.OrderBy(row => row.Vendor).ThenBy(row => row.Model)).Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken).ConfigureAwait(false);
         var items = rows.Select(row => new AnalyserModelListItem(row.Id, row.Vendor, row.Model, row.Discipline, row.Protocol.ToString(), row.PhysicalLink.ToString(), row.Modes, row.DriverVersion, row.IsActive)).ToList();
         return new Paged<AnalyserModelListItem>(items, page.Page, page.PageSize, total);
     }
@@ -386,7 +435,14 @@ internal sealed class PcrKitTemplateRepository(AppDbContext context) : Repositor
     public Task<bool> NameExistsAsync(string name, Guid? exceptId, CancellationToken cancellationToken) =>
         Set.AnyAsync(kit => kit.Name.ToLower() == name.ToLower() && (exceptId == null || kit.Id != exceptId), cancellationToken);
 
-    public async Task<Paged<PcrKitListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken)
+    /// <summary>B-03: the sortable columns of the PCR kit library (SA-16); the analyser model ("vendor model") is a correlated sub-query.</summary>
+    private SortColumns<PcrKitTemplate> KitSorts() => new SortColumns<PcrKitTemplate>(PlatformAdminSortKeys.PcrKits)
+        .Column("name", kit => kit.Name)
+        .Column("analyserModel", kit => Context.Set<AnalyserModel>().Where(model => model.Id == kit.AnalyserModelId).Select(model => model.Vendor + " " + model.Model).FirstOrDefault())
+        .ThenBy(kit => kit.Name)
+        .ThenBy(kit => kit.Id);
+
+    public async Task<Paged<PcrKitListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken)
     {
         var query = Set.AsNoTracking();
         if (search is { Length: > 0 })
@@ -401,12 +457,18 @@ internal sealed class PcrKitTemplateRepository(AppDbContext context) : Repositor
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
+
+        // B-03: the page of the requested order is chosen on the server; the model join keeps no order, so the rows are
+        // put back in the order of the ids.
+        var ids = await KitSorts().Apply(query, sort, kits => kits.OrderBy(kit => kit.Name).ThenBy(kit => kit.Id))
+            .Skip(page.Skip).Take(page.PageSize).Select(kit => kit.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var position = ids.Select((id, index) => (id, index)).ToDictionary(entry => entry.id, entry => entry.index);
         var rows = await (
-            from kit in query.OrderBy(kit => kit.Name).Skip(page.Skip).Take(page.PageSize)
+            from kit in Set.AsNoTracking().Where(kit => ids.Contains(kit.Id))
             from model in Context.Set<AnalyserModel>().AsNoTracking().Where(model => model.Id == kit.AnalyserModelId).DefaultIfEmpty()
             select new { kit, ModelName = model == null ? null : model.Vendor + " " + model.Model })
             .ToListAsync(cancellationToken).ConfigureAwait(false);
-        var items = rows.OrderBy(row => row.kit.Name, StringComparer.OrdinalIgnoreCase)
+        var items = rows.OrderBy(row => position[row.kit.Id])
             .Select(row => new PcrKitListItem(row.kit.Id, row.kit.Name, row.kit.AnalyserModelId, row.ModelName, row.kit.LayoutJson, row.kit.ThresholdsJson, row.kit.VerdictRulesJson, row.kit.IsActive))
             .ToList();
         return new Paged<PcrKitListItem>(items, page.Page, page.PageSize, total);
@@ -418,7 +480,13 @@ internal sealed class CodeSystemRepository(AppDbContext context) : Repository<Co
     public Task<bool> ExistsAsync(CodeSystemName name, string version, Guid? exceptId, CancellationToken cancellationToken) =>
         Set.AnyAsync(row => row.Name == name && row.Version.ToLower() == version.ToLower() && (exceptId == null || row.Id != exceptId), cancellationToken);
 
-    public async Task<Paged<CodeSystemListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken)
+    private static readonly SortColumns<CodeSystem> CodeSystemSorts = new SortColumns<CodeSystem>(PlatformAdminSortKeys.CodeSystems)
+        .Column("name", row => row.Name)
+        .Column("version", row => row.Version)
+        .ThenBy(row => row.Name)
+        .ThenBy(row => row.Id);
+
+    public async Task<Paged<CodeSystemListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken)
     {
         var query = Set.AsNoTracking();
         if (search is { Length: > 0 })
@@ -433,7 +501,7 @@ internal sealed class CodeSystemRepository(AppDbContext context) : Repository<Co
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await query.OrderBy(row => row.Name).ThenByDescending(row => row.Version).Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await CodeSystemSorts.Apply(query, sort, systems => systems.OrderBy(row => row.Name).ThenByDescending(row => row.Version)).Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken).ConfigureAwait(false);
         var items = rows.Select(row => new CodeSystemListItem(row.Id, row.Name.ToString(), row.Version, row.Use, row.ItemCount, row.LastImportedAtUtc, row.IsActive)).ToList();
         return new Paged<CodeSystemListItem>(items, page.Page, page.PageSize, total);
     }
@@ -467,7 +535,13 @@ internal sealed class RuleTemplateRepository(AppDbContext context) : Repository<
     public Task<bool> NameExistsAsync(string name, Guid? exceptId, CancellationToken cancellationToken) =>
         Set.AnyAsync(rule => rule.Name.ToLower() == name.ToLower() && (exceptId == null || rule.Id != exceptId), cancellationToken);
 
-    public async Task<Paged<RuleTemplateListItem>> ListAsync(string? search, bool? isActive, PageRequest page, CancellationToken cancellationToken)
+    private static readonly SortColumns<RuleTemplate> RuleSorts = new SortColumns<RuleTemplate>(PlatformAdminSortKeys.RuleTemplates)
+        .Column("name", rule => rule.Name)
+        .Column("clinicalGroupName", rule => rule.ClinicalGroupName)
+        .ThenBy(rule => rule.Name)
+        .ThenBy(rule => rule.Id);
+
+    public async Task<Paged<RuleTemplateListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken)
     {
         var query = Set.AsNoTracking();
         if (search is { Length: > 0 })
@@ -482,7 +556,7 @@ internal sealed class RuleTemplateRepository(AppDbContext context) : Repository<
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await query.OrderBy(rule => rule.Name).Skip(page.Skip).Take(page.PageSize)
+        var items = await RuleSorts.Apply(query, sort, rules => rules.OrderBy(rule => rule.Name)).Skip(page.Skip).Take(page.PageSize)
             .Select(rule => new RuleTemplateListItem(rule.Id, rule.Name, rule.ClinicalGroupName, rule.Formula, rule.Description, rule.IsActive))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
         return new Paged<RuleTemplateListItem>(items, page.Page, page.PageSize, total);

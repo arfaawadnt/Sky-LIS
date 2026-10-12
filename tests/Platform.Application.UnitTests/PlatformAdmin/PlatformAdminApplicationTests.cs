@@ -36,6 +36,19 @@ public sealed class PlatformAdminApplicationTests
     }
 
     [Theory]
+    [InlineData("14.145", false)]
+    [InlineData("0.001", false)]
+    [InlineData("14.15", true)]
+    [InlineData("14.150", true)]
+    [InlineData("0", true)]
+    public void C_05_plan_fees_with_more_than_two_decimals_are_refused_by_shape(string text, bool valid)
+    {
+        var fee = decimal.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(valid, new CreatePlanValidator().Validate(new CreatePlanCommand("V14PLAN", "Plan", "باقة", fee, "EGP", 2, 14, 140, 0)).IsValid);
+        Assert.Equal(valid, new UpdatePlanValidator().Validate(new UpdatePlanCommand(Guid.CreateVersion7(), "Plan", "باقة", fee, "EGP", 2, 14, 140, 0)).IsValid);
+    }
+
+    [Theory]
     [InlineData("short1", "noor.admin", 8, PlatformAdminCodes.PasswordTooShort)]
     [InlineData("my-Noor.Admin-2026", "noor.admin", 8, PlatformAdminCodes.PasswordContainsUsername)]
     public void The_password_policy_refuses_with_its_code(string password, string username, int minimum, string code)

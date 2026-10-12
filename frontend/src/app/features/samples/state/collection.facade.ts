@@ -8,6 +8,12 @@ import { mutation } from '../../../core/state/mutation';
 import { SamplesApi } from '../data/samples.api';
 import { normalizeSampleNumber, todayWindow } from '../ui/sample-format';
 import { SampleListExport } from './sample-list-export';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { sortParams } from '../../../shared/forms/paging';
+import { type SortKeyMap, type TableSort, serverSortOf } from '../../../shared/ui/data-table/data-table.types';
+
+/** The server keys of the sortable columns of today's samples (B-03, SamplesSortKeys.Samples). */
+export const COLLECTION_SORT_KEYS: SortKeyMap = { sampleNumber: 'sampleNumber', accession: 'accession', status: 'status' };
 
 /** The outcome of one scan, for the feedback strip and the session log of CP-14. */
 export interface ScanOutcome {
@@ -38,6 +44,7 @@ let nextOutcomeId = 0;
  */
 @Injectable()
 export class CollectionFacade {
+  private readonly i18n = inject(I18nService);
   private readonly api = inject(SamplesApi);
   private readonly auth = inject(AuthStore);
   private readonly exporter = inject(SampleListExport);
@@ -47,6 +54,9 @@ export class CollectionFacade {
   readonly lastOutcome = computed(() => this.outcomes()[0] ?? null);
 
   readonly filter = signal<TodayFilter>({ status: null, branchOnly: true, search: null, page: 1, pageSize: 50 });
+
+  /** The column order chosen in the table header; the server sorts the whole list before paging (validation v0.5.0 B-03). */
+  readonly sort = signal<TableSort | null>(null);
 
   /** The list filter as the API takes it: today (local day) and, by default, the session branch. */
   readonly listFilter = computed<SampleListFilter>(() => {
@@ -63,6 +73,7 @@ export class CollectionFacade {
       search: filter.search,
       page: filter.page,
       pageSize: filter.pageSize,
+      ...sortParams(serverSortOf(this.sort(), COLLECTION_SORT_KEYS, () => this.i18n.lang())),
     };
   });
 
@@ -133,6 +144,12 @@ export class CollectionFacade {
 
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
+  }
+
+  /** A header click: the new order starts at page 1. */
+  setSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.filter.update((current) => ({ ...current, page: 1 }));
   }
 
   /** The visit of an accession, from the samples register (the accession is on every sample). */

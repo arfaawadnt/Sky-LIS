@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Platform.Application.Identity;
 using Platform.Contracts.Common;
 using Platform.Contracts.Identity;
 using Platform.Contracts.Organization;
@@ -253,6 +255,59 @@ public sealed class OrganizationFlowTests(ApiFactory factory) : IClassFixture<Ap
         Assert.DoesNotContain(catalogue!.Modules, module => module.Key is "platform" or "tenancy");
         Assert.Contains(catalogue.Modules, module => module.Key == "registration" && module.Actions.Contains("create"));
         Assert.Contains("viewConfidential", catalogue.Actions);
+    }
+
+    /// <summary>
+    /// Validation 2026-10-11, C-01: the Platform Administrator holds every catalogued key (seeder, and migration
+    /// GrantExportPermissions for existing databases), so it grants the export keys v0.4.0 introduced; an administrator who
+    /// does not hold a key still cannot hand it out (INV-ORG-011, ORG-030), which is why nobody could grant them before.
+    /// </summary>
+    [DatabaseFact]
+    public async Task The_platform_administrator_grants_the_export_keys_that_a_holder_without_them_cannot_C_01()
+    {
+        var username = $"nt.{Suffix()}";
+        using (var scope = factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<PlatformAdministratorSeeder>().SeedAsync(username, ApiFactory.Password, CancellationToken.None);
+        }
+
+        var platform = await SignedInClientAsync(username);
+        var roleId = await CreateRoleAsync(platform, $"Exporters {Suffix()}", ["organization.view"]);
+        var granted = await platform.PutAsJsonAsync($"{Roles}/{roleId}/permissions", new SetRolePermissionsRequest(["organization.view", "organization.export", "treasury.export"]));
+        Assert.Equal(HttpStatusCode.NoContent, granted.StatusCode);
+        Assert.Equal(["organization.export", "organization.view", "treasury.export"], (await platform.GetFromJsonAsync<RoleDetail>($"{Roles}/{roleId}"))!.PermissionKeys.Order(StringComparer.Ordinal));
+
+        var (supervisor, _, _) = await factory.SeedUserAsync(tenantId: TenantIds.Platform, permissions: ["organization.view", "organization.edit", "organization.manage"], displayName: "Platform Supervisor");
+        var otherRoleId = await CreateRoleAsync(platform, $"Viewers {Suffix()}", ["organization.view"]);
+        var refused = await (await SignedInClientAsync(supervisor)).PutAsJsonAsync($"{Roles}/{otherRoleId}/permissions", new SetRolePermissionsRequest(["organization.view", "organization.export"]));
+        Assert.Equal(("ORG-030", HttpStatusCode.Forbidden), (await AuthClient.CodeOf(refused), refused.StatusCode));
+    }
+
+    [DatabaseFact]
+    public async Task A_user_mobile_is_stored_in_E164_and_unique_in_every_spelling_C_03()
+    {
+        await CreatePlaceAsync(await PlatformAdministratorAsync(), "Mobile " + Suffix());   // an active +20 country, ten national digits
+        var tenant = Guid.CreateVersion7();
+        var admin = await AdministratorAsync(tenant);
+        var roleId = await CreateRoleAsync(admin, "Reception", ["registration.view"]);
+        var national = "010" + Random.Shared.Next(10_000_000, 99_999_999).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        var first = $"mob.{Suffix()}";
+        var created = await PostSealedAsync(admin, Users, "password", "a long staff password", sealedValue => WithMobile(UserBody(first, sealedValue, roleId), "+2" + national));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var firstId = (await admin.GetFromJsonAsync<Paged<UserListItem>>($"{Users}?search={first}"))!.Items.Single().UserId;
+        Assert.Equal("+2" + national, (await admin.GetFromJsonAsync<UserDetail>($"{Users}/{firstId}"))!.Mobile);
+
+        // The same number in its national spelling is the same number: refused, not stored a second time.
+        var duplicate = await PostSealedAsync(admin, Users, "password", "a long staff password", sealedValue => WithMobile(UserBody($"mob.{Suffix()}", sealedValue, roleId), national));
+        Assert.Equal(("ORG-104", HttpStatusCode.Conflict), (await AuthClient.CodeOf(duplicate), duplicate.StatusCode));
+    }
+
+    private static Dictionary<string, object?> WithMobile(object body, string mobile)
+    {
+        var values = body.GetType().GetProperties().ToDictionary(property => property.Name, property => property.GetValue(body));
+        values["mobile"] = mobile;
+        return values;
     }
 
     private static int _isoCounter;

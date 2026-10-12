@@ -14,7 +14,7 @@ import {
   type TreasuryListFilter,
   type TreasuryListItem,
 } from '../../../core/api/treasury.contracts';
-import { type BranchListItem, ORGANIZATION_API } from '../../../core/api/organization.contracts';
+import { type BranchListItem, ORGANIZATION_API, type SelectableBranch, type SelectableBranchesResponse } from '../../../core/api/organization.contracts';
 import { toHttpParams } from '../../../shared/forms/paging';
 
 /** Typed calls of the module; URLs are built with `HttpParams`, never by string concatenation (pitfall P-60). */
@@ -27,9 +27,9 @@ export class TreasuryApi {
     return firstValueFrom(this.http.get<Paged<TreasuryListItem>>(TREASURY_API.treasuries, { params }), { defaultValue: emptyPage<TreasuryListItem>() }).then(abortable(signal));
   }
 
-  /** The paged catalogue (CP-28); the API has no text search, the page filters client-side. */
+  /** The paged catalogue (CP-28), searched on the server over the code and both names (UAT B-08). */
   listTreasuriesPage(filter: TreasuryListFilter, signal?: AbortSignal): Promise<Paged<TreasuryListItem>> {
-    const params = toHttpParams({ isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize });
+    const params = toHttpParams({ search: filter.search.trim(), isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize, sort: filter.sort ?? null, direction: filter.direction ?? null });
     return firstValueFrom(this.http.get<Paged<TreasuryListItem>>(TREASURY_API.treasuries, { params }), { defaultValue: emptyPage<TreasuryListItem>() }).then(abortable(signal));
   }
 
@@ -38,6 +38,12 @@ export class TreasuryApi {
     const params = toHttpParams({ search: '', isActive: true, page: 1, pageSize: 200 });
     const page = await firstValueFrom(this.http.get<Paged<BranchListItem>>(ORGANIZATION_API.branches, { params }), { defaultValue: emptyPage<BranchListItem>() }).then(abortable(signal));
     return page.items;
+  }
+
+  /** The branches the session may select (CP-04, any signed-in user): the picker of a manager without `organization.view` (R-08). */
+  async selectableBranches(signal?: AbortSignal): Promise<readonly SelectableBranch[]> {
+    const response = await firstValueFrom(this.http.get<SelectableBranchesResponse>(ORGANIZATION_API.selectableBranches), { defaultValue: { currentBranchId: null, branches: [] } }).then(abortable(signal));
+    return response.branches;
   }
 
   createTreasury(request: CreateTreasuryRequest): Promise<CreatedResource> {

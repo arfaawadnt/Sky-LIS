@@ -254,6 +254,59 @@ public sealed class ResultTests
     }
 
     [Fact]
+    public void R_BR11_recheck_a_previous_verified_after_entry_flags_the_result_before_verification()
+    {
+        // Validation A-02 (2026-10-11): CREA 2.0 entered while the patient's CREA 1.2 was not verified yet.
+        var result = Ordered();
+        result.Enter(ResultValueInput.Number(2.0m), Delta20, null, null, Bench, true, Now);
+        Assert.False(result.DeltaFlag);
+
+        var previous = new PreviousResultValue(Guid.CreateVersion7(), 1.2m, Now.AddMinutes(10));
+        Assert.True(result.RecheckDelta(previous, 20m));
+
+        Assert.True(result.DeltaFlag);
+        Assert.Equal((66.7m, 1.2m, previous.ResultId, previous.VerifiedAtUtc), (result.DeltaPercent!.Value, result.PreviousValue!.Value, result.PreviousResultId!.Value, result.PreviousVerifiedAtUtc!.Value));
+        Refused(ResultsCodes.DeltaNotAcknowledged, () => result.Verify(Doctor, false, Now.AddMinutes(11)));
+        Assert.False(result.RecheckDelta(previous, 20m));   // same basis: nothing to do
+    }
+
+    [Fact]
+    public void R_BR11_recheck_a_newer_basis_clears_the_old_acknowledgement_and_an_older_one_is_ignored()
+    {
+        var result = Ordered();
+        var first = new PreviousResultValue(Guid.CreateVersion7(), 100m, Now.AddDays(-2));
+        result.Enter(ResultValueInput.Number(130m), Delta20, null, first, Bench, true, Now);
+        result.AcknowledgeDelta(Doctor, "Known trend.", Now);
+
+        Assert.False(result.RecheckDelta(new PreviousResultValue(Guid.CreateVersion7(), 50m, Now.AddDays(-5)), 20m));
+        Assert.NotNull(result.DeltaAcknowledgedAtUtc);
+
+        var newer = new PreviousResultValue(Guid.CreateVersion7(), 60m, Now.AddMinutes(1));
+        Assert.True(result.RecheckDelta(newer, 20m));
+        Assert.True(result.DeltaFlag);
+        Assert.Null(result.DeltaAcknowledgedAtUtc);
+        Refused(ResultsCodes.DeltaNotAcknowledged, () => result.Verify(Doctor, false, Now.AddMinutes(2)));
+
+        Assert.True(result.RecheckDelta(new PreviousResultValue(Guid.CreateVersion7(), 125m, Now.AddMinutes(3)), 20m));
+        Assert.False(result.DeltaFlag);
+        result.Verify(Doctor, false, Now.AddMinutes(4));
+        Assert.Equal(ResultStatus.Verified, result.Status);
+    }
+
+    [Fact]
+    public void R_BR11_recheck_leaves_signed_results_and_tests_without_a_delta_limit_alone()
+    {
+        var verified = Verified();
+        var previous = new PreviousResultValue(Guid.CreateVersion7(), 1m, Now.AddHours(1));
+        Assert.False(verified.RecheckDelta(previous, 20m));
+        Assert.False(verified.DeltaFlag);
+
+        var open = Complete();
+        Assert.False(open.RecheckDelta(previous, null));
+        Assert.False(open.DeltaFlag);
+    }
+
+    [Fact]
     public void R_T2_delta_within_the_threshold_is_not_flagged()
     {
         var result = Ordered();

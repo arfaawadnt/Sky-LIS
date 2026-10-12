@@ -86,6 +86,8 @@
   "wizard.chooseCountry": "اختر الدولة",
   "wizard.chooseGovernorate": "اختر المحافظة",
   "wizard.chooseCountryFirst": "اختر الدولة أولاً",
+  "wizard.validation.mobileLength": "جوال المعمل {length} أرقام بعد {dial} في الدولة المختارة.",
+  "wizard.validation.managerMobileLength": "جوال المدير {length} أرقام بعد {dial} في الدولة المختارة.",
   "wizard.mobileHint": "{length} رقماً بعد {dial}",
   "wizard.optional": "اختياري",
   "wizard.managerMobileHint": "يُرسل رمز التحقق إلى هذا الرقم.",

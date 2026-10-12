@@ -2,7 +2,10 @@ import { Injectable, computed, inject, resource, signal } from '@angular/core';
 
 import type { PageRequest } from '../../../core/api/paging';
 import type { ResultStatus, SampleStatusName, WorklistItem, WorklistQuery } from '../../../core/api/results.contracts';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { mutation } from '../../../core/state/mutation';
+import { sortParams } from '../../../shared/forms/paging';
+import { type SortKeyMap, type TableSort, localizedSortKey, serverSortOf } from '../../../shared/ui/data-table/data-table.types';
 import { ResultsApi } from '../data/results.api';
 import { localDayStart, today } from '../ui/result-format';
 import { WorklistExport } from './worklist-export';
@@ -43,6 +46,19 @@ export function defaultWorklistFilter(day: string = today()): WorklistFilter {
 }
 
 /**
+ * The server keys of the sortable worklist columns (B-03, ResultsSortKeys.Worklist): names by the language on screen,
+ * the status in workflow order, the delay past the expected time. The consumed percentage is not sortable (a ratio).
+ */
+export const WORKLIST_SORT_KEYS: SortKeyMap = {
+  accession: 'accession',
+  patient: localizedSortKey('patient'),
+  test: localizedSortKey('test'),
+  status: 'status',
+  expectedAtUtc: 'expectedAtUtc',
+  delay: 'delay',
+};
+
+/**
  * CP-18 Worklist (01 §6.3): one row per test of the collection window with the BR-13 delay colour, the counters
  * (requests, tests, samples, delayed), the status boxes and the filter lists; the bench-list document and a CSV of the
  * current filter. Reads through `resource()`, the document through `mutation()`.
@@ -52,7 +68,12 @@ export class WorklistFacade {
   private readonly api = inject(ResultsApi);
   private readonly exporter = inject(WorklistExport);
 
+  private readonly i18n = inject(I18nService);
+
   readonly filter = signal<WorklistFilter>(defaultWorklistFilter());
+
+  /** The column order chosen in the table header; the server sorts the whole list before paging (validation v0.5.0 B-03). */
+  readonly sort = signal<TableSort | null>(null);
 
   /** The API query: the "to" day is inclusive, so its window ends at the next local midnight. */
   readonly query = computed<WorklistQuery>(() => {
@@ -71,6 +92,7 @@ export class WorklistFacade {
       branchOnly: filter.branchOnly,
       page: filter.page,
       pageSize: filter.pageSize,
+      ...sortParams(serverSortOf(this.sort(), WORKLIST_SORT_KEYS, () => this.i18n.lang())),
     };
   });
 
@@ -124,6 +146,12 @@ export class WorklistFacade {
 
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
+  }
+
+  /** A header click: the new order starts at page 1. */
+  setSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.filter.update((current) => ({ ...current, page: 1 }));
   }
 
   clear(): void {

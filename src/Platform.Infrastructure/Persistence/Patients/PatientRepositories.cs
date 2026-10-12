@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Patients;
 using Platform.Contracts.Common;
 using Platform.Contracts.Patients;
@@ -12,15 +13,51 @@ internal sealed class PatientRepository(AppDbContext context) : Repository<Patie
     /// <summary>Merge chains deeper than this are not followed (a chain of 16 merges is an operational anomaly).</summary>
     public const int MaxMergeDepth = 16;
 
+    private static readonly SortColumns<Patient> Sorts = new SortColumns<Patient>(PatientSortKeys.Patients)
+        .Column("number", patient => patient.Number)
+        .Column("name", patient => patient.FullName)
+        .ThenBy(patient => patient.Number)
+        .ThenBy(patient => patient.Id);
+
     public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken) => Set.AnyAsync(patient => patient.Id == id, cancellationToken);
 
     public async Task<Paged<PatientRow>> SearchAsync(PatientSearchFilter filter, PageRequest page, CancellationToken cancellationToken)
     {
         var query = PatientQueries.Filter(Set.AsNoTracking(), filter);
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var pageQuery = query.OrderByDescending(patient => patient.CreatedAtUtc).ThenByDescending(patient => patient.Id).Skip(page.Skip).Take(page.PageSize);
-        var rows = await PatientQueries.Rows(pageQuery, Set.AsNoTracking()).ToListAsync(cancellationToken).ConfigureAwait(false);
-        return new Paged<PatientRow>(PatientQueries.Newest(rows), page.Page, page.PageSize, total);
+        if (filter.Sort.Key is null)
+        {
+            var pageQuery = query.OrderByDescending(patient => patient.CreatedAtUtc).ThenByDescending(patient => patient.Id).Skip(page.Skip).Take(page.PageSize);
+            var rows = await PatientQueries.Rows(pageQuery, Set.AsNoTracking()).ToListAsync(cancellationToken).ConfigureAwait(false);
+            return new Paged<PatientRow>(PatientQueries.Newest(rows), page.Page, page.PageSize, total);
+        }
+
+        // B-03: the page of the requested order is chosen on the server; the row projection keeps no order, so the rows
+        // are put back in the order of the ids.
+        var ids = await Order(query, filter).Skip(page.Skip).Take(page.PageSize)
+            .Select(patient => patient.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var sorted = await PatientQueries.Rows(Set.AsNoTracking().Where(patient => ids.Contains(patient.Id)), Set.AsNoTracking()).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var position = ids.Select((id, index) => (id, index)).ToDictionary(entry => entry.id, entry => entry.index);
+        return new Paged<PatientRow>(sorted.OrderBy(row => position[row.Id]).ToList(), page.Page, page.PageSize, total);
+    }
+
+    /// <summary>
+    /// The requested order. Sorted by name for a user without the See-VIP right (<see cref="PatientSearchFilter.IncludeVip"/>
+    /// false), a masked VIP row sorts as if its name were empty: after every named row in either direction, by number, so
+    /// its place never hints at the hidden name (validation v0.5.0 R-05).
+    /// </summary>
+    internal static IOrderedQueryable<Patient> Order(IQueryable<Patient> query, PatientSearchFilter filter)
+    {
+        if (!filter.IncludeVip && string.Equals(filter.Sort.Key, "name", StringComparison.OrdinalIgnoreCase))
+        {
+            var namedFirst = query.OrderBy(patient => patient.IsVip);
+            var byName = filter.Sort.Descending
+                ? namedFirst.ThenByDescending(patient => patient.IsVip ? string.Empty : patient.FullName)
+                : namedFirst.ThenBy(patient => patient.IsVip ? string.Empty : patient.FullName);
+            return byName.ThenBy(patient => patient.Number).ThenBy(patient => patient.Id);
+        }
+
+        return Sorts.Apply(query, filter.Sort, rows => rows.OrderByDescending(patient => patient.CreatedAtUtc));
     }
 
     public async Task<IReadOnlyList<PatientRow>> SearchAllAsync(PatientSearchFilter filter, int limit, CancellationToken cancellationToken)
@@ -158,7 +195,12 @@ internal sealed class PatientDocumentRepository(AppDbContext context) : Reposito
 /// <summary>Shared query pieces of the module: the register filter, the row projection (with the survivor's number) and predicate composition.</summary>
 internal static class PatientQueries
 {
-    /// <summary>Gender, VIP and status filters, then the search box: number OR mobile digits OR national id OR every name token (Latin or Arabic key).</summary>
+    /// <summary>
+    /// Gender, VIP and status filters, then the search box: number OR mobile digits OR national id OR every name token
+    /// (Latin or Arabic key). Without the See-VIP right (<see cref="PatientSearchFilter.IncludeVip"/> false) a VIP file
+    /// matches only its full patient number or full national id, never a name, a mobile or a part of a number, as in the
+    /// visit register (REG intake Q12; validation A-03, 2026-10-11).
+    /// </summary>
     public static IQueryable<Patient> Filter(IQueryable<Patient> query, PatientSearchFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
@@ -177,7 +219,20 @@ internal static class PatientQueries
             query = query.Where(patient => patient.Status == status);
         }
 
-        return filter.Terms is { } terms ? query.Where(Matches(terms)) : query;
+        if (filter.Terms is not { } terms)
+        {
+            return query;
+        }
+
+        if (filter.IncludeVip)
+        {
+            return query.Where(Matches(terms));
+        }
+
+        var number = terms.Number;
+        var nationalId = terms.NationalId;
+        Expression<Func<Patient, bool>> exactVip = patient => patient.IsVip && (patient.Number == number || (nationalId != null && patient.NationalId == nationalId));
+        return query.Where(Or(And(patient => !patient.IsVip, Matches(terms)), exactVip));
     }
 
     public static IQueryable<PatientRow> Rows(IQueryable<Patient> source, IQueryable<Patient> all) =>

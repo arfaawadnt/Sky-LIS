@@ -1,5 +1,7 @@
 /** Pricing module contracts mirrored from `Platform.Contracts.Pricing` (bootstrap until the OpenAPI generator lands, 01 §6.2). */
 
+import type { SortRequest } from './paging';
+
 export type { Paged } from './paging';
 
 export interface CreatedResource {
@@ -63,7 +65,8 @@ export interface ContractTierRequest {
   readonly nameAr: string;
 }
 
-export interface PayerListFilter {
+/** `sort`: `nameEn`, `nameAr`, `searchKey` or `type` (B-03, server allow-list). */
+export interface PayerListFilter extends SortRequest {
   readonly search: string;
   readonly type: PayerType | null;
   readonly isActive: boolean | null;
@@ -156,7 +159,8 @@ export interface CopyBasePriceListRequest {
   readonly roundingStep: number;
 }
 
-export interface BasePriceListFilter {
+/** `sort`: `code`, `nameEn`, `nameAr` or `year` (B-03, server allow-list). */
+export interface BasePriceListFilter extends SortRequest {
   readonly search: string;
   readonly year: number | null;
   readonly isActive: boolean | null;

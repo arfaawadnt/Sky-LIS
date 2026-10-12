@@ -14,6 +14,12 @@ public interface IPlatformUserRepository : IRepository<PlatformUser>
 
     /// <summary>The one user registered with this mobile (normalised form), or <see langword="null"/>; mobiles are unique among users that have one.</summary>
     Task<PlatformUser?> FindByMobileAsync(string mobile, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Every user whose stored mobile is one of <paramref name="spellings"/> (C-03: rows saved before the E.164 rule may
+    /// hold the national form). <see cref="IUserMobileNumbers.SpellingsAsync"/> builds the list.
+    /// </summary>
+    Task<IReadOnlyList<PlatformUser>> ListByMobileSpellingsAsync(IReadOnlyCollection<string> spellings, CancellationToken cancellationToken);
 }
 
 /// <summary>Write-side port of <see cref="RefreshSession"/>. Lookups are keyed by session id, token hash or family.</summary>
@@ -26,4 +32,10 @@ public interface IRefreshSessionRepository : IRepository<RefreshSession>
 
     /// <summary>Every unrevoked session of a user, for password-change and deactivation revocation.</summary>
     Task<IReadOnlyList<RefreshSession>> ListLiveForUserAsync(Guid platformUserId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The session as last committed, read past this unit of work's change tracker (never tracked): after a concurrent
+    /// rotation refused this request's own rotation (<c>CONCURRENCY-409</c>), the refresh handler reads what won (C-02).
+    /// </summary>
+    Task<RefreshSession?> FindCommittedAsync(Guid sessionId, CancellationToken cancellationToken);
 }

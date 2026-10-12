@@ -25,6 +25,7 @@
   "created": "Patient file {number} was created.",
   "saved": "Patient file {number} was saved.",
   "vip": "VIP",
+  "vipMasked": "VIP patient",
   "estimated": "estimated from the age",
   "registeredOn": "Registered on",
   "createdBy": "Created by",

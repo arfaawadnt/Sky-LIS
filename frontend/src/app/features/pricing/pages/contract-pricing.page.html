@@ -155,6 +155,9 @@
       [emptyTitle]="i18n.t(current.exists ? 'pricing.contract.emptyPrices' : 'pricing.contract.noFormula')"
       [emptyMessage]="i18n.t(current.exists ? 'pricing.contract.emptyPricesHint' : 'pricing.contract.noFormulaHint')"
       [caption]="i18n.t('pricing.contract.derived')"
+      [sort]="sort()"
+      [serverSort]="true"
+      (sortChange)="onSort($event)"
     >
       <ng-template appCell="code" [appCellOf]="pagedPrices()" let-row>
         <span class="mono">{{ facade.names.code(row.serviceId) || '—' }}</span>

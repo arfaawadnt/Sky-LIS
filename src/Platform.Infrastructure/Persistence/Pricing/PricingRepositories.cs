@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Pricing;
 using Platform.Contracts.Common;
 using Platform.Contracts.Pricing;
@@ -8,6 +9,14 @@ namespace Platform.Infrastructure.Persistence.Pricing;
 
 internal sealed class PayerRepository(AppDbContext context) : Repository<Payer>(context), IPayerRepository
 {
+    private static readonly SortColumns<Payer> Sorts = new SortColumns<Payer>(PricingSortKeys.Payers)
+        .Column("nameEn", payer => payer.Name.En)
+        .Column("nameAr", payer => payer.Name.Ar)
+        .Column("searchKey", payer => payer.SearchKey)
+        .Column("type", payer => payer.Type)
+        .ThenBy(payer => payer.Name.En)
+        .ThenBy(payer => payer.Id);
+
     public override Task<Payer?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken) =>
         Set.Include(payer => payer.Tiers).FirstOrDefaultAsync(payer => payer.Id == id, cancellationToken);
 
@@ -26,7 +35,7 @@ internal sealed class PayerRepository(AppDbContext context) : Repository<Payer>(
         if (filter.Search is { } search)
         {
             var pattern = PricingReads.ContainsPattern(search);
-            query = query.Where(payer => EF.Functions.ILike(payer.Name.En, pattern) || EF.Functions.ILike(payer.Name.Ar, pattern) || EF.Functions.ILike(payer.SearchKey, pattern));
+            query = query.Where(payer => EF.Functions.ILike(payer.Name.En, pattern, "\\") || EF.Functions.ILike(payer.Name.Ar, pattern, "\\") || EF.Functions.ILike(payer.SearchKey, pattern, "\\"));
         }
 
         if (filter.Type is { } type)
@@ -40,7 +49,7 @@ internal sealed class PayerRepository(AppDbContext context) : Repository<Payer>(
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await query.OrderByDescending(payer => payer.IsDefault).ThenBy(payer => payer.Name.En).ThenBy(payer => payer.Id)
+        var rows = await Sorts.Apply(query, filter.Sort, payers => payers.OrderByDescending(payer => payer.IsDefault).ThenBy(payer => payer.Name.En).ThenBy(payer => payer.Id))
             .Skip(page.Skip)
             .Take(page.PageSize)
             .Select(PayerRow.Projection)
@@ -103,6 +112,14 @@ internal sealed class PayerRepository(AppDbContext context) : Repository<Payer>(
 
 internal sealed class BasePriceListRepository(AppDbContext context) : Repository<BasePriceList>(context), IBasePriceListRepository
 {
+    private static readonly SortColumns<BasePriceList> Sorts = new SortColumns<BasePriceList>(PricingSortKeys.BasePriceLists)
+        .Column("code", list => list.Code)
+        .Column("nameEn", list => list.Name.En)
+        .Column("nameAr", list => list.Name.Ar)
+        .Column("year", list => list.Year)
+        .ThenBy(list => list.Code)
+        .ThenBy(list => list.Id);
+
     public override Task<BasePriceList?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken) =>
         Set.Include(list => list.Lines).FirstOrDefaultAsync(list => list.Id == id, cancellationToken);
 
@@ -126,7 +143,7 @@ internal sealed class BasePriceListRepository(AppDbContext context) : Repository
         if (filter.Search is { } search)
         {
             var pattern = PricingReads.ContainsPattern(search);
-            query = query.Where(list => EF.Functions.ILike(list.Code, pattern) || EF.Functions.ILike(list.Name.En, pattern) || EF.Functions.ILike(list.Name.Ar, pattern));
+            query = query.Where(list => EF.Functions.ILike(list.Code, pattern, "\\") || EF.Functions.ILike(list.Name.En, pattern, "\\") || EF.Functions.ILike(list.Name.Ar, pattern, "\\"));
         }
 
         if (filter.Year is { } year)
@@ -140,7 +157,7 @@ internal sealed class BasePriceListRepository(AppDbContext context) : Repository
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await query.OrderByDescending(list => list.Year).ThenBy(list => list.Code)
+        var items = await Sorts.Apply(query, filter.Sort, lists => lists.OrderByDescending(list => list.Year).ThenBy(list => list.Code))
             .Skip(page.Skip)
             .Take(page.PageSize)
             .Select(list => new BasePriceListItem(

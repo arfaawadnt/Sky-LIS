@@ -119,6 +119,15 @@ describe('RejectionsFacade (CP-16, BR-18)', () => {
     backend.verify();
   });
 
+  it('B-03: sorts the rejected samples on the server from page 1 (rejection time)', async () => {
+    await flushInitialLoads();
+    facade.setSort({ key: 'rejectedAtUtc', direction: 'desc' });
+    await runEffects();
+    const sorted = backend.expectOne((request) => request.url === SAMPLES_API.samples);
+    expect([sorted.request.params.get('sort'), sorted.request.params.get('direction'), sorted.request.params.get('status')]).toEqual(['rejectedAtUtc', 'desc', 'Rejected']);
+    sorted.flush(page([]));
+  });
+
   it('bounds the rejected list by local dates', async () => {
     await flushInitialLoads();
 

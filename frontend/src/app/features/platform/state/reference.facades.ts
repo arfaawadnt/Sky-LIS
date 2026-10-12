@@ -10,8 +10,17 @@ import {
   type ReferenceListFilter,
 } from '../../../core/api/platform.contracts';
 import type { SettingValueItem, TenantSettingItem } from '../../../core/api/settings.contracts';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { mutation } from '../../../core/state/mutation';
+import { sortParams } from '../../../shared/forms/paging';
+import { type SortKeyMap, type TableSort, serverSortOf } from '../../../shared/ui/data-table/data-table.types';
 import { PlatformApi } from '../data/platform.api';
+
+/** The server keys of the sortable columns of the PCR kit library (B-03, PlatformAdminSortKeys.PcrKits). */
+export const PCR_KIT_SORT_KEYS: SortKeyMap = { name: 'name', analyserModelName: 'analyserModel' };
+
+/** The server key of the sortable column of the notification templates (B-03, PlatformAdminSortKeys.NotificationTemplates). */
+export const TEMPLATE_SORT_KEYS: SortKeyMap = { code: 'code' };
 
 /** The list state every hand-written reference register shares: search, active filter, page. */
 function listFilter(): WritableSignal<ReferenceListFilter> {
@@ -22,11 +31,17 @@ function listFilter(): WritableSignal<ReferenceListFilter> {
 @Injectable()
 export class PcrKitsFacade {
   private readonly api = inject(PlatformApi);
+  private readonly i18n = inject(I18nService);
 
   readonly filter = listFilter();
 
+  /** The column order chosen in the table header; the server sorts the whole list before paging (validation v0.5.0 B-03). */
+  readonly sort = signal<TableSort | null>(null);
+
+  private readonly query = computed<ReferenceListFilter>(() => ({ ...this.filter(), ...sortParams(serverSortOf(this.sort(), PCR_KIT_SORT_KEYS, () => this.i18n.lang())) }));
+
   readonly kits = resource({
-    params: () => this.filter(),
+    params: () => this.query(),
     loader: ({ params, abortSignal }) => this.api.listPcrKits(params, abortSignal),
   });
 
@@ -52,6 +67,12 @@ export class PcrKitsFacade {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
   }
 
+  /** A header click: the new order starts at page 1. */
+  setSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.filter.update((current) => ({ ...current, page: 1 }));
+  }
+
   /** Re-reads the kits and the analyser models when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
   refresh(): void {
     this.kits.reload();
@@ -63,11 +84,17 @@ export class PcrKitsFacade {
 @Injectable()
 export class TemplatesFacade {
   private readonly api = inject(PlatformApi);
+  private readonly i18n = inject(I18nService);
 
   readonly filter = listFilter();
 
+  /** The column order chosen in the table header; the server sorts the whole list before paging (validation v0.5.0 B-03). */
+  readonly sort = signal<TableSort | null>(null);
+
+  private readonly query = computed<ReferenceListFilter>(() => ({ ...this.filter(), ...sortParams(serverSortOf(this.sort(), TEMPLATE_SORT_KEYS, () => this.i18n.lang())) }));
+
   readonly templates = resource({
-    params: () => this.filter(),
+    params: () => this.query(),
     loader: ({ params, abortSignal }) => this.api.listTemplates(params, abortSignal),
   });
 
@@ -95,6 +122,12 @@ export class TemplatesFacade {
 
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
+  }
+
+  /** A header click: the new order starts at page 1. */
+  setSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.filter.update((current) => ({ ...current, page: 1 }));
   }
 
   /** Re-reads the templates and the placeholders when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */

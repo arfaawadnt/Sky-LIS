@@ -6,8 +6,8 @@
 </div>
 
 <app-section-card [title]="i18n.t('adminHome.welcomeTitle')">
-  @if (auth.currentUser(); as user) {
-    <p>{{ i18n.t('adminHome.welcome') }} <strong>{{ user.displayName }}</strong></p>
+  @if (auth.profile()) {
+    <p>{{ i18n.t('adminHome.welcome') }} <strong>{{ userName() }}</strong></p>
   }
   <p class="muted">{{ i18n.t('adminHome.placeholder') }}</p>
 </app-section-card>

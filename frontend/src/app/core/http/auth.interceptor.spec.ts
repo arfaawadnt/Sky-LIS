@@ -171,4 +171,18 @@ describe('authInterceptor + csrfInterceptor (01 §6.4)', () => {
     await expect(call).rejects.toMatchObject({ code: 'AUTH-002' });
     backend.expectNone(AUTH_API.refresh);
   });
+
+  it('sends no API request once the session was signed out and /login is loading (round 2 R2-05)', async () => {
+    await signInWith('token-1');
+    const signOut = store.signOut();
+    backend.expectOne(AUTH_API.signOut).flush(null, { status: 204, statusText: 'No Content' });
+    await signOut;
+
+    const call = firstValueFrom(http.get('/api/v1/dashboard/branch'));
+    await expect(call).rejects.toBeDefined();
+    await settle();
+    backend.expectNone('/api/v1/dashboard/branch');
+    backend.expectNone(AUTH_API.refresh);
+    expect(navigation.loads).toEqual(['/login']);
+  });
 });

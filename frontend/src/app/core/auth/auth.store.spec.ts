@@ -1,6 +1,6 @@
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, resource } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { AUTH_API, type AuthResponse } from '../api/auth.contracts';
@@ -151,6 +151,42 @@ describe('AuthStore (D-01, P-61)', () => {
     await complete;
 
     expect(store.isAuthenticated()).toBe(false);
+  });
+
+  it('sign-out re-runs no resource of the open page and asks the server nothing more before /login loads (round 2 R2-05)', async () => {
+    const signIn = store.signIn('mona', 'secret', null);
+    http.expectOne(AUTH_API.signIn).flush(signedIn('token-1', 'b1'));
+    await signIn;
+
+    // A page's resources keyed by the user and the branch, as the dashboard and the branch picker are.
+    const loads: string[] = [];
+    TestBed.runInInjectionContext(() =>
+      resource({
+        params: () => ({ user: store.currentUser()?.id ?? '', branch: store.currentBranch() }),
+        loader: ({ params }) => {
+          loads.push(`${params.user}/${params.branch ?? '-'}`);
+          return Promise.resolve(null);
+        },
+      }),
+    );
+    TestBed.tick();
+    await Promise.resolve();
+    expect(loads).toEqual(['u1/b1']);
+
+    const signOut = store.signOut();
+    http.expectOne(AUTH_API.signOut).flush(null, { status: 204, statusText: 'No Content' });
+    await signOut;
+    TestBed.tick();
+    await Promise.resolve();
+
+    expect(loads).toEqual(['u1/b1']);
+    expect(store.hasEnded()).toBe(true);
+    expect(store.token()).toBeNull();
+    expect(store.currentBranch()).toBe('b1');
+    await expect(store.refresh()).resolves.toBeNull();
+    http.expectNone(AUTH_API.refresh);
+    channel.deliver({ kind: 'signed-out' });
+    expect(navigation.loads).toEqual(['/login']);
   });
 
   it('sign-out clears local state even when the server call fails', async () => {

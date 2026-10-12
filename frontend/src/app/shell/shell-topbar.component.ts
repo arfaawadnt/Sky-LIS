@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input
 import { RouterLink } from '@angular/router';
 
 import { AuthStore } from '../core/auth/auth.store';
+import { displayNameFor } from '../core/auth/display-name';
+import { roleNameFor } from '../core/auth/role-name';
 import { I18nService } from '../core/i18n/i18n.service';
 import { PortalService } from '../core/portal/portal.service';
 import { IconComponent } from '../shared/ui/icon/icon.component';
@@ -45,9 +47,11 @@ export class ShellTopbarComponent {
   protected readonly menuLabel = computed(() =>
     this.i18n.t(this.narrow() ? 'shell.openMenu' : this.collapsed() ? 'shell.expandMenu' : 'shell.collapseMenu'));
 
-  protected readonly displayName = computed(() => this.auth.currentUser()?.displayName ?? '');
+  /** R-12: the user's own name in the language of the page (the member's full name in that language). */
+  protected readonly displayName = computed(() => displayNameFor(this.auth.profile(), this.i18n.lang()));
 
-  protected readonly roleName = computed(() => this.auth.profile()?.roleName ?? null);
+  /** B-09: the role in the language of the page. */
+  protected readonly roleName = computed(() => roleNameFor(this.auth.profile(), this.i18n.lang()));
 
   protected readonly initials = computed(() =>
     this.displayName()

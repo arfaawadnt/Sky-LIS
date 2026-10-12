@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Contracts.Catalogue;
 using Platform.Contracts.Common;
@@ -14,7 +15,7 @@ namespace Platform.Application.Catalogue.Queries;
 // catalogue.export; the SPA writes the CSV.
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
-public sealed record ListClinicalGroupsQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<ClinicalGroupListItem>>;
+public sealed record ListClinicalGroupsQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<ClinicalGroupListItem>>;
 
 public sealed class ListClinicalGroupsValidator : AbstractValidator<ListClinicalGroupsQuery>
 {
@@ -23,13 +24,15 @@ public sealed class ListClinicalGroupsValidator : AbstractValidator<ListClinical
         RuleFor(query => query.Search).MaximumLength(CatalogueAPaging.MaxSearchLength);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(CatalogueSortKeys.ClinicalGroups);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
 public sealed class ListClinicalGroupsHandler(IClinicalGroupRepository groups) : IQueryHandler<ListClinicalGroupsQuery, Paged<ClinicalGroupListItem>>
 {
     public Task<Paged<ClinicalGroupListItem>> Handle(ListClinicalGroupsQuery query, CancellationToken cancellationToken) =>
-        groups.ListAsync(new CatalogueAListFilter(query.Search, query.IsActive), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        groups.ListAsync(new CatalogueAListFilter(query.Search, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Export)]
@@ -42,7 +45,7 @@ public sealed class ExportClinicalGroupsHandler(IClinicalGroupRepository groups)
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
-public sealed record ListSampleTypesQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<SampleTypeListItem>>;
+public sealed record ListSampleTypesQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<SampleTypeListItem>>;
 
 public sealed class ListSampleTypesValidator : AbstractValidator<ListSampleTypesQuery>
 {
@@ -51,13 +54,15 @@ public sealed class ListSampleTypesValidator : AbstractValidator<ListSampleTypes
         RuleFor(query => query.Search).MaximumLength(CatalogueAPaging.MaxSearchLength);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(CatalogueSortKeys.SampleTypes);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
 public sealed class ListSampleTypesHandler(ISampleTypeRepository sampleTypes) : IQueryHandler<ListSampleTypesQuery, Paged<SampleTypeListItem>>
 {
     public Task<Paged<SampleTypeListItem>> Handle(ListSampleTypesQuery query, CancellationToken cancellationToken) =>
-        sampleTypes.ListAsync(new CatalogueAListFilter(query.Search, query.IsActive), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        sampleTypes.ListAsync(new CatalogueAListFilter(query.Search, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Export)]
@@ -80,7 +85,7 @@ public sealed class GetSampleTypeHandler(ISampleTypeRepository sampleTypes) : IQ
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
-public sealed record ListMeasurementUnitsQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<MeasurementUnitListItem>>;
+public sealed record ListMeasurementUnitsQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<MeasurementUnitListItem>>;
 
 public sealed class ListMeasurementUnitsValidator : AbstractValidator<ListMeasurementUnitsQuery>
 {
@@ -89,13 +94,15 @@ public sealed class ListMeasurementUnitsValidator : AbstractValidator<ListMeasur
         RuleFor(query => query.Search).MaximumLength(CatalogueAPaging.MaxSearchLength);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(CatalogueSortKeys.Units);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
 public sealed class ListMeasurementUnitsHandler(IMeasurementUnitRepository units) : IQueryHandler<ListMeasurementUnitsQuery, Paged<MeasurementUnitListItem>>
 {
     public Task<Paged<MeasurementUnitListItem>> Handle(ListMeasurementUnitsQuery query, CancellationToken cancellationToken) =>
-        units.ListAsync(new CatalogueAListFilter(query.Search, query.IsActive), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        units.ListAsync(new CatalogueAListFilter(query.Search, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Export)]
@@ -108,7 +115,7 @@ public sealed class ExportMeasurementUnitsHandler(IMeasurementUnitRepository uni
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
-public sealed record ListPatientConditionsQuery(string? Search, bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<PatientConditionListItem>>;
+public sealed record ListPatientConditionsQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<PatientConditionListItem>>;
 
 public sealed class ListPatientConditionsValidator : AbstractValidator<ListPatientConditionsQuery>
 {
@@ -117,13 +124,15 @@ public sealed class ListPatientConditionsValidator : AbstractValidator<ListPatie
         RuleFor(query => query.Search).MaximumLength(CatalogueAPaging.MaxSearchLength);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(CatalogueSortKeys.PatientConditions);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
 public sealed class ListPatientConditionsHandler(IPatientConditionRepository conditions) : IQueryHandler<ListPatientConditionsQuery, Paged<PatientConditionListItem>>
 {
     public Task<Paged<PatientConditionListItem>> Handle(ListPatientConditionsQuery query, CancellationToken cancellationToken) =>
-        conditions.ListAsync(new CatalogueAListFilter(query.Search, query.IsActive), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        conditions.ListAsync(new CatalogueAListFilter(query.Search, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Export)]

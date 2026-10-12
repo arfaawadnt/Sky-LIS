@@ -167,6 +167,8 @@ function worklistParams(query: WorklistQuery, paged: boolean): ReturnType<typeof
     branchOnly: query.branchOnly || null,
     page: paged ? query.page : null,
     pageSize: paged ? query.pageSize : null,
+    sort: paged ? (query.sort ?? null) : null,
+    direction: paged ? (query.direction ?? null) : null,
   });
   for (const status of query.statuses) {
     params = params.append('status', status);

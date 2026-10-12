@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Organization;
 using Platform.Contracts.Common;
@@ -13,14 +14,27 @@ namespace Platform.Application.Treasury.Queries;
 // Registers of the module (intake §14). Queries carry a policy like commands (D-04) and read projections only.
 
 [RequirePermissionPolicy(PermissionCatalog.Treasury, PermissionAction.View)]
-public sealed record ListTreasuriesQuery(bool? IsActive, int? Page, int? PageSize) : IQuery<Paged<TreasuryListItem>>;
+public sealed record ListTreasuriesQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<TreasuryListItem>>;
 
-/// <summary>The page of treasuries with each branch's code and names from the Organization read port (UAT A-04: a reader without <c>organization.view</c> sees <c>CODE · name</c>).</summary>
+public sealed class ListTreasuriesValidator : AbstractValidator<ListTreasuriesQuery>
+{
+    public ListTreasuriesValidator()
+    {
+        RuleFor(query => query.Search).MaximumLength(100);
+        RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
+        RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(TreasurySortKeys.Treasuries);
+        RuleFor(query => query.Direction).SortDirection();
+    }
+}
+
+/// <summary>The page of treasuries (search over the code and both names, UAT B-08) with each branch's code and names from the Organization read port (UAT A-04: a reader without <c>organization.view</c> sees <c>CODE · name</c>).</summary>
 public sealed class ListTreasuriesHandler(ITreasuryRepository treasuries, IBranchLookup branches) : IQueryHandler<ListTreasuriesQuery, Paged<TreasuryListItem>>
 {
     public async Task<Paged<TreasuryListItem>> Handle(ListTreasuriesQuery query, CancellationToken cancellationToken)
     {
-        var page = await treasuries.ListAsync(query.IsActive, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken).ConfigureAwait(false);
+        var search = string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim();
+        var page = await treasuries.ListAsync(search, query.IsActive, ListSort.Of(query.Sort, query.Direction), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken).ConfigureAwait(false);
         var names = await branches.GetManyAsync(page.Items.Select(item => item.BranchId).ToList(), cancellationToken).ConfigureAwait(false);
         var items = page.Items
             .Select(item => names.TryGetValue(item.BranchId, out var branch) ? item with { BranchCode = branch.Code, BranchNameEn = branch.NameEn, BranchNameAr = branch.NameAr } : item)

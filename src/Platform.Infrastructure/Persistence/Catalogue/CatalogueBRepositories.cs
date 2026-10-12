@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Catalogue;
 using Platform.Contracts.Catalogue;
 using Platform.Contracts.Common;
@@ -34,6 +35,13 @@ internal static class CatalogueBListing
 
 internal sealed class PreparationRepository(AppDbContext context) : Repository<Preparation>(context), IPreparationRepository
 {
+    private static readonly SortColumns<Preparation> Sorts = new SortColumns<Preparation>(CatalogueSortKeys.Preparations)
+        .Column("code", preparation => preparation.Code)
+        .Column("questionEn", preparation => preparation.Question.En)
+        .Column("questionAr", preparation => preparation.Question.Ar)
+        .ThenBy(preparation => preparation.Code)
+        .ThenBy(preparation => preparation.Id);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken) =>
         Set.AnyAsync(preparation => preparation.Code == code, cancellationToken);
 
@@ -53,7 +61,7 @@ internal sealed class PreparationRepository(AppDbContext context) : Repository<P
                                                || EF.Functions.ILike(preparation.Question.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(preparation => preparation.Code), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(preparation => preparation.Code)), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
     }
 
     public async Task<PreparationListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -72,6 +80,10 @@ internal sealed class PreparationRepository(AppDbContext context) : Repository<P
 
 internal sealed class CommentTemplateRepository(AppDbContext context) : Repository<CommentTemplate>(context), ICommentTemplateRepository
 {
+    private static readonly SortColumns<CommentTemplate> Sorts = new SortColumns<CommentTemplate>(CatalogueSortKeys.CommentTemplates)
+        .Column("shortName", template => template.ShortName)
+        .ThenBy(template => template.Id);
+
     public Task<bool> ShortNameExistsAsync(string shortName, CancellationToken cancellationToken) =>
         Set.AnyAsync(template => template.ShortName == shortName, cancellationToken);
 
@@ -92,7 +104,7 @@ internal sealed class CommentTemplateRepository(AppDbContext context) : Reposito
                                             || EF.Functions.ILike(template.Text.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(template => template.ShortName), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(template => template.ShortName)), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
     }
 
     public async Task<CommentTemplateListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -114,6 +126,14 @@ internal sealed class CommentTemplateRepository(AppDbContext context) : Reposito
 
 internal sealed class DoctorRepository(AppDbContext context) : Repository<Doctor>(context), IDoctorRepository
 {
+    private static readonly SortColumns<Doctor> Sorts = new SortColumns<Doctor>(CatalogueSortKeys.Doctors)
+        .Column("code", doctor => doctor.Code)
+        .Column("nameEn", doctor => doctor.Name.En)
+        .Column("nameAr", doctor => doctor.Name.Ar)
+        .Column("specialty", doctor => doctor.Specialty)
+        .ThenBy(doctor => doctor.Code)
+        .ThenBy(doctor => doctor.Id);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken) =>
         Set.AnyAsync(doctor => doctor.Code == code, cancellationToken);
 
@@ -135,7 +155,7 @@ internal sealed class DoctorRepository(AppDbContext context) : Repository<Doctor
                                           || (doctor.Phone != null && EF.Functions.ILike(doctor.Phone, pattern, CatalogueBListing.Escape)));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(doctor => doctor.Code), page, rows => Task.FromResult(Map(rows)), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(doctor => doctor.Code)), page, rows => Task.FromResult(Map(rows)), cancellationToken);
     }
 
     public async Task<DoctorListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -150,6 +170,13 @@ internal sealed class DoctorRepository(AppDbContext context) : Repository<Doctor
 
 internal sealed class DiagnosisRepository(AppDbContext context) : Repository<Diagnosis>(context), IDiagnosisRepository
 {
+    private static readonly SortColumns<Diagnosis> Sorts = new SortColumns<Diagnosis>(CatalogueSortKeys.Diagnoses)
+        .Column("icdCode", diagnosis => diagnosis.IcdCode)
+        .Column("nameEn", diagnosis => diagnosis.Name.En)
+        .Column("nameAr", diagnosis => diagnosis.Name.Ar)
+        .ThenBy(diagnosis => diagnosis.IcdCode)
+        .ThenBy(diagnosis => diagnosis.Id);
+
     public Task<bool> IcdCodeExistsAsync(string icdCode, CancellationToken cancellationToken) =>
         Set.AnyAsync(diagnosis => diagnosis.IcdCode == icdCode, cancellationToken);
 
@@ -164,7 +191,7 @@ internal sealed class DiagnosisRepository(AppDbContext context) : Repository<Dia
                                              || EF.Functions.ILike(diagnosis.Name.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(diagnosis => diagnosis.IcdCode), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(diagnosis => diagnosis.IcdCode)), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
     }
 
     public async Task<DiagnosisListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -182,6 +209,11 @@ internal sealed class DiagnosisRepository(AppDbContext context) : Repository<Dia
 
 internal sealed class SendingLabRepository(AppDbContext context) : Repository<SendingLab>(context), ISendingLabRepository
 {
+    private static readonly SortColumns<SendingLab> Sorts = new SortColumns<SendingLab>(CatalogueSortKeys.SendingLabs)
+        .Column("nameEn", lab => lab.Name.En)
+        .Column("nameAr", lab => lab.Name.Ar)
+        .ThenBy(lab => lab.Id);
+
     public Task<bool> NameExistsAsync(string nameEn, Guid? exceptId, CancellationToken cancellationToken)
     {
         var lowered = nameEn.Trim().ToLowerInvariant();
@@ -206,7 +238,7 @@ internal sealed class SendingLabRepository(AppDbContext context) : Repository<Se
                                        || (lab.Phone != null && EF.Functions.ILike(lab.Phone, pattern, CatalogueBListing.Escape)));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(lab => lab.Name.En).ThenBy(lab => lab.Id), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(lab => lab.Name.En).ThenBy(lab => lab.Id)), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
     }
 
     public async Task<SendingLabListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -232,6 +264,13 @@ internal sealed class SendingLabRepository(AppDbContext context) : Repository<Se
 
 internal sealed class ShortcutSetRepository(AppDbContext context) : Repository<ShortcutSet>(context), IShortcutSetRepository
 {
+    private static readonly SortColumns<ShortcutSet> Sorts = new SortColumns<ShortcutSet>(CatalogueSortKeys.ShortcutSets)
+        .Column("code", set => set.Code)
+        .Column("nameEn", set => set.Name.En)
+        .Column("nameAr", set => set.Name.Ar)
+        .ThenBy(set => set.Code)
+        .ThenBy(set => set.Id);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken) =>
         Set.AnyAsync(set => set.Code == code, cancellationToken);
 
@@ -246,7 +285,7 @@ internal sealed class ShortcutSetRepository(AppDbContext context) : Repository<S
                                        || EF.Functions.ILike(set.Name.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(set => set.Code), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(set => set.Code)), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
     }
 
     public async Task<ShortcutSetListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -264,6 +303,11 @@ internal sealed class ShortcutSetRepository(AppDbContext context) : Repository<S
 
 internal sealed class TestRuleRepository(AppDbContext context) : Repository<TestRule>(context), ITestRuleRepository
 {
+    private static readonly SortColumns<TestRule> Sorts = new SortColumns<TestRule>(CatalogueSortKeys.TestRules)
+        .Column("nameEn", rule => rule.Name.En)
+        .Column("nameAr", rule => rule.Name.Ar)
+        .ThenBy(rule => rule.Id);
+
     public Task<bool> NameExistsAsync(string nameEn, Guid? exceptId, CancellationToken cancellationToken)
     {
         var lowered = nameEn.Trim().ToLowerInvariant();
@@ -288,7 +332,7 @@ internal sealed class TestRuleRepository(AppDbContext context) : Repository<Test
                                         || EF.Functions.ILike(rule.Name.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(rule => rule.Name.En).ThenBy(rule => rule.Id), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(rule => rule.Name.En).ThenBy(rule => rule.Id)), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
     }
 
     public async Task<TestRuleListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -313,6 +357,13 @@ internal sealed class TestRuleRepository(AppDbContext context) : Repository<Test
 
 internal sealed class ReasonRepository(AppDbContext context) : Repository<Reason>(context), IReasonRepository
 {
+    private static readonly SortColumns<Reason> Sorts = new SortColumns<Reason>(CatalogueSortKeys.Reasons)
+        .Column("kind", reason => reason.Kind)
+        .Column("nameEn", reason => reason.Name.En)
+        .Column("nameAr", reason => reason.Name.Ar)
+        .ThenBy(reason => reason.Name.En)
+        .ThenBy(reason => reason.Id);
+
     public Task<bool> NameExistsAsync(ReasonKind kind, string nameEn, Guid? exceptId, CancellationToken cancellationToken)
     {
         var lowered = nameEn.Trim().ToLowerInvariant();
@@ -334,7 +385,7 @@ internal sealed class ReasonRepository(AppDbContext context) : Repository<Reason
                                           || EF.Functions.ILike(reason.Name.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(reason => reason.Kind).ThenBy(reason => reason.Name.En).ThenBy(reason => reason.Id), page, rows => Task.FromResult(Map(rows)), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(reason => reason.Kind).ThenBy(reason => reason.Name.En).ThenBy(reason => reason.Id)), page, rows => Task.FromResult(Map(rows)), cancellationToken);
     }
 
     public async Task<ReasonListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -349,6 +400,13 @@ internal sealed class ReasonRepository(AppDbContext context) : Repository<Reason
 
 internal sealed class ReportTemplateRepository(AppDbContext context) : Repository<ReportTemplate>(context), IReportTemplateRepository
 {
+    private static readonly SortColumns<ReportTemplate> Sorts = new SortColumns<ReportTemplate>(CatalogueSortKeys.ReportTemplates)
+        .Column("nameEn", template => template.Name.En)
+        .Column("nameAr", template => template.Name.Ar)
+        .Column("type", template => template.Type)
+        .ThenBy(template => template.Name.En)
+        .ThenBy(template => template.Id);
+
     public Task<bool> NameExistsAsync(string nameEn, Guid? exceptId, CancellationToken cancellationToken)
     {
         var lowered = nameEn.Trim().ToLowerInvariant();
@@ -370,7 +428,7 @@ internal sealed class ReportTemplateRepository(AppDbContext context) : Repositor
                                             || EF.Functions.ILike(template.Name.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(template => template.Name.En).ThenBy(template => template.Id), page, rows => Task.FromResult(Map(rows)), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(template => template.Name.En).ThenBy(template => template.Id)), page, rows => Task.FromResult(Map(rows)), cancellationToken);
     }
 
     public async Task<ReportTemplateListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -387,6 +445,11 @@ internal sealed class ReportTemplateRepository(AppDbContext context) : Repositor
 
 internal sealed class DrugTypeRepository(AppDbContext context) : Repository<DrugType>(context), IDrugTypeRepository
 {
+    private static readonly SortColumns<DrugType> Sorts = new SortColumns<DrugType>(CatalogueSortKeys.DrugTypes)
+        .Column("nameEn", drugType => drugType.Name.En)
+        .Column("nameAr", drugType => drugType.Name.Ar)
+        .ThenBy(drugType => drugType.Id);
+
     public Task<bool> NameExistsAsync(string nameEn, Guid? exceptId, CancellationToken cancellationToken)
     {
         var lowered = nameEn.Trim().ToLowerInvariant();
@@ -403,7 +466,7 @@ internal sealed class DrugTypeRepository(AppDbContext context) : Repository<Drug
                                             || EF.Functions.ILike(drugType.Name.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(drugType => drugType.Name.En).ThenBy(drugType => drugType.Id), page, rows => Task.FromResult(Map(rows)), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(drugType => drugType.Name.En).ThenBy(drugType => drugType.Id)), page, rows => Task.FromResult(Map(rows)), cancellationToken);
     }
 
     public async Task<DrugTypeListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -418,6 +481,19 @@ internal sealed class DrugTypeRepository(AppDbContext context) : Repository<Drug
 
 internal sealed class CommercialNameRepository(AppDbContext context) : Repository<CommercialName>(context), ICommercialNameRepository
 {
+    /// <summary>The drug type columns sort by the drug type's name (a correlated sub-select), the others by the row's own columns.</summary>
+    private SortColumns<CommercialName> Sorts()
+    {
+        var drugTypes = Context.Set<DrugType>().AsNoTracking();
+        return new SortColumns<CommercialName>(CatalogueSortKeys.CommercialNames)
+            .Column("nameEn", commercialName => commercialName.Name.En)
+            .Column("nameAr", commercialName => commercialName.Name.Ar)
+            .Column("drugTypeEn", commercialName => drugTypes.Where(drugType => drugType.Id == commercialName.DrugTypeId).Select(drugType => drugType.Name.En).FirstOrDefault())
+            .Column("drugTypeAr", commercialName => drugTypes.Where(drugType => drugType.Id == commercialName.DrugTypeId).Select(drugType => drugType.Name.Ar).FirstOrDefault())
+            .ThenBy(commercialName => commercialName.Name.En)
+            .ThenBy(commercialName => commercialName.Id);
+    }
+
     public Task<bool> NameExistsAsync(string nameEn, Guid? exceptId, CancellationToken cancellationToken)
     {
         var lowered = nameEn.Trim().ToLowerInvariant();
@@ -439,7 +515,7 @@ internal sealed class CommercialNameRepository(AppDbContext context) : Repositor
                                                   || EF.Functions.ILike(commercialName.Name.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(commercialName => commercialName.Name.En).ThenBy(commercialName => commercialName.Id), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts().Apply(query, filter.Sort, rows => rows.OrderBy(commercialName => commercialName.Name.En).ThenBy(commercialName => commercialName.Id)), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
     }
 
     public async Task<CommercialNameListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -465,6 +541,12 @@ internal sealed class CommercialNameRepository(AppDbContext context) : Repositor
 
 internal sealed class AntibioticRepository(AppDbContext context) : Repository<Antibiotic>(context), IAntibioticRepository
 {
+    private static readonly SortColumns<Antibiotic> Sorts = new SortColumns<Antibiotic>(CatalogueSortKeys.Antibiotics)
+        .Column("code", antibiotic => antibiotic.Code)
+        .Column("nameEn", antibiotic => antibiotic.Name.En)
+        .Column("nameAr", antibiotic => antibiotic.Name.Ar)
+        .ThenBy(antibiotic => antibiotic.Code);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken) =>
         Set.AnyAsync(antibiotic => antibiotic.Code == code, cancellationToken);
 
@@ -480,7 +562,7 @@ internal sealed class AntibioticRepository(AppDbContext context) : Repository<An
                                               || EF.Functions.ILike(antibiotic.Name.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(antibiotic => antibiotic.Code), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(antibiotic => antibiotic.Code)), page, rows => MapAsync(rows, cancellationToken), cancellationToken);
     }
 
     public async Task<AntibioticListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -506,6 +588,12 @@ internal sealed class AntibioticRepository(AppDbContext context) : Repository<An
 
 internal sealed class OrganismRepository(AppDbContext context) : Repository<Organism>(context), IOrganismRepository
 {
+    private static readonly SortColumns<Organism> Sorts = new SortColumns<Organism>(CatalogueSortKeys.Organisms)
+        .Column("code", organism => organism.Code)
+        .Column("nameEn", organism => organism.Name.En)
+        .Column("nameAr", organism => organism.Name.Ar)
+        .ThenBy(organism => organism.Code);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken) =>
         Set.AnyAsync(organism => organism.Code == code, cancellationToken);
 
@@ -520,7 +608,7 @@ internal sealed class OrganismRepository(AppDbContext context) : Repository<Orga
                                             || EF.Functions.ILike(organism.Name.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(organism => organism.Code), page, rows => Task.FromResult(Map(rows)), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(organism => organism.Code)), page, rows => Task.FromResult(Map(rows)), cancellationToken);
     }
 
     public async Task<OrganismListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)
@@ -535,6 +623,13 @@ internal sealed class OrganismRepository(AppDbContext context) : Repository<Orga
 
 internal sealed class SensitivityValueRepository(AppDbContext context) : Repository<SensitivityValue>(context), ISensitivityValueRepository
 {
+    private static readonly SortColumns<SensitivityValue> Sorts = new SortColumns<SensitivityValue>(CatalogueSortKeys.SensitivityValues)
+        .Column("displayOrder", value => value.DisplayOrder)
+        .Column("code", value => value.Code)
+        .Column("nameEn", value => value.Name.En)
+        .Column("nameAr", value => value.Name.Ar)
+        .ThenBy(value => value.Code);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken) =>
         Set.AnyAsync(value => value.Code == code, cancellationToken);
 
@@ -549,7 +644,7 @@ internal sealed class SensitivityValueRepository(AppDbContext context) : Reposit
                                          || EF.Functions.ILike(value.Name.Ar, pattern, CatalogueBListing.Escape));
         }
 
-        return CatalogueBListing.PageAsync(query.OrderBy(value => value.DisplayOrder).ThenBy(value => value.Code), page, rows => Task.FromResult(Map(rows)), cancellationToken);
+        return CatalogueBListing.PageAsync(Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(value => value.DisplayOrder).ThenBy(value => value.Code)), page, rows => Task.FromResult(Map(rows)), cancellationToken);
     }
 
     public async Task<SensitivityValueListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken)

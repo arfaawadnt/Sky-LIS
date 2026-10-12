@@ -30,7 +30,7 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { openFile, saveFile } from '../data/save-file';
 import { PatientFileFacade } from '../state/patient-file.facade';
 import { MergeDialogComponent } from '../ui/merge-dialog.component';
-import { ageParts, fileSize, formatDateTime } from '../../../shared/patient/patient-demographics';
+import { ageText, fileSize, formatCalendarDate, formatDateTime, localDigits } from '../../../shared/patient/patient-demographics';
 import { PatientFormComponent } from '../../../shared/patient/patient-form.component';
 
 /**
@@ -93,13 +93,13 @@ export class PatientFilePage {
     { label: this.patient()?.number ?? '…', path: null },
   ]);
 
-  /** The Documents tab only with `files.view` (UAT A-03: it was offered and failed with 403). */
+  /** The Documents tab only with `files.view` (UAT A-03: it was offered and failed with 403), the Visits tab only with `registration.view` (round 2 R2-04). */
   protected readonly tabs = computed<readonly TabItem[]>(() => [
     { id: 'file', label: this.i18n.t('patients.tab.file') },
     ...(this.facade.canSeeDocuments()
       ? [{ id: 'documents', label: this.i18n.t('patients.tab.documents'), badge: this.facade.documents.hasValue() ? this.documents().filter((document) => document.isActive).length : null }]
       : []),
-    { id: 'visits', label: this.i18n.t('patients.tab.visits') },
+    ...(this.facade.canSeeVisits() ? [{ id: 'visits', label: this.i18n.t('patients.tab.visits') }] : []),
   ]);
 
   protected readonly documentColumns: readonly TableColumn<PatientDocumentItem>[] = [
@@ -115,9 +115,9 @@ export class PatientFilePage {
   protected readonly visitColumns: readonly TableColumn<PatientVisitItem>[] = [
     { key: 'accession', header: 'patients.visit.accession', mono: true, width: '160px' },
     { key: 'registeredAtUtc', header: 'patients.visit.date', value: (row) => (row.registeredAtUtc ? formatDateTime(row.registeredAtUtc, this.i18n.lang()) : null) },
-    { key: 'branchName', header: 'patients.visit.branch', secondary: true },
-    { key: 'servicesCount', header: 'patients.visit.services', align: 'end', width: '100px' },
-    { key: 'status', header: 'patients.visit.status', width: '120px' },
+    { key: 'branchName', header: 'patients.visit.branch', secondary: true, value: (row) => (this.i18n.lang() === 'ar' ? (row.branchNameAr ?? row.branchName) : row.branchName) },
+    { key: 'servicesCount', header: 'patients.visit.services', align: 'end', width: '100px', value: (row) => (row.servicesCount === null ? null : localDigits(row.servicesCount, this.i18n.lang())), sortValue: (row) => row.servicesCount },
+    { key: 'status', header: 'patients.visit.status', width: '120px', value: (row) => (row.status ? this.i18n.t(`shared.status.${row.status}`) : null) },
   ];
 
   constructor() {
@@ -264,9 +264,7 @@ export class PatientFilePage {
   }
 
   protected ageText(age: { readonly years: number; readonly months: number; readonly days: number }): string {
-    return ageParts(age)
-      .map((part) => this.i18n.tf(`patients.age.${part.unit}`, { value: part.value }))
-      .join(' ');
+    return ageText(age, this.i18n.lang(), (key, params) => this.i18n.tf(key, params));
   }
 
   protected optionName(option: { readonly nameEn: string; readonly nameAr: string } | null | undefined): string | null {
@@ -298,6 +296,11 @@ export class PatientFilePage {
 
   protected problemText(problem: ProblemDetails): string {
     return problemMessage(this.i18n, 'patients', problem);
+  }
+
+  /** A date of birth or registration day in the language's digits (round 2 R2-02). */
+  protected calendarDate(iso: string | null): string {
+    return iso === null ? '—' : formatCalendarDate(iso, this.i18n.lang());
   }
 
   protected when(iso: string | null): string {

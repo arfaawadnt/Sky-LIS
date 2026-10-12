@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input, model } from '@angular/core';
 
+import { I18nService } from '../../../core/i18n/i18n.service';
+
 /** One tab; `label` is passed translated, `badge` is a small count or tag. */
 export interface TabItem {
   readonly id: string;
@@ -24,12 +26,20 @@ let nextTabsId = 0;
 })
 export class TabsComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly i18n = inject(I18nService);
   private readonly idPrefix = `app-tabs-${++nextTabsId}`;
 
   readonly tabs = input.required<readonly TabItem[]>();
   readonly active = model<string | null>(null);
 
   protected readonly current = computed(() => this.active() ?? this.tabs().find((tab) => !tab.disabled)?.id ?? null);
+
+  /** A count badge in the language's digits (round 2 R2-02: the Documents badge read "0" on Arabic pages); a tag as given. */
+  protected readonly badgeFormat = computed(() => new Intl.NumberFormat(this.i18n.lang() === 'ar' ? 'ar-EG' : 'en-GB', { maximumFractionDigits: 0 }));
+
+  protected badgeText(badge: string | number): string {
+    return typeof badge === 'number' ? this.badgeFormat().format(badge) : badge;
+  }
 
   tabId(id: string): string {
     return `${this.idPrefix}-${id}`;

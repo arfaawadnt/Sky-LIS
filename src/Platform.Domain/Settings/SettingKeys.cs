@@ -27,6 +27,7 @@ public abstract class SettingDescriptor
 {
     public const int MaxKeyLength = 80;
     public const int MaxValueLength = 200;
+    public const int MaxTimeZoneLength = 64;
 
     protected SettingDescriptor(string key, SettingType type, string defaultValue, string description)
     {
@@ -64,6 +65,14 @@ public abstract class SettingDescriptor
     /// <summary>A free text (≤ 200 characters) or, when <paramref name="allowed"/> is given, one of a closed set (case-sensitive).</summary>
     public static SettingDescriptor<string> String(string key, string defaultValue, string description, params string[] allowed) =>
         new(key, SettingType.String, defaultValue, description, text => (true, text), value => value.Length <= MaxValueLength && (allowed.Length == 0 || allowed.Contains(value, StringComparer.Ordinal)));
+
+    /// <summary>An IANA time zone name this host knows (<c>Africa/Cairo</c>), at most 64 characters, stored as text (round 2 R2-01).</summary>
+    public static SettingDescriptor<string> TimeZone(string key, string defaultValue, string description) =>
+        new(key, SettingType.String, defaultValue, description, text => (true, text), IsIanaTimeZone);
+
+    /// <summary>True for an IANA zone id this host resolves (the rule of a country's zone, GEO-007).</summary>
+    public static bool IsIanaTimeZone(string value) =>
+        !string.IsNullOrWhiteSpace(value) && value.Length <= MaxTimeZoneLength && TimeZoneInfo.TryFindSystemTimeZoneById(value, out var zone) && zone.HasIanaId;
 }
 
 /// <summary>A typed descriptor: parses the stored text into <typeparamref name="T"/> and falls back to the default on anything malformed.</summary>
@@ -126,6 +135,9 @@ public sealed class SettingDescriptor<T> : SettingDescriptor
 /// </summary>
 public static class SettingKeys
 {
+    /// <summary>The platform default of <see cref="TimeZone"/>.</summary>
+    public const string DefaultTimeZone = "Africa/Cairo";
+
     // Registration (CP-06, BR-01)
     public static readonly SettingDescriptor<bool> MandatoryMobile = SettingDescriptor.Bool("mandatoryMobile", false, "The patient mobile is required at registration.");
     public static readonly SettingDescriptor<bool> MandatoryDoctor = SettingDescriptor.Bool("mandatoryDoctor", false, "The referring doctor is required at registration.");
@@ -159,12 +171,20 @@ public static class SettingKeys
     public static readonly SettingDescriptor<string> DefaultLanguage = SettingDescriptor.String("defaultLanguage", "en", "Default user-interface language.", "en", "ar");
     public static readonly SettingDescriptor<string> MasterDataUpdatePolicy = SettingDescriptor.String("masterDataUpdatePolicy", "propose", "How later global master-data changes reach the tenant (BR-25): push, propose or ignore.", "push", "propose", "ignore");
 
+    /// <summary>
+    /// The laboratory's time zone where its client record names none (round 2 R2-01): a laboratory without a client record
+    /// (the demo laboratory, a development tenant) dates registrations and stated ages by this zone, the platform's value
+    /// when the laboratory set none, else Africa/Cairo, never by the UTC day.
+    /// </summary>
+    public static readonly SettingDescriptor<string> TimeZone = SettingDescriptor.TimeZone("timeZone", DefaultTimeZone, "IANA time zone of the laboratory's calendar day when its client record names no country zone.");
+
+
     private static readonly SettingDescriptor[] Catalogue =
     [
         MandatoryMobile, MandatoryDoctor, MandatoryNationalId, SimilarNameWarning, DiscountCapPercent, AccessionFormat,
         AutoPrintLabels, AutoPrintJobOrder, AutoPrintReceipt, PrintUnverified, LabelCopies, ResultLanguage,
         AutoCollect, AutoReceive, NewBarcodeOnReject, ReviewBeforeVerify, DelayWarnPercent, DelayLatePercent,
-        SessionTimeoutMinutes, OtpLength, PasswordMinLength, TrialDays, DefaultCurrency, DefaultLanguage, MasterDataUpdatePolicy,
+        SessionTimeoutMinutes, OtpLength, PasswordMinLength, TrialDays, DefaultCurrency, DefaultLanguage, MasterDataUpdatePolicy, TimeZone,
     ];
 
     private static readonly Dictionary<string, SettingDescriptor> ByKey = Catalogue.ToDictionary(descriptor => descriptor.Key, StringComparer.Ordinal);

@@ -19,8 +19,8 @@ public sealed class BasePriceListsController(ISender sender) : ControllerBase
         [FromQuery] bool? isActive,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
-        CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListBasePriceListsQuery(search, year, isActive, page, pageSize), cancellationToken));
+        [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListBasePriceListsQuery(search, year, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<BasePriceListDetail>> Get(Guid id, CancellationToken cancellationToken) =>

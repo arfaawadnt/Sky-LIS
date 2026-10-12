@@ -91,7 +91,8 @@ export class WorklistPage {
       { key: 'collectedAtUtc', header: 'results.worklist.column.collected', width: '140px', secondary: true, value: (row) => (row.collectedAtUtc ? formatDateTime(row.collectedAtUtc, lang) : null) },
       { key: 'expectedAtUtc', header: 'results.worklist.column.expected', width: '140px', sortable: true, value: (row) => formatDateTime(row.expectedAtUtc, lang) },
       { key: 'delay', header: 'results.worklist.column.delay', width: '110px', value: (row) => row.delaySeconds, sortable: true },
-      { key: 'consumed', header: 'results.worklist.column.consumed', width: '120px', value: (row) => row.consumedPercent, sortable: true },
+      // not sortable: the percentage is a ratio of intervals the server does not order by (B-03: a page-only sort would mislead)
+      { key: 'consumed', header: 'results.worklist.column.consumed', width: '120px', value: (row) => row.consumedPercent },
     ];
   });
 

@@ -30,7 +30,7 @@ import { CanDirective } from '../ui/can.directive';
 import { FormFieldComponent } from '../ui/form-field/form-field.component';
 import { IconComponent } from '../ui/icon/icon.component';
 import { type NationalIdFacts, readEgyptianNationalId } from './egyptian-national-id';
-import { ageBetween, ageParts, birthDateFromAge, defaultGender, isValidAge, isValidMobile, normalizeMobile, parseIso, todayIso } from './patient-demographics';
+import { ageBetween, ageText, birthDateFromAge, defaultGender, isValidAge, isValidMobile, normalizeMobile, parseIso, todayIso } from './patient-demographics';
 
 /** What the user is typing in a new file, for the similar-patient lookup (BR-01). */
 export interface TypedIdentity {
@@ -435,9 +435,7 @@ export class PatientFormComponent {
   }
 
   protected ageText(age: PatientAge): string {
-    return ageParts(age)
-      .map((part) => this.i18n.tf(`patients.age.${part.unit}`, { value: part.value }))
-      .join(' ');
+    return ageText(age, this.i18n.lang(), (key, params) => this.i18n.tf(key, params));
   }
 
   protected matchLabel(candidate: SimilarPatient): string {

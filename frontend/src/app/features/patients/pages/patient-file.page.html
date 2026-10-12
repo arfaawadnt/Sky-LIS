@@ -43,7 +43,7 @@
             <dd>{{ i18n.t('patients.gender.' + patient.gender) }}</dd>
             <dt>{{ i18n.t('patients.field.dateOfBirth') }}</dt>
             <dd>
-              {{ patient.dateOfBirth ?? '—' }}
+              {{ calendarDate(patient.dateOfBirth) }}
               @if (patient.dateOfBirthIsEstimated) {
                 <span class="muted small">({{ i18n.t('patients.estimated') }})</span>
               }
@@ -86,7 +86,7 @@
         <app-section-card [title]="i18n.t('patients.section.record')">
           <dl class="kv">
             <dt>{{ i18n.t('patients.registeredOn') }}</dt>
-            <dd>{{ patient.registeredOn }}</dd>
+            <dd>{{ calendarDate(patient.registeredOn) }}</dd>
             <dt>{{ i18n.t('patients.createdBy') }}</dt>
             <dd>{{ patient.createdByName ?? '—' }} · {{ when(patient.createdAtUtc) }}</dd>
             @if (patient.modifiedAtUtc) {

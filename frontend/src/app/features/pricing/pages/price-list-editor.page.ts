@@ -13,7 +13,7 @@ import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { CellTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
 import { DataTableComponent } from '../../../shared/ui/data-table/data-table.component';
-import type { TableColumn } from '../../../shared/ui/data-table/data-table.types';
+import { type TableColumn, type TableSort, sortRows } from '../../../shared/ui/data-table/data-table.types';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { type Breadcrumb, PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
@@ -24,9 +24,10 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
 import { csvFileName, downloadCsv, toCsv } from '../data/csv';
 import { formatAmount } from '../data/money';
+import { PricingApi, takenCodes } from '../data/pricing.api';
 import { ServiceCatalogApi } from '../data/service-catalog.api';
 import { type EditorRow, PriceListEditorFacade } from '../state/price-list-editor.facade';
-import { CopyListDialogComponent } from '../ui/copy-list-dialog.component';
+import { CopyListDialogComponent, copyCodeStem } from '../ui/copy-list-dialog.component';
 import { ServicePickerComponent } from '../ui/service-picker.component';
 
 const PAGE_SIZE = 50;
@@ -62,6 +63,7 @@ export class PriceListEditorPage {
   protected readonly i18n = inject(I18nService);
   protected readonly facade = inject(PriceListEditorFacade);
   private readonly catalog = inject(ServiceCatalogApi);
+  private readonly api = inject(PricingApi);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
@@ -76,6 +78,8 @@ export class PriceListEditorPage {
   protected readonly contractPricingOffered = inReleaseScope('R2');
   protected readonly page = signal<PageRequest>({ page: 1, pageSize: PAGE_SIZE });
   protected readonly copyOpen = signal(false);
+  /** Existing codes like the proposed copy code, read before the dialog opens (UAT B-06). */
+  protected readonly copyTaken = signal<ReadonlySet<string>>(new Set<string>());
 
   protected readonly detail = computed(() => (this.facade.detail.hasValue() ? this.facade.detail.value() : null));
 
@@ -97,9 +101,12 @@ export class PriceListEditorPage {
     { key: 'state', header: 'pricing.grid.state', width: '110px', secondary: true },
   ];
 
+  /** The column order chosen in the header: the grid holds every line, so the whole list is sorted before the page is cut (B-03). */
+  protected readonly sort = signal<TableSort | null>(null);
+
   protected readonly pagedRows = computed(() => {
     const { page, pageSize } = this.page();
-    return this.facade.visibleRows().slice((page - 1) * pageSize, page * pageSize);
+    return sortRows(this.facade.visibleRows(), this.columns, this.sort(), this.i18n.lang()).slice((page - 1) * pageSize, page * pageSize);
   });
 
   /** Inline inputs are read-only without pricing.edit (affordance; the server decides). */
@@ -117,7 +124,21 @@ export class PriceListEditorPage {
     });
   }
 
+  /**
+   * Every change of the search box (typing, clear, Escape) is the grid's filter at once: the rows are filtered in the
+   * browser, and the box is bound to the facade's filter, so the grid never applies a filter the box does not show (UAT B-05).
+   */
+  /** A header click sorts every line (the table shows the slice as given) and goes back to page 1. */
+  protected onSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.page.update((current) => ({ ...current, page: 1 }));
+  }
+
   protected onSearch(term: string): void {
+    if (term === this.facade.search()) {
+      return;
+    }
+
     this.facade.search.set(term);
     this.page.update((current) => ({ ...current, page: 1 }));
   }
@@ -137,7 +158,8 @@ export class PriceListEditorPage {
       this.page.update((current) => ({ ...current, page: 1 }));
       this.toast.info(this.i18n.tf('pricing.editor.added', { code: service.code || service.nameEn }));
     } else {
-      this.facade.search.set(service.code || service.nameEn);
+      // shows the line by filtering on it; the search box shows the same text, so clearing it brings every line back (UAT B-05)
+      this.onSearch(service.code || service.nameEn);
       this.toast.info(this.i18n.t('pricing.editor.alreadyOnList'));
     }
   }
@@ -176,15 +198,14 @@ export class PriceListEditorPage {
       return;
     }
 
-    if (detail.isActive) {
-      const confirmed = await this.confirm.confirm({
-        title: this.i18n.t('pricing.lists.deactivate'),
-        message: this.i18n.tf('pricing.editor.confirmDeactivate', { code: detail.code }),
-        danger: true,
-      });
-      if (!confirmed) {
-        return;
-      }
+    // both directions ask first: activating changes what cash patients pay (validation O-1), deactivating stops it
+    const confirmed = await this.confirm.confirm(
+      detail.isActive
+        ? { title: this.i18n.t('pricing.lists.deactivate'), message: this.i18n.tf('pricing.editor.confirmDeactivate', { code: detail.code }), danger: true }
+        : { title: this.i18n.t('pricing.lists.confirmActivate.title'), message: this.i18n.tf('pricing.editor.confirmActivate', { code: detail.code }), confirmLabel: this.i18n.t('pricing.lists.activate') },
+    );
+    if (!confirmed) {
+      return;
     }
 
     if ((await this.facade.setActive.execute({ listId: detail.id, active: !detail.isActive })) !== null) {
@@ -218,8 +239,14 @@ export class PriceListEditorPage {
     }
   }
 
-  protected openCopy(): void {
+  protected async openCopy(): Promise<void> {
+    const detail = this.detail();
+    if (detail === null) {
+      return;
+    }
+
     this.facade.copy.reset();
+    this.copyTaken.set(await takenCodes(this.api, copyCodeStem(detail)));
     this.copyOpen.set(true);
   }
 

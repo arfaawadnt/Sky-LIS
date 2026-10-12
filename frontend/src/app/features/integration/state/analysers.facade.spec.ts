@@ -30,6 +30,17 @@ describe('AnalysersFacade (CP-58)', () => {
     backend.expectOne((request) => request.url === INTEGRATION_API.analyserModels).flush([]);
   }
 
+  it('B-03: sorts the analysers on the server from page 1 by code or name', async () => {
+    await runEffects();
+    backend.expectOne((request) => request.url === INTEGRATION_API.analysers).flush(page([analyser]));
+    flushLookups();
+    facade.setSort({ key: 'name', direction: 'desc' });
+    await runEffects();
+    const sorted = backend.expectOne((request) => request.url === INTEGRATION_API.analysers);
+    expect([sorted.request.params.get('sort'), sorted.request.params.get('direction'), sorted.request.params.get('page')]).toEqual(['nameEn', 'desc', '1']);
+    sorted.flush(page([]));
+  });
+
   it('lists with the filter, creates through POST and reloads', async () => {
     await runEffects();
     const first = backend.expectOne((request) => request.url === INTEGRATION_API.analysers);

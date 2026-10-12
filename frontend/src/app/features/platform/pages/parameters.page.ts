@@ -7,6 +7,7 @@ import type { SettingValueItem, TenantSettingItem } from '../../../core/api/sett
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
+import { SERVER_ERROR_KEY } from '../../../shared/forms/problem-to-form-errors';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CanDirective } from '../../../shared/ui/can.directive';
@@ -24,6 +25,8 @@ interface ParameterSpec {
   readonly max?: number;
   readonly options?: readonly string[];
   readonly pattern?: RegExp;
+  /** The server's length limit of a text value (default 200). */
+  readonly maxLength?: number;
 }
 
 const SPECS: Readonly<Record<string, ParameterSpec>> = {
@@ -38,13 +41,15 @@ const SPECS: Readonly<Record<string, ParameterSpec>> = {
   resultLanguage: { options: ['en', 'ar'] },
   defaultLanguage: { options: ['en', 'ar'] },
   masterDataUpdatePolicy: { options: ['push', 'propose', 'ignore'] },
-  defaultCurrency: { pattern: /^[A-Za-z]{3}$/ },
+  defaultCurrency: { pattern: /^[A-Za-z]{3}$/, maxLength: 3 },
+  // an IANA zone (Africa/Cairo, Etc/UTC); the server checks it against the host's zones (round 2 R2-01)
+  timeZone: { pattern: /^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+)*$/, maxLength: 64 },
 };
 
 /** SA-19 first (the platform-wide defaults the SRS names), then the laboratory defaults by area. */
 const GROUPS: readonly { readonly id: string; readonly keys: readonly string[] }[] = [
   { id: 'security', keys: ['otpLength', 'passwordMinLength', 'sessionTimeoutMinutes'] },
-  { id: 'subscription', keys: ['trialDays', 'defaultCurrency', 'defaultLanguage', 'masterDataUpdatePolicy'] },
+  { id: 'subscription', keys: ['trialDays', 'defaultCurrency', 'defaultLanguage', 'masterDataUpdatePolicy', 'timeZone'] },
   { id: 'thresholds', keys: ['delayWarnPercent', 'delayLatePercent', 'discountCapPercent'] },
   { id: 'registration', keys: ['mandatoryMobile', 'mandatoryDoctor', 'mandatoryNationalId', 'similarNameWarning', 'accessionFormat'] },
   { id: 'printing', keys: ['autoPrintLabels', 'autoPrintJobOrder', 'autoPrintReceipt', 'printUnverified', 'labelCopies', 'resultLanguage'] },
@@ -138,7 +143,12 @@ export class ParametersPage {
 
   protected async save(): Promise<void> {
     const form = this.form();
-    if (form === null || this.facade.save.pending() || !markAllTouched(form)) {
+    if (form === null || this.facade.save.pending()) {
+      return;
+    }
+
+    if (!markAllTouched(form)) {
+      this.toast.warn(this.i18n.t('shared.masterData.invalid'));   // a blocked save says so (round 3 R3-03)
       return;
     }
 
@@ -159,7 +169,16 @@ export class ParametersPage {
     if ((await this.facade.save.execute(changes)) !== null) {
       this.toast.success(this.i18n.tf('platform.parameters.saved', { count: changes.length }));
     } else {
-      this.saveProblem.set(this.facade.save.problem());
+      const problem = this.facade.save.problem();
+      const only = changes.length === 1 ? form.controls[changes[0]?.key ?? ''] : undefined;
+      if (problem?.code === 'SET-002' && only) {
+        // one value sent and refused: the refusal belongs under that field, not in a generic banner (round 3 R3-03)
+        only.setErrors({ [SERVER_ERROR_KEY]: this.problemText(problem) });
+        only.markAsTouched();
+        this.saveProblem.set(null);
+      } else {
+        this.saveProblem.set(problem);
+      }
     }
   }
 
@@ -214,7 +233,7 @@ export class ParametersPage {
 
         controls[item.key] = new FormControl<number | null>(Number.parseInt(item.value, 10), { validators }) as AbstractControl<string | number | boolean | null>;
       } else {
-        const validators = [Validators.required, Validators.maxLength(200)];
+        const validators = [Validators.required, Validators.maxLength(spec.maxLength ?? 200)];
         if (spec.pattern) {
           validators.push(Validators.pattern(spec.pattern));
         }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Catalogue;
 using Platform.Contracts.Catalogue;
 using Platform.Contracts.Common;
@@ -29,6 +30,14 @@ internal static class CatalogueASearch
 
 internal sealed class ClinicalGroupRepository(AppDbContext context) : Repository<ClinicalGroup>(context), IClinicalGroupRepository
 {
+    private static readonly SortColumns<ClinicalGroup> Sorts = new SortColumns<ClinicalGroup>(CatalogueSortKeys.ClinicalGroups)
+        .Column("code", group => group.Code)
+        .Column("nameEn", group => group.Name.En)
+        .Column("nameAr", group => group.Name.Ar)
+        .Column("displayOrder", group => group.DisplayOrder)
+        .ThenBy(group => group.Code)
+        .ThenBy(group => group.Id);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken)
     {
         var cleaned = (code ?? string.Empty).Trim().ToUpperInvariant();
@@ -42,7 +51,8 @@ internal sealed class ClinicalGroupRepository(AppDbContext context) : Repository
     {
         var query = Filtered(filter);
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await Project(query.OrderBy(group => group.DisplayOrder).ThenBy(group => group.Code).Skip(page.Skip).Take(page.PageSize)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var ordered = Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(group => group.DisplayOrder).ThenBy(group => group.Code));
+        var items = await Project(ordered.Skip(page.Skip).Take(page.PageSize)).ToListAsync(cancellationToken).ConfigureAwait(false);
         return new Paged<ClinicalGroupListItem>(items, page.Page, page.PageSize, total);
     }
 
@@ -76,6 +86,12 @@ internal sealed class ClinicalGroupRepository(AppDbContext context) : Repository
 
 internal sealed class SampleTypeRepository(AppDbContext context) : Repository<SampleType>(context), ISampleTypeRepository
 {
+    private static readonly SortColumns<SampleType> Sorts = new SortColumns<SampleType>(CatalogueSortKeys.SampleTypes)
+        .Column("code", sampleType => sampleType.Code)
+        .Column("nameEn", sampleType => sampleType.Name.En)
+        .Column("nameAr", sampleType => sampleType.Name.Ar)
+        .ThenBy(sampleType => sampleType.Code);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken)
     {
         var cleaned = (code ?? string.Empty).Trim().ToUpperInvariant();
@@ -86,7 +102,8 @@ internal sealed class SampleTypeRepository(AppDbContext context) : Repository<Sa
     {
         var query = Filtered(filter);
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await Project(query.OrderBy(sampleType => sampleType.Code).Skip(page.Skip).Take(page.PageSize)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var ordered = Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(sampleType => sampleType.Code));
+        var items = await Project(ordered.Skip(page.Skip).Take(page.PageSize)).ToListAsync(cancellationToken).ConfigureAwait(false);
         return new Paged<SampleTypeListItem>(items, page.Page, page.PageSize, total);
     }
 
@@ -140,6 +157,11 @@ internal sealed class SampleTypeRepository(AppDbContext context) : Repository<Sa
 
 internal sealed class MeasurementUnitRepository(AppDbContext context) : Repository<MeasurementUnit>(context), IMeasurementUnitRepository
 {
+    // The symbol sorts by its case-folded key (mg/dL beside MG/L), then by id so equal keys page stably.
+    private static readonly SortColumns<MeasurementUnit> Sorts = new SortColumns<MeasurementUnit>(CatalogueSortKeys.Units)
+        .Column("name", unit => unit.NameKey)
+        .ThenBy(unit => unit.Id);
+
     public Task<bool> NameExistsAsync(string nameKey, Guid? exceptId, CancellationToken cancellationToken) =>
         Set.AnyAsync(unit => unit.NameKey == nameKey && (exceptId == null || unit.Id != exceptId), cancellationToken);
 
@@ -150,7 +172,7 @@ internal sealed class MeasurementUnitRepository(AppDbContext context) : Reposito
     {
         var query = Filtered(filter);
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await query.OrderBy(unit => unit.NameKey).Skip(page.Skip).Take(page.PageSize)
+        var items = await Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(unit => unit.NameKey)).Skip(page.Skip).Take(page.PageSize)
             .Select(unit => new MeasurementUnitListItem(unit.Id, unit.Name, unit.IsActive))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
         return new Paged<MeasurementUnitListItem>(items, page.Page, page.PageSize, total);
@@ -181,6 +203,11 @@ internal sealed class MeasurementUnitRepository(AppDbContext context) : Reposito
 
 internal sealed class PatientConditionRepository(AppDbContext context) : Repository<PatientCondition>(context), IPatientConditionRepository
 {
+    private static readonly SortColumns<PatientCondition> Sorts = new SortColumns<PatientCondition>(CatalogueSortKeys.PatientConditions)
+        .Column("nameEn", condition => condition.Name.En)
+        .Column("nameAr", condition => condition.Name.Ar)
+        .ThenBy(condition => condition.Id);
+
     public Task<bool> NameExistsAsync(string nameKey, Guid? exceptId, CancellationToken cancellationToken) =>
         Set.AnyAsync(condition => condition.NameKey == nameKey && (exceptId == null || condition.Id != exceptId), cancellationToken);
 
@@ -196,7 +223,7 @@ internal sealed class PatientConditionRepository(AppDbContext context) : Reposit
     {
         var query = Filtered(filter);
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await query.OrderBy(condition => condition.NameKey).Skip(page.Skip).Take(page.PageSize)
+        var items = await Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(condition => condition.NameKey)).Skip(page.Skip).Take(page.PageSize)
             .Select(condition => new PatientConditionListItem(condition.Id, condition.Name.En, condition.Name.Ar, condition.IsActive))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
         return new Paged<PatientConditionListItem>(items, page.Page, page.PageSize, total);

@@ -10,7 +10,11 @@ public interface ITreasuryRepository : IRepository<Domain.Treasury.Treasury>
 {
     Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken);
 
-    Task<Paged<TreasuryListItem>> ListAsync(bool? isActive, PageRequest page, CancellationToken cancellationToken);
+    /// <summary>
+    /// <paramref name="search"/> (trimmed, or null) matches the code and both names, whatever the UI language (UAT B-08);
+    /// <paramref name="sort"/> orders the whole list before paging (validation v0.5.0 B-03, <see cref="TreasurySortKeys.Treasuries"/>).
+    /// </summary>
+    Task<Paged<TreasuryListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken);
 
     Task<TreasuryListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken);
 }

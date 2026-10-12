@@ -18,12 +18,12 @@ describe('Subscription rules (CP-02, mirrors of the server)', () => {
 
   it('validates a mobile only once a country is chosen', () => {
     let country: typeof EGYPT | null = null;
-    const control = new FormControl('123', { nonNullable: true, validators: [countryMobileValidator(() => country)] });
+    const control = new FormControl('123', { nonNullable: true, validators: [countryMobileValidator(() => country, (selected) => `has ${selected.mobileLength} digits after ${selected.dialCode}`)] });
     expect(control.valid).toBe(true);
 
     country = EGYPT;
     control.updateValueAndValidity();
-    expect(control.errors).toEqual({ mobileLength: { length: 10 } });
+    expect(control.errors).toEqual({ server: 'has 10 digits after +20' });   // C-08: the digit count, not the generic text
 
     control.setValue('01012345678');
     expect(control.valid).toBe(true);

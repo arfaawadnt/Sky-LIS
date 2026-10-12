@@ -149,6 +149,38 @@ public sealed class ResultsModuleTests(DatabaseFixture fixture)
     }
 
     [DatabaseFact]
+    public async Task A_delta_rechecked_against_a_previous_verified_after_entry_is_stored_with_its_basis()
+    {
+        // Validation A-02 (2026-10-11): CREA 2.0 entered before the patient's CREA 1.2 was verified.
+        var tenant = Guid.CreateVersion7();
+        var patient = Guid.CreateVersion7();
+        var test = Guid.CreateVersion7();
+        var rules = ResultTestRules.For(LabTestType.Numeric, 1, "mg/dL", deltaPercent: 20m);
+        var older = Order(Guid.CreateVersion7(), Guid.CreateVersion7(), patient: patient, test: test);
+        older.Enter(ResultValueInput.Number(1.2m), rules, null, null, Bench, true, Now);
+        var newer = Order(Guid.CreateVersion7(), Guid.CreateVersion7(), patient: patient, test: test);
+        newer.Enter(ResultValueInput.Number(2.0m), rules, null, null, Bench, true, Now);
+        older.Verify(Bench, false, Now.AddMinutes(5));
+        await AddAsync(tenant, older, newer);
+
+        using (var scope = fixture.AppScope(tenant))
+        {
+            var results = scope.ServiceProvider.GetRequiredService<IResultRepository>();
+            var tracked = (await results.ListForUpdateAsync([newer.Id], CancellationToken.None)).Single();
+            Assert.False(tracked.DeltaFlag);
+            var previous = await results.PreviousVerifiedAsync(patient, test, tracked.VisitId, null, CancellationToken.None);
+            Assert.True(tracked.RecheckDelta(previous, 20m));
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        }
+
+        using var reader = fixture.AppScope(tenant);
+        var stored = (await reader.ServiceProvider.GetRequiredService<IResultRepository>().ReadAsync(newer.Id, CancellationToken.None))!;
+        Assert.Equal((true, 66.7m, older.Id, 1.2m), (stored.DeltaFlag, stored.DeltaPercent!.Value, stored.PreviousResultId!.Value, stored.PreviousValue!.Value));
+        Assert.Equal(Now.AddMinutes(5), stored.PreviousVerifiedAtUtc);
+        Assert.Null(stored.DeltaAcknowledgedAtUtc);
+    }
+
+    [DatabaseFact]
     public async Task The_result_log_is_append_only_and_results_are_never_deleted()
     {
         var tenant = Guid.CreateVersion7();
@@ -201,6 +233,33 @@ public sealed class ResultsModuleTests(DatabaseFixture fixture)
         }
 
         Assert.Empty((await results.WorklistAsync(Filter() with { Search = "Nobody" }, everything, PageRequest.Normalized(1, 50), Now, CancellationToken.None)).Rows);
+    }
+
+    [DatabaseFact]
+    public async Task The_worklist_carries_the_birth_date_implied_by_a_stated_age()
+    {
+        // Validation A-05 (2026-10-11): a patient registered by age ("30 y") showed only "F" in the Age / sex column.
+        var tenant = Guid.CreateVersion7();
+        var group = Guid.CreateVersion7();
+        var byAge = Patient.Register(
+            "PAT-2026-71002",
+            new PatientDemographics(PatientTitle.Mrs, "Walk In Two", null, PatientGender.Female, null, new Platform.Domain.Patients.PatientAge(30, 0, 0), null, null, null, null, null, null, null, null, null),
+            PatientFieldRules.Optional,
+            false,
+            Now);
+        using (var scope = fixture.AppScope(tenant, Guid.CreateVersion7()))
+        {
+            scope.ServiceProvider.GetRequiredService<Platform.Application.Patients.IPatientRepository>().Add(byAge);
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        }
+
+        var result = Order(Guid.CreateVersion7(), group, patient: byAge.Id);
+        await AddAsync(tenant, result);
+
+        using var reader = fixture.AppScope(tenant);
+        var slice = await reader.ServiceProvider.GetRequiredService<IResultRepository>().WorklistAsync(Filter() with { Search = "PAT-2026-71002" }, ResultVisibility.Everything, PageRequest.Normalized(1, 50), Now, CancellationToken.None);
+        var row = Assert.Single(slice.Rows);
+        Assert.Equal(DateOnly.FromDateTime(Now.UtcDateTime).AddYears(-30), row.DateOfBirth);
     }
 
     private static WorklistFilter Filter() => new(null, null, null, null, null, null, null, null, false, null, null);

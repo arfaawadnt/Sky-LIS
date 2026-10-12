@@ -4,7 +4,9 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
-import { PRICING_API } from '../../../core/api/pricing.contracts';
+import type { PageRequest } from '../../../core/api/paging';
+import { type ContractPriceItem, PRICING_API } from '../../../core/api/pricing.contracts';
+import type { TableSort } from '../../../shared/ui/data-table/data-table.types';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { ContractPricingFacade } from '../state/contract-pricing.facade';
@@ -59,6 +61,32 @@ describe('ContractPricingPage (CP-34)', () => {
 
     return element;
   }
+
+  it('B-03: a header sort orders every derived price before the page is cut, and goes back to page 1', async () => {
+    const prices: ContractPriceItem[] = Array.from({ length: 60 }, (_, index) => {
+      const n = String(index + 1).padStart(2, '0');
+      return { serviceId: `s${n}`, listPrice: 100, patientShare: 10, payerShare: 1000 - index, isExcluded: false, alertCondition: null, sourceListId: 'pl26', sourceListCode: 'PL26', serviceCode: `S${n}`, serviceNameEn: `Service ${n}`, serviceNameAr: `خدمة ${n}` };
+    });
+    const fixture = TestBed.createComponent(ContractPricingPage);
+    fixture.componentRef.setInput('tierId', 't-gold');
+    await flush();
+    backend.expectOne((request) => request.url === PRICING_API.tierOptions).flush(TIER_OPTIONS);
+    backend.expectOne((request) => request.url === PRICING_API.basePriceLists).flush(LISTS_PAGE);
+    backend.expectOne(`${PRICING_API.contractPricing}/t-gold`).flush({ ...GOLD, prices });
+    await flush();
+    const page = fixture.componentInstance as unknown as {
+      readonly page: { set(value: PageRequest): void; (): PageRequest };
+      readonly pagedPrices: () => readonly ContractPriceItem[];
+      onSort(sort: TableSort | null): void;
+    };
+
+    page.page.set({ page: 2, pageSize: 50 });
+    page.onSort({ key: 'payerShare', direction: 'asc' });
+    expect(page.page().page).toBe(1);
+    expect(page.pagedPrices()[0]?.serviceId).toBe('s60');   // the smallest payer share of the whole list
+    page.page.set({ page: 2, pageSize: 50 });
+    expect(page.pagedPrices().map((price) => price.serviceId)).toEqual(['s10', 's09', 's08', 's07', 's06', 's05', 's04', 's03', 's02', 's01']);
+  });
 
   it('shows the tier formula, the derived prices with their names and the exclusion', async () => {
     const host = await render();

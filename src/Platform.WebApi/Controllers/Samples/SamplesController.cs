@@ -29,8 +29,8 @@ public sealed class SamplesController(ISender sender) : ControllerBase
         [FromQuery] string? search,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
-        CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListSamplesQuery(visitId, accession, status, from, to, branchId, clinicalGroupId, search, page, pageSize), cancellationToken));
+        [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListSamplesQuery(visitId, accession, status, from, to, branchId, clinicalGroupId, search, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SampleDetail>> Get(Guid id, CancellationToken cancellationToken) =>

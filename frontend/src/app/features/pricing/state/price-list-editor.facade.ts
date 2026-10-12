@@ -103,12 +103,16 @@ export class PriceListEditorFacade {
 
   readonly copy = mutation((input: { listId: string; request: Parameters<PricingApi['copyBasePriceList']>[1] }) => this.api.copyBasePriceList(input.listId, input.request));
 
-  /** Opens a list; the same list is re-read, because the facade outlives the page (route provider, UAT D-14). */
+  /**
+   * Opens a list; the same list is re-read, because the facade outlives the page (route provider, UAT D-14). Another
+   * list starts unfiltered; Refresh (`reload`) keeps the filter, which the page's search box always shows (UAT B-05).
+   */
   load(listId: string): void {
     this.discard();
     if (this.listId() === listId) {
       this.reload();
     } else {
+      this.search.set('');
       this.listId.set(listId);
     }
   }

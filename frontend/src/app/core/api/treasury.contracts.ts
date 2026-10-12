@@ -1,5 +1,7 @@
 /** Treasury module contracts mirrored from `Platform.Contracts.Treasury` (bootstrap until the OpenAPI generator lands, 01 §6.2). */
 
+import type { SortRequest } from './paging';
+
 /** Paging lives in `./paging`; re-exported so existing imports keep working. */
 export type { Paged } from './paging';
 
@@ -36,7 +38,10 @@ export interface RenameTreasuryRequest {
   readonly nameAr: string;
 }
 
-export interface TreasuryListFilter {
+/** `sort`: `code`, `nameEn` or `nameAr` (B-03, server allow-list); absent = by code. */
+export interface TreasuryListFilter extends SortRequest {
+  /** Matches the code and both names on the server, whatever the UI language (UAT B-08); empty = no search. */
+  readonly search: string;
   readonly isActive: boolean | null;
   readonly page: number;
   readonly pageSize: number;

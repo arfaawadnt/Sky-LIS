@@ -1,4 +1,4 @@
-import { HttpInterceptorFn, HttpRequest } from '@angular/common/http';
+import { HttpErrorResponse, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, from, switchMap, throwError } from 'rxjs';
@@ -21,6 +21,9 @@ function withBearer<T>(req: HttpRequest<T>, token: string | null): HttpRequest<T
  * tabs of the browser, and a request built for one user must never be sent as another. When the refresh fails or
  * returns another identity, the store clears the session and reloads the sign-in page itself (full page load, A-01);
  * the original error is surfaced and nothing is replayed. A 401 without a session (anonymous page) routes to sign-in.
+ *
+ * Once the tab's session has ended and the sign-in page is loading (`AuthStore.hasEnded`, round 2 R2-05), no API request
+ * leaves the browser: it fails locally (status 0) instead of reaching the server without a token and being refused with 401.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (!isApiRequest(req.url)) {
@@ -28,6 +31,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   const store = inject(AuthStore);
+  if (store.hasEnded()) {
+    return throwError(() => new HttpErrorResponse({ url: req.url, status: 0, statusText: 'Session ended' }));
+  }
+
   const router = inject(Router);
   const sentAs = store.currentUser()?.id ?? null;
   const sentFor = store.currentTenant();

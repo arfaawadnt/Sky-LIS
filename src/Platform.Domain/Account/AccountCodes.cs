@@ -16,6 +16,9 @@ public static class AccountCodes
     public const string SessionActorRequired = "ACC-020";
     public const string MembershipNotFound = "ACC-404";
 
+    /// <summary>CP-05: the dashboard shows today or an earlier day of the user, never a future one (validation A-10).</summary>
+    public const string DashboardDayInFuture = "ACC-030";
+
     // Support tickets (S1–S7)
     public const string SubjectInvalid = "SUP-001";
     public const string DescriptionInvalid = "SUP-002";

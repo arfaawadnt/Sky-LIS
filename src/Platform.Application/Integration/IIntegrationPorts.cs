@@ -8,7 +8,7 @@ namespace Platform.Application.Integration;
 // Write sides and projections of the module (intake LIS-INT-INT-001 §14). Every read is bounded to the current tenant
 // (query filter + FORCE RLS). Names of other modules' records are joined by the handlers through the read ports below.
 
-public sealed record AnalyserFilter(string? Search, bool? IsActive, Guid? ClinicalGroupId, Guid? SiteAgentId);
+public sealed record AnalyserFilter(string? Search, bool? IsActive, Guid? ClinicalGroupId, Guid? SiteAgentId, ListSort Sort = default);
 
 public interface IAnalyserRepository : IRepository<Analyser>
 {
@@ -56,7 +56,7 @@ public interface IAnalyserSampleCodeRepository : IRepository<AnalyserSampleCode>
     Task<IReadOnlyList<SampleCodeItem>> ListAsync(IReadOnlyCollection<Guid> analyserIds, bool activeOnly, CancellationToken cancellationToken);
 }
 
-public sealed record SiteAgentFilter(string? Search, Guid? BranchId, bool? IsActive);
+public sealed record SiteAgentFilter(string? Search, Guid? BranchId, bool? IsActive, ListSort Sort = default);
 
 /// <summary>A site agent as registers show it before the handler adds names, credential and heartbeat state.</summary>
 public sealed record SiteAgentRow(Guid Id, string Name, Guid BranchId, Guid MachineCredentialId, string ConfigJson, int ConfigVersion, bool IsActive);
@@ -73,7 +73,7 @@ public interface ISiteAgentRepository : IRepository<SiteAgent>
     Task<IReadOnlyDictionary<Guid, string>> NamesAsync(IReadOnlyCollection<Guid> agentIds, CancellationToken cancellationToken);
 }
 
-public sealed record PcrKitFilter(string? Search, bool? IsActive, Guid? AnalyserId);
+public sealed record PcrKitFilter(string? Search, bool? IsActive, Guid? AnalyserId, ListSort Sort = default);
 
 public interface IPcrKitRepository : IRepository<PcrKit>
 {

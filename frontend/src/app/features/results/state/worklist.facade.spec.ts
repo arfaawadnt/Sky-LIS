@@ -54,6 +54,29 @@ describe('WorklistFacade (CP-18)', () => {
     expect(facade.rows()).toEqual([]);
   });
 
+  it('B-03: sorts the whole worklist on the server from page 1; the consumed percentage has no server order', async () => {
+    await runEffects();
+    backend.expectOne((request) => request.url === RESULTS_API.worklist).flush(worklistPage([]));
+    flushLookups();
+    facade.setPage({ page: 2, pageSize: 50 });
+    await runEffects();
+    backend.expectOne((request) => request.url === RESULTS_API.worklist).flush(worklistPage([]));
+
+    facade.setSort({ key: 'patient', direction: 'asc' });
+    await runEffects();
+    const byPatient = backend.expectOne((request) => request.url === RESULTS_API.worklist);
+    expect([byPatient.request.params.get('sort'), byPatient.request.params.get('direction'), byPatient.request.params.get('page')]).toEqual(['patientEn', 'asc', '1']);
+    byPatient.flush(worklistPage([]));
+
+    facade.setSort({ key: 'delay', direction: 'desc' });
+    await runEffects();
+    expect(backend.expectOne((request) => request.url === RESULTS_API.worklist).request.params.get('sort')).toBe('delay');
+
+    facade.setSort({ key: 'consumed', direction: 'desc' });
+    await runEffects();
+    expect(backend.expectOne((request) => request.url === RESULTS_API.worklist).request.params.has('sort')).toBe(false);
+  });
+
   it("loads today's collection window of the branch with the counters and the delay thresholds", async () => {
     await runEffects();
     const first = backend.expectOne((request) => request.url === RESULTS_API.worklist);

@@ -4,6 +4,7 @@ import type { FormGroup } from '@angular/forms';
 import { CATALOGUE_B_PERMISSIONS } from '../../../core/api/catalogue-b.contracts';
 import { type ProblemDetails, ProblemCodes } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
@@ -33,6 +34,7 @@ export abstract class CatalogueBEditorPage<TItem extends CatalogueBRow, TCreate,
   protected readonly confirm = inject(ConfirmService);
   protected readonly toast = inject(ToastService);
   protected readonly permissions = CATALOGUE_B_PERMISSIONS;
+  private readonly access = inject(PermissionsService);
 
   protected abstract readonly facade: CatalogueBListFacade<TItem, TCreate, TUpdate>;
   /** `catalogue-b.<list>`: title, subtitle, add, edit, column.*, field.*, hint.* of the page. */
@@ -44,7 +46,12 @@ export abstract class CatalogueBEditorPage<TItem extends CatalogueBRow, TCreate,
   protected readonly editing = signal<TItem | null>(null);
   protected readonly saveProblem = signal<ProblemDetails | null>(null);
   protected readonly saving = computed(() => this.facade.create.pending() || this.facade.update.pending());
-  protected readonly drawerTitle = computed(() => this.text(this.editing() === null ? 'add' : 'edit'));
+  /**
+   * R-07: a row opened without `catalogue.edit` is a read-only view (fields disabled, no Save nor F10, title "View"); the
+   * server refuses the change anyway, the screen no longer offers it.
+   */
+  protected readonly readOnly = computed(() => this.editing() !== null && !this.access.can(this.permissions.edit));
+  protected readonly drawerTitle = computed(() => this.text(this.editing() === null ? 'add' : this.readOnly() ? 'view' : 'edit'));
 
   constructor() {
     void this.i18n.load(CATALOGUE_B_I18N);
@@ -87,6 +94,10 @@ export abstract class CatalogueBEditorPage<TItem extends CatalogueBRow, TCreate,
     this.fill(item);
     this.form.enable();
     this.lockOnEdit(true);
+    if (this.readOnly()) {
+      this.form.disable();
+    }
+
     this.drawerOpen.set(true);
   }
 
@@ -100,7 +111,7 @@ export abstract class CatalogueBEditorPage<TItem extends CatalogueBRow, TCreate,
   }
 
   async save(): Promise<void> {
-    if (this.saving() || !markAllTouched(this.form)) {
+    if (this.saving() || this.readOnly() || !markAllTouched(this.form)) {
       return;
     }
 

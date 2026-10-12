@@ -31,6 +31,7 @@ import {
   type UpsertPriceLinesResult,
 } from '../../../core/api/pricing.contracts';
 import { toHttpParams } from '../../../shared/forms/paging';
+import { allPages } from './csv';
 
 /** Typed calls of the Pricing module; URLs are built with `HttpParams` and encoded ids, never by string concatenation of user text (pitfall P-60). */
 @Injectable({ providedIn: 'root' })
@@ -40,7 +41,7 @@ export class PricingApi {
   // ---- payers and tiers (CP-32) ----
 
   listPayers(filter: PayerListFilter, signal?: AbortSignal): Promise<Paged<PayerListItem>> {
-    const params = toHttpParams({ search: filter.search, type: filter.type, isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize });
+    const params = toHttpParams({ search: filter.search, type: filter.type, isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize, sort: filter.sort ?? null, direction: filter.direction ?? null });
     return firstValueFrom(this.http.get<Paged<PayerListItem>>(PRICING_API.payers, { params }), { defaultValue: emptyPage<PayerListItem>() }).then(abortable(signal));
   }
 
@@ -85,8 +86,14 @@ export class PricingApi {
   // ---- base price lists (CP-33) ----
 
   listBasePriceLists(filter: BasePriceListFilter, signal?: AbortSignal): Promise<Paged<BasePriceListItem>> {
-    const params = toHttpParams({ search: filter.search, year: filter.year, isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize });
+    const params = toHttpParams({ search: filter.search, year: filter.year, isActive: filter.isActive, page: filter.page, pageSize: filter.pageSize, sort: filter.sort ?? null, direction: filter.direction ?? null });
     return firstValueFrom(this.http.get<Paged<BasePriceListItem>>(PRICING_API.basePriceLists, { params }), { defaultValue: emptyPage<BasePriceListItem>() }).then(abortable(signal));
+  }
+
+  /** Codes (upper case) of every list, active or not, whose code or name contains `text`: the copy dialog proposes a free code (UAT B-06). */
+  async listCodesContaining(text: string): Promise<ReadonlySet<string>> {
+    const lists = await allPages((page, pageSize) => this.listBasePriceLists({ search: text, year: null, isActive: null, page, pageSize }));
+    return new Set(lists.map((list) => list.code.toUpperCase()));
   }
 
   getBasePriceList(id: string, signal?: AbortSignal): Promise<BasePriceListDetail> {
@@ -187,4 +194,13 @@ export function abortable<T>(signal: AbortSignal | undefined): (value: T) => T {
 
     return value;
   };
+}
+
+/** The existing codes the copy proposal must skip; none when they cannot be read (the server still refuses a taken code, PRC-101). */
+export async function takenCodes(api: PricingApi, stem: string): Promise<ReadonlySet<string>> {
+  try {
+    return await api.listCodesContaining(stem);
+  } catch {
+    return new Set<string>();
+  }
 }

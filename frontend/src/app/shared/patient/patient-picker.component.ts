@@ -1,6 +1,6 @@
 // Shared patient picker (Patients CP-11 and Registration CP-06 use the same file lookup and creation form). It reads the
 // `patients` dictionary and the Patients contracts; it never imports a feature.
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, resource, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, resource, signal, untracked, viewChild } from '@angular/core';
 
 import { type CreatedPatient, PATIENTS_PERMISSIONS, type PatientListItem, type PatientSummary, type RegisterPatientRequest, type SimilarPatient } from '../../core/api/patients.contracts';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -11,7 +11,7 @@ import { EmptyStateComponent } from '../ui/empty-state/empty-state.component';
 import { IconComponent } from '../ui/icon/icon.component';
 import { SearchBoxComponent } from '../ui/search-box/search-box.component';
 import { PatientLookupApi } from './patient-lookup.api';
-import { ageBetween, ageParts, birthDateFromAge, toSummary, todayIso } from './patient-demographics';
+import { ageBetween, ageText, birthDateFromAge, toSummary, todayIso } from './patient-demographics';
 import { PatientFormComponent, type TypedIdentity } from './patient-form.component';
 
 const RESULT_LIMIT = 10;
@@ -98,6 +98,21 @@ export class PatientPickerComponent {
 
   constructor() {
     void this.i18n.load('patients');
+
+    // A chosen file ends the search. The search box is gone while the card shows, so when the host clears the choice
+    // (a reset of the registration page after a save, "Change") the picker starts empty instead of listing the previous
+    // result under an empty box, where one click re-selected that patient (validation R-01).
+    effect(() => {
+      if (this.selected() !== null) {
+        untracked(() => this.resetSearch());
+      }
+    });
+  }
+
+  private resetSearch(): void {
+    this.query.set('');
+    this.typed.set('');
+    this.mode.set('search');
   }
 
   protected onSearch(text: string): void {
@@ -144,9 +159,7 @@ export class PatientPickerComponent {
   }
 
   protected ageText(item: { readonly age: { readonly years: number; readonly months: number; readonly days: number } }): string {
-    return ageParts(item.age)
-      .map((part) => this.i18n.tf(`patients.age.${part.unit}`, { value: part.value }))
-      .join(' ');
+    return ageText(item.age, this.i18n.lang(), (key, params) => this.i18n.tf(key, params));
   }
 }
 

@@ -5,20 +5,36 @@ import type { PageRequest } from '../../../core/api/paging';
 import { SETTING_KEYS } from '../../../core/api/settings.contracts';
 import { mutation } from '../../../core/state/mutation';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { sortParams } from '../../../shared/forms/paging';
+import { type TableSort, localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { OrganizationApi } from '../data/organization.api';
 
 /** The minimum of the password policy when the tenant parameter cannot be read (decision of 2026-10-09: default 8). */
 export const DEFAULT_PASSWORD_MIN_LENGTH = 8;
 
-/** The users register (CP-38, SA-07): search, role and status filters, paging. Provided at the route. */
+/** The server key of each sortable column of the users table (B-03): the name sorts by the language on screen. */
+const USER_SORT_KEYS: Readonly<Record<string, (lang: string) => string>> = { name: localizedSortKey('name'), username: () => 'username' };
+
+/** The users register (CP-38, SA-07): search, role and status filters, a server-side sort, paging. Provided at the route. */
 @Injectable()
 export class UsersFacade {
   private readonly api = inject(OrganizationApi);
+  private readonly i18n = inject(I18nService);
 
   readonly filter = signal<UserListFilter>({ search: '', roleId: null, status: null, page: 1, pageSize: 50 });
 
+  /** The column order chosen in the table header; the server sorts before paging (validation v0.5.0 B-03). */
+  readonly sort = signal<TableSort | null>(null);
+
+  private readonly query = computed<UserListFilter>(() => {
+    const sort = this.sort();
+    const key = sort === null ? undefined : USER_SORT_KEYS[sort.key];
+    return { ...this.filter(), ...sortParams(sort !== null && key ? { key: key(this.i18n.lang()), direction: sort.direction } : null) };
+  });
+
   readonly list = resource({
-    params: () => this.filter(),
+    params: () => this.query(),
     loader: ({ params, abortSignal }) => this.api.listUsers(params, abortSignal),
   });
 
@@ -34,6 +50,12 @@ export class UsersFacade {
 
   setStatus(status: UserStatus | null): void {
     this.filter.update((current) => ({ ...current, status, page: 1 }));
+  }
+
+  /** A header click: the new order starts at page 1. */
+  setSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.filter.update((current) => ({ ...current, page: 1 }));
   }
 
   setPage(page: PageRequest): void {
@@ -92,7 +114,7 @@ export class UserEditorFacade {
 
   readonly assignRole = mutation((roleId: string) => this.api.assignUserRole(this.requireId(), roleId), { then: () => this.detail.reload() });
 
-  readonly assignBranches = mutation((branchIds: readonly string[]) => this.api.assignUserBranches(this.requireId(), branchIds), { then: () => this.detail.reload() });
+  readonly assignBranches = mutation((choice: { readonly branchIds: readonly string[]; readonly allBranches: boolean }) => this.api.assignUserBranches(this.requireId(), choice.branchIds, choice.allBranches), { then: () => this.detail.reload() });
 
   readonly setOverrides = mutation((request: SetUserOverridesRequest) => this.api.setUserOverrides(this.requireId(), request), { then: () => this.detail.reload() });
 

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Integration;
 using Platform.Contracts.Common;
 using Platform.Contracts.Integration;
@@ -15,6 +16,13 @@ internal static class SearchPattern
 
 internal sealed class AnalyserRepository(AppDbContext context) : Repository<Analyser>(context), IAnalyserRepository
 {
+    private static readonly SortColumns<Analyser> Sorts = new SortColumns<Analyser>(IntegrationSortKeys.Analysers)
+        .Column("code", analyser => analyser.Code)
+        .Column("nameEn", analyser => analyser.Name.En)
+        .Column("nameAr", analyser => analyser.Name.Ar)
+        .ThenBy(analyser => analyser.Code)
+        .ThenBy(analyser => analyser.Id);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken)
     {
         var cleaned = (code ?? string.Empty).Trim().ToUpperInvariant();
@@ -52,12 +60,12 @@ internal sealed class AnalyserRepository(AppDbContext context) : Repository<Anal
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var pattern = SearchPattern.Contains(filter.Search);
-            query = query.Where(analyser => EF.Functions.ILike(analyser.Code, pattern) || EF.Functions.ILike(analyser.Name.En, pattern) || EF.Functions.ILike(analyser.Name.Ar, pattern));
+            query = query.Where(analyser => EF.Functions.ILike(analyser.Code, pattern, "\\") || EF.Functions.ILike(analyser.Name.En, pattern, "\\") || EF.Functions.ILike(analyser.Name.Ar, pattern, "\\"));
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
         var rows = await (
-            from analyser in query.OrderBy(analyser => analyser.Code).Skip(page.Skip).Take(page.PageSize)
+            from analyser in Sorts.Apply(query, filter.Sort, analysers => analysers.OrderBy(analyser => analyser.Code)).Skip(page.Skip).Take(page.PageSize)
             from agent in Context.Set<SiteAgent>().AsNoTracking().Where(agent => agent.Id == analyser.SiteAgentId).DefaultIfEmpty()
             select new
             {
@@ -161,7 +169,7 @@ internal sealed class AnalyserTestMappingRepository(AppDbContext context) : Repo
         if (!string.IsNullOrWhiteSpace(search))
         {
             var pattern = SearchPattern.Contains(search);
-            query = query.Where(mapping => EF.Functions.ILike(mapping.AnalyserCode, pattern) || (mapping.HostCode != null && EF.Functions.ILike(mapping.HostCode, pattern)));
+            query = query.Where(mapping => EF.Functions.ILike(mapping.AnalyserCode, pattern, "\\") || (mapping.HostCode != null && EF.Functions.ILike(mapping.HostCode, pattern, "\\")));
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
@@ -246,6 +254,10 @@ internal sealed class SiteAgentRepository(AppDbContext context) : Repository<Sit
     public Task<SiteAgent?> FindByServiceUserAsync(Guid serviceUserId, CancellationToken cancellationToken) =>
         Set.FirstOrDefaultAsync(agent => agent.ServiceUserId == serviceUserId, cancellationToken);
 
+    private static readonly SortColumns<SiteAgent> AgentSorts = new SortColumns<SiteAgent>(IntegrationSortKeys.SiteAgents)
+        .Column("name", agent => agent.Name)
+        .ThenBy(agent => agent.Id);
+
     public async Task<Paged<SiteAgentRow>> ListAsync(SiteAgentFilter filter, PageRequest page, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(filter);
@@ -263,11 +275,11 @@ internal sealed class SiteAgentRepository(AppDbContext context) : Repository<Sit
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var pattern = SearchPattern.Contains(filter.Search);
-            query = query.Where(agent => EF.Functions.ILike(agent.Name, pattern));
+            query = query.Where(agent => EF.Functions.ILike(agent.Name, pattern, "\\"));
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await query.OrderBy(agent => agent.Name).ThenBy(agent => agent.Id).Skip(page.Skip).Take(page.PageSize)
+        var items = await AgentSorts.Apply(query, filter.Sort, agents => agents.OrderBy(agent => agent.Name).ThenBy(agent => agent.Id)).Skip(page.Skip).Take(page.PageSize)
             .Select(agent => new SiteAgentRow(agent.Id, agent.Name, agent.BranchId, agent.MachineCredentialId, agent.ConfigJson, agent.ConfigVersion, agent.IsActive))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -315,6 +327,10 @@ internal sealed class PcrKitRepository(AppDbContext context) : Repository<PcrKit
         return await Set.AsNoTracking().Where(kit => kit.IsActive && ids.Contains(kit.AnalyserId)).OrderBy(kit => kit.Name).ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    private static readonly SortColumns<PcrKit> KitSorts = new SortColumns<PcrKit>(IntegrationSortKeys.PcrKits)
+        .Column("name", kit => kit.Name)
+        .ThenBy(kit => kit.Id);
+
     public async Task<Paged<PcrKitListItem>> ListAsync(PcrKitFilter filter, PageRequest page, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(filter);
@@ -332,12 +348,12 @@ internal sealed class PcrKitRepository(AppDbContext context) : Repository<PcrKit
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var pattern = SearchPattern.Contains(filter.Search);
-            query = query.Where(kit => EF.Functions.ILike(kit.Name, pattern));
+            query = query.Where(kit => EF.Functions.ILike(kit.Name, pattern, "\\"));
         }
 
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
         var items = await (
-            from kit in query.OrderBy(kit => kit.Name).ThenBy(kit => kit.Id).Skip(page.Skip).Take(page.PageSize)
+            from kit in KitSorts.Apply(query, filter.Sort, kits => kits.OrderBy(kit => kit.Name).ThenBy(kit => kit.Id)).Skip(page.Skip).Take(page.PageSize)
             from analyser in Context.Set<Analyser>().AsNoTracking().Where(analyser => analyser.Id == kit.AnalyserId).DefaultIfEmpty()
             select new PcrKitListItem(
                 kit.Id,

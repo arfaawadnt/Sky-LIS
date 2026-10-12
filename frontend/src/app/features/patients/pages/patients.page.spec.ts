@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
 import { PATIENTS_API, type PatientListItem } from '../../../core/api/patients.contracts';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { PatientsFacade } from '../state/patients.facade';
 import { PatientsPage } from './patients.page';
@@ -59,10 +60,10 @@ describe('PatientsPage (CP-11 register)', () => {
     await settle();
   }
 
-  async function render(): Promise<HTMLElement> {
+  async function render(items: readonly PatientListItem[] = [row]): Promise<HTMLElement> {
     const fixture = TestBed.createComponent(PatientsPage);
     await flush();
-    backend.expectOne((r) => r.url === PATIENTS_API.patients).flush({ items: [row], page: 1, pageSize: 50, totalCount: 1, totalPages: 1 });
+    backend.expectOne((r) => r.url === PATIENTS_API.patients).flush({ items, page: 1, pageSize: 50, totalCount: items.length, totalPages: 1 });
     backend.match(() => true).forEach((call) => call.flush(call.request.url.endsWith('form-settings') ? { mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true } : []));
     await flush();
     return fixture.nativeElement as HTMLElement;
@@ -79,6 +80,18 @@ describe('PatientsPage (CP-11 register)', () => {
     expect(host.querySelector('app-page-header .btn.primary')).toBeNull();
   });
 
+  it('shows a masked VIP row as "VIP patient" with no identity (validation A-03)', async () => {
+    granted = new Set(['patients.view']);
+    const masked: PatientListItem = { ...row, fullName: '', nameAr: null, mobile: null, nationalId: null, isVip: null, identityMasked: true };
+    const host = await render([masked]);
+
+    const text = host.querySelector('tbody tr[data-row]')?.textContent ?? '';
+    expect(text).toContain('PAT-2026-00001');
+    expect(text).toContain('patients.vipMasked');
+    expect(text).not.toContain('01001234567');
+    expect(text).not.toContain('منى');
+  });
+
   it('shows the visit count and the last visit of each file (CP-11, UAT A-09)', async () => {
     granted = new Set(['patients.view']);
     const host = await render();
@@ -88,6 +101,34 @@ describe('PatientsPage (CP-11 register)', () => {
     const cells = [...(host.querySelector('tbody tr[data-row]')?.querySelectorAll('td') ?? [])].map((cell) => cell.textContent?.trim());
     expect(cells).toContain('3');
     expect(cells.some((text) => text?.includes('2026'))).toBe(true);
+  });
+
+  it('reads the conditions from the patients API, never the catalogue, and names the condition of the file (round 2 R2-04)', async () => {
+    granted = new Set(['patients.view']);
+    const fixture = TestBed.createComponent(PatientsPage);
+    await flush();
+    backend.expectOne((r) => r.url === PATIENTS_API.patients).flush({ items: [{ ...row, patientConditionId: 'c-1' }], page: 1, pageSize: 50, totalCount: 1, totalPages: 1 });
+    const conditions = backend.expectOne((r) => r.url === '/api/v1/patients/conditions');
+    expect(conditions.request.method).toBe('GET');
+    conditions.flush([{ id: 'c-1', nameEn: 'Pregnant', nameAr: 'حامل' }]);
+    backend.expectNone((r) => r.url.startsWith('/api/v1/catalogue/'));
+    backend.match(() => true).forEach((call) => call.flush(call.request.url.endsWith('form-settings') ? { mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true } : []));
+    await flush();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('tbody tr[data-row]')?.textContent).toContain('Pregnant');
+  });
+
+  it('shows the visit count in Arabic-Indic digits on an Arabic page (round 2 R2-02)', async () => {
+    granted = new Set(['patients.view']);
+    TestBed.inject(I18nService).setLanguage('ar');
+    try {
+      const host = await render([{ ...row, visitCount: 16 }]);
+      const cells = [...(host.querySelector('tbody tr[data-row]')?.querySelectorAll('td') ?? [])].map((cell) => cell.textContent?.trim());
+      expect(cells).toContain('١٦');
+      expect(cells).not.toContain('16');
+    } finally {
+      TestBed.inject(I18nService).setLanguage('en');
+    }
   });
 
   it('shows VIP to the confidential right and opens the create drawer for a creator', async () => {

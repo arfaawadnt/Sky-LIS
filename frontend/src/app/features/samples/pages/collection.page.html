@@ -98,7 +98,7 @@
     <p class="problem list-problem" role="alert">{{ problemText(problem) }}</p>
   }
 
-  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.today.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('samples.collection.empty')" [caption]="i18n.t('samples.collection.todayTitle')">
+  <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.today.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('samples.collection.empty')" [caption]="i18n.t('samples.collection.todayTitle')" [sort]="facade.sort()" [serverSort]="true" (sortChange)="facade.setSort($event)">
     <ng-template appCell="sampleNumber" [appCellOf]="rows()" let-row>
       <a class="mono link" [routerLink]="links.track(row.sampleNumber)">{{ row.sampleNumber }}</a>
     </ng-template>

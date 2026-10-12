@@ -158,6 +158,25 @@ export function ageParts(age: PatientAge): readonly { readonly unit: 'years' | '
   return parts.slice(0, 2);
 }
 
+/** A whole number in the digits of the language: Arabic-Indic in Arabic (validation R-02), never grouped. */
+export function localDigits(value: number, language: string): string {
+  return new Intl.NumberFormat(language === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 0, useGrouping: false }).format(value);
+}
+
+/**
+ * The age text of the patient screens ("52 y", "٥٢ سنة"): {@link ageParts} through the `patients.age.<unit>` dictionary
+ * entries, with the numbers in the language's digits (validation R-02: Arabic pages showed "52 سنة").
+ */
+export function ageText(
+  age: PatientAge,
+  language: string,
+  translate: (key: string, params: Readonly<Record<string, string | number>>) => string,
+): string {
+  return ageParts(age)
+    .map((part) => translate(`patients.age.${part.unit}`, { value: localDigits(part.value, language) }))
+    .join(' ');
+}
+
 /** The picker's output from any projection of a file. */
 export function toSummary(source: PatientListItem | SimilarPatient | PatientDetail, isVip: boolean | null = 'isVip' in source ? source.isVip : null): PatientSummary {
   return {
@@ -183,6 +202,22 @@ export function fileSize(bytes: number): string {
   }
 
   return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * A calendar date (`yyyy-MM-dd`, a date of birth or a registration day) in the user's language and digits, never shifted
+ * by the time zone: `12 Oct 1979` / `١٢‏/١٠‏/١٩٧٩` (round 2 R2-02: the patient file showed the ISO text in Arabic). Anything
+ * else is returned as given.
+ */
+export function formatCalendarDate(iso: string, language: string): string {
+  const date = parseIso(iso);
+  if (date === null) {
+    return iso;
+  }
+
+  const local = new Date(2000, 0, 1);
+  local.setFullYear(date.year, date.month - 1, date.day);
+  return new Intl.DateTimeFormat(language === 'ar' ? 'ar-EG' : 'en-GB', { dateStyle: 'medium' }).format(local);
 }
 
 /** Date and time in the user's language without Angular locale data (Intl): `en-GB` / `ar-EG`, medium date, short time. */

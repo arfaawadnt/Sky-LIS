@@ -87,6 +87,23 @@ describe('PatientsFacade (01 §6.3)', () => {
     backend.expectOne(`${PATIENTS_API.patients}/form-settings`).flush({ mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true });
   });
 
+  it('B-03: sorts the register on the server from page 1 (number, full name); the export keeps its own order', async () => {
+    await initialLoad();
+    facade.setPage({ page: 3, pageSize: 50 });
+    await runEffects();
+    backend.expectOne((r) => r.url === PATIENTS_API.patients).flush(page([]));
+
+    facade.setSort({ key: 'name', direction: 'asc' });
+    await runEffects();
+    const sorted = backend.expectOne((r) => r.url === PATIENTS_API.patients);
+    expect([sorted.request.params.get('sort'), sorted.request.params.get('direction'), sorted.request.params.get('page')]).toEqual(['name', 'asc', '1']);
+    sorted.flush(page([]));
+
+    facade.setSort({ key: 'number', direction: 'desc' });
+    await runEffects();
+    expect(backend.expectOne((r) => r.url === PATIENTS_API.patients).request.params.get('sort')).toBe('number');
+  });
+
   it('loads active files first and filters on search, gender and VIP with the page reset', async () => {
     await runEffects();
     const first = backend.expectOne((r) => r.url === PATIENTS_API.patients);

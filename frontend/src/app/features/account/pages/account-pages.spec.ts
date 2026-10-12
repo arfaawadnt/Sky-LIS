@@ -111,7 +111,7 @@ describe('Account pages', () => {
   });
 
   it('CP-05 shows the figures, "—" for what is not live yet, and the 7-day chart', async () => {
-    await signIn({ permissions: ['dashboard.view', 'wallet.view'] });
+    await signIn({ permissions: ['dashboard.view', 'wallet.view', 'billing.view'] });
     const fixture = TestBed.createComponent(DashboardPage);
     await render(fixture);
     const dashboard: BranchDashboard = {
@@ -159,7 +159,7 @@ describe('Account pages', () => {
         { status: 200 },
       ),
     );
-    await signIn({ permissions: ['dashboard.view', 'audit.view'] });
+    await signIn({ permissions: ['dashboard.view', 'audit.view', 'billing.view'] });
     const i18n = TestBed.inject(I18nService);
     i18n.setLanguage('ar');
     await i18n.load('account');
@@ -206,6 +206,47 @@ describe('Account pages', () => {
     expect(activity).not.toContain('ResultLogEntry');
     expect(root.querySelector('a[href="/account/audit"]')).toBeNull();
     expect(root.textContent).not.toContain('account.dashboard.openAudit');   // CP-68 is Release 2: no "Open audit" link
+  });
+
+  it('CP-05 reads a day with one registration in the singular, in both languages (validation v0.5.0 R-10)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      const dictionary = url === '/i18n/account.en.json'
+        ? { 'dashboard.chartBar': '{date}: {count} registrations', 'dashboard.chartBarOne': '{date}: 1 registration' }
+        : url === '/i18n/account.ar.json'
+          ? { 'dashboard.chartBar': '{date}: {count} تسجيلات', 'dashboard.chartBarOne': '{date}: تسجيل واحد' }
+          : {};
+      return new Response(JSON.stringify(dictionary), { status: 200 });
+    });
+    await signIn({ permissions: ['dashboard.view'] });
+    const i18n = TestBed.inject(I18nService);
+    await i18n.load('account');
+    const fixture = TestBed.createComponent(DashboardPage);
+    await render(fixture);
+    backend.expectOne((r) => r.url === ACCOUNT_API.dashboard).flush({
+      branchId: 'b1',
+      date: '2026-10-12',
+      fromUtc: '2026-10-11T21:00:00Z',
+      toUtc: '2026-10-12T21:00:00Z',
+      currencyCode: 'EGP',
+      kpis: { registrations: 1, collectedToday: 0, samplesReceived: null, pendingResults: 0, unverifiedBacklog: 0, delayedTests: 0, rejectedSamples: null, walletBalance: null, walletCurrency: null },
+      registrationsByDay: [{ date: '2026-10-11', count: 3 }, { date: '2026-10-12', count: 1 }],
+      delayedTests: [],
+    } satisfies BranchDashboard);
+    backend.expectOne(ORGANIZATION_API.selectableBranches).flush({ currentBranchId: 'b1', branches: [{ id: 'b1', code: 'MAIN', nameEn: 'Main', nameAr: 'الرئيسي' }] });
+    await render(fixture);
+
+    const descriptions = (): string[] => [...(fixture.nativeElement as HTMLElement).querySelectorAll('app-bar-chart li')].map((item) => item.textContent?.trim() ?? '');
+    expect(descriptions()).toHaveLength(2);
+    expect(descriptions()[0]).toMatch(/: 3 registrations$/);
+    expect(descriptions()[1]).toMatch(/: 1 registration$/);
+
+    i18n.setLanguage('ar');
+    await i18n.load('account');
+    await render(fixture);
+    expect(descriptions()[0]).toMatch(/: ٣ تسجيلات$/);
+    expect(descriptions()[1]).toMatch(/: تسجيل واحد$/);
+    i18n.setLanguage('en');
   });
 
   it('CP-05 lists the delayed tests the tile counts: accession, patient, test, delay and status (UAT R1-02)', async () => {
@@ -290,6 +331,8 @@ describe('Account pages', () => {
     expect(root.textContent).toContain('V11 Validation Lab');
     const options = [...root.querySelectorAll<HTMLOptionElement>('select[formcontrolname=clientTenantId] option')].map((option) => option.value);
     expect(options).toEqual(['', 'lab-a']);
+    // C-12: the entity hint names Super Admin entities in the platform log
+    expect(root.textContent).toContain('account.audit.entityHintPlatform');
   });
 
   it('CP-68 a laboratory log has no client column or filter', async () => {
@@ -304,6 +347,8 @@ describe('Account pages', () => {
     const root = fixture.nativeElement as HTMLElement;
     expect(root.textContent).not.toContain('account.audit.client');
     expect(root.querySelector('select[formcontrolname=clientTenantId]')).toBeNull();
+    expect(root.textContent).toContain('account.audit.entityHint');
+    expect(root.textContent).not.toContain('account.audit.entityHintPlatform');
   });
 
   it('CP-65 shows the password rule live and does not send a password that contains the username', async () => {

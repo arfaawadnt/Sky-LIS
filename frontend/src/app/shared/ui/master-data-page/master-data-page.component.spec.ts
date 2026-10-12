@@ -5,10 +5,12 @@ import sharedEn from '../../../../../public/i18n/shared.en.json';
 import type { Paged } from '../../../core/api/paging';
 import { ProblemCodes, ProblemError } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { CellTemplateDirective } from '../data-table/cell-template.directive';
 import { ConfirmService } from '../dialog/confirm.service';
 import { ToastService } from '../toast/toast.service';
 import { MasterDataPageComponent } from './master-data-page.component';
+import { localizedSortKey } from '../data-table/data-table.types';
 import type { MasterDataAdapter, MasterDataConfig, MasterDataFilter } from './master-data.types';
 
 interface Item {
@@ -91,6 +93,31 @@ class HostComponent {
   };
 }
 
+/** A gated register (validation v0.5.0 R-07): editing needs `test.edit`, which a reader does not hold. */
+@Component({
+  imports: [MasterDataPageComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<app-master-data-page [config]="config" />`,
+})
+class GatedHostComponent {
+  readonly adapter = new FakeAdapter();
+
+  readonly config: MasterDataConfig<Item, ItemDto> = {
+    i18nPrefix: 'test.gated',
+    columns: [{ key: 'code', header: 'test.gated.column.code' }],
+    fields: [
+      { name: 'code', kind: 'code', required: true },
+      { name: 'name', kind: 'localizedText', required: true },
+      { name: 'tags', kind: 'multiSelect', options: [{ value: 'a', label: 'Alpha' }] },
+    ],
+    adapter: this.adapter,
+    permissions: { create: 'test.create', update: 'test.edit', activate: 'test.manage' },
+  };
+}
+
+/** The permissions the signed-in user holds in a test (the page's affordances read them; the server decides). */
+const granted = new Set<string>();
+
 /** A branch-like page: the currency is a code field that starts at EGP (B-01). */
 @Component({
   imports: [MasterDataPageComponent],
@@ -109,7 +136,71 @@ class DefaultsHostComponent {
   };
 }
 
+interface PlaceDto {
+  readonly code: string;
+  readonly countryId: string | null;
+  readonly governorateId: string | null;
+}
+
+/** A branch-like page (validation v0.5.0): a two-field server rule (ORG-017) and a list sorted on the server. */
+@Component({
+  imports: [MasterDataPageComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<app-master-data-page [config]="config" />`,
+})
+class PairHostComponent {
+  readonly filters: MasterDataFilter[] = [];
+  readonly created: PlaceDto[] = [];
+  refusals = 1;
+
+  readonly config: MasterDataConfig<Item, PlaceDto> = {
+    i18nPrefix: 'test.places',
+    sortMode: 'server',
+    columns: [
+      { key: 'code', header: 'test.places.column.code', sortable: true },
+      { key: 'name', header: 'test.places.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (item) => item.nameEn },
+    ],
+    fields: [
+      { name: 'code', kind: 'code', required: true },
+      { name: 'countryId', kind: 'select', options: [{ value: 'eg', label: 'Egypt' }, { value: 'jo', label: 'Jordan' }] },
+      { name: 'governorateId', kind: 'select', options: [{ value: 'cairo', label: 'Cairo' }] },
+    ],
+    linkedFields: [['countryId', 'governorateId']],
+    adapter: {
+      list: async (filter) => {
+        this.filters.push(filter);
+        // the server order: Beta before Alpha (a client sort would put Alpha first)
+        const items: Item[] = [
+          { id: 'b', code: 'B2', nameEn: 'Beta', nameAr: 'بيتا', isActive: true },
+          { id: 'a', code: 'A1', nameEn: 'Alpha', nameAr: 'ألفا', isActive: true },
+        ];
+        return { items, page: 1, pageSize: 50, totalCount: 60, totalPages: 2 };
+      },
+      create: async (dto) => {
+        if (this.refusals-- > 0) {
+          throw new ProblemError(
+            { type: 'about:blank', title: '', status: 422, code: ProblemCodes.validationFailed, traceId: null, correlationId: null, errors: { governorateId: ['The governorate must belong to the chosen country.'] } },
+            422,
+          );
+        }
+
+        this.created.push(dto);
+      },
+      update: async () => undefined,
+    },
+  };
+}
+
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+function choose(select: HTMLSelectElement | null | undefined, label: string): void {
+  if (!select) {
+    throw new Error('select not found');
+  }
+
+  select.selectedIndex = [...select.options].findIndex((option) => option.text.trim() === label);
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+}
 
 function setValue(input: HTMLInputElement | null, value: string): void {
   if (!input) {
@@ -122,7 +213,7 @@ function setValue(input: HTMLInputElement | null, value: string): void {
 
 describe('MasterDataPageComponent (shared/ui)', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [HostComponent, DefaultsHostComponent], providers: [provideZonelessChangeDetection()] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [HostComponent, DefaultsHostComponent, PairHostComponent, GatedHostComponent], providers: [provideZonelessChangeDetection(), { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> }] }).compileComponents();
   });
 
   async function render(): Promise<{ fixture: ReturnType<typeof TestBed.createComponent<HostComponent>>; host: HTMLElement; adapter: FakeAdapter }> {
@@ -324,5 +415,175 @@ describe('MasterDataPageComponent (shared/ui)', () => {
     await flush(fixture);
     expect(adapter.calls).toContain('setActive:a:false');
     expect(host.querySelectorAll('tbody tr[data-row]').length).toBe(1);
+  });
+
+  describe('validation v0.5.0 R-07: a row opened without the edit permission', () => {
+    afterEach(() => granted.clear());
+
+    async function renderGated(): Promise<{ fixture: ReturnType<typeof TestBed.createComponent<GatedHostComponent>>; host: HTMLElement; adapter: FakeAdapter }> {
+      const fixture = TestBed.createComponent(GatedHostComponent);
+      await flush(fixture);
+      return { fixture, host: fixture.nativeElement as HTMLElement, adapter: fixture.componentInstance.adapter };
+    }
+
+    it('opens read-only: fields disabled, no Save, the title says View, and F10 / Ctrl+S save nothing', async () => {
+      granted.add('test.view');
+      const { fixture, host, adapter } = await renderGated();
+      expect(host.querySelector('tbody tr[data-row="b"] .row-btn')).toBeNull();   // no edit or activate button for a reader
+
+      host.querySelector<HTMLTableRowElement>('tbody tr[data-row="b"]')?.click();
+      await fixture.whenStable();
+      const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+      expect(dialog).not.toBeNull();
+      expect(dialog?.textContent).toContain('masterData.view');
+      expect(dialog?.textContent).not.toContain('masterData.edit');
+      expect(dialog?.querySelector<HTMLInputElement>('input[lang="en"]')?.value).toBe('Beta');   // the record is shown
+      const controls = [...(dialog?.querySelectorAll<HTMLInputElement | HTMLSelectElement>('form input, form select, form textarea') ?? [])];
+      expect(controls.length).toBeGreaterThanOrEqual(4);
+      expect(controls.every((control) => control.disabled)).toBe(true);
+      const footer = [...(dialog?.querySelectorAll<HTMLButtonElement>('.foot button') ?? [])].map((button) => button.textContent?.trim());
+      expect(footer).toEqual(['shared.drawer.close']);
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true }));
+      await flush(fixture);
+      expect(adapter.calls.some((call) => call.startsWith('update'))).toBe(false);
+
+      dialog?.querySelector<HTMLButtonElement>('.foot .btn')?.click();
+      await fixture.whenStable();
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+    });
+
+    it('opens for editing with the permission (title Edit, fields enabled but the code, Save present)', async () => {
+      granted.add('test.edit');
+      const { fixture, host, adapter } = await renderGated();
+      host.querySelector<HTMLTableRowElement>('tbody tr[data-row="b"]')?.click();
+      await fixture.whenStable();
+      const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+      expect(dialog?.textContent).toContain('masterData.edit');
+      expect(dialog?.querySelector<HTMLInputElement>('input.code')?.disabled).toBe(true);
+      expect(dialog?.querySelector<HTMLInputElement>('input[lang="en"]')?.disabled).toBe(false);
+
+      setValue(dialog?.querySelector<HTMLInputElement>('input[lang="en"]') ?? null, 'Beta 2');
+      dialog?.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
+      await flush(fixture);
+      expect(adapter.calls).toContain('update:b:{"code":"B2","nameEn":"Beta 2","nameAr":"بيتا","tags":[]}');
+    });
+
+    it('a reader who may create still gets an editable Add drawer, and the next row opens read-only again', async () => {
+      granted.add('test.create');
+      const { fixture, host } = await renderGated();
+      host.querySelector<HTMLButtonElement>('app-page-header .btn.primary')?.click();
+      await fixture.whenStable();
+      let dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+      expect(dialog?.querySelector<HTMLInputElement>('input.code')?.disabled).toBe(false);
+      expect(dialog?.querySelector('.foot .btn.primary')).not.toBeNull();
+      dialog?.querySelector<HTMLButtonElement>('.foot .btn')?.click();
+      await flush(fixture);
+
+      host.querySelector<HTMLTableRowElement>('tbody tr[data-row="a"]')?.click();
+      await fixture.whenStable();
+      dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+      expect(dialog?.querySelector<HTMLInputElement>('input[lang="en"]')?.disabled).toBe(true);
+      expect(dialog?.querySelector('.foot .btn.primary')).toBeNull();
+    });
+  });
+
+  describe('validation v0.5.0', () => {
+    async function renderPair(): Promise<{ fixture: ReturnType<typeof TestBed.createComponent<PairHostComponent>>; host: HTMLElement; page: PairHostComponent }> {
+      const fixture = TestBed.createComponent(PairHostComponent);
+      await flush(fixture);
+      return { fixture, host: fixture.nativeElement as HTMLElement, page: fixture.componentInstance };
+    }
+
+    async function openAndFill(fixture: { whenStable(): Promise<unknown> }, host: HTMLElement): Promise<HTMLElement> {
+      host.querySelector<HTMLButtonElement>('app-page-header .btn.primary')?.click();
+      await fixture.whenStable();
+      const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+      if (!dialog) {
+        throw new Error('drawer missing');
+      }
+
+      setValue(dialog.querySelector<HTMLInputElement>('input.code'), 'east');
+      const [country, governorate] = [...dialog.querySelectorAll<HTMLSelectElement>('select')];
+      choose(country, 'Jordan');
+      choose(governorate, 'Cairo');
+      await fixture.whenStable();
+      return dialog;
+    }
+
+    it('B-01: correcting the other field of a refused pair clears the server error, so the next save reaches the server', async () => {
+      const { fixture, host, page } = await renderPair();
+      const dialog = await openAndFill(fixture, host);
+
+      dialog.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
+      await flush(fixture);
+      expect(dialog.querySelector('app-form-field .error')?.textContent).toContain('The governorate must belong to the chosen country.');
+
+      // the user fixes the COUNTRY, not the governorate that carries the error
+      choose(dialog.querySelectorAll<HTMLSelectElement>('select')[0], 'Egypt');
+      await flush(fixture);
+      expect(dialog.querySelector('app-form-field .error')).toBeNull();
+
+      dialog.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
+      await flush(fixture);
+      expect(page.created).toEqual([{ code: 'EAST', countryId: 'eg', governorateId: 'cairo' }]);
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+    });
+
+    it('B-01: an unrelated edit leaves the server error of the pair in place', async () => {
+      const { fixture, host, page } = await renderPair();
+      const dialog = await openAndFill(fixture, host);
+      dialog.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
+      await flush(fixture);
+
+      setValue(dialog.querySelector<HTMLInputElement>('input.code'), 'east2');
+      await flush(fixture);
+      expect(dialog.querySelector('app-form-field .error')?.textContent).toContain('The governorate must belong to the chosen country.');
+      expect(page.created).toEqual([]);
+    });
+
+    it('B-01: a save blocked by the form says so and focuses the first invalid field', async () => {
+      const { fixture, host, page } = await renderPair();
+      host.querySelector<HTMLButtonElement>('app-page-header .btn.primary')?.click();
+      await fixture.whenStable();
+      const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+      expect(dialog?.querySelector('p.problem[role="alert"]')).toBeNull();
+
+      dialog?.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
+      await flush(fixture);
+
+      expect(page.created).toEqual([]);
+      expect(dialog?.querySelector('p.problem[role="alert"]')?.textContent).toContain('masterData.invalid');
+      expect(document.activeElement).toBe(dialog?.querySelector('input.code'));
+
+      setValue(dialog?.querySelector<HTMLInputElement>('input.code') ?? null, 'ok');
+      await flush(fixture);
+      expect(dialog?.querySelector('p.problem[role="alert"]')).toBeNull();   // the notice follows the form
+    });
+
+    it('B-03: a header click sorts on the server from page 1 and shows the rows in the server order', async () => {
+      const { fixture, host, page } = await renderPair();
+      expect(page.filters.at(-1)?.sort).toBeUndefined();
+
+      host.querySelectorAll<HTMLButtonElement>('thead .sort-btn')[1]?.click();
+      await flush(fixture);
+      expect(page.filters.at(-1)?.sort).toEqual({ key: 'nameEn', direction: 'asc' });
+      // not re-sorted in the browser: Beta (server order) stays before Alpha
+      expect([...host.querySelectorAll('tbody tr[data-row]')].map((row) => row.getAttribute('data-row'))).toEqual(['b', 'a']);
+
+      host.querySelectorAll<HTMLButtonElement>('thead .sort-btn')[1]?.click();
+      await flush(fixture);
+      expect(page.filters.at(-1)?.sort).toEqual({ key: 'nameEn', direction: 'desc' });
+
+      TestBed.inject(I18nService).setLanguage('ar');
+      await flush(fixture);
+      expect(page.filters.at(-1)?.sort).toEqual({ key: 'nameAr', direction: 'desc' });   // the name of the shown language
+      TestBed.inject(I18nService).setLanguage('en');
+
+      host.querySelectorAll<HTMLButtonElement>('thead .sort-btn')[0]?.click();
+      await flush(fixture);
+      expect(page.filters.at(-1)?.sort).toEqual({ key: 'code', direction: 'asc' });
+    });
   });
 });

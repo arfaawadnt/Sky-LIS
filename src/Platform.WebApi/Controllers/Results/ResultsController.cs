@@ -147,8 +147,10 @@ public sealed class ResultsController(ISender sender) : ControllerBase
         [FromQuery] bool branchOnly,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
+        [FromQuery] string? sort,
+        [FromQuery] string? direction,
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new GetWorklistQuery(from, to, clinicalGroupId, testId, analyserId, sampleStatus, payerId, statuses, delayedOnly, search, branchOnly, page, pageSize), cancellationToken));
+        Ok(await sender.Send(new GetWorklistQuery(from, to, clinicalGroupId, testId, analyserId, sampleStatus, payerId, statuses, delayedOnly, search, branchOnly, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("worklist/documents/worklist")]
     public async Task<ActionResult<WorklistDocument>> WorklistBenchList(

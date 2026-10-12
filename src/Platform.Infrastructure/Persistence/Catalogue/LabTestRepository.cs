@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Catalogue;
 using Platform.Contracts.Catalogue;
 using Platform.Contracts.Common;
@@ -8,6 +9,13 @@ namespace Platform.Infrastructure.Persistence.Catalogue;
 
 internal sealed class LabTestRepository(AppDbContext context) : Repository<LabTest>(context), ILabTestRepository
 {
+    private static readonly SortColumns<LabTest> Sorts = new SortColumns<LabTest>(CatalogueSortKeys.LabTests)
+        .Column("code", test => test.Code)
+        .Column("nameEn", test => test.Name.En)
+        .Column("nameAr", test => test.Name.Ar)
+        .ThenBy(test => test.Code)
+        .ThenBy(test => test.Id);
+
     public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken)
     {
         var cleaned = (code ?? string.Empty).Trim().ToUpperInvariant();
@@ -36,8 +44,19 @@ internal sealed class LabTestRepository(AppDbContext context) : Repository<LabTe
     {
         var query = Filtered(filter);
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await ProjectAsync(query.OrderBy(test => test.Code).Skip(page.Skip).Take(page.PageSize), cancellationToken).ConfigureAwait(false);
-        return new Paged<LabTestListItem>(items, page.Page, page.PageSize, total);
+        if (filter.Sort.Key is null)
+        {
+            var items = await ProjectAsync(query.OrderBy(test => test.Code).Skip(page.Skip).Take(page.PageSize), cancellationToken).ConfigureAwait(false);
+            return new Paged<LabTestListItem>(items, page.Page, page.PageSize, total);
+        }
+
+        // B-03: the page of the requested order is chosen on the server; the projection orders by code, so the rows are
+        // put back in the order of the ids.
+        var ids = await Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(test => test.Code)).Skip(page.Skip).Take(page.PageSize)
+            .Select(test => test.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var projected = await ProjectAsync(Set.AsNoTracking().Where(test => ids.Contains(test.Id)), cancellationToken).ConfigureAwait(false);
+        var position = ids.Select((id, index) => (id, index)).ToDictionary(entry => entry.id, entry => entry.index);
+        return new Paged<LabTestListItem>(projected.OrderBy(item => position[item.Id]).ToList(), page.Page, page.PageSize, total);
     }
 
     public Task<IReadOnlyList<LabTestListItem>> ExportAsync(LabTestListFilter filter, CancellationToken cancellationToken) =>

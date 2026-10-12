@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Identity;
 using Platform.Contracts.Common;
@@ -16,7 +17,7 @@ namespace Platform.Application.Organization.Queries;
 
 /// <summary><paramref name="Status"/> is a status name: Active, Locked, Expired, Inactive.</summary>
 [RequirePermissionPolicy(PermissionCatalog.Identity, PermissionAction.View)]
-public sealed record ListUsersQuery(string? Search, Guid? RoleId, string? Status, int? Page, int? PageSize) : IQuery<Paged<UserListItem>>;
+public sealed record ListUsersQuery(string? Search, Guid? RoleId, string? Status, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<UserListItem>>;
 
 public sealed class ListUsersValidator : AbstractValidator<ListUsersQuery>
 {
@@ -26,6 +27,8 @@ public sealed class ListUsersValidator : AbstractValidator<ListUsersQuery>
         RuleFor(query => query.Status).IsEnumName(typeof(StaffStatus), caseSensitive: false).When(query => !string.IsNullOrEmpty(query.Status));
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(OrganizationSortKeys.Users);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
@@ -34,7 +37,7 @@ public sealed class ListUsersHandler(IStaffDirectory directory, IClock clock) : 
     public Task<Paged<UserListItem>> Handle(ListUsersQuery query, CancellationToken cancellationToken)
     {
         StaffStatus? status = string.IsNullOrEmpty(query.Status) ? null : Enum.Parse<StaffStatus>(query.Status, ignoreCase: true);
-        return directory.ListAsync(new StaffFilter(query.Search, query.RoleId, status), PageRequest.Normalized(query.Page, query.PageSize), clock.UtcNow, cancellationToken);
+        return directory.ListAsync(new StaffFilter(query.Search, query.RoleId, status, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), clock.UtcNow, cancellationToken);
     }
 }
 

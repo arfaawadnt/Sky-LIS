@@ -4,9 +4,11 @@ import { toCsv } from '../data/csv-export';
 import { statusTone } from './status';
 import {
   countryMobileValidator,
+  fieldProblem,
   formatJson,
   hasAtMostTwoDecimals,
   ianaTimeZones,
+  isDialCodeValid,
   jsonValidator,
   matchingPasswords,
   maxTwoDecimals,
@@ -100,6 +102,13 @@ describe('Platform helpers', () => {
     expect(amount.errors).toEqual({ server: 'two decimals' });
     amount.setValue(250.56);
     expect(amount.errors).toBeNull();
+  });
+
+  it('C-09: a dial code is + and one to four digits, not starting with 0 (GEO-002)', () => {
+    expect(['+20', '+1', '+998', '+1 684', ' +966 '].map(isDialCodeValid)).toEqual([true, true, true, true, true]);
+    expect(['998', '20', '+', '+0', '+12345', '+2a', ''].map(isDialCodeValid)).toEqual([false, false, false, false, false, false, false]);
+    const problem = fieldProblem('dialCode', 'The dial code is +.');
+    expect([problem.code, problem.problem.errors]).toEqual(['VALIDATION-400', { dialCode: ['The dial code is +.'] }]);
   });
 
   it('C-08: offers the IANA time zones, keeping UTC and the zones already stored', () => {

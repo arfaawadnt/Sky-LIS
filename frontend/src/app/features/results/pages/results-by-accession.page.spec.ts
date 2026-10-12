@@ -1,3 +1,5 @@
+import resultsAr from '../../../../../public/i18n/results.ar.json';
+import resultsEn from '../../../../../public/i18n/results.en.json';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
@@ -6,6 +8,7 @@ import { provideRouter } from '@angular/router';
 
 import { RESULTS_API, type ResultRowView } from '../../../core/api/results.contracts';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { ResultsCaseFacade } from '../state/results-case.facade';
@@ -179,6 +182,52 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     backend.verify();
   });
 
+  it('a Verify refused for a delta found on the server re-reads the case and opens the delta dialog (validation v0.5.0 A-02)', async () => {
+    // reviewed before the older result was verified: the page shows no Δ until the server re-checks at verification
+    const reviewed = resultRow({ status: 'Reviewed', numericValue: 2.5, textValue: '2.50' });
+    await open(['results.view', 'results.approve'], [reviewed]);
+
+    buttons('results.case.verify')[0]!.click();
+    await settle();
+    const first = backend.expectOne(RESULTS_API.verifyMany);
+    expect(first.request.body).toEqual({ resultIds: ['res-1'] });
+    first.flush({ changed: [], refused: [{ resultId: 'res-1', code: 'RES-015', message: 'Acknowledge the delta check before verifying (BR-11).' }] });
+    await render();
+    const flagged = resultRow({ status: 'Reviewed', numericValue: 2.5, textValue: '2.50', delta: { flag: true, percent: 150, previousValue: 1, previousResultId: 'old', acknowledged: false, acknowledgedByName: null, acknowledgedAtUtc: null, comment: null } });
+    flushReload([flagged]);
+    await render();
+    await settle();
+
+    // the dialog was confirmed: the refreshed flag is acknowledged, then the result verifies — one click, no dead end
+    backend.expectOne(RESULTS_API.acknowledgeDelta('res-1')).flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+    const second = backend.expectOne(RESULTS_API.verifyMany);
+    expect(second.request.body).toEqual({ resultIds: ['res-1'] });
+    second.flush({ changed: ['res-1'], refused: [] });
+    await render();
+    flushReload([{ ...flagged, status: 'Verified', delta: { ...flagged.delta!, acknowledged: true } }]);
+    await render();
+    expect(host.querySelector('app-result-grid .badge[data-status="Verified"]')).not.toBeNull();
+    backend.verify();
+  });
+
+  it('A-02: cancelling the reopened delta dialog leaves the result Reviewed and acknowledges nothing', async () => {
+    await open(['results.view', 'results.approve'], [resultRow({ status: 'Reviewed', numericValue: 2.5, textValue: '2.50' })]);
+    confirmAnswer = false;
+
+    buttons('results.case.verify')[0]!.click();
+    await settle();
+    backend.expectOne(RESULTS_API.verifyMany).flush({ changed: [], refused: [{ resultId: 'res-1', code: 'RES-015', message: 'delta' }] });
+    await render();
+    flushReload([resultRow({ status: 'Reviewed', numericValue: 2.5, textValue: '2.50', delta: { flag: true, percent: 150, previousValue: 1, previousResultId: 'old', acknowledged: false, acknowledgedByName: null, acknowledgedAtUtc: null, comment: null } })]);
+    await render();
+    await settle();
+
+    backend.expectNone(RESULTS_API.acknowledgeDelta('res-1'));
+    backend.expectNone(RESULTS_API.verifyMany);
+    backend.verify();
+  });
+
   it('previews the report in a dialog without marking it printed', async () => {
     await open(['results.view'], [resultRow({ status: 'Verified', numericValue: 95, textValue: '95.0' })]);
     expect(buttons('results.case.print').length).toBe(0);
@@ -241,5 +290,51 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     await render();
     expect(host.textContent).toContain('Mona Adel');
     backend.verify();
+  });
+
+  it('reads one report unit and one result in the singular in both languages (round 2 R2-07)', async () => {
+    const dictionaries: Record<string, unknown> = { '/i18n/results.en.json': resultsEn, '/i18n/results.ar.json': resultsAr };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) => new Response(JSON.stringify(dictionaries[String(input)] ?? {}), { status: 200 }));
+    granted = new Set(['results.view']);
+    await TestBed.configureTestingModule({
+      imports: [ResultsByAccessionPage],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        provideHttpClient(withInterceptors([problemDetailsInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+        { provide: ResultsPrinter, useValue: new PrinterStub() },
+        ResultsCaseFacade,
+      ],
+    }).compileComponents();
+    const i18n = TestBed.inject(I18nService);
+    i18n.setLanguage('en');
+    fixture = TestBed.createComponent(ResultsByAccessionPage);
+    backend = TestBed.inject(HttpTestingController);
+    host = fixture.nativeElement as HTMLElement;
+    await render();
+    await i18n.load('results');
+    const name = host.querySelector<HTMLInputElement>('input[formcontrolname="patientName"]')!;
+    name.value = 'mo%';
+    name.dispatchEvent(new Event('input'));
+    host.querySelector<HTMLFormElement>('form.query-form')!.dispatchEvent(new Event('submit'));
+    await render();
+    backend.expectOne((call) => call.url === RESULTS_API.visits).flush(page([visitItem({ units: 1, results: 1 }), visitItem({ visitId: 'visit-2', accession: 'ACC-2026-00002', units: 2, results: 3 })]));
+    await render();
+
+    const lines = (): string[] => [...host.querySelectorAll('.visit-list .line.small.muted')].map((line) => line.textContent?.replace(/\s+/g, ' ').trim() ?? '');
+    expect(lines()[0]).toContain('1 report unit · 1 result');
+    expect(lines()[0]).not.toContain('units');
+    expect(lines()[0]).not.toContain('results');
+    expect(lines()[1]).toContain('2 report units · 3 results');
+
+    i18n.setLanguage('ar');
+    await i18n.load('results');
+    await render();
+    expect(lines()[0]).toContain('وحدة تقرير واحدة · نتيجة واحدة');
+    expect(lines()[1]).toContain('٢ وحدة تقرير · ٣ نتيجة');
+    expect(host.querySelector('app-section-card.visits')?.textContent).toContain('(٢)');   // the heading count (round 3 R3-02)
+    i18n.setLanguage('en');
   });
 });

@@ -69,7 +69,10 @@ public sealed record AuthResponse(
 /// <summary>
 /// The identity the SPA gates its screens on. <see cref="BranchId"/> is the branch the session is bound to (CP-04),
 /// <see cref="BranchIds"/> the branches the membership may choose from (empty = the membership is unrestricted;
-/// the branch list then comes from the organization module).
+/// the branch list then comes from the organization module). <see cref="RoleName"/> is the role's English name and
+/// <see cref="RoleNameAr"/> its Arabic name, so the shell shows the one of the current language (validation v0.5.0 B-09).
+/// <see cref="DisplayNameEn"/> and <see cref="DisplayNameAr"/> are the member's full name in each language (null without a
+/// membership); <see cref="DisplayName"/> stays the name in the preferred language (validation v0.5.0 R-12).
 /// </summary>
 public sealed record AuthProfile(
     Guid UserId,
@@ -81,7 +84,10 @@ public sealed record AuthProfile(
     string Scope,
     Guid? BranchId,
     IReadOnlyList<Guid> BranchIds,
-    bool MustChangePassword = false);
+    bool MustChangePassword = false,
+    string? RoleNameAr = null,
+    string? DisplayNameEn = null,
+    string? DisplayNameAr = null);
 
 public sealed record TenantChoice(Guid TenantId, string DisplayName);
 
@@ -99,3 +105,15 @@ public sealed record SessionResponse(
     IReadOnlyList<string> Permissions,
     Guid? BranchId,
     IReadOnlyList<Guid> BranchIds);
+
+/// <summary>Problem codes of the authentication surface that are not in <see cref="ProblemCodes"/> (unique across the solution).</summary>
+public static class AuthProblemCodes
+{
+    /// <summary>
+    /// Validation 2026-10-11 C-04 (ORG-001 A13, 02 §6.1 forced change): the account must change its password first. While
+    /// <c>mustChangePassword</c> is set every API request but the password change, the own profile and privileges, the
+    /// branch selection of the session and the <c>/api/v1/auth</c> surface (refresh, sign-out, me, challenge) is refused
+    /// <c>403 AUTH-016</c>. The SPA routes such a user to the profile page.
+    /// </summary>
+    public const string PasswordChangeRequired = "AUTH-016";
+}

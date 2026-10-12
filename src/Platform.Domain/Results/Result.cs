@@ -428,6 +428,43 @@ public sealed class Result : AggregateRoot, ITenantScoped
     }
 
     /// <summary>
+    /// BR-11 re-check (validation A-02, 2026-10-11): the delta is first computed when the value is entered, against the
+    /// latest verified previous result at that time. A previous result verified later (or amended and verified again)
+    /// becomes the new basis before review, acknowledgement and verification, so the check cannot be skipped by the order of
+    /// entry and verification. Only an open (Complete or Reviewed) numeric result changes; an older basis never replaces a
+    /// newer one. A new basis clears an acknowledgement given against the old one: a flag beyond the limit must be
+    /// acknowledged again before the result verifies (RES-015). Returns true when the stored delta changed.
+    /// </summary>
+    public bool RecheckDelta(PreviousResultValue? previous, decimal? thresholdPercent)
+    {
+        if (Status is not (ResultStatus.Complete or ResultStatus.Reviewed) || NumericValue is null || previous is null || thresholdPercent is null)
+        {
+            return false;
+        }
+
+        if (previous.ResultId == PreviousResultId && previous.Value == PreviousValue && previous.VerifiedAtUtc == PreviousVerifiedAtUtc)
+        {
+            return false;
+        }
+
+        if (PreviousVerifiedAtUtc is { } known && previous.VerifiedAtUtc < known)
+        {
+            return false;
+        }
+
+        var (deltaFlag, deltaPercent) = ResultValueRules.Delta(NumericValue, previous, thresholdPercent);
+        DeltaFlag = deltaFlag;
+        DeltaPercent = deltaPercent;
+        PreviousResultId = previous.ResultId;
+        PreviousValue = previous.Value;
+        PreviousVerifiedAtUtc = previous.VerifiedAtUtc;
+        DeltaAcknowledgedByUserId = null;
+        DeltaAcknowledgedAtUtc = null;
+        DeltaComment = null;
+        return true;
+    }
+
+    /// <summary>
     /// T8 Print (<c>results.export</c>): the print right (RES-053); a value (RES-014); Verified or Printed (RES-021, BR-09)
     /// unless the tenant prints unverified results — then only the printed flag is set and the status stays.
     /// </summary>

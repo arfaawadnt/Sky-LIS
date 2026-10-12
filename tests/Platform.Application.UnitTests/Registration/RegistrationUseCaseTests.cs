@@ -78,6 +78,26 @@ public sealed class RegistrationUseCaseTests
     }
 
     [Fact]
+    public async Task S_V1_freq_alert_names_the_repeated_member_test_and_the_profile_it_came_through()
+    {
+        // Validation A-11 (2026-10-11): CREA ordered alone, then RENAL (CREA + UREA): the alert named RENAL only.
+        await Register(_world.Female.Id, Catalogue.Creatinine.Id);
+        _world.Clock = new FixedRegistrationClock(RegistrationWorld.Now.AddMinutes(1));
+
+        var unconfirmed = await Refused(() => Register(_world.Female.Id, Catalogue.Renal.Id));
+        Assert.Equal(RegistrationCodes.FrequencyConfirmationRequired, unconfirmed.Code);
+        Assert.StartsWith("'CREA (RENAL)' was ordered", unconfirmed.Message, StringComparison.Ordinal);
+
+        var confirmed = await Register(_world.Female.Id, confirm: true, Catalogue.Renal.Id);
+        var alert = Assert.Single(confirmed.Warnings, warning => warning.Code == RegistrationCodes.WarningFrequency);
+        Assert.Equal(("CREA (RENAL)", "CREA", Catalogue.Renal.Id, "ACC-2026-00001"), (alert.ServiceCode, alert.Detail, alert.ServiceId!.Value, alert.LastAccession));
+
+        // A single-test service keeps its own code.
+        var again = await Register(_world.Female.Id, confirm: true, Catalogue.Creatinine.Id);
+        Assert.Equal("CREA", Assert.Single(again.Warnings, warning => warning.Code == RegistrationCodes.WarningFrequency).ServiceCode);
+    }
+
+    [Fact]
     public async Task S_V1_rule_and_diagnosis_add_services_and_unorderable_companions_are_skipped()
     {
         _world.Rules.Rules.Add(([Catalogue.Glucose.Id, Catalogue.Urea.Id], Catalogue.Cbc.Id));

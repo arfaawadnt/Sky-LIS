@@ -1,6 +1,7 @@
 import type { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 
 import type { PublicCountry } from '../../../core/api/public-subscription.contracts';
+import { SERVER_ERROR_KEY } from '../../../shared/forms/problem-to-form-errors';
 
 /**
  * The browser side of the wizard's rules, mirroring the server so the user learns of a mistake before sending:
@@ -29,8 +30,15 @@ export function normaliseMobile(input: string, country: Pick<PublicCountry, 'dia
   return national.length === country.mobileLength && !national.startsWith('0') ? `+${dial}${national}` : null;
 }
 
-/** `{ mobileLength: { length } }` when the value is not a mobile of the selected country; empty values pass (combine with required). */
-export function countryMobileValidator(country: () => Pick<PublicCountry, 'dialCode' | 'mobileLength'> | null): ValidatorFn {
+/**
+ * The message of `message(country)` (shown under the field like a server message) when the value is not a mobile of the
+ * selected country; empty values pass (combine with required). Validation 2026-10-11 C-08: the wizard names the digit count
+ * like the Add client form does, never the generic "The value is not valid.".
+ */
+export function countryMobileValidator(
+  country: () => Pick<PublicCountry, 'dialCode' | 'mobileLength'> | null,
+  message: (country: Pick<PublicCountry, 'dialCode' | 'mobileLength'>) => string,
+): ValidatorFn {
   return (control: AbstractControl): ValidationErrors | null => {
     const value: unknown = control.value;
     const selected = country();
@@ -38,7 +46,7 @@ export function countryMobileValidator(country: () => Pick<PublicCountry, 'dialC
       return null;
     }
 
-    return normaliseMobile(value, selected) === null ? { mobileLength: { length: selected.mobileLength } } : null;
+    return normaliseMobile(value, selected) === null ? { [SERVER_ERROR_KEY]: message(selected) } : null;
   };
 }
 

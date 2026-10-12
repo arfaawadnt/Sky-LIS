@@ -15,8 +15,8 @@ namespace Platform.WebApi.Controllers.PlatformAdmin;
 public sealed class PlatformAnalyserModelsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<AnalyserModelListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListAnalyserModelsQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<AnalyserModelListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListAnalyserModelsQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<CreatedResource>> Create([FromBody] AnalyserModelRequest request, CancellationToken cancellationToken)
@@ -53,8 +53,8 @@ public sealed class PlatformAnalyserModelsController(ISender sender) : Controlle
 public sealed class PlatformPcrKitsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<PcrKitListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListPcrKitsQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<PcrKitListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListPcrKitsQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<CreatedResource>> Create([FromBody] PcrKitRequest request, CancellationToken cancellationToken)
@@ -94,8 +94,8 @@ public sealed class PlatformCodeSystemsController(ISender sender) : ControllerBa
     public const long ImportRequestLimit = CodeSystemCsv.MaxBytes + (1024 * 1024);
 
     [HttpGet]
-    public async Task<ActionResult<Paged<CodeSystemListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListCodeSystemsQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<CodeSystemListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListCodeSystemsQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("{id:guid}/items")]
     public async Task<ActionResult<Paged<CodeSystemItemView>>> Items(Guid id, [FromQuery] string? search, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
@@ -147,8 +147,8 @@ public sealed class PlatformCodeSystemsController(ISender sender) : ControllerBa
 public sealed class PlatformRuleTemplatesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<RuleTemplateListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListRuleTemplatesQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<RuleTemplateListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListRuleTemplatesQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<CreatedResource>> Create([FromBody] RuleTemplateRequest request, CancellationToken cancellationToken)

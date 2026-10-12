@@ -83,6 +83,34 @@ public sealed class PatientsModuleTests(DatabaseFixture fixture)
     }
 
     [DatabaseFact]
+    public async Task Without_the_See_VIP_right_a_VIP_file_matches_only_its_full_number_or_national_id()
+    {
+        // Validation A-03 (2026-10-11): the register and the picker found a VIP file by name and mobile.
+        var tenant = Guid.CreateVersion7();
+        var vip = await RegisterAsync(tenant, "Mona Hassan", "منى حسن", "01112223333", PatientGender.Female, nationalId: "29505050101234", number: "PAT-2026-90010", vip: true);
+        var plain = await RegisterAsync(tenant, "Mona Ali", null, "01112224444", PatientGender.Female, number: "PAT-2026-90011");
+
+        using var scope = fixture.AppScope(tenant, Guid.CreateVersion7());
+        var repository = scope.ServiceProvider.GetRequiredService<IPatientRepository>();
+
+        async Task<IReadOnlyList<Guid>> Search(string? text, bool includeVip) =>
+            (await repository.SearchAsync(new PatientSearchFilter(PatientSearchTerms.Parse(text), null, null, PatientStatus.Active, includeVip), PageRequest.Normalized(1, 50), CancellationToken.None))
+                .Items.Select(row => row.Id).ToList();
+
+        Assert.Equal([plain], await Search("mona", includeVip: false));
+        Assert.Empty(await Search("منى حسن", includeVip: false));
+        Assert.Equal([plain], await Search("0111 222", includeVip: false));
+        Assert.Equal([plain], await Search("PAT-2026-9001", includeVip: false));
+        Assert.Empty(await Search("2950505", includeVip: false));
+        Assert.Equal([vip], await Search("pat-2026-90010", includeVip: false));
+        Assert.Equal([vip], await Search("29505050101234", includeVip: false));
+        Assert.Equal([plain, vip], await Search(null, includeVip: false));   // listed (masked by the projection), never searched by identity
+
+        Assert.Equal([plain, vip], await Search("mona", includeVip: true));
+        Assert.Equal([vip], await Search("0111 2223", includeVip: true));
+    }
+
+    [DatabaseFact]
     public async Task The_similar_prefilter_finds_mobiles_and_two_token_names_of_active_files_only()
     {
         var tenant = Guid.CreateVersion7();
@@ -225,7 +253,7 @@ public sealed class PatientsModuleTests(DatabaseFixture fixture)
             id, tenant, $"ACC-IT-{id.ToString("N")[^10..].ToUpperInvariant()}", patientId, Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), registeredAtUtc, Guid.CreateVersion7());
     }
 
-    private async Task<Guid> RegisterAsync(Guid tenant, string fullName, string? nameAr, string? mobile, PatientGender gender = PatientGender.Male, string? nationalId = null, string? number = null)
+    private async Task<Guid> RegisterAsync(Guid tenant, string fullName, string? nameAr, string? mobile, PatientGender gender = PatientGender.Male, string? nationalId = null, string? number = null, bool vip = false)
     {
         using var scope = fixture.AppScope(tenant, Guid.CreateVersion7());
         var assigned = number ?? await scope.ServiceProvider.GetRequiredService<IReferenceNumbers>().NextAsync(Patient.NumberKind, Patient.NumberPrefix, Now, CancellationToken.None);
@@ -233,7 +261,7 @@ public sealed class PatientsModuleTests(DatabaseFixture fixture)
             assigned,
             new PatientDemographics(PatientTitle.Mr, fullName, nameAr, gender, new DateOnly(1990, 1, 1), null, null, mobile, nationalId, null, null, null, null, null, null),
             PatientFieldRules.Optional,
-            false,
+            vip,
             Now);
         scope.ServiceProvider.GetRequiredService<IPatientRepository>().Add(patient);
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);

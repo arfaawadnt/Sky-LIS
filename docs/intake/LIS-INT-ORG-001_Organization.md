@@ -158,7 +158,7 @@ Platform-only modules (`platform`, `tenancy`) cannot be granted in a client tena
 | INV-ORG-014 | Passwords: length between the tenant's `passwordMinLength` (default 8) and 128, no composition rules, must not contain the username (decision of the user, 2026-10-09) | `PasswordRules` (application) | ORG-020 / ORG-021 | — |
 | INV-ORG-015 | Credentials and contact data of a user who is an active member of another tenant are changed only there or by the user (prevents a cross-tenant takeover) | handler (`IMembershipDirectory`) | ORG-031 | "This user belongs to other organisations; their credentials cannot be changed here." |
 | INV-ORG-016 | No per-user override in the platform tenant (SA-07 "privileges inherited from the role only") | handler | ORG-032 | — |
-| INV-ORG-017 | Branch assignment references existing active branches of the tenant; an empty assignment means all active branches | handler (`IBranchLookup`) | ORG-012 | — |
+| INV-ORG-017 | Branch assignment references existing active branches of the tenant; an empty assignment means all active branches. The create and assign requests say which they mean with `allBranches` (validation v0.5.0 B-02): `false` with no branch, or `true` with branches, is refused ORG-018 (field `branchIds`); `null` keeps the older contract | handler (`IBranchLookup`, `OrganizationGuards.EnsureBranchChoice`) | ORG-012, ORG-018 | — |
 
 ## 9. Segregation-of-duties rules
 

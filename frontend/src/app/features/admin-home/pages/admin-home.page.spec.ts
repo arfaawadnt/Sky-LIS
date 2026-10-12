@@ -4,7 +4,9 @@ import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { PLATFORM_API, type PlatformDashboard } from '../../../core/api/platform.contracts';
+import type { AuthProfile } from '../../../core/api/auth.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { AdminHomePage, PLATFORM_VIEW } from './admin-home.page';
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -26,16 +28,18 @@ const dashboard: PlatformDashboard = {
 describe('AdminHomePage (SA-01)', () => {
   let backend: HttpTestingController;
   let allowed = true;
+  const profile = signal<AuthProfile | null>(null);
 
   beforeEach(async () => {
     allowed = true;
+    profile.set(null);
     await TestBed.configureTestingModule({
       imports: [AdminHomePage],
       providers: [
         provideZonelessChangeDetection(),
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: AuthStore, useValue: { hasPermission: (key: string) => allowed && key === PLATFORM_VIEW, currentUser: signal(null) } },
+        { provide: AuthStore, useValue: { hasPermission: (key: string) => allowed && key === PLATFORM_VIEW, profile } },
       ],
     }).compileComponents();
     backend = TestBed.inject(HttpTestingController);
@@ -68,5 +72,33 @@ describe('AdminHomePage (SA-01)', () => {
     const root = await render();
     backend.expectNone((request) => request.url === PLATFORM_API.dashboard);
     expect(Array.from(root.querySelectorAll('app-stat-card')).every((tile) => tile.textContent?.includes('—'))).toBe(true);
+  });
+
+  it('greets the user by the name of the language on screen, following a switch both ways (round 2 R2-03)', async () => {
+    // The language of the sign-in decides displayName; the greeting must not keep it after a switch.
+    profile.set({ userId: 'u-1', displayName: 'مدير المنصة', displayNameEn: 'Platform Administrator', displayNameAr: 'مدير المنصة', tenantId: null, roleName: null, permissions: [PLATFORM_VIEW], language: 'ar', scope: 'platform' });
+    const i18n = TestBed.inject(I18nService);
+    i18n.setLanguage('en');
+    const fixture = TestBed.createComponent(AdminHomePage);
+    const root = fixture.nativeElement as HTMLElement;
+    const greeting = (): string => root.querySelector('app-section-card strong')?.textContent?.trim() ?? '';
+    const step = async (): Promise<void> => {
+      TestBed.tick();
+      await settle();
+      backend.match((request) => request.url.startsWith('/i18n/')).forEach((request) => request.flush({}));
+      fixture.detectChanges();
+    };
+    await step();
+    backend.match((request) => request.url === PLATFORM_API.dashboard).forEach((request) => request.flush(dashboard));
+    await step();
+    expect(greeting()).toBe('Platform Administrator');
+
+    i18n.setLanguage('ar');
+    await step();
+    expect(greeting()).toBe('مدير المنصة');
+
+    i18n.setLanguage('en');
+    await step();
+    expect(greeting()).toBe('Platform Administrator');
   });
 });

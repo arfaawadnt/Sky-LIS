@@ -7,9 +7,9 @@ namespace Platform.Domain.UnitTests.Settings;
 public sealed class SettingKeysTests
 {
     [Fact]
-    public void The_catalogue_holds_the_twenty_five_keys_with_unique_lower_camel_names_and_valid_defaults()
+    public void The_catalogue_holds_the_twenty_six_keys_with_unique_lower_camel_names_and_valid_defaults()
     {
-        Assert.Equal(25, SettingKeys.All.Count);
+        Assert.Equal(26, SettingKeys.All.Count);
         Assert.Equal(SettingKeys.All.Count, SettingKeys.All.Select(descriptor => descriptor.Key).Distinct(StringComparer.Ordinal).Count());
         Assert.All(SettingKeys.All, descriptor =>
         {
@@ -37,6 +37,7 @@ public sealed class SettingKeysTests
         Assert.Equal(14, SettingKeys.TrialDays.Default);
         Assert.Equal("EGP", SettingKeys.DefaultCurrency.Default);
         Assert.Equal("propose", SettingKeys.MasterDataUpdatePolicy.Default);
+        Assert.Equal("Africa/Cairo", SettingKeys.TimeZone.Default);
     }
 
     [Fact]
@@ -62,5 +63,20 @@ public sealed class SettingKeysTests
         Assert.Equal(SettingCodes.InvalidValue, Assert.Throws<DomainException>(() => SettingKeys.Validate("autoCollect", "maybe")).Code);
         Assert.Equal(SettingCodes.InvalidValue, Assert.Throws<DomainException>(() => SettingKeys.Validate("masterDataUpdatePolicy", "Push")).Code);
         Assert.Same(SettingKeys.LabelCopies, SettingKeys.Validate("labelCopies", "3"));
+    }
+
+    [Fact]
+    public void The_time_zone_accepts_an_IANA_zone_this_host_knows_and_nothing_else()
+    {
+        // Round 2 R2-01: the zone of a laboratory without a client record.
+        Assert.Same(SettingKeys.TimeZone, SettingKeys.Validate("timeZone", "Asia/Riyadh"));
+        Assert.Equal("Asia/Riyadh", SettingKeys.TimeZone.Parse(" Asia/Riyadh "));
+        Assert.Equal(SettingType.String, SettingKeys.TimeZone.Type);
+        foreach (var invalid in new[] { "Mars/Olympus", "", "   ", "Cairo", new string('A', 65) })
+        {
+            Assert.Equal(SettingCodes.InvalidValue, Assert.Throws<DomainException>(() => SettingKeys.Validate("timeZone", invalid)).Code);
+        }
+
+        Assert.Equal("Africa/Cairo", SettingKeys.TimeZone.Parse("Mars/Olympus"));   // a bad row never breaks a module
     }
 }

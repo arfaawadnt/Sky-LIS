@@ -5960,5 +5960,61 @@ BEGIN
     VALUES ('20261011124135_AppendOnlyTruncateGuard', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261011201519_GrantExportPermissions') THEN
+    UPDATE app.roles AS r
+    SET permission_keys = ARRAY(SELECT k FROM (SELECT DISTINCT unnest(r.permission_keys || ARRAY['organization.export']) AS k) AS d ORDER BY k COLLATE "C"),
+        modified_at_utc = now(),
+        modified_by_display_name = 'Migration GrantExportPermissions'
+    WHERE r.permission_keys @> ARRAY['organization.view', 'organization.manage']
+      AND NOT r.permission_keys @> ARRAY['organization.export'];
+
+    UPDATE app.roles AS r
+    SET permission_keys = ARRAY(SELECT k FROM (SELECT DISTINCT unnest(r.permission_keys || ARRAY['treasury.export']) AS k) AS d ORDER BY k COLLATE "C"),
+        modified_at_utc = now(),
+        modified_by_display_name = 'Migration GrantExportPermissions'
+    WHERE r.permission_keys @> ARRAY['treasury.view', 'treasury.manage']
+      AND NOT r.permission_keys @> ARRAY['treasury.export'];
+
+    UPDATE app.roles AS r
+    SET permission_keys = ARRAY(SELECT k FROM (SELECT DISTINCT unnest(r.permission_keys || c.keys) AS k) AS d ORDER BY k COLLATE "C"),
+        modified_at_utc = now(),
+        modified_by_display_name = 'Migration GrantExportPermissions'
+    FROM (SELECT ARRAY[
+        'audit.export', 'audit.view', 'automation.approve', 'automation.create', 'automation.edit',
+        'automation.manage', 'automation.view', 'billing.approve', 'billing.cancel', 'billing.create', 'billing.edit',
+        'billing.export', 'billing.manage', 'billing.view', 'catalogue.create', 'catalogue.edit', 'catalogue.export',
+        'catalogue.manage', 'catalogue.view', 'claims.approve', 'claims.cancel', 'claims.create', 'claims.export',
+        'claims.view', 'dashboard.view', 'files.create', 'files.manage', 'files.view', 'identity.create',
+        'identity.edit', 'identity.manage', 'identity.view', 'integration.create', 'integration.edit',
+        'integration.export', 'integration.manage', 'integration.view', 'notifications.manage', 'notifications.view',
+        'organization.create', 'organization.edit', 'organization.export', 'organization.manage', 'organization.view',
+        'patients.create', 'patients.edit', 'patients.export', 'patients.manage', 'patients.view',
+        'patients.viewConfidential', 'platform.manage', 'platform.view', 'pricing.approve', 'pricing.create',
+        'pricing.edit', 'pricing.export', 'pricing.manage', 'pricing.view', 'quality.create', 'quality.edit',
+        'quality.manage', 'quality.view', 'registration.approve', 'registration.cancel', 'registration.create',
+        'registration.edit', 'registration.export', 'registration.manage', 'registration.view', 'reporting.export',
+        'reporting.view', 'results.approve', 'results.cancel', 'results.create', 'results.edit', 'results.export',
+        'results.manage', 'results.view', 'samples.cancel', 'samples.create', 'samples.edit', 'samples.manage',
+        'samples.view', 'settings.manage', 'settings.view', 'support.create', 'support.manage', 'support.view',
+        'tenancy.create', 'tenancy.edit', 'tenancy.manage', 'tenancy.view', 'treasury.approve', 'treasury.cancel',
+        'treasury.create', 'treasury.export', 'treasury.manage', 'treasury.view', 'wallet.create', 'wallet.manage',
+        'wallet.view'
+    ]::text[] AS keys) AS c
+    WHERE r.tenant_id = '00000000-0000-0000-0000-000000000001'
+      AND lower(r.name_en) = 'platform administrator'
+      AND NOT r.permission_keys @> c.keys;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261011201519_GrantExportPermissions') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261011201519_GrantExportPermissions', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

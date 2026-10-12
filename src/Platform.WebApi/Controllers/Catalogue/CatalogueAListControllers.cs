@@ -16,8 +16,8 @@ namespace Platform.WebApi.Controllers.Catalogue;
 public sealed class ClinicalGroupsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<ClinicalGroupListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListClinicalGroupsQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<ClinicalGroupListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListClinicalGroupsQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("export")]
     public async Task<ActionResult<IReadOnlyList<ClinicalGroupListItem>>> Export([FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>
@@ -60,8 +60,8 @@ public sealed class ClinicalGroupsController(ISender sender) : ControllerBase
 public sealed class SampleTypesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<SampleTypeListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListSampleTypesQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<SampleTypeListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListSampleTypesQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("export")]
     public async Task<ActionResult<IReadOnlyList<SampleTypeListItem>>> Export([FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>
@@ -116,8 +116,8 @@ public sealed class SampleTypesController(ISender sender) : ControllerBase
 public sealed class MeasurementUnitsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<MeasurementUnitListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListMeasurementUnitsQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<MeasurementUnitListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListMeasurementUnitsQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("export")]
     public async Task<ActionResult<IReadOnlyList<MeasurementUnitListItem>>> Export([FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>
@@ -160,8 +160,8 @@ public sealed class MeasurementUnitsController(ISender sender) : ControllerBase
 public sealed class PatientConditionsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<PatientConditionListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListPatientConditionsQuery(search, isActive, page, pageSize), cancellationToken));
+    public async Task<ActionResult<Paged<PatientConditionListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListPatientConditionsQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
 
     [HttpGet("export")]
     public async Task<ActionResult<IReadOnlyList<PatientConditionListItem>>> Export([FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>

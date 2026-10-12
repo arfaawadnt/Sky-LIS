@@ -59,6 +59,32 @@ public sealed class PatientTests
     }
 
     [Fact]
+    public void S_T1_age_local_day_The_age_and_the_registration_are_dated_by_the_laboratory_day_not_the_UTC_one()
+    {
+        // Validation v0.5.0 R-11: created at 01:57 in Cairo (UTC+3 in October) on 12 Oct = 22:57 UTC on 11 Oct.
+        var cairo = TimeZoneInfo.FindSystemTimeZoneById("Africa/Cairo");
+        var atNight = new DateTimeOffset(2026, 10, 11, 22, 57, 0, TimeSpan.Zero);
+
+        var local = Patient.Register("PAT-2026-00014", Mona(age: new PatientAge(52, 0, 0)), PatientFieldRules.Optional, false, atNight, cairo);
+        Assert.Equal((new DateOnly(2026, 10, 12), new DateOnly(2026, 10, 12)), (local.AgeRecordedOn!.Value, local.RegisteredOn));
+        Assert.Equal(new DateOnly(1974, 10, 12), local.EstimatedDateOfBirth);
+
+        // No zone known: the UTC day, as before; one minute before local midnight stays on the previous day.
+        Assert.Equal(new DateOnly(2026, 10, 11), Patient.Register("PAT-2026-00015", Mona(age: new PatientAge(52, 0, 0)), PatientFieldRules.Optional, false, atNight).AgeRecordedOn);
+        var plusThree = TimeZoneInfo.CreateCustomTimeZone("Lab+3", TimeSpan.FromHours(3), "Lab+3", "Lab+3");
+        Assert.Equal(new DateOnly(2026, 10, 11), Patient.LocalDate(new DateTimeOffset(2026, 10, 11, 20, 59, 0, TimeSpan.Zero), plusThree));
+        Assert.Equal(new DateOnly(2026, 10, 12), Patient.LocalDate(new DateTimeOffset(2026, 10, 11, 21, 0, 0, TimeSpan.Zero), plusThree));
+
+        // A date of birth of the local today is not "in the future" although the UTC day is still the day before.
+        var newborn = Patient.Register("PAT-2026-00016", Mona(dateOfBirth: new DateOnly(2026, 10, 12)), PatientFieldRules.Optional, false, atNight, cairo);
+        Assert.Equal(PatientAge.Zero, newborn.AgeOn(new DateOnly(2026, 10, 12)));
+
+        // T2 re-states the age on the laboratory's day too.
+        local.Update(Mona(age: new PatientAge(53, 0, 0)), PatientFieldRules.Optional, null, atNight.AddDays(1), cairo);
+        Assert.Equal(new DateOnly(2026, 10, 13), local.AgeRecordedOn);
+    }
+
+    [Fact]
     public void S_T1_age_The_date_of_birth_wins_when_both_are_given()
     {
         var patient = Register(new PatientDemographics(PatientTitle.Mr, "Ali", null, PatientGender.Male, new DateOnly(2000, 1, 1), new PatientAge(3, 0, 0), null, null, null, null, null, null, null, null, null));

@@ -118,6 +118,9 @@
     [emptyMessage]="i18n.t('results.worklist.emptyHint')"
     [caption]="i18n.t('results.worklist.title')"
     [compact]="true"
+    [sort]="facade.sort()"
+    [serverSort]="true"
+    (sortChange)="facade.setSort($event)"
   >
     <ng-template appCell="accession" [appCellOf]="facade.rows()" let-row>
       <a class="mono link" [routerLink]="links.byAccession" [queryParams]="{ accession: row.accession }">{{ row.accession }}</a>

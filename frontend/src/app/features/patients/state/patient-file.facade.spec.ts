@@ -32,7 +32,7 @@ describe('PatientFileFacade (01 §6.3)', () => {
   let granted: Set<string>;
 
   beforeEach(() => {
-    granted = new Set(['patients.view', 'files.view']);
+    granted = new Set(['patients.view', 'files.view', 'registration.view']);
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
@@ -70,6 +70,16 @@ describe('PatientFileFacade (01 §6.3)', () => {
     backend.expectOne(`${PATIENTS_API.patients}/p-1`).flush({ id: 'p-1', number: 'PAT-2026-00001', status: 'Active', rowVersion: 7 });
     backend.expectNone((r) => r.url === `${PATIENTS_API.patients}/p-1/documents`);
     expect(facade.canSeeDocuments()).toBe(false);
+  });
+
+  it('never asks for the visits without registration.view, even when the tab is requested (round 2 R2-04)', async () => {
+    granted = new Set(['patients.view']);
+    facade.load('p-1');
+    facade.visitsRequested.set(true);
+    await runEffects();
+    backend.expectOne(`${PATIENTS_API.patients}/p-1`).flush({ id: 'p-1', number: 'PAT-2026-00001', status: 'Active', rowVersion: 7 });
+    backend.expectNone((r) => r.url === PATIENTS_API.visits);
+    expect(facade.canSeeVisits()).toBe(false);
   });
 
   it('re-reads the file and its documents when the page opens again (UAT D-14, A-01)', async () => {

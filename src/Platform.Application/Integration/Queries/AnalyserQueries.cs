@@ -1,5 +1,6 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Contracts.Common;
 using Platform.Contracts.Integration;
@@ -13,7 +14,7 @@ namespace Platform.Application.Integration.Queries;
 // Registers of analysers (CP-58), their connection state ("test connection") and the platform model library (SA-15 read).
 
 [RequirePermissionPolicy(PermissionCatalog.Integration, PermissionAction.View)]
-public sealed record ListAnalysersQuery(string? Search, bool? IsActive, Guid? ClinicalGroupId, Guid? SiteAgentId, int? Page, int? PageSize) : IQuery<Paged<AnalyserListItem>>;
+public sealed record ListAnalysersQuery(string? Search, bool? IsActive, Guid? ClinicalGroupId, Guid? SiteAgentId, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<AnalyserListItem>>;
 
 [RequirePermissionPolicy(PermissionCatalog.Integration, PermissionAction.View)]
 public sealed record GetAnalyserQuery(Guid AnalyserId) : IQuery<AnalyserDetail>;
@@ -31,6 +32,8 @@ public sealed class ListAnalysersValidator : AbstractValidator<ListAnalysersQuer
         RuleFor(query => query.Search).MaximumLength(100);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
+        RuleFor(query => query.Sort).SortKeyOf(IntegrationSortKeys.Analysers);
+        RuleFor(query => query.Direction).SortDirection();
     }
 }
 
@@ -44,7 +47,7 @@ public sealed class ListAnalysersHandler(IAnalyserRepository analysers, IAgentTe
     public async Task<Paged<AnalyserListItem>> Handle(ListAnalysersQuery query, CancellationToken cancellationToken)
     {
         var now = clock.UtcNow;
-        var page = await analysers.ListAsync(new AnalyserFilter(query.Search, query.IsActive, query.ClinicalGroupId, query.SiteAgentId), PageRequest.Normalized(query.Page, query.PageSize), now, cancellationToken);
+        var page = await analysers.ListAsync(new AnalyserFilter(query.Search, query.IsActive, query.ClinicalGroupId, query.SiteAgentId, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), now, cancellationToken);
         var groups = await IntegrationReferences.NamesAsync(lookup, ReferenceKind.ClinicalGroup, page.Items.Select(item => (Guid?)item.ClinicalGroupId), cancellationToken);
         var links = await telemetry.LinkStatesAsync(page.Items.Select(item => item.Id).ToList(), cancellationToken);
 

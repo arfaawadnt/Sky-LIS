@@ -4,6 +4,11 @@ import type { AgentLogFilter, AgentLogItem, CreateSiteAgentRequest, IntakeFilter
 import { emptyPage, type PageRequest } from '../../../core/api/paging';
 import { mutation } from '../../../core/state/mutation';
 import { IntegrationApi } from '../data/integration.api';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { type SortKeyMap, type TableSort, serverSortOf } from '../../../shared/ui/data-table/data-table.types';
+
+/** The server key of the sortable column of the site agents table (B-03, IntegrationSortKeys.SiteAgents). */
+export const AGENT_SORT_KEYS: SortKeyMap = { name: 'name' };
 
 /**
  * Site agents (CP-61): the register with derived status and heartbeat age, the agent detail, the credential actions
@@ -14,11 +19,16 @@ import { IntegrationApi } from '../data/integration.api';
 export class SiteAgentsFacade {
   private readonly api = inject(IntegrationApi);
 
+  private readonly i18n = inject(I18nService);
+
   readonly filter = signal<{ search: string; isActive: boolean | null; page: number; pageSize: number }>({ search: '', isActive: null, page: 1, pageSize: 50 });
 
+  /** The column order chosen in the table header; the server sorts the whole list before paging (validation v0.5.0 B-03). */
+  readonly sort = signal<TableSort | null>(null);
+
   readonly list = resource({
-    params: () => this.filter(),
-    loader: ({ params, abortSignal }) => this.api.listAgents(params.search, params.isActive, params.page, params.pageSize, abortSignal),
+    params: () => ({ ...this.filter(), sort: serverSortOf(this.sort(), AGENT_SORT_KEYS, () => this.i18n.lang()) }),
+    loader: ({ params, abortSignal }) => this.api.listAgents(params.search, params.isActive, params.page, params.pageSize, abortSignal, params.sort),
   });
 
   readonly branches = resource({ loader: ({ abortSignal }) => this.api.branches(abortSignal) });
@@ -83,6 +93,12 @@ export class SiteAgentsFacade {
 
   setPage(page: PageRequest): void {
     this.filter.update((current) => ({ ...current, page: page.page, pageSize: page.pageSize }));
+  }
+
+  /** A header click: the new order starts at page 1. */
+  setSort(sort: TableSort | null): void {
+    this.sort.set(sort);
+    this.filter.update((current) => ({ ...current, page: 1 }));
   }
 
   select(id: string | null): void {

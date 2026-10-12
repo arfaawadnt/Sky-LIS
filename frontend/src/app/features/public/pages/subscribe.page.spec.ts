@@ -6,6 +6,7 @@ import { provideRouter } from '@angular/router';
 
 import { PUBLIC_SUBSCRIPTION_API, type PublicCountry } from '../../../core/api/public-subscription.contracts';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { SubscriptionFacade } from '../state/subscription.facade';
 import { LandingPage } from './landing.page';
 import { SubscribePage } from './subscribe.page';
@@ -62,6 +63,40 @@ describe('Public pages (CP-01, CP-02)', () => {
       await render();
     });
 
+    it('renders a shown digit-count message again when the language changes (re-test R-02)', async () => {
+      const i18n = TestBed.inject(I18nService);
+      const tf = i18n.tf.bind(i18n);
+      vi.spyOn(i18n, 'tf').mockImplementation((key: string, params: Readonly<Record<string, string | number>>) =>
+        key === 'public.wizard.validation.mobileLength' || key === 'public.wizard.validation.managerMobileLength'
+          ? `${i18n.lang()}:${key.endsWith('managerMobileLength') ? 'manager' : 'lab'}:${String(params['length'])}`
+          : tf(key, params),
+      );
+      setValue(root, 'select[formcontrolname=countryId]', 'eg');
+      await render();
+      backend.expectOne((request) => request.url === PUBLIC_SUBSCRIPTION_API.governorates).flush([]);
+      for (const name of ['mobile', 'managerMobile']) {
+        setValue(root, `input[formcontrolname=${name}]`, '12345');
+        root.querySelector(`input[formcontrolname=${name}]`)?.dispatchEvent(new Event('blur'));
+      }
+      await render();
+      const shown = (): string => root.textContent ?? '';
+      expect(shown()).toContain('en:lab:10');
+      expect(shown()).toContain('en:manager:10');
+
+      // Round 2 RA-02: the text on screen changes, not only the validator's result.
+      i18n.setLanguage('ar');
+      await render();
+      expect(shown()).toContain('ar:lab:10');
+      expect(shown()).toContain('ar:manager:10');
+      expect(shown()).not.toContain('en:lab:10');
+      expect(shown()).not.toContain('en:manager:10');
+
+      i18n.setLanguage('en');
+      await render();
+      expect(shown()).toContain('en:lab:10');
+      expect(shown()).not.toContain('ar:manager:10');
+    });
+
     it('does not send the code while the details are incomplete or a mobile has the wrong length', async () => {
       (root.querySelector('form button[type=submit]') as HTMLButtonElement).click();
       await render();
@@ -82,6 +117,10 @@ describe('Public pages (CP-01, CP-02)', () => {
       (root.querySelector('form button[type=submit]') as HTMLButtonElement).click();
       await render();
       backend.expectNone(PUBLIC_SUBSCRIPTION_API.start);
+      // C-08: the wrong mobile says the country's digit count (as Add client does), not the generic "The value is not valid."
+      expect(root.textContent).toContain('public.wizard.validation.mobileLength');
+      expect(root.textContent).not.toContain('public.wizard.validation.managerMobileLength');
+      expect(root.textContent).not.toContain('shared.validation.invalid');
 
       setValue(root, 'input[formcontrolname=mobile]', '01012345678');
       (root.querySelector('form button[type=submit]') as HTMLButtonElement).click();

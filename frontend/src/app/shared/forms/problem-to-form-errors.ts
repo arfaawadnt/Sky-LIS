@@ -82,3 +82,37 @@ export function clearServerErrors(control: AbstractControl): void {
     }
   }
 }
+
+/** `true` when the control carries an error set by `problemToFormErrors`. */
+function hasServerError(control: AbstractControl): boolean {
+  if (control.errors && SERVER_ERROR_KEY in control.errors) {
+    return true;
+  }
+
+  const children = (control as { controls?: unknown }).controls;
+  return !!children && typeof children === 'object' && Object.values(children as Record<string, AbstractControl>).some(hasServerError);
+}
+
+/**
+ * Validation v0.5.0 B-01: a server error about a pair of fields (ORG-017, the governorate of another country) lands on one
+ * control, but the user may correct the *other* one. For each group of related control names, when any member's value
+ * differs from `snapshot` (the raw form value when the errors arrived), the server errors of every member are cleared,
+ * so the form is valid again and the next save reaches the server, which re-checks the pair. Returns whether it cleared any.
+ */
+export function clearLinkedServerErrors(form: FormGroup, groups: readonly (readonly string[])[], snapshot: Readonly<Record<string, unknown>>): boolean {
+  let cleared = false;
+  for (const group of groups) {
+    const members = group.map((name) => form.get(name)).filter((control): control is AbstractControl => control !== null);
+    if (!members.some(hasServerError)) {
+      continue;
+    }
+
+    const changed = group.some((name) => JSON.stringify(form.get(name)?.getRawValue() ?? null) !== JSON.stringify(snapshot[name] ?? null));
+    if (changed) {
+      members.forEach(clearServerErrors);
+      cleared = true;
+    }
+  }
+
+  return cleared;
+}

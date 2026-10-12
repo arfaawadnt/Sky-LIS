@@ -206,7 +206,7 @@ public sealed class FoundationFlowTests(ApiFactory factory) : IClassFixture<ApiF
         var viewerClient = await SignedInClientAsync(viewer);
 
         var initial = await viewerClient.GetFromJsonAsync<TenantSettingsResponse>(Settings);
-        Assert.Equal(25, initial!.Settings.Count);
+        Assert.Equal(26, initial!.Settings.Count);   // timeZone joined in round 2 (R2-01)
         Assert.All(initial.Settings, item => Assert.True(item.IsDefault));
         Assert.Equal(("Int", "1"), (initial.Settings.Single(item => item.Key == "labelCopies").Type, initial.Settings.Single(item => item.Key == "labelCopies").Value));
 

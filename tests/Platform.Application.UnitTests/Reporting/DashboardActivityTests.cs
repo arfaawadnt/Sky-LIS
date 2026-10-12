@@ -4,9 +4,11 @@ using Platform.Application.Account;
 using Platform.Application.Account.Queries;
 using Platform.Application.UnitTests.Support;
 using Platform.Contracts.Account;
+using Platform.Domain.Account;
 using Platform.Domain.Organization;
 using Platform.Domain.Settings;
 using Platform.Infrastructure.Persistence.Reporting;
+using Platform.SharedKernel.Primitives;
 
 namespace Platform.Application.UnitTests.Reporting;
 
@@ -33,6 +35,19 @@ public sealed class DashboardActivityTests
     }
 
     [Fact]
+    public async Task O9_the_collected_amount_reaches_only_a_user_who_may_see_payments()
+    {
+        var reader = new FixedReader(new BranchDayFigures(12, 3400m, 30, 1, new Dictionary<string, int>()));
+        var query = new GetBranchDashboardQuery("2026-10-10", 0);
+
+        var technician = await new GetBranchDashboardHandler(reader, new DefaultSettings(), new NoPrivileges(), new SessionUser(Guid.CreateVersion7()), new NoTenant(), new FixedClock(Now)).Handle(query, CancellationToken.None);
+        var cashier = await new GetBranchDashboardHandler(reader, new DefaultSettings(), new KeyPrivileges("billing.view"), new SessionUser(Guid.CreateVersion7()), new NoTenant(), new FixedClock(Now)).Handle(query, CancellationToken.None);
+
+        Assert.Null(technician.Kpis.CollectedToday);
+        Assert.Equal(3400m, cashier.Kpis.CollectedToday);
+    }
+
+    [Fact]
     public async Task S_D1b_the_delayed_tests_of_the_reader_fill_the_dashboard_table()
     {
         // UAT R1-02: the tile counted the delayed tests while the table was always built empty.
@@ -44,6 +59,24 @@ public sealed class DashboardActivityTests
 
         Assert.Equal([delayed], dashboard.DelayedTests);
         Assert.Equal(1, dashboard.Kpis.DelayedTests);
+    }
+
+    [Fact]
+    public async Task A10_a_future_day_of_the_user_is_refused_and_today_in_the_user_s_offset_is_accepted()
+    {
+        // Validation A-10 (2026-10-11): 2026-10-20 was accepted and shown with figures "as of now".
+        var reader = new FixedReader(new BranchDayFigures(null, null, null, null, null));
+        var handler = new GetBranchDashboardHandler(reader, new DefaultSettings(), new NoPrivileges(), new SessionUser(Guid.CreateVersion7()), new NoTenant(), new FixedClock(Now));
+
+        var future = await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new GetBranchDashboardQuery("2026-10-20", 180), CancellationToken.None));
+        Assert.Equal(AccountCodes.DashboardDayInFuture, future.Code);
+
+        // 09:30 UTC: still the 10th at +14 h (23:30), so the 11th is the future in every allowed offset.
+        var tomorrowUtc = await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new GetBranchDashboardQuery("2026-10-11", 0), CancellationToken.None));
+        Assert.Equal(AccountCodes.DashboardDayInFuture, tomorrowUtc.Code);
+        Assert.Equal("2026-10-10", (await handler.Handle(new GetBranchDashboardQuery("2026-10-10", 840), CancellationToken.None)).Date);
+        Assert.Equal("2026-10-09", (await handler.Handle(new GetBranchDashboardQuery("2026-10-09", -600), CancellationToken.None)).Date);
+        Assert.Equal("2026-10-10", (await handler.Handle(new GetBranchDashboardQuery(null, 180), CancellationToken.None)).Date);
     }
 
     [Fact]
@@ -107,6 +140,19 @@ public sealed class DashboardActivityTests
 
         public ValueTask<IReadOnlyDictionary<string, string>> GetAllAsync(CancellationToken cancellationToken) =>
             ValueTask.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>());
+    }
+
+    private sealed class KeyPrivileges(params string[] keys) : IUserPrivileges
+    {
+        public IReadOnlySet<string> PermissionKeys { get; } = new HashSet<string>(keys);
+
+        public SpecialRights SpecialRights => SpecialRights.None;
+
+        public IReadOnlyList<ResultRight> ResultRights { get; } = [];
+
+        public bool Has(string permissionKey) => PermissionKeys.Contains(permissionKey);
+
+        public bool CanOnResults(ResultAction action, Guid clinicalGroupId, Guid branchId) => false;
     }
 
     private sealed class NoPrivileges : IUserPrivileges
