@@ -68,3 +68,9 @@
   }
 }
 .logo-card { display: block; margin-block-end: var(--sp-4); }
+
+/* a parameter a laboratory cannot change yet (editableFrom) */
+.locked {
+  display: block;
+  color: var(--warn);
+}

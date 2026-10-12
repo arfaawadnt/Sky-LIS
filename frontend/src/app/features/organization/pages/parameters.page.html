@@ -36,6 +36,9 @@
             <div class="text">
               <label class="name" [attr.for]="'parameter-' + parameter.key">{{ label(parameter.key) }}</label>
               <span class="muted small">{{ description(parameter.key) }}</span>
+              @if (isLocked(parameter.key)) {
+                <span class="locked small">{{ i18n.t('organization.parameters.lockedUntilR2') }}</span>
+              }
               <span class="meta">
                 @if (item(parameter.key)?.isDefault && !isEdited(parameter.key)) {
                   <app-badge tone="neutral">{{ i18n.t('organization.parameters.default') }}</app-badge>
@@ -49,7 +52,7 @@
               @switch (parameter.input) {
                 @case ('switch') {
                   <label class="check">
-                    <input [id]="'parameter-' + parameter.key" type="checkbox" role="switch" [checked]="facade.valueOf(parameter.key) === 'true'" [disabled]="!canManage()" (change)="onSwitch(parameter.key, $event)" />
+                    <input [id]="'parameter-' + parameter.key" type="checkbox" role="switch" [checked]="facade.valueOf(parameter.key) === 'true'" [disabled]="!canManage() || isLocked(parameter.key)" (change)="onSwitch(parameter.key, $event)" />
                     <span>{{ facade.valueOf(parameter.key) === 'true' ? i18n.t('organization.on') : i18n.t('organization.off') }}</span>
                   </label>
                 }
@@ -62,12 +65,12 @@
                     [attr.min]="parameter.min ?? null"
                     [attr.max]="parameter.max ?? null"
                     [value]="facade.valueOf(parameter.key)"
-                    [disabled]="!canManage()"
+                    [disabled]="!canManage() || isLocked(parameter.key)"
                     [attr.aria-invalid]="invalidKeys().has(parameter.key)"
                     (change)="onValue(parameter.key, $event)" />
                 }
                 @case ('select') {
-                  <select [id]="'parameter-' + parameter.key" class="inp" [value]="facade.valueOf(parameter.key)" [disabled]="!canManage()" (change)="onValue(parameter.key, $event)">
+                  <select [id]="'parameter-' + parameter.key" class="inp" [value]="facade.valueOf(parameter.key)" [disabled]="!canManage() || isLocked(parameter.key)" (change)="onValue(parameter.key, $event)">
                     @for (option of parameter.options ?? []; track option) {
                       <option [value]="option" [selected]="option === facade.valueOf(parameter.key)">{{ optionLabel(parameter.key, option) }}</option>
                     }
@@ -80,7 +83,7 @@
                     type="text"
                     [attr.maxlength]="parameter.maxLength ?? 200"
                     [value]="facade.valueOf(parameter.key)"
-                    [disabled]="!canManage()"
+                    [disabled]="!canManage() || isLocked(parameter.key)"
                     [attr.aria-invalid]="invalidKeys().has(parameter.key)"
                     (change)="onValue(parameter.key, $event)" />
                 }

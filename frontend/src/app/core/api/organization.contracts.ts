@@ -1,5 +1,6 @@
 /** Organization module contracts mirrored from `Platform.Contracts.Organization` (intake LIS-INT-ORG-001; bootstrap until the OpenAPI generator lands, 01 §6.2). */
 
+import type { Release } from '../release';
 import type { SettingKey } from './settings.contracts';
 
 import type { SortRequest } from './paging';
@@ -330,10 +331,18 @@ export interface ParameterDescriptor {
   readonly maxLength?: number;
   /** Shown only in the Super Admin portal (platform defaults, SA-19). */
   readonly platformOnly?: boolean;
+  /**
+   * A laboratory may change it only from this release (shown locked before). Auto-collect / auto-receive: Release 1 has
+   * no sample pages, so switching either off would leave samples uncollected or not received and block result entry
+   * (BR-03, RES-010) with no screen to fix it (decision 2026-10-12).
+   */
+  readonly editableFrom?: Release;
 }
 
 export interface ParameterGroup {
   readonly id: string;
+  /** The release in which a laboratory sees the group (the Super Admin portal sees every group). */
+  readonly release: Release;
   readonly parameters: readonly ParameterDescriptor[];
 }
 
@@ -344,6 +353,7 @@ export interface ParameterGroup {
 export const PARAMETER_GROUPS: readonly ParameterGroup[] = [
   {
     id: 'registration',
+    release: 'R1',
     parameters: [
       { key: 'mandatoryMobile', input: 'switch' },
       { key: 'mandatoryDoctor', input: 'switch' },
@@ -356,6 +366,7 @@ export const PARAMETER_GROUPS: readonly ParameterGroup[] = [
   },
   {
     id: 'printing',
+    release: 'R1',
     parameters: [
       { key: 'autoPrintLabels', input: 'switch' },
       { key: 'autoPrintJobOrder', input: 'switch' },
@@ -367,9 +378,10 @@ export const PARAMETER_GROUPS: readonly ParameterGroup[] = [
   },
   {
     id: 'samples',
+    release: 'R1',
     parameters: [
-      { key: 'autoCollect', input: 'switch' },
-      { key: 'autoReceive', input: 'switch' },
+      { key: 'autoCollect', input: 'switch', editableFrom: 'R2' },
+      { key: 'autoReceive', input: 'switch', editableFrom: 'R2' },
       { key: 'newBarcodeOnReject', input: 'switch' },
       { key: 'reviewBeforeVerify', input: 'switch' },
       { key: 'delayWarnPercent', input: 'number', min: 0, max: 1000 },
@@ -378,6 +390,7 @@ export const PARAMETER_GROUPS: readonly ParameterGroup[] = [
   },
   {
     id: 'security',
+    release: 'R1',
     parameters: [
       { key: 'sessionTimeoutMinutes', input: 'number', min: 1, max: 720 },
       { key: 'otpLength', input: 'number', min: 4, max: 10 },
@@ -388,6 +401,7 @@ export const PARAMETER_GROUPS: readonly ParameterGroup[] = [
   },
   {
     id: 'subscription',
+    release: 'R2',
     parameters: [
       { key: 'trialDays', input: 'number', min: 0, max: 365, platformOnly: true },
       { key: 'masterDataUpdatePolicy', input: 'select', options: ['push', 'propose', 'ignore'] },

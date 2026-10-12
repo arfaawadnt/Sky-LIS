@@ -43,22 +43,36 @@ describe('ParametersPage (CP-57)', () => {
     await settle();
   }
 
-  it('shows a laboratory only its logo in Release 1, not the parameter groups', async () => {
+  it('shows a laboratory the four Release 1 groups with its logo, locks auto-collect and auto-receive, hides Subscription', async () => {
     const fixture = TestBed.createComponent(ParametersPage);
     await flush();
-    backend.match(ORGANIZATION_API.settings).forEach((request) => request.flush({ settings: [item('mandatoryMobile', 'Bool', 'false', 'false')] }));
+    backend.expectOne(ORGANIZATION_API.settings).flush({
+      settings: [
+        item('mandatoryMobile', 'Bool', 'false', 'false'),
+        item('labelCopies', 'Int', '1', '1'),
+        item('autoCollect', 'Bool', 'true', 'true'),
+        item('autoReceive', 'Bool', 'true', 'true'),
+        item('reviewBeforeVerify', 'Bool', 'false', 'false'),
+        item('sessionTimeoutMinutes', 'Int', '30', '30'),
+        item('masterDataUpdatePolicy', 'String', 'propose', 'propose'),
+      ],
+    });
     await flush();
 
     const host = fixture.nativeElement as HTMLElement;
     expect(host.querySelector('app-laboratory-logo-card')).not.toBeNull();
-    expect(host.querySelector('#parameter-mandatoryMobile')).toBeNull();
-    expect(host.querySelector('form.groups')).toBeNull();
-    expect([...host.querySelectorAll('button')].some((button) => button.textContent?.includes('organization.save'))).toBe(false);
+    expect(host.querySelectorAll('form app-section-card').length).toBe(4);   // registration, printing, samples, security
+    expect(host.querySelector('#parameter-masterDataUpdatePolicy')).toBeNull();   // Subscription is Release 2
+    expect(host.querySelector<HTMLInputElement>('#parameter-autoCollect')?.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('#parameter-autoReceive')?.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('#parameter-reviewBeforeVerify')?.disabled).toBe(false);
+    expect(host.querySelectorAll('.locked').length).toBe(2);
+    expect([...host.querySelectorAll('button')].some((button) => button.textContent?.includes('organization.save'))).toBe(true);
   });
 
   it('groups the parameters with typed inputs and saves the changed value (Release 2)', async () => {
     const fixture = TestBed.createComponent(ParametersPage);
-    (fixture.componentInstance as unknown as { labParametersOffered: WritableSignal<boolean> }).labParametersOffered.set(true);
+    (fixture.componentInstance as unknown as { scope: WritableSignal<'R1' | 'R2'> }).scope.set('R2');
     await flush();
     backend.expectOne(ORGANIZATION_API.settings).flush({
       settings: [item('mandatoryMobile', 'Bool', 'false', 'false'), item('labelCopies', 'Int', '1', '1'), item('resultLanguage', 'String', 'en', 'en'), item('trialDays', 'Int', '14', '14')],

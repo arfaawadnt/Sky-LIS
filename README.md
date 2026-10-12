@@ -234,7 +234,12 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Laboratory parameters in Release 1.** Setup › Parameters now shows a laboratory four groups next to its logo:
+  Registration, Printing, Samples and results, and Security and general (Subscription stays Release 2). Holders of
+  `settings.manage` edit them. "Mark samples Collected" and "Mark samples Received" stay locked On until the sample
+  pages of Release 2, because switching either off would block result entry (BR-03, RES-010) with no screen to
+  recover. Each parameter group now carries the release a laboratory sees it in (`ParameterGroup.release`), and a
+  parameter can be locked until a release (`editableFrom`).
 
 ### v0.7.1 — 2026-10-12
 

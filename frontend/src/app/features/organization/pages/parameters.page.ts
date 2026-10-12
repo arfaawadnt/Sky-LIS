@@ -5,7 +5,7 @@ import type { TenantSettingItem } from '../../../core/api/settings.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { PortalService } from '../../../core/portal/portal.service';
-import { inReleaseScope } from '../../../core/release';
+import { RELEASE_SCOPE, type Release, inReleaseScope } from '../../../core/release';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
@@ -41,8 +41,10 @@ export function isValidParameter(descriptor: ParameterDescriptor, value: string)
  * Parameters (SRS CP-57): the tenant behaviour switches every module reads at runtime, grouped by topic with typed
  * inputs (switch, bounded number, closed list, text). Edits are collected and saved together (Save or Ctrl+S); only
  * changed keys are sent; a value can be returned to the platform default. Read-only without `settings.manage`.
- * A laboratory also manages its logo here (`LaboratoryLogoCardComponent`). In Release 1 a laboratory sees only the logo:
- * its parameter groups are Release 2 (user decision 2026-10-12); the Super Admin portal shows its parameters as before.
+ * A laboratory also manages its logo here (`LaboratoryLogoCardComponent`). Each group carries the release a laboratory sees it
+ * in (Registration, Printing, Samples and results, Security and general: Release 1; Subscription: Release 2; user decision
+ * 2026-10-12); auto-collect and auto-receive stay locked On until the sample pages of Release 2. The Super Admin portal
+ * shows every group as before.
  */
 @Component({
   selector: 'app-parameters-page',
@@ -59,22 +61,30 @@ export class ParametersPage {
   private readonly permissionsService = inject(PermissionsService);
 
   protected readonly permissions = ORGANIZATION_PERMISSIONS;
-  /** The laboratory parameter groups are Release 2; a signal so a spec can open them. */
-  protected readonly labParametersOffered = signal(inReleaseScope('R2'));
-
-  /** The parameter groups, Save and Discard: always in the Super Admin portal, in a laboratory from Release 2. */
-  protected readonly showParameters = computed(() => this.isPlatform() || this.labParametersOffered());
+  /** The delivered release (a signal so a spec can open Release 2). */
+  protected readonly scope = signal<Release>(RELEASE_SCOPE);
 
   protected readonly canManage = computed(() => this.permissionsService.can(ORGANIZATION_PERMISSIONS.settingsManage));
 
   /** The groups of this portal, restricted to the keys the server returned. */
   protected readonly groups = computed<readonly ParameterGroup[]>(() => {
     const known = this.facade.byKey();
-    return PARAMETER_GROUPS.map((group) => ({
+    return PARAMETER_GROUPS.filter((group) => this.isPlatform() || inReleaseScope(group.release, this.scope())).map((group) => ({
       id: group.id,
+      release: group.release,
       parameters: group.parameters.filter((parameter) => known.has(parameter.key) && (this.isPlatform() || !parameter.platformOnly)),
     })).filter((group) => group.parameters.length > 0);
   });
+
+  /** Save and Discard: whenever a group is shown (a laboratory's Subscription group is Release 2). */
+  protected readonly showParameters = computed(() => this.groups().length > 0);
+
+  /** Keys a laboratory cannot change yet (`editableFrom`): shown locked, with the reason. */
+  private readonly lockedKeys = computed(() => new Set<string>(this.isPlatform() ? [] : PARAMETER_GROUPS.flatMap((group) => group.parameters).filter((parameter) => parameter.editableFrom !== undefined && !inReleaseScope(parameter.editableFrom, this.scope())).map((parameter) => parameter.key)));
+
+  protected isLocked(key: string): boolean {
+    return this.lockedKeys().has(key);
+  }
 
   protected readonly invalidKeys = computed(() => {
     const descriptors = new Map(PARAMETER_GROUPS.flatMap((group) => group.parameters).map((parameter) => [parameter.key as string, parameter]));

@@ -427,5 +427,6 @@
   "error.ACC-041": "A logo may not exceed 512 KB.",
   "error.ACC-042": "The logo must be a PNG, JPEG or WebP image.",
   "error.ACC-045": "The laboratory has no logo.",
-  "error.ACC-403": "Only a laboratory has a logo."
+  "error.ACC-403": "Only a laboratory has a logo.",
+  "parameters.lockedUntilR2": "Always on in Release 1: the sample collection and receiving pages come in Release 2, and results can be entered only for received samples."
 }
