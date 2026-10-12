@@ -9,6 +9,7 @@ import {
   type BranchDashboard,
   type BranchDashboardQuery,
   type DeskTicketFilter,
+  type LaboratoryLogoView,
   type MyAccountProfile,
   type OpenSupportTicketRequest,
   type SupportTicketDetail,
@@ -44,6 +45,17 @@ export class AccountApi {
 
   profile(): Promise<MyAccountProfile> {
     return firstValueFrom(this.http.get<MyAccountProfile>(ACCOUNT_API.profile));
+  }
+
+  /** Uploads or replaces the laboratory's logo (settings.manage; PNG, JPEG or WebP up to 512 KB, the server decides). */
+  uploadLaboratoryLogo(file: File): Promise<LaboratoryLogoView> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return firstValueFrom(this.http.post<LaboratoryLogoView>(ACCOUNT_API.laboratoryLogo, form));
+  }
+
+  removeLaboratoryLogo(): Promise<void> {
+    return completed(this.http.delete<void>(ACCOUNT_API.laboratoryLogo));
   }
 
   updateLanguage(language: AccountLanguage): Promise<void> {

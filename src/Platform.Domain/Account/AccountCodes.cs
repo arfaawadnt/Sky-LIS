@@ -19,6 +19,15 @@ public static class AccountCodes
     /// <summary>CP-05: the dashboard shows today or an earlier day of the user, never a future one (validation A-10).</summary>
     public const string DashboardDayInFuture = "ACC-030";
 
+    // Laboratory logo (top bar, later letterheads): content rules, existence, laboratory scope
+    public const string LogoEmpty = "ACC-040";
+    public const string LogoTooLarge = "ACC-041";
+    public const string LogoTypeNotAllowed = "ACC-042";
+    public const string LogoNotFound = "ACC-045";
+
+    /// <summary>A logo belongs to a laboratory: the platform tenant (Super Admin portal) has none.</summary>
+    public const string LaboratoryRequired = "ACC-403";
+
     // Support tickets (S1–S7)
     public const string SubjectInvalid = "SUP-001";
     public const string DescriptionInvalid = "SUP-002";

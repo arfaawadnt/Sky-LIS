@@ -11,6 +11,31 @@
     <div class="column">
       @if (p.laboratory; as lab) {
         <app-section-card [title]="i18n.t('account.profile.laboratory')" [subtitle]="i18n.t('account.profile.laboratorySub')">
+          <!-- the logo of the top bar: shown to everyone, changed by a holder of settings.manage -->
+          <div class="logo-row">
+            <div class="logo-box">
+              @if (brand.logoUrl(); as url) {
+                <img [src]="url" [alt]="i18n.t('account.profile.logo')" />
+              } @else {
+                <span class="logo-badge" aria-hidden="true">{{ brand.initials() || '—' }}</span>
+              }
+            </div>
+            <div class="logo-text">
+              <b>{{ i18n.t('account.profile.logo') }}</b>
+              <span class="small muted">{{ i18n.t(lab.logoVersion ? 'account.profile.logoSet' : 'account.profile.logoNone') }}</span>
+              <div class="logo-actions" *appCan="'settings.manage'">
+                <label class="btn sm" [class.disabled]="logoBusy()">
+                  <input class="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" [disabled]="logoBusy()" (change)="onLogoSelected($event)" />
+                  {{ i18n.t(lab.logoVersion ? 'account.profile.logoReplace' : 'account.profile.logoUpload') }}
+                </label>
+                @if (lab.logoVersion) {
+                  <button type="button" class="btn sm ghost" [disabled]="logoBusy()" (click)="removeLogo()">{{ i18n.t('account.profile.logoRemove') }}</button>
+                }
+                <span class="small muted">{{ i18n.t('account.profile.logoHint') }}</span>
+              </div>
+            </div>
+          </div>
+
           @if (lab.nameEn === null && lab.nameAr === null) {
             <!-- UAT R3-04: no internal identifier on a production screen; the platform team owns the missing record. -->
             <p class="info-strip">{{ i18n.t('account.profile.laboratoryUnavailable') }}</p>

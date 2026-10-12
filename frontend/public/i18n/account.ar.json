@@ -362,5 +362,20 @@
   "audit.client": "العميل",
   "audit.allClients": "كل العملاء",
   "dashboard.onDay": "في {date}",
-  "dashboard.kpi.collected": "المحصّل"
+  "dashboard.kpi.collected": "المحصّل",
+  "profile.logo": "شعار المختبر",
+  "profile.logoNone": "لا يوجد شعار بعد: يعرض الشريط العلوي الأحرف الأولى من اسم المختبر.",
+  "profile.logoSet": "يظهر في الشريط العلوي لكل مستخدمي المختبر.",
+  "profile.logoUpload": "رفع الشعار",
+  "profile.logoReplace": "تغيير الشعار",
+  "profile.logoRemove": "إزالة",
+  "profile.logoHint": "PNG أو JPEG أو WebP بحد أقصى 512 كيلوبايت.",
+  "profile.logoSaved": "تم حفظ الشعار.",
+  "profile.logoRemoved": "تمت إزالة الشعار.",
+  "profile.logoError": "تعذر حفظ الشعار. حاول مرة أخرى.",
+  "error.ACC-040": "الملف فارغ.",
+  "error.ACC-041": "لا يجوز أن يتجاوز الشعار 512 كيلوبايت.",
+  "error.ACC-042": "يجب أن يكون الشعار صورة PNG أو JPEG أو WebP.",
+  "error.ACC-045": "لا يوجد شعار للمختبر.",
+  "error.ACC-403": "الشعار خاص بالمختبرات فقط."
 }

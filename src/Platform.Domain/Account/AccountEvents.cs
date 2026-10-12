@@ -17,3 +17,9 @@ public sealed record SupportTicketResolved(Guid TicketId, Guid TenantId, string 
 public sealed record SupportTicketReopened(Guid TicketId, Guid TenantId, string Number, Guid ActorUserId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
 public sealed record SupportTicketClosed(Guid TicketId, Guid TenantId, string Number, Guid ActorUserId, bool ByPlatform, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+// The laboratory logo (top bar): an upload or replacement, and a removal. The tenant is the scope that raised them.
+
+public sealed record LaboratoryLogoChanged(Guid LogoId, int Version, string ContentType, long SizeBytes, Guid ActorUserId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+public sealed record LaboratoryLogoRemoved(Guid LogoId, int Version, Guid ActorUserId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);

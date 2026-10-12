@@ -61,3 +61,64 @@ form {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* the laboratory logo (top bar) */
+.logo-row {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  margin-block-end: var(--sp-4);
+  padding-block-end: var(--sp-4);
+  border-block-end: 1px solid var(--line-soft);
+}
+
+.logo-box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 64px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.logo-box img {
+  max-width: 88px;
+  max-height: 56px;
+  object-fit: contain;
+}
+
+.logo-badge {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  background: var(--grad);
+  color: #fff;
+  font-weight: 700;
+}
+
+.logo-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+  margin-block-start: var(--sp-1);
+}
+
+.logo-actions label:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
+.logo-actions label.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}

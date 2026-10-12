@@ -40,7 +40,11 @@ public sealed record LaboratoryProfile(
     string? Mobile,
     string? Email,
     string? Status,
-    DateTimeOffset? TrialEndsAtUtc);
+    DateTimeOffset? TrialEndsAtUtc,
+    int? LogoVersion = null);
+
+/// <summary>The laboratory logo after an upload: its version (the top bar reloads the image when it changes), type and size.</summary>
+public sealed record LaboratoryLogoView(int Version, string ContentType, long SizeBytes);
 
 /// <summary>CP-65 / SA-21: the signed-in user's own account. <see cref="Laboratory"/> is <see langword="null"/> for the platform tenant.</summary>
 public sealed record MyAccountProfile(

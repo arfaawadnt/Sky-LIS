@@ -40,6 +40,15 @@ export interface LaboratoryProfile {
   readonly email: string | null;
   readonly status: string | null;
   readonly trialEndsAtUtc: string | null;
+  /** The logo's version (it changes on every upload or removal); null when the laboratory has no logo. */
+  readonly logoVersion?: number | null;
+}
+
+/** The laboratory logo after an upload (`POST /api/v1/account/laboratory/logo`). */
+export interface LaboratoryLogoView {
+  readonly version: number;
+  readonly contentType: string;
+  readonly sizeBytes: number;
 }
 
 export interface MyAccountProfile {
@@ -212,6 +221,8 @@ export interface BranchDashboardQuery {
 
 export const ACCOUNT_API = {
   profile: '/api/v1/account/profile',
+  /** GET the image (any member), POST multipart `file` / DELETE with settings.manage. */
+  laboratoryLogo: '/api/v1/account/laboratory/logo',
   preferences: '/api/v1/account/preferences',
   password: '/api/v1/account/password',
   auditActors: '/api/v1/account/audit/actors',

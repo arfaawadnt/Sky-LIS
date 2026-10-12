@@ -6016,5 +6016,65 @@ BEGIN
     VALUES ('20261011201519_GrantExportPermissions', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261012021635_LaboratoryLogo') THEN
+    CREATE TABLE app.laboratory_logos (
+        id uuid NOT NULL,
+        tenant_id uuid NOT NULL,
+        content_type character varying(50) NOT NULL,
+        size_bytes bigint NOT NULL,
+        storage_key character varying(400) NOT NULL,
+        sha256 character(64) NOT NULL,
+        version integer NOT NULL,
+        is_active boolean NOT NULL,
+        changed_by_user_id uuid NOT NULL,
+        changed_at_utc timestamp with time zone NOT NULL,
+        created_at_utc timestamp with time zone NOT NULL,
+        created_by_user_id uuid,
+        created_by_display_name character varying(200),
+        modified_at_utc timestamp with time zone,
+        modified_by_user_id uuid,
+        modified_by_display_name character varying(200),
+        CONSTRAINT pk_laboratory_logos PRIMARY KEY (tenant_id, id),
+        CONSTRAINT ck_laboratory_logos_content_type CHECK (content_type IN ('image/png', 'image/jpeg', 'image/webp')),
+        CONSTRAINT ck_laboratory_logos_size CHECK (size_bytes BETWEEN 1 AND 524288),
+        CONSTRAINT ck_laboratory_logos_version CHECK (version >= 1)
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261012021635_LaboratoryLogo') THEN
+    CREATE UNIQUE INDEX ix_laboratory_logos_tenant_id ON app.laboratory_logos (tenant_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261012021635_LaboratoryLogo') THEN
+    ALTER TABLE app.laboratory_logos ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE app.laboratory_logos FORCE ROW LEVEL SECURITY;
+    CREATE POLICY tenant_isolation ON app.laboratory_logos
+        USING (
+            tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid
+            OR current_setting('app.bypass_rls', true) = 'on'
+        )
+        WITH CHECK (
+            tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid
+            OR current_setting('app.bypass_rls', true) = 'on'
+        );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261012021635_LaboratoryLogo') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261012021635_LaboratoryLogo', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

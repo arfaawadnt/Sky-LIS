@@ -20,6 +20,7 @@ public sealed record GetMyAccountProfileQuery : IQuery<MyAccountProfile>;
 public sealed class GetMyAccountProfileHandler(
     IAccountDirectory directory,
     ILaboratoryProfileLookup laboratories,
+    ILaboratoryLogoRepository logos,
     ITenantSettings settings,
     SessionPolicy policy,
     ICurrentUser user,
@@ -34,6 +35,12 @@ public sealed class GetMyAccountProfileHandler(
         var tenantId = tenant.TenantId;
         var isPlatform = tenantId is { } id && TenantIds.IsPlatform(id);
         var laboratory = tenantId is { } labId && !isPlatform ? await laboratories.FindAsync(labId, cancellationToken) ?? Placeholder(labId) : null;
+        if (laboratory is not null)
+        {
+            // the top bar reloads the image when this changes; null = no logo (the initials are shown)
+            laboratory = laboratory with { LogoVersion = (await logos.FindActiveAsync(cancellationToken))?.Version };
+        }
+
         var minimum = Math.Max(policy.PasswordMinLength, await settings.GetAsync(SettingKeys.PasswordMinLength, cancellationToken));
 
         return new MyAccountProfile(

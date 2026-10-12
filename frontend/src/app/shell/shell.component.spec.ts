@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
@@ -9,7 +9,13 @@ import { AuthStore } from '../core/auth/auth.store';
 import { I18nService } from '../core/i18n/i18n.service';
 import { FakeBrowserNavigation, FakeSessionChannel, provideSessionTesting } from '../core/auth/session-testing';
 import { PLATFORM_TENANT_ID } from '../core/tenancy/tenant-ids';
+import { LabBrandComponent } from './lab-brand.component';
 import { ShellComponent } from './shell.component';
+import { ShellTopbarComponent } from './shell-topbar.component';
+
+/** The laboratory name has its own spec (lab-brand.component.spec.ts); here it would only wait for an unanswered request. */
+@Component({ selector: 'app-shell-lab-brand', template: '', changeDetection: ChangeDetectionStrategy.OnPush })
+class LabBrandStub {}
 
 async function signIn(tenantId: string, permissions: readonly string[], roleNameAr: string | null = null, names: { readonly displayNameEn?: string; readonly displayNameAr?: string } = {}): Promise<void> {
   const store = TestBed.inject(AuthStore);
@@ -40,7 +46,9 @@ describe('ShellComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ShellComponent],
       providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(), ...provideSessionTesting(navigation, channel)],
-    }).compileComponents();
+    })
+      .overrideComponent(ShellTopbarComponent, { remove: { imports: [LabBrandComponent] }, add: { imports: [LabBrandStub] } })
+      .compileComponents();
   });
 
   it('signs out with a full page load of the sign-in page, so no module keeps the user state (A-01, B-11)', async () => {

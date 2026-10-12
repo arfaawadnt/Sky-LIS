@@ -1,6 +1,6 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 
@@ -13,6 +13,7 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
+import { LaboratoryBrandService } from '../../../core/brand/laboratory-brand.service';
 import { AuditLogFacade } from '../state/audit-log.facade';
 import { BranchSelectionFacade } from '../state/branch-selection.facade';
 import { DashboardFacade } from '../state/dashboard.facade';
@@ -53,6 +54,8 @@ describe('Account pages', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
+        // the top bar's laboratory brand reads the profile too; the pages are tested on their own requests
+        { provide: LaboratoryBrandService, useValue: { logoUrl: signal<string | null>(null), initials: signal(''), logoVersion: signal<number | null>(null), refresh: () => undefined } },
         provideZonelessChangeDetection(),
         provideRouter([]),
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),

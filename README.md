@@ -234,7 +234,18 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **The top bar shows the client laboratory instead of the Sky LIS brand.** It shows the laboratory's logo, or a badge
+  with its initials ("DL" for "Demo Laboratory"; the Arabic article "ال" is skipped), with the laboratory's name in the
+  language of the page. The Sky LIS logo stays at the top of the sidebar, and the Super Admin portal shows nothing there.
+- **Laboratory logo on the profile page (CP-65).** A holder of `settings.manage` uploads, replaces or removes the
+  laboratory's logo; every user of the laboratory sees it in the top bar at once. The logo must be PNG, JPEG or WebP
+  (decided by the file's bytes, not its name; SVG is refused because it can carry script), up to 512 KB. Refusal codes:
+  ACC-040 empty, ACC-041 too large, ACC-042 wrong type, ACC-045 no logo, ACC-403 platform tenant. Endpoints:
+  `GET`/`POST`/`DELETE /api/v1/account/laboratory/logo`; the profile carries `laboratory.logoVersion`.
+- **Migration `LaboratoryLogo`:** new table `app.laboratory_logos`, one row per laboratory, with row-level security.
+  Images are kept in the file store (area `account`); a replacement or removal never deletes a stored file.
+- **Site CSP:** `img-src` now allows `blob:` (`deploy/windows/web.config`), because the logo is fetched with the
+  sign-in token and shown through an object URL. A reinstall of the site applies it.
 
 ### v0.6.0 — 2026-10-12
 

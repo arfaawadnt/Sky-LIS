@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Platform.Application.Account.Commands;
 using Platform.Application.Account.Queries;
 using Platform.Contracts.Account;
+using Platform.Domain.Account;
 using Platform.WebApi.Security;
 
 namespace Platform.WebApi.Controllers.Account;
@@ -17,9 +18,38 @@ namespace Platform.WebApi.Controllers.Account;
 [Route("api/v1/account")]
 public sealed class AccountController(ISender sender) : ControllerBase
 {
+    /// <summary>The logo limit plus room for the multipart envelope; the command refuses anything above the limit itself.</summary>
+    private const long MaxLogoRequestBytes = LaboratoryLogoFiles.MaxSizeBytes + (64 * 1024);
+
     [HttpGet("profile")]
     public async Task<ActionResult<MyAccountProfile>> GetProfile(CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetMyAccountProfileQuery(), cancellationToken));
+
+    /// <summary>The laboratory's logo for the top bar (inline; any signed-in member of the laboratory).</summary>
+    [HttpGet("laboratory/logo")]
+    public async Task<IActionResult> GetLaboratoryLogo(CancellationToken cancellationToken)
+    {
+        var logo = await sender.Send(new GetLaboratoryLogoQuery(), cancellationToken);
+        return File(logo.Content, logo.ContentType);
+    }
+
+    /// <summary>Uploads or replaces the laboratory's logo (multipart field <c>file</c>; PNG, JPEG or WebP up to 512 KB).</summary>
+    [HttpPost("laboratory/logo")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxLogoRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxLogoRequestBytes)]
+    public async Task<ActionResult<LaboratoryLogoView>> UploadLaboratoryLogo(IFormFile? file, CancellationToken cancellationToken)
+    {
+        await using var content = file?.OpenReadStream() ?? Stream.Null;
+        return Ok(await sender.Send(new UploadLaboratoryLogoCommand(content), cancellationToken));
+    }
+
+    [HttpDelete("laboratory/logo")]
+    public async Task<IActionResult> RemoveLaboratoryLogo(CancellationToken cancellationToken)
+    {
+        await sender.Send(new RemoveLaboratoryLogoCommand(), cancellationToken);
+        return NoContent();
+    }
 
     [HttpPut("preferences")]
     public async Task<IActionResult> UpdatePreferences([FromBody] UpdatePreferencesRequest request, CancellationToken cancellationToken)

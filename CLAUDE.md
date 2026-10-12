@@ -355,6 +355,13 @@ QMS source is never read or copied (section 1); everything here is written from 
   read ports `IResultStatusLookup`, `IResultKpiLookup`; `ResultsController` under `/api/v1/results`. Frontend
   `features/results`: `/results/worklist` (CP-18) and `/results/by-accession?accession=` (CP-19); link with
   `RESULTS_LINKS.accession(acc)`. Results by sample, work queue, QC and analyser landing are Release 2 (backend only).
+- Laboratory brand (2026-10-12, migration `LaboratoryLogo`): the top bar shows the client laboratory (logo or initials +
+  name), the Sky LIS logo stays in the sidebar. Backend: `Domain/Account/LaboratoryLogo` (one per tenant, `Version` on
+  every change, removal keeps the file; `LaboratoryLogoFiles` sniffs PNG/JPEG/WebP ≤ 512 KB, ACC-040…045, ACC-403 for the
+  platform tenant), `app.laboratory_logos` (RLS), file-store area `account`, `GET/POST/DELETE /api/v1/account/laboratory/logo`
+  (read: any member; write: `settings.manage`), `LaboratoryProfile.LogoVersion`. Frontend: `core/brand/laboratory-brand.service.ts`
+  (profile + logo blob → object URL, `refresh()`), `shell/lab-brand.component.ts`, the logo block of `features/account`
+  profile page. The site CSP allows `img-src blob:`; specs that render the profile page stub `LaboratoryBrandService`.
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, scheduled jobs and the retention purge, the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

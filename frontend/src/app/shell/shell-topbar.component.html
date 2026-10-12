@@ -1,10 +1,8 @@
 <header class="topbar">
   <!-- collapses / expands the sidebar; under 960px opens it as a drawer -->
   <button type="button" class="icon-btn menu-btn" (click)="menuToggled.emit()" aria-controls="app-sidebar" [attr.aria-expanded]="menuExpanded()" [attr.aria-label]="menuLabel()" [title]="menuLabel()"><app-icon name="menu" /></button>
-  <a class="brand" [routerLink]="portal.homePath()">
-    <img src="/brand/sky-lis-logo.png" alt="" height="30" />
-    <span>{{ i18n.t('shell.brand') }}</span>
-  </a>
+  <!-- the client laboratory (name + logo / initials); the Sky LIS logo is at the top of the sidebar -->
+  <app-shell-lab-brand />
 
   <app-search-box class="global-search" [fallback]="true" [debounce]="120" [placeholder]="i18n.t('shell.searchPlaceholder')" [label]="i18n.t('shell.searchLabel')" [(value)]="navSearch" (keydown.enter)="searchSubmitted.emit()" />
 

@@ -1,6 +1,6 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 
@@ -9,6 +9,7 @@ import { AUTH_API, type AuthResponse } from '../../../core/api/auth.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PLATFORM_TENANT_ID } from '../../../core/tenancy/tenant-ids';
+import { LaboratoryBrandService } from '../../../core/brand/laboratory-brand.service';
 import { ProfileFacade } from '../state/profile.facade';
 import { ProfilePage } from './profile.page';
 
@@ -44,7 +45,7 @@ describe('ProfilePage — forced password change (C-07)', () => {
 
   beforeEach(async () => {
     TestBed.configureTestingModule({
-      providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(withInterceptors([problemDetailsInterceptor])), provideHttpClientTesting(), ProfileFacade],
+      providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(withInterceptors([problemDetailsInterceptor])), provideHttpClientTesting(), ProfileFacade, { provide: LaboratoryBrandService, useValue: { logoUrl: signal<string | null>(null), initials: signal(''), logoVersion: signal<number | null>(null), refresh: () => undefined } }],
     });
     backend = TestBed.inject(HttpTestingController);
     navigateByUrl = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);

@@ -1,23 +1,23 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input, model, output } from '@angular/core';
-import { RouterLink } from '@angular/router';
 
 import { AuthStore } from '../core/auth/auth.store';
 import { displayNameFor } from '../core/auth/display-name';
 import { roleNameFor } from '../core/auth/role-name';
 import { I18nService } from '../core/i18n/i18n.service';
-import { PortalService } from '../core/portal/portal.service';
 import { IconComponent } from '../shared/ui/icon/icon.component';
 import { SearchBoxComponent } from '../shared/ui/search-box/search-box.component';
+import { LabBrandComponent } from './lab-brand.component';
 
 /**
  * The top bar of the shell (prototypes' `.topbar`): menu button (collapses / expands the sidebar; under 960px opens it
- * as a drawer), brand, the navigation search
+ * as a drawer), the client laboratory (name and logo or initials, `LabBrandComponent`; the Sky LIS logo stays at the
+ * top of the sidebar), the navigation search
  * (the Ctrl+K fallback when a page has no search box of its own), portal pill, language toggle, and the user
  * button with its menu (language, sign-out). The shell owns the state; this component renders it.
  */
 @Component({
   selector: 'app-shell-topbar',
-  imports: [RouterLink, IconComponent, SearchBoxComponent],
+  imports: [IconComponent, SearchBoxComponent, LabBrandComponent],
   templateUrl: './shell-topbar.component.html',
   styleUrl: './shell-topbar.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -26,7 +26,6 @@ import { SearchBoxComponent } from '../shared/ui/search-box/search-box.component
 export class ShellTopbarComponent {
   protected readonly i18n = inject(I18nService);
   protected readonly auth = inject(AuthStore);
-  protected readonly portal = inject(PortalService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
   readonly portalLabel = input.required<string>();
