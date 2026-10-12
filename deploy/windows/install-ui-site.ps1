@@ -273,8 +273,10 @@ if ($useTls) {
 
 if ($PSCmdlet.ShouldProcess($physicalPath, "Grant $poolIdentity read and execute")) { Set-PoolIdentityAcl $physicalPath }
 
-if ($PSCmdlet.ShouldProcess($siteName, 'Start application pool and site')) {
-    if ((Get-WebAppPoolState -Name $poolName).Value -ne 'Started') { Start-WebAppPool -Name $poolName }
+if ($PSCmdlet.ShouldProcess($siteName, 'Start (or recycle) application pool and site')) {
+    # A running pool is recycled: the content folder was swapped, and a worker that kept the old folder's configuration
+    # served the previous web.config (its CSP) until the next recycle (found installing 0.7.0: img-src blob: missing).
+    if ((Get-WebAppPoolState -Name $poolName).Value -ne 'Started') { Start-WebAppPool -Name $poolName } else { Restart-WebAppPool -Name $poolName }
     if ((Get-WebsiteState -Name $siteName).Value -ne 'Started') { Start-Website -Name $siteName }
 }
 

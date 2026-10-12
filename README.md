@@ -234,7 +234,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Site installer recycles the app pool.** `install-ui-site.ps1` used to only start the `lis-ui` app pool after swapping
+  the content folder, which does nothing when the pool is already running. The worker then kept serving the previous
+  `web.config`, including its old CSP, until the next recycle; this was found when installing 0.7.0. A running pool is
+  now recycled, so a new `web.config` takes effect immediately.
 
 ### v0.7.0 — 2026-10-12
 
