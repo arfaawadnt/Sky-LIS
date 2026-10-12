@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.7.1** · released 2026-10-12 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.7.2** · released 2026-10-12 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.7.2 — 2026-10-12
 
 - **Laboratory parameters in Release 1.** Setup › Parameters now shows a laboratory four groups next to its logo:
   Registration, Printing, Samples and results, and Security and general (Subscription stays Release 2). Holders of
