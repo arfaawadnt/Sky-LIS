@@ -67,3 +67,4 @@
     justify-content: flex-start;
   }
 }
+.logo-card { display: block; margin-block-end: var(--sp-4); }

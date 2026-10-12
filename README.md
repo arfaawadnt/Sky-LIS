@@ -234,6 +234,11 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
+- **The laboratory logo moved to Setup › Parameters.** It is one logo for the whole laboratory, a laboratory setting
+  rather than a personal one, so it is managed where the laboratory's settings live. Setup › Parameters is now in the
+  Release 1 menu (permission `settings.view`), but in a laboratory it shows only the "Laboratory logo" card until
+  Release 2; the Super Admin portal keeps its full parameter page. The profile page shows the logo read-only, with a
+  "Change it in Setup › Parameters" link for holders of `settings.manage`.
 - **Site installer recycles the app pool.** `install-ui-site.ps1` used to only start the `lis-ui` app pool after swapping
   the content folder, which does nothing when the pool is already running. The worker then kept serving the previous
   `web.config`, including its old CSP, until the next recycle; this was found when installing 0.7.0. A running pool is

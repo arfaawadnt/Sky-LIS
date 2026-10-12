@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { DestroyRef, Injectable, computed, effect, inject, resource, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
-import { ACCOUNT_API, type LaboratoryProfile, type MyAccountProfile } from '../api/account.contracts';
+import { ACCOUNT_API, type LaboratoryLogoView, type LaboratoryProfile, type MyAccountProfile } from '../api/account.contracts';
 import { AuthStore } from '../auth/auth.store';
 import { I18nService } from '../i18n/i18n.service';
 import { PortalService } from '../portal/portal.service';
@@ -73,6 +73,24 @@ export class LaboratoryBrandService {
   /** Reads the laboratory again (after the logo or the name changed). */
   refresh(): void {
     this.profile.reload();
+  }
+
+  /**
+   * Uploads or replaces the laboratory's logo (`settings.manage`; PNG, JPEG or WebP up to 512 KB — the server decides
+   * and refuses with ACC-040…042), then reads the laboratory again so every view shows the new image.
+   */
+  async upload(file: File): Promise<LaboratoryLogoView> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    const view = await firstValueFrom(this.http.post<LaboratoryLogoView>(ACCOUNT_API.laboratoryLogo, form));
+    this.refresh();
+    return view;
+  }
+
+  /** Removes the laboratory's logo (ACC-045 when there is none); the initials come back. */
+  async remove(): Promise<void> {
+    await firstValueFrom(this.http.delete<void>(ACCOUNT_API.laboratoryLogo), { defaultValue: undefined });
+    this.refresh();
   }
 
   /** Revokes the previous object URL; the previous one is kept in a field, not read from the signal, so the effect that calls this does not depend on what it writes. */

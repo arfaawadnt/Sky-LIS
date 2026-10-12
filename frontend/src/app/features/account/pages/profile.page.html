@@ -11,7 +11,7 @@
     <div class="column">
       @if (p.laboratory; as lab) {
         <app-section-card [title]="i18n.t('account.profile.laboratory')" [subtitle]="i18n.t('account.profile.laboratorySub')">
-          <!-- the logo of the top bar: shown to everyone, changed by a holder of settings.manage -->
+          <!-- the laboratory's logo of the top bar, read-only here: it is a laboratory setting (Setup › Parameters) -->
           <div class="logo-row">
             <div class="logo-box">
               @if (brand.logoUrl(); as url) {
@@ -23,16 +23,7 @@
             <div class="logo-text">
               <b>{{ i18n.t('account.profile.logo') }}</b>
               <span class="small muted">{{ i18n.t(lab.logoVersion ? 'account.profile.logoSet' : 'account.profile.logoNone') }}</span>
-              <div class="logo-actions" *appCan="'settings.manage'">
-                <label class="btn sm" [class.disabled]="logoBusy()">
-                  <input class="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" [disabled]="logoBusy()" (change)="onLogoSelected($event)" />
-                  {{ i18n.t(lab.logoVersion ? 'account.profile.logoReplace' : 'account.profile.logoUpload') }}
-                </label>
-                @if (lab.logoVersion) {
-                  <button type="button" class="btn sm ghost" [disabled]="logoBusy()" (click)="removeLogo()">{{ i18n.t('account.profile.logoRemove') }}</button>
-                }
-                <span class="small muted">{{ i18n.t('account.profile.logoHint') }}</span>
-              </div>
+              <a class="small" *appCan="'settings.manage'" routerLink="/organization/parameters">{{ i18n.t('account.profile.logoManage') }}</a>
             </div>
           </div>
 

@@ -366,16 +366,5 @@
   "profile.logo": "Laboratory logo",
   "profile.logoNone": "No logo yet: the top bar shows the laboratory's initials.",
   "profile.logoSet": "Shown in the top bar of every user of the laboratory.",
-  "profile.logoUpload": "Upload logo",
-  "profile.logoReplace": "Replace logo",
-  "profile.logoRemove": "Remove",
-  "profile.logoHint": "PNG, JPEG or WebP, up to 512 KB.",
-  "profile.logoSaved": "The logo was saved.",
-  "profile.logoRemoved": "The logo was removed.",
-  "profile.logoError": "The logo could not be saved. Try again.",
-  "error.ACC-040": "The file is empty.",
-  "error.ACC-041": "A logo may not exceed 512 KB.",
-  "error.ACC-042": "The logo must be a PNG, JPEG or WebP image.",
-  "error.ACC-045": "The laboratory has no logo.",
-  "error.ACC-403": "Only a laboratory has a logo."
+  "profile.logoManage": "Change it in Setup › Parameters"
 }

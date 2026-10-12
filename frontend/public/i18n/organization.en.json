@@ -410,5 +410,22 @@
   "error.IDN-010": "The account is inactive.",
   "error.SET-001": "Unknown parameter.",
   "error.SET-002": "A parameter value is invalid.",
-  "error.TENANT-005": "This branch is not assigned to you."
+  "error.TENANT-005": "This branch is not assigned to you.",
+  "parameters.subtitleLogoOnly": "The laboratory's logo, shown in the top bar of every user of the laboratory. The other parameters come in Release 2.",
+  "parameters.logo.title": "Laboratory logo",
+  "parameters.logo.subtitle": "One logo for the whole laboratory, shown in every user's top bar.",
+  "parameters.logo.none": "No logo yet: the top bar shows the laboratory's initials.",
+  "parameters.logo.set": "Shown in the top bar of every user of the laboratory.",
+  "parameters.logo.upload": "Upload logo",
+  "parameters.logo.replace": "Replace logo",
+  "parameters.logo.remove": "Remove",
+  "parameters.logo.hint": "PNG, JPEG or WebP, up to 512 KB.",
+  "parameters.logo.saved": "The logo was saved.",
+  "parameters.logo.removed": "The logo was removed.",
+  "parameters.logo.error": "The logo could not be saved. Try again.",
+  "error.ACC-040": "The file is empty.",
+  "error.ACC-041": "A logo may not exceed 512 KB.",
+  "error.ACC-042": "The logo must be a PNG, JPEG or WebP image.",
+  "error.ACC-045": "The laboratory has no logo.",
+  "error.ACC-403": "Only a laboratory has a logo."
 }

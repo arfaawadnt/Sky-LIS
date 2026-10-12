@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import { ORGANIZATION_PERMISSIONS, PARAMETER_GROUPS, type ParameterDescriptor, type ParameterGroup } from '../../../core/api/organization.contracts';
 import type { TenantSettingItem } from '../../../core/api/settings.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { PortalService } from '../../../core/portal/portal.service';
+import { inReleaseScope } from '../../../core/release';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
@@ -14,6 +15,7 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ParametersFacade } from '../state/parameters.facade';
+import { LaboratoryLogoCardComponent } from '../ui/laboratory-logo-card.component';
 
 /** True when the text value satisfies the descriptor's input (mirrors the server's SET-002 check for the bounded inputs). */
 export function isValidParameter(descriptor: ParameterDescriptor, value: string): boolean {
@@ -39,10 +41,12 @@ export function isValidParameter(descriptor: ParameterDescriptor, value: string)
  * Parameters (SRS CP-57): the tenant behaviour switches every module reads at runtime, grouped by topic with typed
  * inputs (switch, bounded number, closed list, text). Edits are collected and saved together (Save or Ctrl+S); only
  * changed keys are sent; a value can be returned to the platform default. Read-only without `settings.manage`.
+ * A laboratory also manages its logo here (`LaboratoryLogoCardComponent`). In Release 1 a laboratory sees only the logo:
+ * its parameter groups are Release 2 (user decision 2026-10-12); the Super Admin portal shows its parameters as before.
  */
 @Component({
   selector: 'app-parameters-page',
-  imports: [SaveShortcutDirective, CanDirective, PageHeaderComponent, SectionCardComponent, BadgeComponent, IconComponent],
+  imports: [SaveShortcutDirective, CanDirective, PageHeaderComponent, SectionCardComponent, BadgeComponent, IconComponent, LaboratoryLogoCardComponent],
   templateUrl: './parameters.page.html',
   styleUrl: './parameters.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -51,10 +55,16 @@ export class ParametersPage {
   protected readonly i18n = inject(I18nService);
   protected readonly facade = inject(ParametersFacade);
   private readonly toast = inject(ToastService);
-  private readonly isPlatform = inject(PortalService).isPlatform;
+  protected readonly isPlatform = inject(PortalService).isPlatform;
   private readonly permissionsService = inject(PermissionsService);
 
   protected readonly permissions = ORGANIZATION_PERMISSIONS;
+  /** The laboratory parameter groups are Release 2; a signal so a spec can open them. */
+  protected readonly labParametersOffered = signal(inReleaseScope('R2'));
+
+  /** The parameter groups, Save and Discard: always in the Super Admin portal, in a laboratory from Release 2. */
+  protected readonly showParameters = computed(() => this.isPlatform() || this.labParametersOffered());
+
   protected readonly canManage = computed(() => this.permissionsService.can(ORGANIZATION_PERMISSIONS.settingsManage));
 
   /** The groups of this portal, restricted to the keys the server returned. */

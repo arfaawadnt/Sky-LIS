@@ -9,7 +9,6 @@ import { AUTH_API, type AuthResponse } from '../../../core/api/auth.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { LaboratoryBrandService } from '../../../core/brand/laboratory-brand.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
-import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ProfileFacade } from '../state/profile.facade';
 import { ProfilePage } from './profile.page';
 
@@ -40,7 +39,7 @@ function profile(logoVersion: number | null): MyAccountProfile {
   };
 }
 
-describe('ProfilePage — laboratory logo', () => {
+describe('ProfilePage — laboratory logo (read-only; it is changed on Setup › Parameters)', () => {
   let backend: HttpTestingController;
   let refreshed: number;
 
@@ -88,70 +87,22 @@ describe('ProfilePage — laboratory logo', () => {
     return fixture;
   }
 
-  function choose(fixture: ComponentFixture<ProfilePage>, file: File): void {
-    const input = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('.logo-actions input[type=file]');
-    if (!input) {
-      throw new Error('no file input');
-    }
-
-    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
-    input.dispatchEvent(new Event('change'));
-  }
-
-  it('uploads the chosen image and refreshes the page and the top bar', async () => {
-    const fixture = await open(['settings.manage'], null);
+  it('shows the laboratory logo read-only and sends the manager to Setup › Parameters', async () => {
+    const fixture = await open(['settings.manage'], 2);
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('.logo-badge')?.textContent?.trim()).toBe('DL');
-    expect(root.querySelector('.logo-actions label')?.textContent).toContain('account.profile.logoUpload');
-    expect(root.querySelector('.logo-actions .btn.ghost')).toBeNull();   // nothing to remove yet
-
-    choose(fixture, new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'logo.png', { type: 'image/png' }));
-    await settle();
-    const upload = backend.expectOne({ method: 'POST', url: ACCOUNT_API.laboratoryLogo });
-    expect((upload.request.body as FormData).get('file')).toBeInstanceOf(File);
-    upload.flush({ version: 1, contentType: 'image/png', sizeBytes: 4 });
-    await settle();
-    await render(fixture);   // the facade re-reads on the next tick
-
-    backend.expectOne(ACCOUNT_API.profile).flush(profile(1));
-    await render(fixture);
-    expect(refreshed).toBe(1);
-    expect(TestBed.inject(ToastService).toasts().some((toast) => toast.kind === 'success')).toBe(true);
-    expect(root.querySelector('.logo-actions label')?.textContent).toContain('account.profile.logoReplace');
-    expect(root.querySelector('.logo-actions .btn.ghost')).not.toBeNull();
-  });
-
-  it('shows the refusal of an image the server does not accept', async () => {
-    const fixture = await open(['settings.manage'], null);
-    choose(fixture, new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' }));
-    await settle();
-    backend.expectOne({ method: 'POST', url: ACCOUNT_API.laboratoryLogo }).flush(
-      { type: 'about:blank', title: 'Refused', status: 422, code: 'ACC-042', detail: 'The logo must be a PNG, JPEG or WebP image.' },
-      { status: 422, statusText: 'Unprocessable Entity' },
-    );
-    await settle();
-
+    expect(root.querySelector('input[type=file]')).toBeNull();   // no upload here any more
+    const link = root.querySelector<HTMLAnchorElement>('.logo-text a');
+    expect(link?.getAttribute('href')).toBe('/organization/parameters');
+    expect(link?.textContent).toContain('account.profile.logoManage');
     expect(refreshed).toBe(0);
-    expect(TestBed.inject(ToastService).toasts().some((toast) => toast.kind === 'error')).toBe(true);
-    backend.expectNone(ACCOUNT_API.profile);
+    backend.expectNone(ACCOUNT_API.laboratoryLogo);
   });
 
-  it('removes the logo', async () => {
-    const fixture = await open(['settings.manage'], 3);
-    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.logo-actions .btn.ghost')?.click();
-    await settle();
-    backend.expectOne({ method: 'DELETE', url: ACCOUNT_API.laboratoryLogo }).flush(null, { status: 204, statusText: 'No Content' });
-    await settle();
-    await render(fixture);
-    backend.expectOne(ACCOUNT_API.profile).flush(profile(null));
-    await render(fixture);
-    expect(refreshed).toBe(1);
-  });
-
-  it('offers no upload to a user without settings.manage', async () => {
+  it('offers no link to a user who cannot change the logo', async () => {
     const fixture = await open([], 2);
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('.logo-row')).not.toBeNull();
-    expect(root.querySelector('.logo-actions')).toBeNull();
+    expect(root.querySelector('.logo-text a')).toBeNull();
   });
 });

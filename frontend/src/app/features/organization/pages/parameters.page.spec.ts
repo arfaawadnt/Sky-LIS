@@ -1,11 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { type WritableSignal, provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
 import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
 import type { TenantSettingItem } from '../../../core/api/settings.contracts';
+import { LaboratoryBrandService } from '../../../core/brand/laboratory-brand.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { ParametersFacade } from '../state/parameters.facade';
 import { ParametersPage, isValidParameter } from './parameters.page';
@@ -29,6 +30,7 @@ describe('ParametersPage (CP-57)', () => {
         provideRouter([]),
         ParametersFacade,
         { provide: PermissionsService, useValue: { can: () => true } satisfies Pick<PermissionsService, 'can'> },
+        { provide: LaboratoryBrandService, useValue: { logoUrl: signal<string | null>(null), initials: signal('DL'), logoVersion: signal<number | null>(null) } },
       ],
     }).compileComponents();
     backend = TestBed.inject(HttpTestingController);
@@ -41,8 +43,22 @@ describe('ParametersPage (CP-57)', () => {
     await settle();
   }
 
-  it('groups the parameters with typed inputs and saves the changed value', async () => {
+  it('shows a laboratory only its logo in Release 1, not the parameter groups', async () => {
     const fixture = TestBed.createComponent(ParametersPage);
+    await flush();
+    backend.match(ORGANIZATION_API.settings).forEach((request) => request.flush({ settings: [item('mandatoryMobile', 'Bool', 'false', 'false')] }));
+    await flush();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('app-laboratory-logo-card')).not.toBeNull();
+    expect(host.querySelector('#parameter-mandatoryMobile')).toBeNull();
+    expect(host.querySelector('form.groups')).toBeNull();
+    expect([...host.querySelectorAll('button')].some((button) => button.textContent?.includes('organization.save'))).toBe(false);
+  });
+
+  it('groups the parameters with typed inputs and saves the changed value (Release 2)', async () => {
+    const fixture = TestBed.createComponent(ParametersPage);
+    (fixture.componentInstance as unknown as { labParametersOffered: WritableSignal<boolean> }).labParametersOffered.set(true);
     await flush();
     backend.expectOne(ORGANIZATION_API.settings).flush({
       settings: [item('mandatoryMobile', 'Bool', 'false', 'false'), item('labelCopies', 'Int', '1', '1'), item('resultLanguage', 'String', 'en', 'en'), item('trialDays', 'Int', '14', '14')],
@@ -50,7 +66,8 @@ describe('ParametersPage (CP-57)', () => {
     await flush();
 
     const host = fixture.nativeElement as HTMLElement;
-    expect(host.querySelectorAll('app-section-card').length).toBe(2);   // registration, printing; trialDays is platform-only
+    expect(host.querySelectorAll('form app-section-card').length).toBe(2);   // registration, printing; trialDays is platform-only
+    expect(host.querySelector('app-laboratory-logo-card')).not.toBeNull();   // a laboratory keeps its logo card
     expect(host.querySelector('#parameter-trialDays')).toBeNull();
     const toggle = host.querySelector<HTMLInputElement>('#parameter-mandatoryMobile');
     expect(toggle?.type).toBe('checkbox');

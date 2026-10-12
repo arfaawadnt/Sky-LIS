@@ -1,9 +1,21 @@
-<app-page-header [title]="i18n.t('organization.parameters.title')" [subtitle]="i18n.t('organization.parameters.subtitle')">
-  <button pageActions *appCan="permissions.settingsManage" type="button" class="btn ghost" [disabled]="!facade.dirty() || facade.save.pending()" (click)="facade.discard()">{{ i18n.t('organization.discard') }}</button>
-  <button pageActions *appCan="permissions.settingsManage" type="button" class="btn primary" [disabled]="!facade.dirty() || facade.save.pending()" (click)="save()">
-    <app-icon name="check" [size]="15" />{{ facade.save.pending() ? i18n.t('organization.saving') : i18n.t('organization.save') }}
-  </button>
+<app-page-header [title]="i18n.t('organization.parameters.title')" [subtitle]="i18n.t(showParameters() ? 'organization.parameters.subtitle' : 'organization.parameters.subtitleLogoOnly')">
+  @if (showParameters()) {
+    <ng-container ngProjectAs="[pageActions]">
+      <button *appCan="permissions.settingsManage" type="button" class="btn ghost" [disabled]="!facade.dirty() || facade.save.pending()" (click)="facade.discard()">{{ i18n.t('organization.discard') }}</button>
+      <button *appCan="permissions.settingsManage" type="button" class="btn primary" [disabled]="!facade.dirty() || facade.save.pending()" (click)="save()">
+        <app-icon name="check" [size]="15" />{{ facade.save.pending() ? i18n.t('organization.saving') : i18n.t('organization.save') }}
+      </button>
+    </ng-container>
+  }
 </app-page-header>
+
+<!-- a laboratory's logo (one per laboratory, shown in every user's top bar) -->
+@if (!isPlatform()) {
+  <app-laboratory-logo-card class="logo-card" />
+}
+
+<!-- the parameter groups: Super Admin portal always, a laboratory from Release 2 -->
+@if (showParameters()) {
 
 @if (facade.settings.error()) {
   <p class="problem" role="alert">{{ i18n.t('organization.parameters.loadError') }}</p>
@@ -89,3 +101,4 @@
     }
   }
 </form>
+}

@@ -410,5 +410,22 @@
   "error.IDN-010": "الحساب غير نشط.",
   "error.SET-001": "إعداد غير معروف.",
   "error.SET-002": "قيمة أحد الإعدادات غير صالحة.",
-  "error.TENANT-005": "هذا الفرع غير مسند إليك."
+  "error.TENANT-005": "هذا الفرع غير مسند إليك.",
+  "parameters.subtitleLogoOnly": "شعار المختبر الذي يظهر في الشريط العلوي لكل مستخدمي المختبر. باقي المعاملات تأتي في الإصدار الثاني.",
+  "parameters.logo.title": "شعار المختبر",
+  "parameters.logo.subtitle": "شعار واحد للمختبر كله يظهر في الشريط العلوي لكل مستخدم.",
+  "parameters.logo.none": "لا يوجد شعار بعد: يعرض الشريط العلوي الأحرف الأولى من اسم المختبر.",
+  "parameters.logo.set": "يظهر في الشريط العلوي لكل مستخدمي المختبر.",
+  "parameters.logo.upload": "رفع الشعار",
+  "parameters.logo.replace": "تغيير الشعار",
+  "parameters.logo.remove": "إزالة",
+  "parameters.logo.hint": "PNG أو JPEG أو WebP بحد أقصى 512 كيلوبايت.",
+  "parameters.logo.saved": "تم حفظ الشعار.",
+  "parameters.logo.removed": "تمت إزالة الشعار.",
+  "parameters.logo.error": "تعذر حفظ الشعار. حاول مرة أخرى.",
+  "error.ACC-040": "الملف فارغ.",
+  "error.ACC-041": "لا يجوز أن يتجاوز الشعار 512 كيلوبايت.",
+  "error.ACC-042": "يجب أن يكون الشعار صورة PNG أو JPEG أو WebP.",
+  "error.ACC-045": "لا يوجد شعار للمختبر.",
+  "error.ACC-403": "الشعار خاص بالمختبرات فقط."
 }

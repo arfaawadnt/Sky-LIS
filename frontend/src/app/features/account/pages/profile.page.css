@@ -62,7 +62,7 @@ form {
   }
 }
 
-/* the laboratory logo (top bar) */
+/* the laboratory logo (top bar), read-only: changed on Setup › Parameters */
 .logo-row {
   display: flex;
   gap: var(--sp-4);
@@ -104,21 +104,4 @@ form {
   display: grid;
   gap: 4px;
   min-width: 0;
-}
-
-.logo-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  align-items: center;
-  margin-block-start: var(--sp-1);
-}
-
-.logo-actions label:has(input:focus-visible) {
-  box-shadow: var(--focus-ring);
-}
-
-.logo-actions label.disabled {
-  opacity: 0.6;
-  pointer-events: none;
 }

@@ -89,7 +89,7 @@ export const NAV_REGISTRY: readonly NavEntry[] = [
   { portal: 'client', group: 'shell.group.setup', path: '/organization/branches', permission: 'organization.view', i18nKey: 'shell.nav.branches', release: 'R1', icon: 'building' },
   { portal: 'client', group: 'shell.group.setup', path: '/organization/roles', permission: 'organization.view', i18nKey: 'shell.nav.roles', release: 'R1', icon: 'shield' },
   { portal: 'client', group: 'shell.group.setup', path: '/organization/users', permission: 'identity.view', i18nKey: 'shell.nav.users', release: 'R1', icon: 'user' },
-  { portal: 'client', group: 'shell.group.setup', path: '/organization/parameters', permission: 'settings.view', i18nKey: 'shell.nav.parameters', release: 'R2', icon: 'settings' },
+  { portal: 'client', group: 'shell.group.setup', path: '/organization/parameters', permission: 'settings.view', i18nKey: 'shell.nav.parameters', release: 'R1', icon: 'settings' },
   { portal: 'client', group: 'shell.group.setup', path: '/catalogue/preparations', permission: 'catalogue.view', i18nKey: 'shell.nav.preparations', release: 'R1', icon: 'clipboard' },
   { portal: 'client', group: 'shell.group.setup', path: '/catalogue/comments', permission: 'catalogue.view', i18nKey: 'shell.nav.commentLibrary', release: 'R1', icon: 'inbox' },
   { portal: 'client', group: 'shell.group.setup', path: '/catalogue/doctors', permission: 'catalogue.view', i18nKey: 'shell.nav.doctors', release: 'R1', icon: 'user' },

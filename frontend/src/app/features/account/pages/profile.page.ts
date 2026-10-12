@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import type { AccountLanguage, MyAccountProfile } from '../../../core/api/account.contracts';
-import { ProblemError, type ProblemDetails } from '../../../core/api/problem-details';
+import type { ProblemDetails } from '../../../core/api/problem-details';
 import { LaboratoryBrandService } from '../../../core/brand/laboratory-brand.service';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PortalService } from '../../../core/portal/portal.service';
@@ -18,7 +18,6 @@ import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
-import { AccountApi } from '../data/account.api';
 import { formatDate, formatDateTime, pick } from '../data/account-format';
 import { ProfileFacade } from '../state/profile.facade';
 
@@ -30,7 +29,7 @@ import { ProfileFacade } from '../state/profile.facade';
  */
 @Component({
   selector: 'app-profile-page',
-  imports: [ReactiveFormsModule, SaveShortcutDirective, PageHeaderComponent, SectionCardComponent, FormFieldComponent, BadgeComponent, IconComponent, CanDirective],
+  imports: [ReactiveFormsModule, SaveShortcutDirective, PageHeaderComponent, SectionCardComponent, FormFieldComponent, BadgeComponent, IconComponent, CanDirective, RouterLink],
   templateUrl: './profile.page.html',
   styleUrl: './profile.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -41,10 +40,8 @@ export class ProfilePage {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly portal = inject(PortalService);
-  private readonly api = inject(AccountApi);
-  /** The laboratory logo of the top bar: the page shows the same image and refreshes it after a change. */
+  /** The laboratory logo of the top bar, shown read-only (it is changed on Setup › Parameters). */
   protected readonly brand = inject(LaboratoryBrandService);
-  protected readonly logoBusy = signal(false);
 
   readonly mustChange = input<string | undefined>();
 
@@ -132,38 +129,6 @@ export class ProfilePage {
         // ?mustChange=1 for its portal home, through the guards again (the cached profile was dropped by the facade).
         await this.router.navigateByUrl(this.portal.homePath(), { replaceUrl: true });
       }
-    }
-  }
-
-  /** Uploads the chosen image (settings.manage); the server checks the type and size and answers with a coded refusal. */
-  protected async onLogoSelected(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';   // the same file can be chosen again after a refusal
-    if (file === undefined || this.logoBusy()) {
-      return;
-    }
-
-    await this.logoAction(() => this.api.uploadLaboratoryLogo(file), 'account.profile.logoSaved');
-  }
-
-  protected async removeLogo(): Promise<void> {
-    if (!this.logoBusy()) {
-      await this.logoAction(() => this.api.removeLaboratoryLogo(), 'account.profile.logoRemoved');
-    }
-  }
-
-  private async logoAction(action: () => Promise<unknown>, doneKey: string): Promise<void> {
-    this.logoBusy.set(true);
-    try {
-      await action();
-      this.facade.refresh();
-      this.brand.refresh();
-      this.toast.success(this.i18n.t(doneKey));
-    } catch (error) {
-      this.toast.error(error instanceof ProblemError ? this.problemText(error.problem) : this.i18n.t('account.profile.logoError'));
-    } finally {
-      this.logoBusy.set(false);
     }
   }
 

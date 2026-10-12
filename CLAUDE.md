@@ -360,8 +360,9 @@ QMS source is never read or copied (section 1); everything here is written from 
   every change, removal keeps the file; `LaboratoryLogoFiles` sniffs PNG/JPEG/WebP ≤ 512 KB, ACC-040…045, ACC-403 for the
   platform tenant), `app.laboratory_logos` (RLS), file-store area `account`, `GET/POST/DELETE /api/v1/account/laboratory/logo`
   (read: any member; write: `settings.manage`), `LaboratoryProfile.LogoVersion`. Frontend: `core/brand/laboratory-brand.service.ts`
-  (profile + logo blob → object URL, `refresh()`), `shell/lab-brand.component.ts`, the logo block of `features/account`
-  profile page. The site CSP allows `img-src blob:`; specs that render the profile page stub `LaboratoryBrandService`.
+  (profile + logo blob → object URL, `refresh()`), `shell/lab-brand.component.ts`; the logo is managed on Setup › Parameters
+  (`features/organization/ui/laboratory-logo-card`; the client Parameters page is in Release 1 but shows a laboratory only
+  this card until Release 2, `labParametersOffered`) and shown read-only on the profile page. The site CSP allows `img-src blob:`; specs that render the profile page stub `LaboratoryBrandService`.
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, scheduled jobs and the retention purge, the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).
