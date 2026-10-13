@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -70,6 +71,7 @@ export interface CriteriaChip {
 @Component({
   selector: 'app-results-by-accession-page',
   imports: [
+    NgTemplateOutlet,
     ReactiveFormsModule,
     SaveShortcutDirective,
     PageHeaderComponent,
@@ -129,18 +131,23 @@ export class ResultsByAccessionPage {
     branchOnly: new FormControl(true, { nonNullable: true }),
   });
 
-  /** The matching-visits panel folds away once a case is open (prototype "hide filters"). */
-  protected readonly listCollapsed = signal(false);
-
   /**
-   * The criteria card folds into a one-line summary once a query has answered (change request 2026-10-13 item 4), so the
-   * results get the height; "Change criteria" or a new query unfolds it. Opening a visit leaves it as it is.
+   * While no case is open the page is the query desk: the criteria card folds into a one-line summary once a query has
+   * answered (change request 2026-10-13 item 4) and the matching list takes the width. Once a visit is open, one sticky
+   * context strip replaces the header, the criteria card and the list (results page redesign, 2026-10-13): the criteria
+   * form lives in a dialog (`criteriaOpen`), the matching visits in a side panel (`visitsOpen`) and the visit details
+   * behind a disclosure (`detailsOpen`), so the results grid starts right under the unit tabs.
    */
   protected readonly criteriaCollapsed = signal(false);
+  protected readonly criteriaOpen = signal(false);
+  protected readonly visitsOpen = signal(false);
+  protected readonly detailsOpen = signal(false);
   /** The form values of the last run, from which the summary chips are built (null before the first run). */
   private readonly runCriteria = signal<ReturnType<ResultsByAccessionPage['form']['getRawValue']> | null>(null);
-  /** Set by a run: once its answer is in, the card collapses and the focus moves to the matching visits. */
+  /** Set by a run: once its answer is in, the card collapses and the answer is opened or handed to the keyboard. */
   private readonly collapseWhenAnswered = signal(false);
+  /** Set when a run opens its only match: once the case is in, the keyboard goes to the first editable result. */
+  private readonly focusGridWhenLoaded = signal(false);
 
   protected readonly criteriaChips = computed<readonly CriteriaChip[]>(() => {
     const value = this.runCriteria();
@@ -244,8 +251,7 @@ export class ResultsByAccessionPage {
 
         this.form.patchValue({ accession });
         this.facade.open({ accession });
-        this.listCollapsed.set(true);
-        // a visit opened from a link is "retrieved" too: the card folds to its accession chip (item 4), focus untouched
+        // a visit opened from a link is "retrieved" too: the criteria fold to its accession chip (item 4), focus untouched
         this.runCriteria.set(this.form.getRawValue());
         this.criteriaCollapsed.set(true);
       });
@@ -254,7 +260,8 @@ export class ResultsByAccessionPage {
       this.historyOpen.set(this.facade.historyRow() !== null);
     });
     effect(() => {
-      // item 4: once the query's answer is in (rows or none), fold the criteria and hand the keyboard to the list
+      // item 4: once the query's answer is in (rows or none), fold the criteria; a single match opens by itself and the
+      // keyboard lands on its first editable result; several matches go to the list (card or side panel)
       const answered = this.facade.query() !== null && !this.facade.visits.isLoading() && this.facade.visits.hasValue();
       untracked(() => {
         if (!answered || !this.collapseWhenAnswered()) {
@@ -263,7 +270,29 @@ export class ResultsByAccessionPage {
 
         this.collapseWhenAnswered.set(false);
         this.criteriaCollapsed.set(true);
+        const items = this.visits();
+        if (items.length === 1 && this.visitsTotal() === 1 && items[0]) {
+          this.focusGridWhenLoaded.set(true);
+          this.select(items[0]);
+          return;
+        }
+
+        if (this.current() !== null) {
+          this.visitsOpen.set(true);
+        }
+
         afterNextRender({ read: () => this.focusResults() }, { injector: this.injector });
+      });
+    });
+    effect(() => {
+      const loaded = this.current() !== null;
+      untracked(() => {
+        if (!loaded || !this.focusGridWhenLoaded()) {
+          return;
+        }
+
+        this.focusGridWhenLoaded.set(false);
+        afterNextRender({ read: () => this.focusGrid() }, { injector: this.injector });
       });
     });
   }
@@ -291,8 +320,8 @@ export class ResultsByAccessionPage {
     };
     this.runCriteria.set(value);
     this.collapseWhenAnswered.set(true);
+    this.criteriaOpen.set(false);
     this.facade.run(query);
-    this.listCollapsed.set(false);
   }
 
   protected onRunKey(event: Event): void {
@@ -304,8 +333,11 @@ export class ResultsByAccessionPage {
     this.form.reset();
     this.facade.query.set(null);
     this.facade.close();
-    this.listCollapsed.set(false);
     this.collapseWhenAnswered.set(false);
+    this.focusGridWhenLoaded.set(false);
+    this.criteriaOpen.set(false);
+    this.visitsOpen.set(false);
+    this.detailsOpen.set(false);
     this.expandCriteria();
     void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
   }
@@ -313,7 +345,23 @@ export class ResultsByAccessionPage {
   /** Unfolds the criteria card ("Change criteria") and puts the cursor back on the accession field. */
   protected expandCriteria(): void {
     this.criteriaCollapsed.set(false);
-    afterNextRender({ read: () => this.host.nativeElement.querySelector<HTMLElement>('input[formcontrolname="accession"]')?.focus() }, { injector: this.injector });
+    afterNextRender({ read: () => this.focusAccession() }, { injector: this.injector });
+  }
+
+  /** With a case open, the criteria form opens in a dialog (the strip's "Criteria"), cursor on the accession field. */
+  protected openCriteria(): void {
+    this.criteriaOpen.set(true);
+    afterNextRender({ read: () => this.focusAccession() }, { injector: this.injector });
+  }
+
+  /** With a case open, the matching visits open in a side panel (the strip's "Visits (n)"), focus on the first row. */
+  protected openVisits(): void {
+    this.visitsOpen.set(true);
+    afterNextRender({ read: () => this.focusResults() }, { injector: this.injector });
+  }
+
+  private focusAccession(): void {
+    this.host.nativeElement.querySelector<HTMLElement>('input[formcontrolname="accession"]')?.focus();
   }
 
   /** The keyboard flow after a search: the first matching visit (Enter opens it), else the list itself. */
@@ -322,9 +370,15 @@ export class ResultsByAccessionPage {
     (element.querySelector<HTMLElement>('.visit-list .visit') ?? element.querySelector<HTMLElement>('.visit-list'))?.focus();
   }
 
+  /** After a single match opened by itself: the first editable result cell, else the unit's tab list. */
+  private focusGrid(): void {
+    const element = this.host.nativeElement;
+    (element.querySelector<HTMLElement>('app-result-grid .value-input:not(:disabled)') ?? element.querySelector<HTMLElement>('.unit-bar [role="tab"][tabindex="0"]'))?.focus();
+  }
+
   protected select(item: ResultVisitListItem): void {
     this.facade.open({ accession: item.accession });
-    this.listCollapsed.set(true);
+    this.visitsOpen.set(false);
     void this.router.navigate([], { relativeTo: this.route, queryParams: { accession: item.accession }, replaceUrl: true });
   }
 

@@ -104,9 +104,13 @@ describe('ResultsByAccessionPage (CP-19)', () => {
 
     expect(host.textContent).toContain('Mona Adel');
     expect(host.textContent).toContain('ACC-2026-00001');
+    // redesign 2026-10-13: an open case shows the sticky strip; the matching list and the criteria wait in overlays
     expect(host.querySelector('.visits .visit-list')).toBeNull();
-    // validation 2026-10-11: a visit opened from a link no longer sits under "Matching visits (0)"
-    expect(host.querySelector('.visits')?.textContent).toContain('results.case.matchingTitle');
+    expect(host.querySelector('app-page-header')).toBeNull();
+    expect(host.querySelector('form.query-form')).toBeNull();
+    expect(host.querySelector('.context-strip .case-title')?.textContent).toContain('ACC-2026-00001');
+    // a visit opened from a link ran no query: the strip's visits button carries no count
+    expect(host.querySelector('.open-visits')?.textContent?.trim()).toBe('results.case.visits');
     expect(buttons('results.case.review').length).toBe(0);
     expect(buttons('results.case.verify').length).toBe(0);
     const input = host.querySelector<HTMLInputElement>('app-result-grid .value-input');
@@ -427,7 +431,7 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     const sub = host.querySelector('.case-sub')?.textContent ?? '';
     expect(sub).toContain('٣٦');
     expect(sub).not.toMatch(/\b36\b/);
-    expect(host.querySelector('.unit-title')?.textContent).toContain('×٢');
+    expect(host.querySelector('.unit-meta')?.textContent).toContain('×٢');
     expect(host.querySelector('.case-flags')?.textContent).toContain('٣ وحدات تقرير');
     i18n.setLanguage('en');
   });
@@ -468,24 +472,39 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     expect(chips()).toEqual(['results.case.patientName: mo%', 'results.case.notVerified', 'results.case.branchOnly']);
     expect(document.activeElement).toBe(host.querySelector('.visit-list .visit'));
 
-    // opening a visit keeps the summary (the case gets the height)
+    // opening a visit replaces the header, the criteria and the list with the sticky strip (the case gets the height)
     host.querySelector<HTMLButtonElement>('.visit-list .visit')!.click();
     await render();
     backend.expectOne((call) => call.url === RESULTS_API.results).flush(caseView());
     await render();
-    expect(host.querySelector('.criteria-bar')).not.toBeNull();
+    expect(host.querySelector('.criteria-bar')).toBeNull();
+    expect(host.querySelector('.visits')).toBeNull();
+    expect(host.querySelector('.context-strip')).not.toBeNull();
+    expect(host.querySelector('.open-visits')?.textContent).toContain('results.case.matching');
     expect(host.textContent).toContain('Mona Adel');
 
-    // "Change criteria" unfolds the form with its values and the cursor on the accession field
-    host.querySelector<HTMLButtonElement>('.change-criteria')!.click();
+    // the strip's "Criteria" opens the form in a dialog with its values and the cursor on the accession field
+    host.querySelector<HTMLButtonElement>('.open-criteria')!.click();
     await render();
-    expect(host.querySelector('.criteria-bar')).toBeNull();
+    expect(host.querySelector('app-dialog form.query-form')).not.toBeNull();
     expect(host.querySelector<HTMLInputElement>('input[formcontrolname="patientName"]')?.value).toBe('mo%');
     expect(document.activeElement).toBe(host.querySelector('input[formcontrolname="accession"]'));
 
-    // a query without criteria folds to a single chip; "New query" unfolds again
+    // "Visits (n)" opens the matching list in a side panel with the keyboard on its first row; a row closes it
+    host.querySelector<HTMLButtonElement>('.open-visits')!.click();
+    await render();
+    expect(host.querySelector('app-drawer .visit-list')).not.toBeNull();
+    expect(document.activeElement).toBe(host.querySelector('app-drawer .visit-list .visit'));
+    host.querySelectorAll<HTMLButtonElement>('app-drawer .visit-list .visit')[1]!.click();
+    await render();
+    backend.expectOne((call) => call.url === RESULTS_API.results).flush(caseView());
+    await render();
+    expect(host.querySelector('app-drawer .visit-list')).toBeNull();
+
+    // a query without criteria folds to a single chip; "New query" returns to the query desk
     buttons('results.case.newQuery')[0]!.click();
     await render();
+    expect(host.querySelector('.context-strip')).toBeNull();
     expect(host.querySelector('form.query-form')).not.toBeNull();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F8', bubbles: true }));
     await render();
@@ -493,6 +512,60 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     await render();
     expect(chips()).toEqual(['results.case.branchOnly']);
     expect(document.activeElement).toBe(host.querySelector('.visit-list'));
+    backend.verify();
+  });
+
+  it('opens the only match of a query by itself and puts the keyboard on its first editable result (redesign 2026-10-13)', async () => {
+    granted = new Set(['results.view', 'results.create']);
+    printer = new PrinterStub();
+    await TestBed.configureTestingModule({
+      imports: [ResultsByAccessionPage],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        provideHttpClient(withInterceptors([problemDetailsInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+        { provide: ResultsPrinter, useValue: printer },
+        ResultsCaseFacade,
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ResultsByAccessionPage);
+    backend = TestBed.inject(HttpTestingController);
+    host = fixture.nativeElement as HTMLElement;
+    await render();
+
+    const accession = host.querySelector<HTMLInputElement>('input[formcontrolname="accession"]')!;
+    accession.value = 'acc-2026-00001';
+    accession.dispatchEvent(new Event('input'));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F8', bubbles: true }));
+    await render();
+    backend.expectOne((call) => call.url === RESULTS_API.visits).flush(page([visitItem()]));
+    await render();
+
+    // one match: no list to pick from, the case is requested at once
+    const byAccession = backend.expectOne((call) => call.url === RESULTS_API.results);
+    expect(byAccession.request.params.get('accession')).toBe('ACC-2026-00001');
+    byAccession.flush(caseView([reportUnit([resultRow()])]));
+    await render();
+    expect(host.querySelector('.context-strip')).not.toBeNull();
+    expect(host.querySelector('.open-visits')?.textContent).toContain('results.case.matching');
+    expect(document.activeElement).toBe(host.querySelector('app-result-grid .value-input'));
+
+    // a later query with several matches opens the side panel instead of leaving the case
+    host.querySelector<HTMLButtonElement>('.open-criteria')!.click();
+    await render();
+    const name = host.querySelector<HTMLInputElement>('input[formcontrolname="patientName"]')!;
+    name.value = 'mo%';
+    name.dispatchEvent(new Event('input'));
+    host.querySelector<HTMLFormElement>('app-dialog form.query-form')!.dispatchEvent(new Event('submit'));
+    await render();
+    expect(host.querySelector('app-dialog form.query-form')).toBeNull();
+    backend.expectOne((call) => call.url === RESULTS_API.visits).flush(page([visitItem(), visitItem({ visitId: 'visit-2', accession: 'ACC-2026-00002' })]));
+    await render();
+    expect(host.querySelector('app-drawer .visit-list')).not.toBeNull();
+    expect(document.activeElement).toBe(host.querySelector('app-drawer .visit-list .visit'));
+    expect(host.textContent).toContain('Mona Adel');
     backend.verify();
   });
 });

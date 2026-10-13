@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input, model } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, booleanAttribute, computed, inject, input, model } from '@angular/core';
 
 import { I18nService } from '../../../core/i18n/i18n.service';
 
@@ -23,6 +23,7 @@ let nextTabsId = 0;
   templateUrl: './tabs.component.html',
   styleUrl: './tabs.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.compact]': 'compact()' },
 })
 export class TabsComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
@@ -31,6 +32,8 @@ export class TabsComponent {
 
   readonly tabs = input.required<readonly TabItem[]>();
   readonly active = model<string | null>(null);
+  /** Inline in a toolbar row that draws its own rule (`<app-tabs compact />`): no bottom margin or rule. */
+  readonly compact = input(false, { transform: booleanAttribute });
 
   protected readonly current = computed(() => this.active() ?? this.tabs().find((tab) => !tab.disabled)?.id ?? null);
 

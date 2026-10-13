@@ -234,7 +234,12 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Results by accession: the results start at the top.** With a visit open, one sticky strip (accession, patient, sex and age,
+  VIP / urgent, rights flags, *Details*) replaces the page header, the criteria card and the matching list; *Criteria* opens the
+  query form in a dialog, *Visits (n)* opens the matching visits in a side panel, and the unit tabs, sample chips and the
+  Save / Review / Verify / Undo / Preview / Print buttons share one row above the grid. A query with exactly one match
+  opens it at once with the cursor on the first editable result; several matches go to the list (card or side panel).
+  The first result row moves from roughly 470 px to about 110 px below the top bar.
 
 ### v0.9.1 — 2026-10-13
 

@@ -411,7 +411,11 @@ QMS source is never read or copied (section 1); everything here is written from 
   span ≤ 366 days) with `IWorkAmountNames`; codes `REP-001` (period before the days limit), `REP-002` (invalid period), `REP-003`
   (branch not allowed: neither the session branch, nor assigned, nor `organization.view`); `ReportsController` under `/api/v1/reports`.
   Frontend `features/reporting` (`/reports/work-amount`, nav group Finance), `core/api/reporting.contracts.ts`, dictionaries
-  `reporting.{en,ar}.json`. Results CP-19 folds its criteria card into a chip bar once a query answers (`criteriaCollapsed`).
+  `reporting.{en,ar}.json`. Results CP-19 (redesign 2026-10-13): with no case open the page is the query desk (header, criteria card folding into a chip bar
+  once a query answers, `criteriaCollapsed`, matching list full width); with a case open one sticky `.context-strip` (accession, patient,
+  flags, *Details* disclosure, *Criteria* → the form in an `app-dialog`, *Visits (n)* → the list in an `app-drawer`, *New query*)
+  replaces them and the unit tabs (`<app-tabs compact />`), sample chips and action buttons share `.unit-bar`; a query with exactly
+  one match opens it (`focusGridWhenLoaded` → first editable cell), several matches go to the list (card or side panel).
 - Wallet charge run (W2, intake PLT-001 §16 Q11): `WalletChargeJob` (Infrastructure `Jobs/`, hosted by `WalletChargeHostedService`,
   `Lis:Jobs:WalletCharge:{Enabled,PollInterval}`, default on / 1 h; `ApiFactory` turns it off) charges each due Active client's plan fee once
   per period (row-version guarded, no migration) through `WalletCharger`; `POST /api/v1/platform/wallets/charge-run` = SA-05 "Run charges now".

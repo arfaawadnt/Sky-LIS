@@ -120,6 +120,8 @@
   "case.hideList": "إخفاء الزيارات",
   "case.criteria": "المعايير",
   "case.changeCriteria": "تعديل المعايير",
+  "case.visits": "الزيارات",
+  "case.details": "التفاصيل",
   "case.allVisits": "أحدث الزيارات، بدون معايير",
   "case.searchError": "تعذر البحث عن الزيارات.",
   "case.unitsPart": "{count} وحدات تقرير",

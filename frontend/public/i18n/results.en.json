@@ -118,6 +118,8 @@
   "case.hideList": "Hide visits",
   "case.criteria": "Criteria",
   "case.changeCriteria": "Change criteria",
+  "case.visits": "Visits",
+  "case.details": "Details",
   "case.allVisits": "latest visits, no criteria",
   "case.searchError": "The visits could not be searched.",
   "case.unitsPart": "{count} report units",

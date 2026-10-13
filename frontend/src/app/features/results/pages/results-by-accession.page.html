@@ -1,272 +1,288 @@
-<app-page-header [title]="i18n.t('results.case.title')" [subtitle]="i18n.t('results.case.subtitle')">
-  <button pageActions type="button" class="btn ghost" (click)="newQuery()">{{ i18n.t('results.case.newQuery') }}</button>
-</app-page-header>
-
-<app-section-card class="query" [padded]="true">
-  @if (criteriaCollapsed()) {
-    <div class="criteria-bar" role="group" [attr.aria-label]="i18n.t('results.case.criteria')">
-      <span class="small muted">{{ i18n.t('results.case.criteria') }}:</span>
-      <ul class="chips">
-        @for (chip of criteriaChips(); track chip.key) {
-          <li class="tag">@if (chip.label) {<span class="chip-key">{{ chip.label }}: </span>}{{ chip.value }}</li>
-        }
-      </ul>
-      <button type="button" class="btn sm ghost change-criteria" (click)="expandCriteria()"><app-icon name="search" [size]="14" />{{ i18n.t('results.case.changeCriteria') }}</button>
+@if (current(); as view) {
+  <div class="context-strip" role="region" [attr.aria-label]="i18n.t('results.case.title')">
+    <div class="strip-row">
+      <div class="strip-main">
+        <h2 class="case-title">
+          <span class="mono">{{ view.visit.accession }}</span>
+          <span class="strip-name">{{ patientName(view) }}</span>
+          @if (view.patient.isVip) {
+            <app-badge tone="violet">VIP</app-badge>
+          }
+          @if (view.visit.urgent) {
+            <app-badge tone="bad">{{ i18n.t('results.urgent') }}</app-badge>
+          }
+        </h2>
+        <span class="case-sub small muted"><span class="mono">{{ view.patient.number ?? '—' }}</span> · {{ gender(view) }} · {{ patientAge(view) }}</span>
+        <span class="case-flags small muted">
+          @if (view.settings.reviewBeforeVerify) {
+            <span class="tag">{{ i18n.t('results.case.reviewBeforeVerify') }}</span>
+          }
+          @if (view.settings.printUnverified) {
+            <span class="tag">{{ i18n.t('results.case.printUnverified') }}</span>
+          }
+          @if (view.hiddenUnits > 0) {
+            <span class="tag">{{ countText('results.case.hiddenUnits', view.hiddenUnits) }}</span>
+          }
+        </span>
+        <button type="button" class="btn sm ghost details-toggle" [attr.aria-expanded]="detailsOpen()" aria-controls="case-details" (click)="detailsOpen.set(!detailsOpen())">
+          <app-icon name="info" [size]="14" />{{ i18n.t('results.case.details') }}
+        </button>
+      </div>
+      <div class="strip-actions">
+        <button type="button" class="btn sm open-criteria" (click)="openCriteria()"><app-icon name="search" [size]="14" />{{ i18n.t('results.case.criteria') }}</button>
+        <button type="button" class="btn sm open-visits" (click)="openVisits()">
+          <app-icon name="layers" [size]="14" />{{ facade.query() === null ? i18n.t('results.case.visits') : i18n.tf('results.case.matching', { count: num(visitsTotal()) }) }}
+        </button>
+        <button type="button" class="btn sm ghost" (click)="newQuery()">{{ i18n.t('results.case.newQuery') }}</button>
+      </div>
     </div>
-  } @else {
-    <form class="query-form" [formGroup]="form" (ngSubmit)="runQuery()" novalidate>
-      <label class="field">
-        <span>{{ i18n.t('results.case.accession') }}</span>
-        <input class="inp" type="text" formControlName="accession" autocomplete="off" spellcheck="false" />
-      </label>
-      <label class="field">
-        <span>{{ i18n.t('results.case.patientNumber') }}</span>
-        <input class="inp" type="text" formControlName="patientNumber" autocomplete="off" />
-      </label>
-      <label class="field">
-        <span>{{ i18n.t('results.case.patientName') }}</span>
-        <input class="inp" type="text" formControlName="patientName" autocomplete="off" [placeholder]="i18n.t('results.case.wildcardHint')" />
-      </label>
-      <label class="field">
-        <span>{{ i18n.t('results.case.testStatus') }}</span>
-        <select class="inp" formControlName="status">
-          <option value="">{{ i18n.t('results.all') }}</option>
-          @for (status of statuses; track status) {
-            <option [value]="status">{{ statusLabel(status) }}</option>
-          }
-        </select>
-      </label>
-      <label class="field">
-        <span>{{ i18n.t('results.case.sampleStatus') }}</span>
-        <select class="inp" formControlName="sampleStatus">
-          <option value="">{{ i18n.t('results.all') }}</option>
-          @for (status of sampleStatuses; track status) {
-            <option [value]="status">{{ sampleStatusLabel(status) }}</option>
-          }
-        </select>
-      </label>
-      <label class="field">
-        <span>{{ i18n.t('results.case.registeredFrom') }}</span>
-        <input class="inp" type="date" formControlName="fromDay" />
-      </label>
-      <label class="field">
-        <span>{{ i18n.t('results.case.registeredTo') }}</span>
-        <input class="inp" type="date" formControlName="toDay" />
-      </label>
-      <div class="field boxes" role="group" [attr.aria-label]="i18n.t('results.case.filters')">
-        <span>{{ i18n.t('results.case.filters') }}</span>
-        <div class="box-row">
-          <label class="check"><input type="checkbox" formControlName="notPrinted" />{{ i18n.t('results.case.notPrinted') }}</label>
-          <label class="check"><input type="checkbox" formControlName="notVerified" />{{ i18n.t('results.case.notVerified') }}</label>
-          <label class="check"><input type="checkbox" formControlName="delta" />{{ i18n.t('results.case.deltaOnly') }}</label>
-          <label class="check"><input type="checkbox" formControlName="branchOnly" />{{ i18n.t('results.case.branchOnly') }}</label>
-        </div>
-      </div>
-      <div class="field actions">
-        <span aria-hidden="true">&nbsp;</span>
-        <button type="submit" class="btn primary"><app-icon name="search" [size]="15" />{{ i18n.t('results.case.run') }}</button>
-      </div>
-    </form>
-    <p class="help small muted">{{ i18n.t('results.case.queryHelp') }}</p>
-  }
-</app-section-card>
-
-<div class="split" [class.collapsed]="listCollapsed()">
-  <app-section-card class="visits" [title]="matchingTitle()" [padded]="false">
-    @if (current()) {
-      <button cardActions type="button" class="btn sm ghost" (click)="listCollapsed.set(!listCollapsed())">
-        {{ listCollapsed() ? i18n.t('results.case.showList') : i18n.t('results.case.hideList') }}
-      </button>
-    }
-    @if (!listCollapsed()) {
-      @if (facade.visits.error()) {
-        <p class="problem list-problem" role="alert">{{ i18n.t('results.case.searchError') }}</p>
-      }
-      <ul class="visit-list" tabindex="-1">
-        @for (item of visits(); track item.visitId) {
-          <li>
-            <button type="button" class="visit" [class.active]="current()?.visit?.visitId === item.visitId" (click)="select(item)">
-              <span class="line"><b class="mono">{{ item.accession }}</b><app-badge [status]="item.status">{{ statusLabel(item.status) }}</app-badge></span>
-              <span class="line small">{{ visitLabel(item) }} · {{ item.patientNumber ?? '' }}</span>
-              <span class="line small muted">
-                {{ at(item.registeredAtUtc) }} · {{ unitsLine(item) }}
-                @if (item.hasPanic) {
-                  <app-badge tone="bad">{{ i18n.t('results.grid.panic') }}</app-badge>
-                }
-                @if (item.hasDelta) {
-                  <app-badge tone="warn">Δ</app-badge>
-                }
-                @if (item.anyPrinted) {
-                  <app-icon name="printer" [size]="13" />
-                }
-              </span>
-            </button>
-          </li>
-        } @empty {
-          <li class="empty-item">
-            @if (facade.query() === null) {
-              <app-empty-state [title]="i18n.t('results.case.start')" [message]="i18n.t('results.case.startHint')" icon="search" />
-            } @else if (facade.visits.isLoading()) {
-              <p class="muted small">{{ i18n.t('results.loading') }}</p>
-            } @else {
-              <app-empty-state [title]="i18n.t('results.case.noMatch')" [message]="i18n.t('results.case.noMatchHint')" icon="inbox" />
-            }
-          </li>
+    @if (detailsOpen()) {
+      <p class="strip-details small muted" id="case-details">
+        @if (view.patient.conditionNameEn || view.patient.conditionNameAr) {
+          <b>{{ name(view.patient.conditionNameEn, view.patient.conditionNameAr) }}</b> ·
         }
-      </ul>
-      @if (visitsTotal() > 0) {
-        <app-paginator [page]="facade.query()?.page ?? 1" [pageSize]="facade.query()?.pageSize ?? 40" [totalCount]="visitsTotal()" (pageChange)="onVisitsPage($event)" />
-      }
+        {{ name(view.visit.branchNameEn, view.visit.branchNameAr) }} · {{ at(view.visit.registeredAtUtc) }} ·
+        {{ i18n.t('results.case.doctor') }}: {{ name(view.visit.doctorNameEn, view.visit.doctorNameAr) }} · {{ i18n.t('results.case.payer') }}: {{ name(view.visit.payerNameEn, view.visit.payerNameAr) }}
+      </p>
+    }
+  </div>
+} @else {
+  <app-page-header [title]="i18n.t('results.case.title')" [subtitle]="i18n.t('results.case.subtitle')">
+    <button pageActions type="button" class="btn ghost" (click)="newQuery()">{{ i18n.t('results.case.newQuery') }}</button>
+  </app-page-header>
+
+  <app-section-card class="query" [padded]="true">
+    @if (criteriaCollapsed()) {
+      <div class="criteria-bar" role="group" [attr.aria-label]="i18n.t('results.case.criteria')">
+        <span class="small muted">{{ i18n.t('results.case.criteria') }}:</span>
+        <ul class="chips">
+          @for (chip of criteriaChips(); track chip.key) {
+            <li class="tag">@if (chip.label) {<span class="chip-key">{{ chip.label }}: </span>}{{ chip.value }}</li>
+          }
+        </ul>
+        <button type="button" class="btn sm ghost change-criteria" (click)="expandCriteria()"><app-icon name="search" [size]="14" />{{ i18n.t('results.case.changeCriteria') }}</button>
+      </div>
+    } @else {
+      <ng-container *ngTemplateOutlet="criteriaForm" />
     }
   </app-section-card>
 
-  <section class="case" appSaveShortcut (appSaveShortcut)="saveActive()">
-    @if (caseProblem(); as problem) {
-      <p class="problem" role="alert">{{ problem }}</p>
-    }
-    @if (current(); as view) {
-      <app-section-card class="head" [padded]="true">
-        <div class="case-head">
-          <div>
-            <h2 class="case-title">
-              {{ patientName(view) }} · <span class="mono">{{ view.visit.accession }}</span>
-              @if (view.patient.isVip) {
-                <app-badge tone="violet">VIP</app-badge>
-              }
-              @if (view.visit.urgent) {
-                <app-badge tone="bad">{{ i18n.t('results.urgent') }}</app-badge>
-              }
-            </h2>
-            <p class="case-sub small muted">
-              <span class="mono">{{ view.patient.number ?? '—' }}</span> · {{ gender(view) }} · {{ patientAge(view) }}
-              @if (view.patient.conditionNameEn || view.patient.conditionNameAr) {
-                · <b>{{ name(view.patient.conditionNameEn, view.patient.conditionNameAr) }}</b>
-              }
-              · {{ name(view.visit.branchNameEn, view.visit.branchNameAr) }} · {{ at(view.visit.registeredAtUtc) }}
-            </p>
-            <p class="case-sub small muted">
-              {{ i18n.t('results.case.doctor') }}: {{ name(view.visit.doctorNameEn, view.visit.doctorNameAr) }} · {{ i18n.t('results.case.payer') }}: {{ name(view.visit.payerNameEn, view.visit.payerNameAr) }}
-            </p>
-          </div>
-          <div class="case-flags small muted">
-            @if (view.settings.reviewBeforeVerify) {
-              <span class="tag">{{ i18n.t('results.case.reviewBeforeVerify') }}</span>
-            }
-            @if (view.settings.printUnverified) {
-              <span class="tag">{{ i18n.t('results.case.printUnverified') }}</span>
-            }
-            @if (view.hiddenUnits > 0) {
-              <span class="tag">{{ countText('results.case.hiddenUnits', view.hiddenUnits) }}</span>
-            }
-          </div>
-        </div>
+  <app-section-card class="visits" [title]="matchingTitle()" [padded]="false">
+    <ng-container *ngTemplateOutlet="visitList" />
+  </app-section-card>
+}
+
+<section class="case" appSaveShortcut (appSaveShortcut)="saveActive()">
+  @if (caseProblem(); as problem) {
+    <p class="problem" role="alert">{{ problem }}</p>
+  }
+  @if (current(); as view) {
+    @if (view.units.length === 0) {
+      <app-section-card>
+        <app-empty-state [title]="i18n.t('results.case.noUnits')" [message]="i18n.t('results.case.noUnitsHint')" icon="flask" />
       </app-section-card>
-
-      @if (view.units.length === 0) {
-        <app-section-card>
-          <app-empty-state [title]="i18n.t('results.case.noUnits')" [message]="i18n.t('results.case.noUnitsHint')" icon="flask" />
-        </app-section-card>
-      } @else {
-        <app-section-card class="units" [padded]="false">
-          <div class="tabs-row"><app-tabs [tabs]="tabs()" [(active)]="facade.activeUnitKey" /></div>
+    } @else {
+      <app-section-card class="units" [padded]="false">
+        <div class="unit-bar">
+          <app-tabs [tabs]="tabs()" [(active)]="facade.activeUnitKey" compact />
           @if (unit(); as unit) {
-            <div class="unit" role="tabpanel">
-              <div class="unit-head">
-                <div class="unit-titles">
-                  <h3 class="unit-title">
-                    {{ unitName(unit) }}
-                    <app-badge [status]="unit.status">{{ statusLabel(unit.status) }}</app-badge>
-                    @if (unit.isPrinted) {
-                      <app-badge tone="neutral"><app-icon name="printer" [size]="12" />{{ i18n.tf('results.case.printedTimes', { count: num(unit.printCount) }) }}</app-badge>
-                    }
-                    @if (unit.hasPanic) {
-                      <app-badge tone="bad">{{ i18n.t('results.grid.panic') }}</app-badge>
-                    }
-                    @if (unit.hasDelta) {
-                      <app-badge tone="warn">Δ {{ i18n.t('results.case.delta') }}</app-badge>
-                    }
-                    @if (unit.printAloneServiceId) {
-                      <span class="tag">{{ i18n.t('results.case.printAlone') }}</span>
-                    }
-                  </h3>
-                  <p class="small muted samples">
-                    {{ i18n.t('results.case.samples') }}:
-                    @for (sample of unit.samples; track sample.tubeId) {
-                      <span class="sample"><span class="mono">{{ sample.sampleNumber ?? '—' }}</span>
-                        @if (sample.status) {
-                          <app-badge [status]="sample.status">{{ sampleStatusLabel(sample.status) }}</app-badge>
-                        }
-                      </span>
-                    } @empty {
-                      <span>—</span>
-                    }
-                    @if (unit.hasMissingValues) {
-                      <span class="tag">{{ i18n.t('results.case.missingValues') }}</span>
-                    }
-                  </p>
-                </div>
-                <div class="unit-actions">
-                  @if (canEnter(unit)) {
-                    <button type="button" class="btn sm primary" [disabled]="busy() || facade.dirtyCount() === 0" (click)="save(unit)"><app-icon name="check" [size]="14" />{{ i18n.t('results.case.save') }}@if (facade.dirtyCount() > 0) { ({{ num(facade.dirtyCount()) }}) }</button>
+            <p class="unit-meta small muted">
+              @for (sample of unit.samples; track sample.tubeId) {
+                <span class="sample"><span class="mono">{{ sample.sampleNumber ?? '—' }}</span>
+                  @if (sample.status) {
+                    <app-badge [status]="sample.status">{{ sampleStatusLabel(sample.status) }}</app-badge>
                   }
-                  @if (canReview(unit)) {
-                    <button type="button" class="btn sm soft" [disabled]="busy()" (click)="review(unit)">{{ i18n.t('results.case.review') }}</button>
-                  }
-                  @if (canVerify(unit)) {
-                    <button type="button" class="btn sm ok" [disabled]="busy()" (click)="verify(unit)"><app-icon name="check" [size]="14" />{{ i18n.t('results.case.verify') }}</button>
-                  }
-                  @if (canUndo(unit)) {
-                    <button type="button" class="btn sm" [disabled]="busy()" (click)="undo(unit)">{{ i18n.t('results.case.undo') }}</button>
-                  }
-                  @if (canPreview()) {
-                    <button type="button" class="btn sm ghost" [disabled]="busy()" (click)="preview(unit)"><app-icon name="eye" [size]="14" />{{ i18n.t('results.case.preview') }}</button>
-                  }
-                  @if (canPrint(unit)) {
-                    <button
-                      type="button"
-                      class="btn sm"
-                      [disabled]="busy() || printBlocked(view)"
-                      [attr.title]="printBlocked(view) ? i18n.t('results.case.printVipBlocked') : null"
-                      (click)="print(unit)"
-                    ><app-icon name="printer" [size]="14" />{{ i18n.t('results.case.print') }}</button>
-                  }
-                </div>
-              </div>
-
-              <app-result-grid
-                [unit]="unit"
-                [drafts]="facade.drafts()"
-                [refusals]="facade.refusals()"
-                [canEdit]="canEnter(unit)"
-                [canAnnotate]="canAnnotate()"
-                [canAmend]="canAmend(unit)"
-                [canAcknowledge]="canAcknowledge(unit)"
-                (draftChange)="onDraft($event)"
-                (culture)="openCulture($event)"
-                (textReport)="openText($event)"
-                (history)="openHistory($event)"
-                (comment)="openComment($event)"
-                (note)="openNote($event)"
-                (acknowledge)="openAcknowledge($event)"
-                (amend)="openAmend($event)"
-              />
-              @if (canPrint(unit) && printBlocked(view)) {
-                <p class="unit-foot small muted vip-print" role="note">{{ i18n.t('results.case.printVipBlocked') }}</p>
+                </span>
+              } @empty {
+                <span>{{ i18n.t('results.case.samples') }}: —</span>
               }
-              <p class="unit-foot small muted">{{ i18n.t('results.case.gridHelp') }}</p>
+              @if (unit.isPrinted) {
+                <app-badge tone="neutral"><app-icon name="printer" [size]="12" />{{ i18n.tf('results.case.printedTimes', { count: num(unit.printCount) }) }}</app-badge>
+              }
+              @if (unit.hasPanic) {
+                <app-badge tone="bad">{{ i18n.t('results.grid.panic') }}</app-badge>
+              }
+              @if (unit.hasDelta) {
+                <app-badge tone="warn">Δ {{ i18n.t('results.case.delta') }}</app-badge>
+              }
+              @if (unit.printAloneServiceId) {
+                <span class="tag">{{ i18n.t('results.case.printAlone') }}</span>
+              }
+              @if (unit.hasMissingValues) {
+                <span class="tag">{{ i18n.t('results.case.missingValues') }}</span>
+              }
+            </p>
+            <div class="unit-actions">
+              @if (canEnter(unit)) {
+                <button type="button" class="btn sm primary" [disabled]="busy() || facade.dirtyCount() === 0" (click)="save(unit)"><app-icon name="check" [size]="14" />{{ i18n.t('results.case.save') }}@if (facade.dirtyCount() > 0) { ({{ num(facade.dirtyCount()) }}) }</button>
+              }
+              @if (canReview(unit)) {
+                <button type="button" class="btn sm soft" [disabled]="busy()" (click)="review(unit)">{{ i18n.t('results.case.review') }}</button>
+              }
+              @if (canVerify(unit)) {
+                <button type="button" class="btn sm ok" [disabled]="busy()" (click)="verify(unit)"><app-icon name="check" [size]="14" />{{ i18n.t('results.case.verify') }}</button>
+              }
+              @if (canUndo(unit)) {
+                <button type="button" class="btn sm" [disabled]="busy()" (click)="undo(unit)">{{ i18n.t('results.case.undo') }}</button>
+              }
+              @if (canPreview()) {
+                <button type="button" class="btn sm ghost" [disabled]="busy()" (click)="preview(unit)"><app-icon name="eye" [size]="14" />{{ i18n.t('results.case.preview') }}</button>
+              }
+              @if (canPrint(unit)) {
+                <button
+                  type="button"
+                  class="btn sm"
+                  [disabled]="busy() || printBlocked(view)"
+                  [attr.title]="printBlocked(view) ? i18n.t('results.case.printVipBlocked') : null"
+                  (click)="print(unit)"
+                ><app-icon name="printer" [size]="14" />{{ i18n.t('results.case.print') }}</button>
+              }
             </div>
           }
-        </app-section-card>
-      }
-    } @else if (facade.caseView.isLoading()) {
-      <app-section-card><p class="muted small" role="status">{{ i18n.t('results.loading') }}</p></app-section-card>
-    } @else if (!caseProblem()) {
-      <app-section-card>
-        <app-empty-state [title]="i18n.t('results.case.selectVisit')" [message]="i18n.t('results.case.selectVisitHint')" icon="flask" />
+        </div>
+        @if (unit(); as unit) {
+          <div class="unit" role="tabpanel">
+            <app-result-grid
+              [unit]="unit"
+              [drafts]="facade.drafts()"
+              [refusals]="facade.refusals()"
+              [canEdit]="canEnter(unit)"
+              [canAnnotate]="canAnnotate()"
+              [canAmend]="canAmend(unit)"
+              [canAcknowledge]="canAcknowledge(unit)"
+              (draftChange)="onDraft($event)"
+              (culture)="openCulture($event)"
+              (textReport)="openText($event)"
+              (history)="openHistory($event)"
+              (comment)="openComment($event)"
+              (note)="openNote($event)"
+              (acknowledge)="openAcknowledge($event)"
+              (amend)="openAmend($event)"
+            />
+            @if (canPrint(unit) && printBlocked(view)) {
+              <p class="unit-foot small muted vip-print" role="note">{{ i18n.t('results.case.printVipBlocked') }}</p>
+            }
+            <p class="unit-foot small muted">{{ i18n.t('results.case.gridHelp') }}</p>
+          </div>
+        }
       </app-section-card>
     }
-  </section>
-</div>
+  } @else if (facade.caseView.isLoading()) {
+    <app-section-card><p class="muted small" role="status">{{ i18n.t('results.loading') }}</p></app-section-card>
+  }
+</section>
+
+<ng-template #criteriaForm>
+  <form class="query-form" [formGroup]="form" (ngSubmit)="runQuery()" novalidate>
+    <label class="field">
+      <span>{{ i18n.t('results.case.accession') }}</span>
+      <input class="inp" type="text" formControlName="accession" autocomplete="off" spellcheck="false" />
+    </label>
+    <label class="field">
+      <span>{{ i18n.t('results.case.patientNumber') }}</span>
+      <input class="inp" type="text" formControlName="patientNumber" autocomplete="off" />
+    </label>
+    <label class="field">
+      <span>{{ i18n.t('results.case.patientName') }}</span>
+      <input class="inp" type="text" formControlName="patientName" autocomplete="off" [placeholder]="i18n.t('results.case.wildcardHint')" />
+    </label>
+    <label class="field">
+      <span>{{ i18n.t('results.case.testStatus') }}</span>
+      <select class="inp" formControlName="status">
+        <option value="">{{ i18n.t('results.all') }}</option>
+        @for (status of statuses; track status) {
+          <option [value]="status">{{ statusLabel(status) }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span>{{ i18n.t('results.case.sampleStatus') }}</span>
+      <select class="inp" formControlName="sampleStatus">
+        <option value="">{{ i18n.t('results.all') }}</option>
+        @for (status of sampleStatuses; track status) {
+          <option [value]="status">{{ sampleStatusLabel(status) }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span>{{ i18n.t('results.case.registeredFrom') }}</span>
+      <input class="inp" type="date" formControlName="fromDay" />
+    </label>
+    <label class="field">
+      <span>{{ i18n.t('results.case.registeredTo') }}</span>
+      <input class="inp" type="date" formControlName="toDay" />
+    </label>
+    <div class="field boxes" role="group" [attr.aria-label]="i18n.t('results.case.filters')">
+      <span>{{ i18n.t('results.case.filters') }}</span>
+      <div class="box-row">
+        <label class="check"><input type="checkbox" formControlName="notPrinted" />{{ i18n.t('results.case.notPrinted') }}</label>
+        <label class="check"><input type="checkbox" formControlName="notVerified" />{{ i18n.t('results.case.notVerified') }}</label>
+        <label class="check"><input type="checkbox" formControlName="delta" />{{ i18n.t('results.case.deltaOnly') }}</label>
+        <label class="check"><input type="checkbox" formControlName="branchOnly" />{{ i18n.t('results.case.branchOnly') }}</label>
+      </div>
+    </div>
+    <div class="field actions">
+      <span aria-hidden="true">&nbsp;</span>
+      <button type="submit" class="btn primary"><app-icon name="search" [size]="15" />{{ i18n.t('results.case.run') }}</button>
+    </div>
+  </form>
+  <p class="help small muted">{{ i18n.t('results.case.queryHelp') }}</p>
+</ng-template>
+
+<ng-template #visitList>
+  @if (facade.visits.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('results.case.searchError') }}</p>
+  }
+  <ul class="visit-list" tabindex="-1">
+    @for (item of visits(); track item.visitId) {
+      <li>
+        <button type="button" class="visit" [class.active]="current()?.visit?.visitId === item.visitId" (click)="select(item)">
+          <span class="line"><b class="mono">{{ item.accession }}</b><app-badge [status]="item.status">{{ statusLabel(item.status) }}</app-badge></span>
+          <span class="line small">{{ visitLabel(item) }} · {{ item.patientNumber ?? '' }}</span>
+          <span class="line small muted">
+            {{ at(item.registeredAtUtc) }} · {{ unitsLine(item) }}
+            @if (item.hasPanic) {
+              <app-badge tone="bad">{{ i18n.t('results.grid.panic') }}</app-badge>
+            }
+            @if (item.hasDelta) {
+              <app-badge tone="warn">Δ</app-badge>
+            }
+            @if (item.anyPrinted) {
+              <app-icon name="printer" [size]="13" />
+            }
+          </span>
+        </button>
+      </li>
+    } @empty {
+      <li class="empty-item">
+        @if (facade.query() === null) {
+          <app-empty-state [title]="i18n.t('results.case.start')" [message]="i18n.t('results.case.startHint')" icon="search" />
+        } @else if (facade.visits.isLoading()) {
+          <p class="muted small">{{ i18n.t('results.loading') }}</p>
+        } @else {
+          <app-empty-state [title]="i18n.t('results.case.noMatch')" [message]="i18n.t('results.case.noMatchHint')" icon="inbox" />
+        }
+      </li>
+    }
+  </ul>
+  @if (visitsTotal() > 0) {
+    <app-paginator [page]="facade.query()?.page ?? 1" [pageSize]="facade.query()?.pageSize ?? 40" [totalCount]="visitsTotal()" (pageChange)="onVisitsPage($event)" />
+  }
+</ng-template>
+
+<app-dialog [(open)]="criteriaOpen" [title]="i18n.t('results.case.criteria')" size="lg">
+  @if (criteriaOpen()) {
+    <ng-container *ngTemplateOutlet="criteriaForm" />
+  }
+</app-dialog>
+
+<app-drawer [(open)]="visitsOpen" [title]="matchingTitle()" size="md">
+  @if (visitsOpen()) {
+    <div class="visits drawer-list">
+      <ng-container *ngTemplateOutlet="visitList" />
+    </div>
+  }
+</app-drawer>
 
 <app-drawer [(open)]="historyOpen" (closed)="closeHistory()" [title]="i18n.t('results.history.title')" size="md">
   @if (historyOpen()) {

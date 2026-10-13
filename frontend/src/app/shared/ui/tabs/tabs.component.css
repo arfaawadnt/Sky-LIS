@@ -8,6 +8,14 @@
   border-bottom: 1px solid var(--line);
   margin-bottom: var(--sp-4);
   overflow-x: auto;
+  /* the tabs overlap the rule by 1px (margin-bottom: -1px): without this, overflow-x: auto turns that into a scrollbar */
+  overflow-y: hidden;
+}
+
+/* `compact`: inline in a toolbar row that draws its own rule (results unit bar) — no margin, no rule of its own. */
+:host(.compact) .tabs {
+  margin-bottom: 0;
+  border-bottom: 0;
 }
 
 .tab {
