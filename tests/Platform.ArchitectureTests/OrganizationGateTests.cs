@@ -16,6 +16,22 @@ public sealed partial class OrganizationGateTests
     private static IReadOnlyList<string> HandlerBodies(string source) =>
         HandlerStart().Split(source).Skip(1).ToList();
 
+    /// <summary>
+    /// Validation F-07: a laboratory role holds only the keys a laboratory may grant (ORG-033 refuses the platform-only modules on
+    /// every later save). The development seeds build laboratory roles from <c>EffectivePrivileges.TenantGrantableKeys</c>; the
+    /// whole catalogue is the platform administrator's alone (<c>PlatformAdministratorSeeder</c>).
+    /// </summary>
+    [Fact]
+    public void Development_seeds_never_give_a_laboratory_role_the_whole_catalogue()
+    {
+        var devTools = Source("tools", "Platform.DevTools", "Program.cs");
+        var roleCreations = RoleCreation().Matches(devTools).Select(match => match.Value).ToList();
+
+        Assert.NotEmpty(roleCreations);
+        Assert.All(roleCreations, call => Assert.DoesNotContain("PermissionCatalog.Keys", call, StringComparison.Ordinal));
+        Assert.Contains(roleCreations, call => call.Contains("EffectivePrivileges.TenantGrantableKeys", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Every_access_administration_handler_refuses_the_actor_as_target()
     {
@@ -54,4 +70,7 @@ public sealed partial class OrganizationGateTests
 
     [GeneratedRegex(@"public sealed class \w+Handler\(")]
     private static partial Regex HandlerStart();
+
+    [GeneratedRegex(@"Role\.Create(ForTenant)?\([^;]*;", RegexOptions.Singleline)]
+    private static partial Regex RoleCreation();
 }

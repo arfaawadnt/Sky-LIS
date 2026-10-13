@@ -4,7 +4,7 @@
 | --- | --- |
 | Module | `treasury` (Sky LIS Client Portal, pages CP-28 Treasuries, CP-29 Treasury access; business rule BR-27) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001) because the TASK 5 intake slot was left blank. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.0 — 2026-10-09 |
+| Version | 1.1 — 2026-10-12 (validation v0.5.0 D-05, O-4, O-5, O-10; see the revision history at the end) |
 | Implemented in | `src/Platform.Domain/Treasury`, `src/Platform.Application/Treasury`, `src/Platform.Infrastructure/Persistence/Treasury`, `src/Platform.WebApi/Controllers/Treasury`, `frontend/src/app/features/treasury` |
 
 ## 1. Purpose and policy basis
@@ -21,7 +21,7 @@ treasury access request (request → approve / reject / cancel, approve → revo
 other modules consult.
 
 Out of scope (later intakes): cash sessions, shifts and the payment itself (the Payments module reacts to the events
-of this module); device fingerprinting beyond the browser-minted device id; notification channels.
+of this module); device fingerprinting beyond the browser-minted device id (one per user and browser profile, Q1); notification channels.
 
 ## 3. Glossary
 
@@ -70,13 +70,13 @@ A request is **live** while Pending or Approved.
 
 | # | From → To | Action | Actor (permission) | Preconditions (codes) | SoD | Gate | Reason | Events | System? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| T1 | — → Pending | Request | `treasury.create` | treasury exists (TRS-404) and is active (TRS-010); device id present (TRS-011); no live request for the same user, treasury and device (TRS-012) | — | — | — | `TreasuryAccessRequested` | no |
+| T1 | — → Pending | Request | `treasury.create` | treasury exists (TRS-404) and is active (TRS-010); the treasury's branch is one of the requester's branches, or the requester works in every branch (TRS-015, Q3); device id present (TRS-011); no live request for the same user, treasury and device (TRS-012) | — | — | — | `TreasuryAccessRequested` | no |
 | T2 | Pending → Approved | Approve | `treasury.approve` | state Pending (TRS-013) | SOD-TRS-001 | G1 | optional comment | `TreasuryAccessApproved` | no |
 | T3 | Pending → Rejected | Reject | `treasury.approve` | state Pending (TRS-013) | SOD-TRS-001 | — | **required** (TRS-020) | `TreasuryAccessRejected` | no |
 | T4 | Approved → Revoked | Revoke | `treasury.approve` | state Approved (TRS-014) | — | — | **required** (TRS-021) | `TreasuryAccessRevoked` | no |
 | T5 | Pending → Cancelled | Cancel | `treasury.cancel` | state Pending (TRS-013); actor is the requester (TRS-030) | — | — | optional | `TreasuryAccessCancelled` | no |
 | T6 | — → Treasury active | Create treasury | `treasury.manage` | code valid (TRS-001), unique in tenant (TRS-100); name (TRS-002) and branch (TRS-003) present | — | — | — | `TreasuryCreated` | no |
-| T7 | Treasury | Rename | `treasury.manage` | name present (TRS-002) | — | — | — | — | no |
+| T7 | Treasury | Rename | `treasury.manage` | name present (TRS-002) | — | — | — | `TreasuryUpdated` (only when the name changed) | no |
 | T8 | active → inactive | Deactivate | `treasury.manage` | — | — | — | — | `TreasuryDeactivated` | no |
 | T9 | inactive → active | Reactivate | `treasury.manage` | — | — | — | — | `TreasuryReactivated` | no |
 
@@ -90,6 +90,7 @@ A request is **live** while Pending or Approved.
 | INV-TRS-004 | Reject and revoke carry a non-empty reason | aggregate | TRS-020 / TRS-021 | "A rejection/revocation needs a reason." |
 | INV-TRS-005 | An inactive treasury accepts no new request | aggregate (`Request` factory) | TRS-010 | "The treasury is inactive." |
 | INV-TRS-006 | Only the requester cancels | aggregate (`Cancel`) | TRS-030 | "Only the requester can cancel a request." |
+| INV-TRS-008 | A user requests access only to a treasury of a branch they may work in (an empty branch assignment = every branch) — **assumption, Q3** | aggregate guard `TreasuryAccessRequest.EnsureRequesterWorksIn` with the branches of the session principal (handler) | TRS-015 (422; the client shows it under the treasury field) | "This treasury belongs to a branch you are not assigned to." |
 | INV-TRS-007 | A request number is unique per tenant | unique index `(tenant_id, number)`; numbers come from a per-tenant, per-year counter under `INSERT … ON CONFLICT DO UPDATE` | — | — |
 
 ## 9. Segregation-of-duties rules
@@ -134,7 +135,8 @@ Timing:   within one outbox cycle
 Event:    TreasuryAccessRejected { …, RejectedByUserId, Reason }      Raised by: T3   Reacts: Notifications (requester)
 Event:    TreasuryAccessRevoked  { …, RevokedByUserId, DeviceId, Reason }   Raised by: T4   Reacts: Payments — "when revoked, then close the device's open cash session on that treasury"
 Event:    TreasuryAccessCancelled { RequestId, Number, TreasuryId, RequestedByUserId, TenantId }   Raised by: T5   Reacts: none
-Event:    TreasuryCreated / TreasuryDeactivated / TreasuryReactivated { TreasuryId, Code, TenantId }   Raised by: T6 / T8 / T9   Reacts: none yet
+Event:    TreasuryCreated / TreasuryUpdated / TreasuryDeactivated / TreasuryReactivated { TreasuryId, Code, TenantId }   Raised by: T6 / T7 / T8 / T9   Reacts: none yet
+          (TreasuryUpdated since validation v0.5.0 O-5: a rename is an event of the audit trail, beside its field changes)
 ```
 
 All events are written to `ops.outbox_events` in the same commit as the state change; cross-module reactions are
@@ -161,7 +163,8 @@ Treasuries are tenant reference data maintained with `treasury.manage`. No tenan
 | Register | Filters | Columns | Who |
 | --- | --- | --- | --- |
 | Treasuries | active flag, page | code, name en/ar, branch, active | `treasury.view` |
-| Access requests | status, treasury, "mine only", page | number, treasury (code + name), requested by, device (label or id), status, requested at, decided by, decided at | `treasury.view` |
+| Access requests | status, treasury, "mine only", page | number, treasury (code + name), requested by, device (label or id), status, requested at, decided by, decided at, **approval comment and decision reason** (validation v0.5.0 D-05; on the requester's and the approver's rows) | `treasury.view` |
+| Access requests CSV | the filters of the register (status, "mine only") | number, treasury, requested by, device label, device id, status, requested at, decided by, decided at, approval comment, decision reason | `treasury.export` |
 | Request detail | — | all of the above + approval (approver, time, comment), decision reason | `treasury.view` |
 
 ## 15. Notifications and escalations
@@ -224,6 +227,15 @@ Scenario S-AUTHZ: any command without the permission
   When the user calls the endpoint
   Then the API answers 403 AUTHZ-001 before the handler runs
 
+Scenario S-T1-branch: a treasury outside the requester's branches (Q3 assumption, validation v0.5.0 O-4)
+  Given a user assigned to branch NORTH only and an active treasury of branch EAST
+  When the user requests access to it
+  Then the attempt is refused with TRS-015 (422) and nothing is recorded; a user of every branch may request it
+
+Scenario S-O10: two people on one browser
+  Given user A approved on treasury T from device D
+  When user B, on the same browser, opens the cash desk
+  Then B presents B's own device id, T is not usable for B, and B's own request needs its own approval
 Scenario S-TENANT: isolation
   Given treasuries and requests of tenant X
   When a user of tenant Y lists or reads them
@@ -234,11 +246,18 @@ Open questions (assumed answers let the build proceed; confirm or change):
 
 | # | Question | Assumed answer |
 | --- | --- | --- |
-| Q1 | How is the "device" identified? The SRS cited by the prototypes is not in the repo. | An opaque id minted once per browser profile and stored locally; the server binds the approval to it. Hardware fingerprinting is out of scope. |
+| Q1 | How is the "device" identified? The SRS cited by the prototypes is not in the repo. | An opaque id minted once per **user and browser profile** and stored locally (one `localStorage` entry `lis.device-id` holding a map user id → device id; the only web-storage use of the SPA). The server binds the approval to (user, treasury, device), so two people sharing a browser each need their own approval, and the approval binds the person on that device, not the browser (validation v0.5.0 O-10; until v0.7.2 one id per browser profile, which the first user of the browser keeps). Hardware fingerprinting is out of scope. |
 | Q2 | Does an approval expire? | No; it is revoked explicitly (T4). |
-| Q3 | Must the approver belong to the treasury's branch? | No; any holder of `treasury.approve` in the tenant. |
+| Q3 | Must the approver belong to the treasury's branch? May a user ask for access to a treasury of any branch? | Approver: no; any holder of `treasury.approve` in the tenant. Requester (**assumption awaiting the business owner**, validation v0.5.0 O-4): only to the treasuries of the branches assigned to their membership; a user assigned to every branch may ask for any. The request picker offers only those treasuries and the server refuses the others with TRS-015. |
 | Q4 | Does approval need a fresh password proof (step-up)? | No. |
 | Q5 | May a cashier hold approvals on several treasuries from one device? | Yes; the uniqueness is per (user, treasury, device). |
 | Q6 | Retention of request history | With the tenant's financial records (10 years). |
 | Q7 | Who is notified, and how? | Nobody yet; events are raised for the Notifications intake. |
 | Q8 | Does the payment screen check the approval at payment time? | Yes, by the Payments module through a policy/query on live approvals (BR-27); not part of this intake. |
+
+## Revision history
+
+| Version | Date | Change |
+| --- | --- | --- |
+| 1.0 | 2026-10-09 | First intake, derived from the Business SRS. |
+| 1.1 | 2026-10-12 | Validation v0.5.0: approval comment and decision reason on the request rows and in the new CSV export (D-05); requests limited to the requester's branches, TRS-015, INV-TRS-008 (O-4, Q3 assumption); `TreasuryUpdated` on a rename (O-5); one device id per user and browser profile (O-10, Q1). |

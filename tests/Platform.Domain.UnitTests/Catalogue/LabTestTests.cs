@@ -124,6 +124,20 @@ public sealed class LabTestTests
     }
 
     [Fact]
+    public void T16_A_value_that_is_both_Normal_and_Critical_is_refused_CAT_061()
+    {
+        var test = Test(LabTestType.RestrictedList);
+
+        var refusal = Assert.Throws<DomainException>(() => test.ReplaceListValues([Value("Yellow"), Value("Red", isNormal: true, isCritical: true)], Now));
+
+        Assert.Equal(LabTestCodes.ListValueNormalAndCritical, refusal.Code);
+        Assert.StartsWith("Value 2:", refusal.Message, StringComparison.Ordinal);
+        Assert.Empty(test.ListValues);   // nothing replaced
+        test.ReplaceListValues([Value("Yellow"), Value("Red", isNormal: false, isCritical: true), Value("Clear", isNormal: false)], Now);
+        Assert.Equal(3, test.ListValues.Count);
+    }
+
+    [Fact]
     public void T16_List_values_are_distinct_and_well_formed_CAT_057_and_only_on_list_tests_CAT_056()
     {
         var test = Test(LabTestType.OptionalList);

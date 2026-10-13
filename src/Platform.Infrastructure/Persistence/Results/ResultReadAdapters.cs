@@ -240,13 +240,6 @@ internal sealed class ResultReferenceLookup(AppDbContext context) : IResultRefer
     }
 }
 
-/// <summary>The dashboard figures of the results (CP-05) for other modules; system read, not limited by result rights.</summary>
-internal sealed class ResultKpiLookup(AppDbContext context, IClock clock) : IResultKpiLookup
-{
-    public Task<ResultKpis> ForBranchAsync(Guid? branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken) =>
-        new ResultRepository(context).KpisAsync(branchId, fromUtc, toUtc, clock.UtcNow, cancellationToken);
-}
-
 /// <summary>The real adapter of Registration's port (MODULES.md §5): a line with a Verified or Printed result cannot be cancelled (CP-10 / CP-26).</summary>
 internal sealed class ResultStatusLookup(AppDbContext context) : IResultStatusLookup
 {

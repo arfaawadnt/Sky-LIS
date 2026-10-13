@@ -19,6 +19,15 @@ environment name.
 | `Lis:Jwt:SubjectEncryptionKey` | 32 random bytes, base64 (D-02) | `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
 | `Lis:Jwt:PreviousSubjectEncryptionKeys:0…` | previous 32-byte keys during a rotation overlap | the key being retired |
 | `Lis:DataProtection:MasterKey` | 32 random bytes, base64; protects envelope keys at rest | as above |
+| `Lis:Notifications:Smtp:UserName`, `Lis:Notifications:Smtp:Password` | optional: SMTP submission account (only with `Smtp:Host`; STARTTLS required off loopback) | issued by the mail provider |
+| `Lis:Notifications:Sms:ApiKey` | optional: API key of the HTTP SMS gateway, sent in the header `Lis:Notifications:Sms:ApiKeyHeader` (only with `Sms:Url`) | issued by the SMS provider |
+
+Notification delivery (`Lis:Notifications:*`, runbook §8 / §8.1) needs no secret on a host without a gateway: the
+pickup directory (`PickupDirectory`; dev `E:\LIS\.local\mail-pickup`, validation stack `E:\LIS\.local\mail-pickup\validation`,
+production `E:\lis-data\mail-pickup`) receives one text file per message, one-time codes included, so it is never
+committed (`.local/` is git-ignored) and on a server it is readable by SYSTEM, Administrators and the service account
+only (`install-api-service.ps1`). In development a gateway is tried with user-secrets, never with appsettings:
+`dotnet user-secrets set "Lis:Notifications:Sms:ApiKey" "<key>" --project src/Platform.WebApi`.
 
 Development shortcut (stores everything in the WebApi user-secrets store, prints nothing secret):
 

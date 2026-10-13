@@ -8,6 +8,9 @@ public static class SettingCodes
 {
     public const string UnknownKey = "SET-001";
     public const string InvalidValue = "SET-002";
+
+    /// <summary>A well-formed time-zone name this host does not know, e.g. <c>Mars/Olympus</c> (validation LIS-VR-002 round 4).</summary>
+    public const string UnknownTimeZone = "SET-003";
 }
 
 /// <summary>The storage type of a setting value; every value is stored as text and parsed by its descriptor.</summary>
@@ -29,7 +32,7 @@ public abstract class SettingDescriptor
     public const int MaxValueLength = 200;
     public const int MaxTimeZoneLength = 64;
 
-    protected SettingDescriptor(string key, SettingType type, string defaultValue, string description)
+    protected SettingDescriptor(string key, SettingType type, string defaultValue, string description, bool isTimeZone = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
@@ -42,6 +45,7 @@ public abstract class SettingDescriptor
         Type = type;
         DefaultValue = defaultValue;
         Description = description;
+        IsTimeZone = isTimeZone;
     }
 
     public string Key { get; }
@@ -52,6 +56,9 @@ public abstract class SettingDescriptor
     public string DefaultValue { get; }
 
     public string Description { get; }
+
+    /// <summary>True for an IANA time-zone setting: a well-formed name the host does not know is refused with <c>SET-003</c>.</summary>
+    public bool IsTimeZone { get; }
 
     /// <summary>True when <paramref name="value"/> is a well-formed, in-range value for this setting (the stored text form).</summary>
     public abstract bool IsValid(string value);
@@ -68,7 +75,7 @@ public abstract class SettingDescriptor
 
     /// <summary>An IANA time zone name this host knows (<c>Africa/Cairo</c>), at most 64 characters, stored as text (round 2 R2-01).</summary>
     public static SettingDescriptor<string> TimeZone(string key, string defaultValue, string description) =>
-        new(key, SettingType.String, defaultValue, description, text => (true, text), IsIanaTimeZone);
+        new(key, SettingType.String, defaultValue, description, text => (true, text), IsIanaTimeZone, isTimeZone: true);
 
     /// <summary>True for an IANA zone id this host resolves (the rule of a country's zone, GEO-007).</summary>
     public static bool IsIanaTimeZone(string value) =>
@@ -82,8 +89,8 @@ public sealed class SettingDescriptor<T> : SettingDescriptor
     private readonly Func<string, (bool Ok, T Value)> _parse;
     private readonly Func<T, bool> _inRange;
 
-    internal SettingDescriptor(string key, SettingType type, T defaultValue, string description, Func<string, (bool, T)> parse, Func<T, bool> inRange)
-        : base(key, type, Format(defaultValue), description)
+    internal SettingDescriptor(string key, SettingType type, T defaultValue, string description, Func<string, (bool, T)> parse, Func<T, bool> inRange, bool isTimeZone = false)
+        : base(key, type, Format(defaultValue), description, isTimeZone)
     {
         Default = defaultValue;
         _parse = parse;
@@ -107,6 +114,13 @@ public sealed class SettingDescriptor<T> : SettingDescriptor
         var (ok, parsed) = _parse(value.Trim());
         return ok && _inRange(parsed) ? parsed : Default;
     }
+
+    /// <summary>
+    /// The effective value of a tenant: its own valid value, else the inherited (platform) valid value, else the default —
+    /// the rule <c>ITenantSettings</c> applies (intake LIS-INT-FND-001 §6), for readers that load the two rows themselves.
+    /// </summary>
+    public T Resolve(string? own, string? inherited) =>
+        own is not null && IsValid(own) ? Parse(own) : inherited is not null && IsValid(inherited) ? Parse(inherited) : Default;
 
     public override bool IsValid(string value)
     {
@@ -163,7 +177,7 @@ public static class SettingKeys
     public static readonly SettingDescriptor<int> DelayLatePercent = SettingDescriptor.Int("delayLatePercent", 100, "Share of the turnaround consumed at which a test is shown as late (BR-13).", 0, 1000);
 
     // Security and platform defaults (SA-19)
-    public static readonly SettingDescriptor<int> SessionTimeoutMinutes = SettingDescriptor.Int("sessionTimeoutMinutes", 30, "Idle minutes before the client locks the screen.", 1, 720);
+    public static readonly SettingDescriptor<int> SessionTimeoutMinutes = SettingDescriptor.Int("sessionTimeoutMinutes", 30, "Idle minutes before the session ends: the client warns a minute before and signs out; the server refuses a later refresh (AUTH-017).", 1, 720);
     public static readonly SettingDescriptor<int> OtpLength = SettingDescriptor.Int("otpLength", 6, "Digits of a one-time code sent by the tenant's flows.", 4, 10);
     public static readonly SettingDescriptor<int> PasswordMinLength = SettingDescriptor.Int("passwordMinLength", 8, "Minimum password length for the tenant's users.", 8, 64);
     public static readonly SettingDescriptor<int> TrialDays = SettingDescriptor.Int("trialDays", 14, "Trial period of a new subscription, in days.", 0, 365);
@@ -196,12 +210,20 @@ public static class SettingKeys
 
     public static bool IsKnown(string key) => Find(key) is not null;
 
-    /// <summary>Validates one stored value against its descriptor: <c>SET-001</c> for an unknown key, <c>SET-002</c> for a malformed or out-of-range value.</summary>
+    /// <summary>
+    /// Validates one stored value against its descriptor: <c>SET-001</c> for an unknown key, <c>SET-003</c> for a time-zone
+    /// name (non-blank, at most 64 characters) the host does not know, <c>SET-002</c> for any other malformed or out-of-range value.
+    /// </summary>
     public static SettingDescriptor Validate(string key, string value)
     {
         var descriptor = Find(key) ?? throw new DomainException(SettingCodes.UnknownKey, $"Unknown setting '{key}'.", DomainFault.Validation);
         if (value is null || !descriptor.IsValid(value))
         {
+            if (descriptor.IsTimeZone && !string.IsNullOrWhiteSpace(value) && value.Trim().Length <= SettingDescriptor.MaxTimeZoneLength)
+            {
+                throw new DomainException(SettingCodes.UnknownTimeZone, $"'{value.Trim()}' is not a time zone this host knows for '{key}' (an IANA name such as Africa/Cairo).", DomainFault.Validation);
+            }
+
             throw new DomainException(SettingCodes.InvalidValue, $"'{value}' is not a valid {descriptor.Type} value for '{key}'.", DomainFault.Validation);
         }
 

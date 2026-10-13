@@ -273,6 +273,19 @@ public sealed class Patient : AggregateRoot, ITenantScoped
         return new string(value);
     }
 
+    /// <summary>
+    /// The digits a mobile search looks for (validation v0.5.0 F-08): with the laboratory's national mobile length, a number
+    /// typed with the trunk 0 (<c>0</c> + that many digits, e.g. <c>01019199912</c> in Egypt) is searched without it, so a
+    /// "contains" match finds the file whether it was stored with the 0 or without it; any other text is searched as typed.
+    /// </summary>
+    public static string MobileSearchDigits(string digits, int? nationalLength)
+    {
+        ArgumentNullException.ThrowIfNull(digits);
+        return nationalLength is { } length && length > 0 && digits.Length == length + 1 && digits[0] == '0' && digits[1] != '0' && digits.All(char.IsAsciiDigit)
+            ? digits[1..]
+            : digits;
+    }
+
     /// <summary>A national id as stored: spaces and dashes removed, upper case, 5–32 letters or digits; <see langword="null"/> when blank; PAT-010 otherwise.</summary>
     public static string? CleanNationalId(string? nationalId)
     {

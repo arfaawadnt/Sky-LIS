@@ -16,6 +16,8 @@
   "releaseTwo": "Release 2",
   "switchLanguage": "Switch language",
   "userMenu": "Account menu",
+  "changeBranch": "Change branch",
+  "currentBranch": "Current branch",
   "portal.client": "Client Portal",
   "portal.admin": "Super Admin",
   "group.overview": "Overview",

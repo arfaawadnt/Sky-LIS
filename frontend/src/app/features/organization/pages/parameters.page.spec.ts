@@ -4,6 +4,10 @@ import { type WritableSignal, provideZonelessChangeDetection, signal } from '@an
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import organizationAr from '../../../../../public/i18n/organization.ar.json';
+import organizationEn from '../../../../../public/i18n/organization.en.json';
+import platformAr from '../../../../../public/i18n/platform.ar.json';
+import platformEn from '../../../../../public/i18n/platform.en.json';
 import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
 import type { TenantSettingItem } from '../../../core/api/settings.contracts';
 import { LaboratoryBrandService } from '../../../core/brand/laboratory-brand.service';
@@ -97,6 +101,61 @@ describe('ParametersPage (CP-57)', () => {
     expect(put.request.body).toEqual({ settings: [{ key: 'mandatoryMobile', value: 'true' }] });
     put.flush({ settings: [item('mandatoryMobile', 'Bool', 'true', 'false')] });
     backend.verify();
+  });
+
+  it('validation F-13: "Use default" sends a removal, and auto-collect and auto-receive stay locked', async () => {
+    const fixture = TestBed.createComponent(ParametersPage);
+    await flush();
+    backend.expectOne(ORGANIZATION_API.settings).flush({
+      settings: [
+        // the state F-13 left behind: laboratory rows that hold the default value
+        { ...item('sessionTimeoutMinutes', 'Int', '30', '30'), isDefault: false, updatedAtUtc: '2026-10-12T13:14:54Z', inheritedValue: '30' },
+        { ...item('autoCollect', 'Bool', 'true', 'true'), isDefault: false, updatedAtUtc: '2026-10-12T13:14:54Z', inheritedValue: 'true' },
+        item('autoReceive', 'Bool', 'true', 'true'),
+        item('labelCopies', 'Int', '1', '1'),
+      ],
+    });
+    await flush();
+    const host = fixture.nativeElement as HTMLElement;
+    const useDefault = (key: string): HTMLButtonElement | undefined =>
+      [...(host.querySelector(`#parameter-${key}`)?.closest('li')?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((button) => button.textContent?.includes('organization.parameters.useDefault'));
+
+    expect(useDefault('labelCopies')).toBeUndefined();   // no value of its own
+    useDefault('sessionTimeoutMinutes')?.click();
+    useDefault('autoCollect')?.click();   // a locked key may go back to its default (On)
+    await flush();
+    expect(useDefault('sessionTimeoutMinutes')).toBeUndefined();   // the removal is pending
+    expect(host.querySelector<HTMLInputElement>('#parameter-autoCollect')?.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('#parameter-autoReceive')?.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('#parameter-autoCollect')?.checked).toBe(true);
+
+    [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('organization.save'))?.click();
+    await flush();
+    const put = backend.expectOne({ method: 'PUT', url: ORGANIZATION_API.settings });
+    expect(put.request.body).toEqual({ settings: [{ key: 'sessionTimeoutMinutes', value: null }, { key: 'autoCollect', value: null }] });
+    put.flush({ settings: [item('sessionTimeoutMinutes', 'Int', '30', '30'), item('autoCollect', 'Bool', 'true', 'true'), item('autoReceive', 'Bool', 'true', 'true'), item('labelCopies', 'Int', '1', '1')] });
+    await flush();
+
+    expect(host.querySelector<HTMLInputElement>('#parameter-autoCollect')?.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('#parameter-autoReceive')?.disabled).toBe(true);
+    expect(useDefault('sessionTimeoutMinutes')).toBeUndefined();
+    backend.verify();
+  });
+
+  it('names the session timeout as a sign-out after inactivity in both languages, in both portals (G1 idle watcher)', () => {
+    for (const dictionary of [organizationEn, platformEn] as Record<string, string>[]) {
+      expect(dictionary['parameters.key.sessionTimeoutMinutes']).toBe('Sign-out after inactivity (minutes)');
+      expect(dictionary['parameters.hint.sessionTimeoutMinutes']).toMatch(/signs out/);
+    }
+
+    for (const dictionary of [organizationAr, platformAr] as Record<string, string>[]) {
+      expect(dictionary['parameters.key.sessionTimeoutMinutes']).toBe('تسجيل الخروج بعد عدم النشاط (دقائق)');
+      expect(dictionary['parameters.hint.sessionTimeoutMinutes']).not.toMatch(/قفل/);
+    }
+
+    for (const dictionary of [organizationEn, platformEn] as Record<string, string>[]) {
+      expect(dictionary['parameters.hint.sessionTimeoutMinutes']).not.toMatch(/lock/i);
+    }
   });
 
   it('validates values against their descriptor before sending', () => {

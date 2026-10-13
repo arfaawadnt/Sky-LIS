@@ -1,6 +1,7 @@
 {
   "title": "Sign in",
   "subtitle": "Your password is sealed in the browser before it is sent.",
+  "sessionEndedIdle": "Your session ended after inactivity. Sign in again to continue.",
   "username": "Username",
   "password": "Password",
   "tenant": "Laboratory",

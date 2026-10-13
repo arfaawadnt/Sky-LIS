@@ -298,6 +298,7 @@ Open questions (assumed answers let the build proceed; confirm or change):
 | Q16 | A payment committed in the very instant a closing of the same period is being saved | Not counted in that closing but frozen by it; closings are taken at the end of the shift with `to` = now. |
 | Q17 | Retention | With the tenant's financial records (10 years). |
 | Q18 | Cashiers without `settings.view` cannot read `autoPrintReceipt` through `/api/v1/settings` | The SPA falls back to the code default (`true`); integrator to decide whether an authenticated read of print parameters is exposed. |
+| Q19 | Digits of amounts and dates (validation v0.5.0 F-09, 2026-10-12) | **Decision.** On screen an Arabic page writes amounts, counts and dates in Arabic-Indic digits like the rest of the portal (`formatMoney`, `formatDateTime`, `formatCount`); the receipt, refund receipt, invoice and closing sheet keep Latin digits in both languages (`formatPrintMoney`, `formatPrintDateTime`), and the CSV exports are written by the server in Latin digits. Counted texts take their Arabic forms ("زيارتان", "٧ إيصالات", "١٢ إيصالًا"; F-11). |
 
 Integration dependencies (wave 1/2 modules built in parallel; placeholders marked `[FallbackAdapter]`):
 

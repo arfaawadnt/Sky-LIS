@@ -146,6 +146,26 @@ public sealed class Visit : AggregateRoot, ITenantScoped
     /// <summary>The service ids of the live lines, package members included (INV-REG-002).</summary>
     public IReadOnlySet<Guid> LiveServiceIds => _lines.Where(line => line.IsLive).Select(line => line.ServiceId).ToHashSet();
 
+    /// <summary>
+    /// The tests already ordered on the live lines, each with the service that orders it (validation O-3, test-level
+    /// duplicates): the line's code, or "PACKAGE › MEMBER" for a package member. The first holder wins.
+    /// </summary>
+    public IReadOnlyDictionary<Guid, string> LiveTestHolders()
+    {
+        var holders = new Dictionary<Guid, string>();
+        foreach (var line in _lines.Where(line => line.IsLive).OrderBy(line => line.Sequence))
+        {
+            var parent = line.ParentLineId is { } parentId ? _lines.FirstOrDefault(candidate => candidate.Id == parentId) : null;
+            var holder = parent is null ? line.ServiceCode : $"{parent.ServiceCode} › {line.ServiceCode}";
+            foreach (var testId in line.TestIds)
+            {
+                holders.TryAdd(testId, holder);
+            }
+        }
+
+        return holders;
+    }
+
     /// <summary>V1 Register (<c>registration.create</c>): header checks, lines, tubes (BR-02), answers, discount, totals; raises <see cref="VisitRegistered"/>.</summary>
     public static Visit Register(
         VisitRegistration registration,

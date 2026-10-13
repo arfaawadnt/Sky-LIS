@@ -165,7 +165,7 @@ internal sealed class DoctorRepository(AppDbContext context) : Repository<Doctor
     }
 
     private static IReadOnlyList<DoctorListItem> Map(IReadOnlyList<Doctor> rows) =>
-        rows.Select(row => new DoctorListItem(row.Id, row.Code, row.Name.En, row.Name.Ar, row.Specialty, row.Occupation, row.BranchIds, row.SharePercent, row.Phone, row.IsActive)).ToList();
+        rows.Select(row => new DoctorListItem(row.Id, row.Code, row.Name.En, row.Name.Ar, row.Specialty, row.Occupation, row.BranchIds, row.SharePercent, row.Phone, row.IsActive, [])).ToList();   // Branches: joined by the query handlers (DoctorBranches)
 }
 
 internal sealed class DiagnosisRepository(AppDbContext context) : Repository<Diagnosis>(context), IDiagnosisRepository

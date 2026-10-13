@@ -84,9 +84,11 @@ public sealed class GetResultCaseHandler(
         var hiddenUnits = scoped.Select(result => result.ReportUnitKey).Distinct().Count() - visible.Select(result => result.ReportUnitKey).Distinct().Count();
         var context = await new ResultReadContextLoader(catalogue, samples, users).LoadAsync(visible, cancellationToken);
         var header = await new ResultHeaderLoader(patients, visits, references, doctors).LoadAsync(scoped[0], cancellationToken);
+        // F-06: an opened VIP case reads "VIP patient" without the See-VIP right, like the lists (A-03, RES Q19).
+        var patientView = ResultVip.IsMasked(header.Patient, privileges) ? ResultVip.Mask(header.PatientView) : header.PatientView;
         return new ResultCaseView(
             header.VisitView,
-            header.PatientView,
+            patientView,
             ResultViews.Units(visible, context, privileges),
             hiddenUnits,
             scanned,
@@ -127,8 +129,15 @@ public sealed class SearchResultVisitsValidator : AbstractValidator<SearchResult
     }
 }
 
+/// <summary>
+/// CP-19 matching visits. VIP rule A-03 (assumption awaiting the business owner, RES Q19): without the See-VIP special
+/// right a VIP row reads "VIP patient" with no Arabic name and a name search does not find it; the accession, sample and
+/// patient number still do. The case, once opened, stays masked too (F-06, <see cref="ResultVip"/>).
+/// </summary>
 public sealed class SearchResultVisitsHandler(IResultRepository results, IPatientLookup patients, IUserPrivileges privileges, ICurrentUser user) : IQueryHandler<SearchResultVisitsQuery, Paged<ResultVisitListItem>>
 {
+    public const string MaskedName = ResultVip.MaskedName;
+
     public async Task<Paged<ResultVisitListItem>> Handle(SearchResultVisitsQuery query, CancellationToken cancellationToken)
     {
         var page = PageRequest.Normalized(query.Page, query.PageSize);
@@ -138,6 +147,7 @@ public sealed class SearchResultVisitsHandler(IResultRepository results, IPatien
             return Paged<ResultVisitListItem>.Empty(page);
         }
 
+        var canSeeVip = privileges.SpecialRights.CanSeeVip;
         var filter = new ResultVisitFilter(
             Clean(query.Accession),
             Clean(query.PatientNumber),
@@ -150,13 +160,17 @@ public sealed class SearchResultVisitsHandler(IResultRepository results, IPatien
             query.Delta,
             query.From,
             query.To,
-            query.BranchOnly ? user.BranchId : null);
+            query.BranchOnly ? user.BranchId : null,
+            canSeeVip);
         var rows = await results.SearchVisitsAsync(filter, visibility, page, cancellationToken);
         var names = await patients.GetManyAsync([.. rows.Items.Select(row => row.PatientId).Distinct()], cancellationToken);
         var items = rows.Items.Select(row =>
         {
             var patient = names.GetValueOrDefault(row.PatientId);
-            return new ResultVisitListItem(row.VisitId, row.Accession, row.RegisteredAtUtc, row.PatientId, patient?.Number, patient?.FullName, patient?.NameAr, row.BranchId, row.Status.ToString(), row.Results, row.Units, row.HasPanic, row.HasDelta, row.AnyPrinted);
+            var masked = patient is { IsVip: true } && !canSeeVip;
+            return new ResultVisitListItem(
+                row.VisitId, row.Accession, row.RegisteredAtUtc, row.PatientId, patient?.Number, masked ? MaskedName : patient?.FullName, masked ? null : patient?.NameAr,
+                row.BranchId, row.Status.ToString(), row.Results, row.Units, row.HasPanic, row.HasDelta, row.AnyPrinted, masked);
         }).ToList();
         return new Paged<ResultVisitListItem>(items, rows.Page, rows.PageSize, rows.TotalCount);
     }

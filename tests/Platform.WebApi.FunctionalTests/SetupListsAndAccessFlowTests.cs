@@ -21,6 +21,7 @@ using Platform.Contracts.PlatformAdmin;
 using Platform.Domain.Organization;
 using Platform.SharedKernel.MultiTenancy;
 using Platform.WebApi.FunctionalTests.Support;
+using Platform.TestSupport;
 
 namespace Platform.WebApi.FunctionalTests;
 
@@ -53,7 +54,6 @@ public sealed class SetupListsAndAccessFlowTests(ApiFactory factory) : IClassFix
     /// <summary>The Super Admin readers of the platform registers (clients, reference data, integration library); <c>tenancy.manage</c> creates the countries of the order test.</summary>
     private static readonly string[] PlatformReader = ["tenancy.view", "tenancy.manage", "notifications.view", "integration.view"];
 
-    private static int _isoCounter;
 
     [DatabaseFact]
     public async Task A_restricted_branch_choice_without_a_branch_is_refused_on_create_and_on_assign()
@@ -315,8 +315,7 @@ public sealed class SetupListsAndAccessFlowTests(ApiFactory factory) : IClassFix
     {
         for (var attempt = 0; attempt < 60; attempt++)
         {
-            var n = Interlocked.Increment(ref _isoCounter);
-            var iso = $"{(n / 26 % 2 == 0 ? 'V' : 'Y')}{(char)('A' + (n % 26))}";   // V? and Y? are used by no other test
+            var iso = TestCountryCodes.Next();
             var created = await platform.PostAsJsonAsync("/api/v1/platform/countries", new CountryRequest("Sortland " + iso, "أرض الترتيب", iso, "+20", "Pound", "EGP", "ar", "Africa/Cairo", 10, null, null));
             if (created.StatusCode == HttpStatusCode.Created)
             {

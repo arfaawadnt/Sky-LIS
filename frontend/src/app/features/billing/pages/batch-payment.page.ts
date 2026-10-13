@@ -23,7 +23,7 @@ import { BatchPaymentFacade } from '../state/batch-payment.facade';
 import { BillingPrinter } from '../state/billing-printer';
 import { CashDeskFacade } from '../state/cash-desk.facade';
 import { BALANCE_TONES } from '../ui/account-summary.component';
-import { formatMoney, roundMoney } from '../ui/billing-format';
+import { formatCount, formatMoney, roundMoney } from '../ui/billing-format';
 import { problemOf } from '../ui/billing-view';
 import { MovementFormComponent, type MovementInput } from '../ui/movement-form.component';
 
@@ -154,7 +154,7 @@ export class BatchPaymentPage {
       return;
     }
 
-    this.toast.success(this.i18n.tf('billing.batch.paidAll', { count: result.payments.length, amount: this.money(result.amount) }));
+    this.toast.success(this.i18n.tc('billing.batch.paidAll', result.payments.length, { count: this.num(result.payments.length), amount: this.money(result.amount) }));
     this.resetForms();   // UAT A-06
     if (this.desk.shouldAutoPrint()) {
       await this.run(() => this.printer.receipts(result.payments.map((payment) => payment.paymentId)));
@@ -187,6 +187,11 @@ export class BatchPaymentPage {
 
   protected money(value: number): string {
     return formatMoney(value, this.i18n.lang());
+  }
+
+  /** A count in the page language's digits (validation v0.5.0 F-09). */
+  protected num(value: number): string {
+    return formatCount(value, this.i18n.lang());
   }
 
   protected problemText(problem: { code: string } | null): string {

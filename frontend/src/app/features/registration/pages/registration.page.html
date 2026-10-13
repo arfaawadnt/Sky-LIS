@@ -1,4 +1,4 @@
-<app-page-header [title]="title()" [subtitle]="facade.isEdit() ? i18n.t('registration.editSubtitle') + ' · ' + branchName() : i18n.t('registration.deskSubtitle')">
+<app-page-header [title]="title()" [subtitle]="subtitle()">
   <button pageActions type="button" class="btn ghost" *appCan="permissions.create" (click)="clear()">{{ i18n.t(facade.isEdit() ? 'registration.newRegistration' : 'registration.clear') }}</button>
   @if (facade.isEdit()) {
     <a pageActions class="btn" [routerLink]="['/registration/visits', facade.visitId(), 'job-order']"><app-icon name="printer" [size]="15" />{{ i18n.t('registration.jobOrder.title') }}</a>
@@ -387,7 +387,7 @@
       @if (done.patient) {
         <p>{{ done.patient.number }} · {{ name(done.patient.fullName, done.patient.nameAr) }}</p>
       }
-      <p class="small muted">{{ i18n.tf('registration.success.tubes', { count: done.visit.tubeCount }) }}</p>
+      <p class="small muted">{{ tubesText(done.visit.tubeCount) }}</p>
       @if (done.payment; as payment) {
         <p class="info-strip">{{ i18n.tf('registration.success.paid', { amount: amount(done.amount), receipt: payment.receiptNumber }) }}</p>
       } @else if (done.paymentProblem; as problem) {

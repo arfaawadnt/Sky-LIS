@@ -4,7 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import type { AuthResponse, TenantChoice } from '../../../core/api/auth.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { isLoginRoute } from '../../../core/auth/session-navigation';
+import { IDLE_REASON, isLoginRoute } from '../../../core/auth/session-navigation';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PortalService } from '../../../core/portal/portal.service';
 import { mutation } from '../../../core/state/mutation';
@@ -17,7 +17,8 @@ export const SELECT_BRANCH_PATH = '/account/select-branch';
  * Sign-in (02 §4.1, SRS CP-03). The form posts username and password; the envelope interceptor seals the password
  * before the request leaves the browser, so this page never touches cryptography. A user with several memberships
  * gets the tenant choice and re-posts with it. After sign-in the interface switches to the user's language and a
- * laboratory session without a branch goes to branch selection (CP-04). Links lead to password recovery, the
+ * laboratory session without a branch goes to branch selection (CP-04). After an idle end (`?reason=idle`, F-01) it says
+ * that the session ended after inactivity. Links lead to password recovery, the
  * subscription wizard and the public site.
  */
 @Component({
@@ -35,6 +36,11 @@ export class LoginPage {
 
   /** Bound from the query string by `withComponentInputBinding()`. */
   readonly returnUrl = input<string | undefined>();
+
+  /** `/login?reason=idle`: the session ended after inactivity (validation F-01); the page says so. */
+  readonly reason = input<string | undefined>();
+
+  protected readonly endedIdle = computed(() => this.reason() === IDLE_REASON);
 
   /** Prefilled after a subscription or a recovery (`/login?username=…`). */
   readonly username = input<string | undefined>();

@@ -201,10 +201,14 @@ function Test-ProductionConfig([string] $Path) {
         if (-not (Get-JsonProperty $json $required)) { $problems.Add("$($required -join ':') is missing") }
     }
 
+    # Lis:Notifications:PickupDirectory holds one-time codes in clear text: an absolute folder under the LIS data root (ConfigGuard).
+    $pickup = Get-JsonProperty $json @('Lis', 'Notifications', 'PickupDirectory')
+    if ($pickup -and ($pickup -notmatch '^(?i)E:\\lis-data\\[^\\]')) { $problems.Add("Lis:Notifications:PickupDirectory '$pickup' must be an absolute folder under E:\lis-data") }
+
     if ($problems.Count -gt 0) { throw "config\appsettings.Production.json is refused:`n - " + ($problems -join "`n - ") }
 
     $filesRoot = Get-JsonProperty $json @('Lis', 'Files', 'Root')
-    return [pscustomobject]@{ FilesRoot = $filesRoot }
+    return [pscustomobject]@{ FilesRoot = $filesRoot; PickupDirectory = $pickup }
 }
 
 function Wait-Ready([string] $Url, [int] $TimeoutSeconds) {
@@ -346,7 +350,7 @@ if ($PSCmdlet.ShouldProcess($serviceName, 'Set description, failure actions and 
 }
 
 # --- permissions ---------------------------------------------------------------------------------------------------
-if ($PSCmdlet.ShouldProcess("$root, $configFile, files root", "Grant $serviceAccount read on the build and configuration, modify on the files root")) {
+if ($PSCmdlet.ShouldProcess("$root, $configFile, files root, mail pickup folder", "Grant $serviceAccount read on the build and configuration, modify on the files root and the mail pickup folder")) {
     $sid = Get-ServiceSid $serviceName
     Set-ProtectedAcl -Path $appDir -ServiceSid $sid -ServiceRights ([System.Security.AccessControl.FileSystemRights]::ReadAndExecute)
     Set-ProtectedAcl -Path $configDir -ServiceSid $sid -ServiceRights ([System.Security.AccessControl.FileSystemRights]::ReadAndExecute)
@@ -355,6 +359,11 @@ if ($PSCmdlet.ShouldProcess("$root, $configFile, files root", "Grant $serviceAcc
     if ($config.FilesRoot) {
         if (-not (Test-Path -LiteralPath $config.FilesRoot)) { New-Item -ItemType Directory -Path $config.FilesRoot -Force | Out-Null }
         Set-ProtectedAcl -Path $config.FilesRoot -ServiceSid $sid -ServiceRights ([System.Security.AccessControl.FileSystemRights]::Modify)
+    }
+    if ($config.PickupDirectory) {
+        # One file per notification, one-time codes included: SYSTEM, Administrators and the service account only, nothing inherited.
+        if (-not (Test-Path -LiteralPath $config.PickupDirectory)) { New-Item -ItemType Directory -Path $config.PickupDirectory -Force | Out-Null }
+        Set-ProtectedAcl -Path $config.PickupDirectory -ServiceSid $sid -ServiceRights ([System.Security.AccessControl.FileSystemRights]::Modify)
     }
 }
 

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -21,7 +21,8 @@ import { ProblemError } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { problemMessage } from '../../../shared/forms/problem-text';
-import { localDigits } from '../../../shared/patient/patient-demographics';
+import type { DocumentTexts } from '../../../shared/print/document-texts';
+import { type LoadedTemplateImages, ReportTemplateImageLoader } from '../../../shared/print/report-template-images';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
@@ -40,7 +41,7 @@ import { type AmendRequest, AmendDialogComponent } from '../ui/amend-dialog.comp
 import { CommentDialogComponent } from '../ui/comment-dialog.component';
 import { type CultureRequest, CultureDialogComponent } from '../ui/culture-dialog.component';
 import { ReportDocumentComponent } from '../ui/report.document';
-import { ageText, formatDateTime, localDayStart, pickName } from '../ui/result-format';
+import { ageText, formatDateTime, localDayStart, pickName, screenNumber } from '../ui/result-format';
 import { type DraftChange, ResultGridComponent } from '../ui/result-grid.component';
 import { ResultHistoryComponent } from '../ui/result-history.component';
 import { ResultTextDialogComponent } from '../ui/text-dialog.component';
@@ -93,6 +94,7 @@ export class ResultsByAccessionPage {
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly printer = inject(ResultsPrinter);
+  private readonly templateImages = inject(ReportTemplateImageLoader);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -134,6 +136,10 @@ export class ResultsByAccessionPage {
   protected readonly commentOpen = signal(false);
   protected readonly previewDoc = signal<LaboratoryReportDocument | null>(null);
   protected readonly previewOpen = signal(false);
+  /** The logo and signature of the previewed report's template (validation F-02); released on the next preview and on leaving. */
+  protected readonly previewImages = signal<LoadedTemplateImages | null>(null);
+  /** The previewed report's captions in the report's own language (validation v0.5.0 F-12). */
+  protected readonly previewTexts = signal<DocumentTexts | null>(null);
   protected readonly historyOpen = signal(false);
 
   protected readonly visits = computed<readonly ResultVisitListItem[]>(() => (this.facade.visits.hasValue() ? this.facade.visits.value().items : []));
@@ -168,6 +174,7 @@ export class ResultsByAccessionPage {
   constructor() {
     void this.i18n.load('results');
     this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14, A-01)
+    inject(DestroyRef).onDestroy(() => this.previewImages()?.release());
     effect(() => {
       const accession = this.accession()?.trim().toUpperCase() ?? '';
       untracked(() => {
@@ -341,7 +348,8 @@ export class ResultsByAccessionPage {
 
   /** The delta dialog (BR-11): lists the flags; "Acknowledge and verify" acknowledges them and verifies `verifyIds`. */
   private async acknowledgeAndVerify(deltas: readonly ResultRowView[], verifyIds: readonly string[]): Promise<void> {
-    const lines = deltas.map((row) => `${this.testName(row)}: ${row.textValue ?? '—'} (Δ ${row.delta?.percent ?? '—'}%, ${this.i18n.t('results.case.previous')} ${row.delta?.previousValue ?? '—'})`).join('\n');
+    const percent = (value: number | null | undefined): string => (value === null || value === undefined ? '—' : this.i18n.tf('results.worklist.percent', { value: this.num(value) }));
+    const lines = deltas.map((row) => `${this.testName(row)}: ${row.textValue ?? '—'} (Δ ${percent(row.delta?.percent)}, ${this.i18n.t('results.case.previous')} ${row.delta?.previousValue ?? '—'})`).join('\n');
     const confirmed = await this.confirm.confirm({
       title: this.i18n.t('results.case.deltaTitle'),
       message: `${this.i18n.t('results.case.deltaMessage')}\n\n${lines}`,
@@ -365,7 +373,7 @@ export class ResultsByAccessionPage {
 
     const reason = await this.confirm.promptReason({
       title: this.i18n.t('results.case.undoTitle'),
-      message: this.i18n.tf('results.case.undoMessage', { count: ids.length }),
+      message: this.countText('results.case.undoMessage', ids.length),
       danger: true,
       confirmLabel: this.i18n.t('results.case.undo'),
     });
@@ -383,6 +391,10 @@ export class ResultsByAccessionPage {
       return;
     }
 
+    const [images, texts] = await Promise.all([this.templateImages.load(doc.template), this.printer.reportTexts(doc)]);
+    this.previewTexts.set(texts);
+    this.previewImages()?.release();
+    this.previewImages.set(images);
     this.previewDoc.set(doc);
     this.previewOpen.set(true);
   }
@@ -492,21 +504,33 @@ export class ResultsByAccessionPage {
 
   // ---- labels ------------------------------------------------------------------------------------------------------
 
+  /** The patient of the open case; a VIP file masked by the server (no See-VIP right, F-06) reads "VIP patient". */
   protected patientName(view: ResultCaseView): string {
-    return pickName(view.patient.fullName, view.patient.nameAr, this.i18n.lang());
+    return view.patient.isMasked === true ? this.i18n.t('results.vipMasked') : pickName(view.patient.fullName, view.patient.nameAr, this.i18n.lang());
+  }
+
+  /** Printing a VIP patient's report needs the See-VIP right (RES-056): the button stays visible, disabled, with the reason. */
+  protected printBlocked(view: ResultCaseView | null): boolean {
+    return view?.patient.isMasked === true;
   }
 
   protected patientAge(view: ResultCaseView): string {
     const patient = view.patient;
-    return ageText(patient.ageYears, patient.ageMonths, patient.ageDays, { y: this.i18n.t('results.age.y'), m: this.i18n.t('results.age.m'), d: this.i18n.t('results.age.d') });
+    return ageText(patient.ageYears, patient.ageMonths, patient.ageDays, { y: this.i18n.t('results.age.y'), m: this.i18n.t('results.age.m'), d: this.i18n.t('results.age.d') }, (value) => this.num(value));
+  }
+
+  /** Counts, ages and percentages in the page language's digits (validation v0.5.0 F-09). */
+  protected num(value: number): string {
+    return screenNumber(value, this.i18n.lang());
   }
 
   protected gender(view: ResultCaseView): string {
     return view.patient.gender ? this.i18n.t(`results.gender.${view.patient.gender}`) : '—';
   }
 
+  /** The patient of a matching visit; a VIP row masked by the server (rule A-03) reads the dictionary's "VIP patient". */
   protected visitLabel(item: ResultVisitListItem): string {
-    return pickName(item.patientName, item.patientNameAr, this.i18n.lang());
+    return item.patientMasked === true ? this.i18n.t('results.vipMasked') : pickName(item.patientName, item.patientNameAr, this.i18n.lang());
   }
 
   protected unitName(unit: ReportUnitView): string {
@@ -555,14 +579,22 @@ export class ResultsByAccessionPage {
     }
   }
 
-  /** One result reads in the singular ("1 result saved"), more in the plural (validation run 2026-10-11). */
+  /**
+   * A counted sentence in its grammatical form (`I18nService.tc`: one, two, 3–10, 11+; validation v0.5.0 F-11) with the
+   * number in the page language's digits.
+   */
   protected countText(key: string, count: number): string {
-    return count === 1 ? this.i18n.t(`${key}One`) : this.i18n.tf(key, { count: localDigits(count, this.i18n.lang()) });
+    return this.i18n.tc(key, count, { count: this.num(count) });
   }
 
-  /** The heading count in the language's digits (round 3 R3-02); dates keep the Latin digits of the printed reports. */
-  protected matchingCount(): string {
-    return localDigits(this.visitsTotal(), this.i18n.lang());
+  /**
+   * The list heading: the count of the last query in the language's digits (round 3 R3-02); no count before a query has
+   * run, so a visit opened from a link does not sit under "Matching visits (0)" (validation 2026-10-11).
+   */
+  protected matchingTitle(): string {
+    return this.facade.query() === null
+      ? this.i18n.t('results.case.matchingTitle')
+      : this.i18n.tf('results.case.matching', { count: this.num(this.visitsTotal()) });
   }
 
   /** The matching-list line "1 report unit · 2 results": each count takes its own singular (round 2 R2-07). */

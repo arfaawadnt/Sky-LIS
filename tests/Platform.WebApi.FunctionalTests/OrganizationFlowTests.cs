@@ -9,6 +9,7 @@ using Platform.Contracts.Organization;
 using Platform.Contracts.PlatformAdmin;
 using Platform.SharedKernel.MultiTenancy;
 using Platform.WebApi.FunctionalTests.Support;
+using Platform.TestSupport;
 
 namespace Platform.WebApi.FunctionalTests;
 
@@ -310,7 +311,6 @@ public sealed class OrganizationFlowTests(ApiFactory factory) : IClassFixture<Ap
         return values;
     }
 
-    private static int _isoCounter;
 
     private async Task<HttpClient> PlatformAdministratorAsync()
     {
@@ -321,8 +321,7 @@ public sealed class OrganizationFlowTests(ApiFactory factory) : IClassFixture<Ap
     /// <summary>A country with one governorate, through the platform API (ISO codes "Q?" and "W?" are this class's own).</summary>
     private static async Task<(Guid Country, Guid Governorate)> CreatePlaceAsync(HttpClient platform, string governorate)
     {
-        var n = Interlocked.Increment(ref _isoCounter);
-        var iso = $"{(n % 2 == 0 ? 'Q' : 'W')}{(char)('A' + (n / 2 % 26))}";
+        var iso = TestCountryCodes.Next();
         var country = await platform.PostAsJsonAsync("/api/v1/platform/countries", new CountryRequest("Branchland " + iso, "أرض الفروع", iso, "+20", "Pound", "EGP", "ar", "Africa/Cairo", 10, null, null));
         Assert.Equal(HttpStatusCode.Created, country.StatusCode);
         var countryId = (await country.Content.ReadFromJsonAsync<CreatedResource>())!.Id;

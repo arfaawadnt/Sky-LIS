@@ -1,5 +1,6 @@
 using Platform.Domain.Identity;
 using Platform.Domain.Organization;
+using Platform.Domain.Settings;
 
 namespace Platform.Application.Abstractions.Security;
 
@@ -60,6 +61,16 @@ public sealed record SessionPrincipal(
 
     /// <summary>The access end date (LDM manual §12.6); from it the session is no longer live.</summary>
     public DateTimeOffset? PasswordExpiresAtUtc { get; init; }
+
+    /// <summary>
+    /// Validation F-01: the idle timeout of the session's tenant in minutes (<c>sessionTimeoutMinutes</c>: the tenant's valid
+    /// value, else the platform's, else the default 30), read in the same elevated query. The refresh refuses a session idle
+    /// longer than it (<c>AUTH-017</c>); the SPA's idle watcher counts down to it. It never shortens an access token already
+    /// issued: that token stays valid until it expires (15 minutes at most), so <see cref="IsLiveAt"/> ignores it.
+    /// </summary>
+    public int SessionTimeoutMinutes { get; init; } = SettingKeys.SessionTimeoutMinutes.Default;
+
+    public TimeSpan IdleTimeout => TimeSpan.FromMinutes(SessionTimeoutMinutes);
 
     /// <summary>A rotated session still authenticates its own access token until it expires; a revoked or expired one never does, nor one whose user's access ended.</summary>
     public bool IsLiveAt(DateTimeOffset nowUtc) =>

@@ -24,6 +24,16 @@ public sealed class PatientTests
     private static Patient Register(PatientDemographics? demographics = null, string number = "PAT-2026-00001", bool vip = false) =>
         Patient.Register(number, demographics ?? Mona(), PatientFieldRules.Optional, vip, Now);
 
+    [Theory]
+    [InlineData("01019199912", 10, "1019199912")]   // F-08: typed with the trunk 0, searched without it
+    [InlineData("1019199912", 10, "1019199912")]
+    [InlineData("01019199912", null, "01019199912")]   // no laboratory country: as typed
+    [InlineData("0101919991", 10, "0101919991")]   // not 0 + 10 digits
+    [InlineData("00201019199912", 10, "00201019199912")]
+    [InlineData("0512345678", 9, "512345678")]   // Saudi Arabia: 9 digits
+    public void F08_a_mobile_search_drops_the_trunk_0_of_a_national_number(string typed, int? length, string searched) =>
+        Assert.Equal(searched, Patient.MobileSearchDigits(typed, length));
+
     [Fact]
     public void S_T1_ok_Register_records_an_active_file_with_cleaned_fields_and_raises_PatientRegistered()
     {

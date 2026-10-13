@@ -85,7 +85,7 @@
   "field.comments": "Comments",
   "field.isVip": "VIP patient (confidential)",
   "hint.estimatedBirth": "Estimated from the age; the age is what is saved.",
-  "hint.mobileLength": "{length} digits, or an international number starting with +.",
+  "hint.mobileLength": "{length} digits, with or without the leading 0, or an international number starting with +.",
   "hint.mobile": "8 to 15 digits; spaces and dashes are allowed.",
   "hint.condition": "Selects the reference ranges (pregnancy, diabetes…).",
   "hint.comments": "Reception note shown to the laboratory.",

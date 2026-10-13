@@ -1,5 +1,8 @@
+using System.Net;
+using System.Net.Mail;
 using System.Security.Cryptography;
 using Platform.Application.Identity;
+using Platform.Infrastructure.Notifications;
 
 namespace Platform.Infrastructure.Security;
 
@@ -144,6 +147,117 @@ public static class ConfigGuard
 
         return violations;
     }
+
+    /// <summary>
+    /// <c>Lis:Notifications</c> (pickup directory, SMTP, HTTP SMS). Pure: the transport rules are the same under every
+    /// environment name; the only environment input is <paramref name="production"/>, explicit, for the location rule
+    /// (a server keeps its pickup files under the reserved data root <see cref="NotificationOptions.ProductionDataRoot"/>,
+    /// where the installer restricts the folder).
+    /// </summary>
+    public static IReadOnlyList<string> InspectNotifications(NotificationOptions options, bool production)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var violations = new List<string>();
+
+        if (options.HasPickupDirectory)
+        {
+            var directory = options.PickupDirectory!.Trim();
+            if (!Path.IsPathFullyQualified(directory))
+            {
+                violations.Add($"{NotificationOptions.PickupDirectoryKey} must be an absolute path");
+            }
+            else if (production && !IsStrictlyUnder(directory, NotificationOptions.ProductionDataRoot))
+            {
+                violations.Add($"{NotificationOptions.PickupDirectoryKey} must lie under the LIS data root {NotificationOptions.ProductionDataRoot} in Production");
+            }
+        }
+
+        var smtp = options.Smtp;
+        if (smtp.IsConfigured)
+        {
+            if (smtp.Port is < 1 or > 65535)
+            {
+                violations.Add($"{NotificationOptions.SmtpPortKey} must be between 1 and 65535");
+            }
+
+            if (!IsMailAddress(smtp.From))
+            {
+                violations.Add($"{NotificationOptions.SmtpFromKey} must be an e-mail address");
+            }
+
+            if (!smtp.EnableSsl && !IsLoopbackHost(smtp.Host!.Trim()))
+            {
+                violations.Add($"{NotificationOptions.SmtpEnableSslKey} may be false only for a loopback relay");
+            }
+
+            if (!string.IsNullOrWhiteSpace(smtp.UserName) && string.IsNullOrEmpty(smtp.Password))
+            {
+                violations.Add($"{NotificationOptions.SmtpPasswordKey} is required with {NotificationOptions.SmtpUserNameKey}");
+            }
+
+            if (smtp.Timeout < TimeSpan.FromSeconds(1) || smtp.Timeout > TimeSpan.FromMinutes(5))
+            {
+                violations.Add($"{NotificationOptions.SmtpTimeoutKey} must be between 1 second and 5 minutes");
+            }
+        }
+
+        var sms = options.Sms;
+        if (sms.IsConfigured)
+        {
+            if (!Uri.TryCreate(sms.Url!.Trim(), UriKind.Absolute, out var url)
+                || !(url.Scheme == Uri.UriSchemeHttps || (url.Scheme == Uri.UriSchemeHttp && url.IsLoopback)))
+            {
+                violations.Add($"{NotificationOptions.SmsUrlKey} must be an absolute https URL (http only for a loopback gateway)");
+            }
+
+            if (string.IsNullOrWhiteSpace(sms.ApiKey))
+            {
+                violations.Add($"{NotificationOptions.SmsApiKeyKey} is required with {NotificationOptions.SmsUrlKey}");
+            }
+
+            if (string.IsNullOrWhiteSpace(sms.ApiKeyHeader) || !sms.ApiKeyHeader.All(IsHeaderNameCharacter))
+            {
+                violations.Add($"{NotificationOptions.SmsApiKeyHeaderKey} must be an HTTP header name");
+            }
+
+            if (!HttpSmsTransport.IsValidTemplate(sms.BodyTemplate))
+            {
+                violations.Add($"{NotificationOptions.SmsBodyTemplateKey} must be JSON with the tokens {{to}} and {{text}} inside string quotes");
+            }
+
+            if (sms.Timeout < TimeSpan.FromSeconds(1) || sms.Timeout > TimeSpan.FromMinutes(2))
+            {
+                violations.Add($"{NotificationOptions.SmsTimeoutKey} must be between 1 second and 2 minutes");
+            }
+        }
+
+        return violations;
+    }
+
+    public static void EnforceNotifications(NotificationOptions options, bool production)
+    {
+        var violations = InspectNotifications(options, production);
+        if (violations.Count > 0)
+        {
+            throw new SecurityConfigurationException(violations);
+        }
+    }
+
+    private static bool IsStrictlyUnder(string path, string root)
+    {
+        var full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var prefix = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return full.Length > prefix.Length && full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMailAddress(string? value) => !string.IsNullOrWhiteSpace(value) && MailAddress.TryCreate(value.Trim(), out _);
+
+    private static bool IsLoopbackHost(string host) =>
+        string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+        || (IPAddress.TryParse(host.Trim('[', ']'), out var address) && IPAddress.IsLoopback(address));
+
+    /// <summary>RFC 9110 token characters.</summary>
+    private static bool IsHeaderNameCharacter(char c) => char.IsAsciiLetterOrDigit(c) || "!#$%&'*+-.^_`|~".Contains(c, StringComparison.Ordinal);
 
     public static void Enforce(SecurityOptions options, SessionPolicy policy)
     {

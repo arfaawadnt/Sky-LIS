@@ -167,6 +167,9 @@ export interface PatientFormSettings {
   readonly mandatoryMobile: boolean;
   readonly mandatoryNationalId: boolean;
   readonly similarNameWarning: boolean;
+  /** The laboratory's country (ISO code of the client record's country): the mobile country the form opens on (F-08). */
+  readonly countryCode?: string | null;
+  readonly countryMobileLength?: number | null;
 }
 
 /** T3 on `POST /patients/{survivorId}/merge`. */

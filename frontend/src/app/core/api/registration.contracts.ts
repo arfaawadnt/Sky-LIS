@@ -64,6 +64,8 @@ export interface OrderIssue {
   readonly serviceId: string | null;
   readonly serviceCode: string | null;
   readonly message: string;
+  /** REG-109: the repeated tests with the services that order them, e.g. "CREA (PKG › RFT)" (validation O-3). */
+  readonly detail?: string | null;
 }
 
 export interface VisitRegisteredResponse {
@@ -406,6 +408,9 @@ export interface RegistrationPageSettings {
   readonly canPay: boolean;
   readonly canSeeVip: boolean;
   readonly currency: string;
+  /** The session's branch (CP-04) for the page header; null before a branch is chosen. */
+  readonly branchNameEn?: string | null;
+  readonly branchNameAr?: string | null;
 }
 
 // ---- documents -----------------------------------------------------------------------------------------------------
@@ -436,6 +441,8 @@ export interface SampleLabel {
   readonly branchNameAr: string | null;
   readonly urgent: boolean;
   readonly serviceCodes: readonly string[];
+  /** The visit is flagged biohazard: the label prints "BIO" (validation 2026-10-11). */
+  readonly biohazard: boolean;
 }
 
 export interface VisitLabelsDocument {

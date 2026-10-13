@@ -7,6 +7,7 @@ using Npgsql;
 using Platform.Contracts.Common;
 using Platform.Contracts.Identity;
 using Platform.WebApi.FunctionalTests.Support;
+using Platform.TestSupport;
 
 namespace Platform.WebApi.FunctionalTests;
 
@@ -21,7 +22,6 @@ public sealed class AuthFlowTests(ApiFactory factory) : IClassFixture<ApiFactory
     /// <summary>Just past the refresh grace of C-02 (<c>SessionPolicy.RefreshReuseGrace</c>, 5 s by default).</summary>
     private static readonly TimeSpan GraceElapsed = TimeSpan.FromSeconds(6);
 
-    private static int _isoCounter;
 
     [DatabaseFact]
     public async Task Security_headers_are_present_on_success_and_error_responses()
@@ -604,8 +604,7 @@ public sealed class AuthFlowTests(ApiFactory factory) : IClassFixture<ApiFactory
     /// <summary>An active country with the dial code +20 and 10 national digits (ISO codes J? are this class's own).</summary>
     private async Task SeedEgyptLikeCountryAsync()
     {
-        var n = Interlocked.Increment(ref _isoCounter);
-        var iso = "J" + (char)('A' + (n % 26));
+        var iso = TestCountryCodes.Next();
         using var scope = factory.Services.CreateScope();
         var country = Platform.Domain.PlatformAdmin.Country.Create(new Platform.Domain.PlatformAdmin.CountryData("Mobileland " + iso, "أرض " + iso, iso, "+20", "Pound", "EGP", "ar", "Africa/Cairo", 10, null, null));
         scope.ServiceProvider.GetRequiredService<Platform.Application.PlatformAdmin.ICountryRepository>().Add(country);

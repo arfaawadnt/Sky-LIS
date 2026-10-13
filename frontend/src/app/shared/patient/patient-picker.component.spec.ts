@@ -294,6 +294,6 @@ describe('PatientPickerComponent (CP-06 patient search / create)', () => {
 
     fixture.componentInstance.selected.set({ ...mona, age: { years: 1, months: 3, days: 0 }, isVip: null });
     await flush();
-    expect(host.querySelector('.chosen .small.muted')?.textContent).toContain('١ سنة ٣ شهر');
+    expect(host.querySelector('.chosen .small.muted')?.textContent).toContain('سنة واحدة ٣ أشهر');   // F-11: one year, three months (plural)
   });
 });

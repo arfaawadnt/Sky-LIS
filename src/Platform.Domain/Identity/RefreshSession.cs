@@ -137,6 +137,15 @@ public sealed class RefreshSession : AggregateRoot
     public bool IsLiveAt(DateTimeOffset nowUtc) => !IsRevoked && RotatedAtUtc is null && ExpiresAtUtc > nowUtc && AbsoluteExpiresAtUtc > nowUtc;
 
     /// <summary>
+    /// Validation F-01 (tenant setting <c>sessionTimeoutMinutes</c>): true when nobody renewed the session for longer than
+    /// <paramref name="idleTimeout"/>. The last activity the server knows is <see cref="LastSeenAtUtc"/>: the sign-in that
+    /// opened the session or the rotation that created it (every refresh is a rotation, so a live session's own value is the
+    /// time of the last refresh), or a later <see cref="Touch"/>. The SPA renews the session while its user is active (idle
+    /// watcher heartbeat), so an idle session is one whose browser stopped asking.
+    /// </summary>
+    public bool IsIdleAt(DateTimeOffset nowUtc, TimeSpan idleTimeout) => idleTimeout > TimeSpan.Zero && nowUtc - LastSeenAtUtc > idleTimeout;
+
+    /// <summary>
     /// Rotates: this session is dead immediately and a successor in the same family takes over, with the sliding
     /// expiry extended and the absolute expiry kept. Presenting this session again afterwards is reuse.
     /// </summary>

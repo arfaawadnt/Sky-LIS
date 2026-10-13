@@ -63,10 +63,22 @@ public sealed class TreasuryModuleTests(DatabaseFixture fixture)
         var tenant = Guid.CreateVersion7();
         var numbers = new System.Collections.Concurrent.ConcurrentBag<string>();
 
+        // At most 10 connections at a time: the private PostgreSQL serves every slot, the installed service and the
+        // validation API under max_connections = 100, and 50 simultaneous opens could be refused (53300) while other
+        // suites run. Ten concurrent callers still race on the first insert and on every increment.
+        using var gate = new SemaphoreSlim(10);
         await Task.WhenAll(Enumerable.Range(0, 50).Select(async _ =>
         {
-            using var scope = fixture.AppScope(tenant);
-            numbers.Add(await scope.ServiceProvider.GetRequiredService<IReferenceNumbers>().NextAsync("parallel-test", "PAR", Now, CancellationToken.None));
+            await gate.WaitAsync();
+            try
+            {
+                using var scope = fixture.AppScope(tenant);
+                numbers.Add(await scope.ServiceProvider.GetRequiredService<IReferenceNumbers>().NextAsync("parallel-test", "PAR", Now, CancellationToken.None));
+            }
+            finally
+            {
+                gate.Release();
+            }
         }));
 
         Assert.Equal(50, numbers.Distinct(StringComparer.Ordinal).Count());
@@ -96,6 +108,7 @@ public sealed class TreasuryModuleTests(DatabaseFixture fixture)
         var item = Assert.Single(page.Items);
         Assert.StartsWith("PRJ", item.TreasuryCode, StringComparison.Ordinal);
         Assert.Equal(("Requester Person", "Approver Person", "Approved"), (item.RequestedByName, item.DecidedByName, item.Status));
+        Assert.Equal(("ok", (string?)null), (item.ApprovalComment, item.DecisionReason));   // validation v0.5.0 D-05: the row carries the comment
 
         var detail = (await repository.GetDetailAsync(requestId, CancellationToken.None))!;
         Assert.Equal("Approver Person", detail.Approval!.ActorName);

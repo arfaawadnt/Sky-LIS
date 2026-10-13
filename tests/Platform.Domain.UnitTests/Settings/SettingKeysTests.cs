@@ -53,6 +53,16 @@ public sealed class SettingKeysTests
     }
 
     [Fact]
+    public void Resolve_takes_the_tenant_value_else_the_inherited_one_else_the_default_F_01()
+    {
+        Assert.Equal(5, SettingKeys.SessionTimeoutMinutes.Resolve("5", "10"));
+        Assert.Equal(10, SettingKeys.SessionTimeoutMinutes.Resolve(null, "10"));
+        Assert.Equal(10, SettingKeys.SessionTimeoutMinutes.Resolve("0", " 10 "));     // out of range → the inherited value
+        Assert.Equal(30, SettingKeys.SessionTimeoutMinutes.Resolve("abc", "721"));   // neither valid → the default
+        Assert.Equal(30, SettingKeys.SessionTimeoutMinutes.Resolve(null, null));
+    }
+
+    [Fact]
     public void Validation_refuses_an_unknown_key_and_an_invalid_value_with_their_codes()
     {
         var unknown = Assert.Throws<DomainException>(() => SettingKeys.Validate("noSuchKey", "1"));
@@ -72,10 +82,23 @@ public sealed class SettingKeysTests
         Assert.Same(SettingKeys.TimeZone, SettingKeys.Validate("timeZone", "Asia/Riyadh"));
         Assert.Equal("Asia/Riyadh", SettingKeys.TimeZone.Parse(" Asia/Riyadh "));
         Assert.Equal(SettingType.String, SettingKeys.TimeZone.Type);
-        foreach (var invalid in new[] { "Mars/Olympus", "", "   ", "Cairo", new string('A', 65) })
+        foreach (var malformed in new[] { "", "   ", new string('A', 65) })
         {
-            Assert.Equal(SettingCodes.InvalidValue, Assert.Throws<DomainException>(() => SettingKeys.Validate("timeZone", invalid)).Code);
+            Assert.Equal(SettingCodes.InvalidValue, Assert.Throws<DomainException>(() => SettingKeys.Validate("timeZone", malformed)).Code);
         }
+
+        // LIS-VR-002 round 4: a name the host does not know says so (SET-003), so the field can read "This time zone is not known."
+        foreach (var unknown in new[] { "Mars/Olympus", "Cairo", " Mars/Olympus " })
+        {
+            var refusal = Assert.Throws<DomainException>(() => SettingKeys.Validate("timeZone", unknown));
+            Assert.Equal(SettingCodes.UnknownTimeZone, refusal.Code);
+            Assert.Equal(DomainFault.Validation, refusal.Fault);
+        }
+
+        // only a time-zone setting has that reason
+        Assert.Equal(SettingCodes.InvalidValue, Assert.Throws<DomainException>(() => SettingKeys.Validate("defaultLanguage", "Mars/Olympus")).Code);
+        Assert.True(SettingKeys.TimeZone.IsTimeZone);
+        Assert.Single(SettingKeys.All, descriptor => descriptor.IsTimeZone);
 
         Assert.Equal("Africa/Cairo", SettingKeys.TimeZone.Parse("Mars/Olympus"));   // a bad row never breaks a module
     }

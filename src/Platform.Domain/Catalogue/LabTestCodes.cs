@@ -17,6 +17,9 @@ public static class LabTestCodes
     public const string DefaultNotPlaceholder = "CAT-058";
     public const string MultipleDefaults = "CAT-059";
     public const string PlaceholderCritical = "CAT-060";
+
+    /// <summary>A list value reads as Normal or as Critical, never both (validation v0.5.0 O-2).</summary>
+    public const string ListValueNormalAndCritical = "CAT-061";
     public const string FormulaNotAllowed = "CAT-062";
     public const string FormulaInvalid = "CAT-063";
     public const string FormulaUnknownReference = "CAT-064";

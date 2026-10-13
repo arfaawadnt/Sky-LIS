@@ -8,6 +8,9 @@
 
   <div class="grow"></div>
 
+  @if (branchLabel(); as branch) {
+    <span class="pill branch-pill" [title]="i18n.t('shell.currentBranch')">{{ branch }}</span>
+  }
   <span class="pill">{{ portalLabel() }}</span>
 
   <button type="button" class="lang-btn" (click)="onLanguage()" [attr.aria-label]="i18n.t('shell.switchLanguage')">
@@ -29,7 +32,13 @@
         <div class="menu-head">
           <b>{{ displayName() }}</b>
           <span>{{ roleName() ?? portalLabel() }}</span>
+          @if (branchLabel(); as branch) {
+            <span class="menu-branch">{{ branch }}</span>
+          }
         </div>
+        @if (sessionBranches.canChange()) {
+          <button type="button" class="mi change-branch" role="menuitem" (click)="onChangeBranch()"><app-icon name="building" [size]="16" />{{ i18n.t('shell.changeBranch') }}</button>
+        }
         <button type="button" class="mi" role="menuitem" (click)="onLanguage()"><app-icon name="globe" [size]="16" />{{ otherLanguageLabel() }}</button>
         <button type="button" class="mi danger" role="menuitem" (click)="onSignOut()"><app-icon name="log-out" [size]="16" />{{ i18n.t('shell.signOut') }}</button>
       </div>

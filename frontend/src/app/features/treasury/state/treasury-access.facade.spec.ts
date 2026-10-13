@@ -1,9 +1,10 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { TREASURY_API, type Paged, type TreasuryAccessRequestListItem } from '../../../core/api/treasury.contracts';
+import { TREASURY_API, type Paged, type TreasuryAccessRequestListItem, type TreasuryListItem } from '../../../core/api/treasury.contracts';
+import { AuthStore, type CurrentUser } from '../../../core/auth/auth.store';
 import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { TreasuryAccessFacade } from './treasury-access.facade';
 
@@ -15,17 +16,26 @@ function page(items: TreasuryAccessRequestListItem[]): Paged<TreasuryAccessReque
 
 const noTreasuries = { items: [], page: 1, pageSize: 200, totalCount: 0, totalPages: 0 };
 
+const northCash: TreasuryListItem = { id: 'trs-n', code: 'NORTH-CASH', nameEn: 'North cash', nameAr: 'خزينة الشمال', branchId: 'b-north', isActive: true, branchCode: 'NORTH', branchNameEn: 'North', branchNameAr: 'الشمال' };
+const eastCash: TreasuryListItem = { ...northCash, id: 'trs-e', code: 'EAST-CASH', branchId: 'b-east', branchCode: 'EAST' };
+
 describe('TreasuryAccessFacade (01 §6.3)', () => {
   let facade: TreasuryAccessFacade;
   let backend: HttpTestingController;
+  const branchIds = signal<readonly string[]>([]);
 
   beforeEach(() => {
+    branchIds.set([]);
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: DeviceIdentityService, useValue: { deviceId: () => 'device-test' } satisfies Pick<DeviceIdentityService, 'deviceId'> },
+        {
+          provide: AuthStore,
+          useValue: { currentUser: signal<CurrentUser | null>({ id: 'u-1', displayName: 'Cashier', language: 'en', scope: 'tenant' }), branchIds } satisfies Pick<AuthStore, 'currentUser' | 'branchIds'>,
+        },
         TreasuryAccessFacade,
       ],
     });
@@ -91,6 +101,37 @@ describe('TreasuryAccessFacade (01 §6.3)', () => {
     picker.flush({ ...noTreasuries, items: [{ id: 'trs-9', code: 'NORTH-CASH', nameEn: 'North cash', nameAr: 'خزينة الشمال', branchId: 'b1', isActive: true, branchCode: 'NORTH', branchNameEn: 'North', branchNameAr: 'الشمال' }], totalCount: 1 });
     await runEffects();
     expect(facade.treasuries.value()?.items.map((item) => item.code)).toEqual(['NORTH-CASH']);
+    backend.verify();
+  });
+
+  it('offers only the treasuries of the branches of the user; a user of every branch sees all (validation v0.5.0 O-4)', async () => {
+    await runEffects();
+    backend.expectOne((request) => request.url === TREASURY_API.requests).flush(page([]));
+    backend.expectOne((request) => request.url === TREASURY_API.treasuries).flush({ ...noTreasuries, items: [northCash, eastCash], totalCount: 2 });
+    await runEffects();
+
+    expect(facade.requestableTreasuries().map((item) => item.code)).toEqual(['NORTH-CASH', 'EAST-CASH']);
+    branchIds.set(['b-north']);
+    expect(facade.requestableTreasuries().map((item) => item.code)).toEqual(['NORTH-CASH']);
+    branchIds.set(['b-west']);
+    expect(facade.requestableTreasuries()).toEqual([]);
+    backend.verify();
+  });
+
+  it('reads every request of the current filter for the export (D-05)', async () => {
+    await runEffects();
+    backend.expectOne((request) => request.url === TREASURY_API.requests).flush(page([]));
+    backend.expectOne((request) => request.url === TREASURY_API.treasuries).flush(noTreasuries);
+    facade.setStatus('Rejected');
+    await runEffects();
+    backend.expectOne((request) => request.url === TREASURY_API.requests).flush(page([]));
+
+    const reading = facade.allRequests();
+    await settle();
+    const all = backend.expectOne((request) => request.url === TREASURY_API.requests);
+    expect([all.request.params.get('status'), all.request.params.get('page'), all.request.params.get('pageSize')]).toEqual(['Rejected', '1', '200']);
+    all.flush({ items: [], page: 1, pageSize: 200, totalCount: 0, totalPages: 0 });
+    expect(await reading).toEqual([]);
     backend.verify();
   });
 });

@@ -14,7 +14,9 @@ public sealed record OrderPatient(Guid PatientId, string Gender);
 /// <summary>
 /// What to plan (intake §5 "Order planning"). <paramref name="ExistingServiceIds"/> are the live services of a saved
 /// visit (duplicates, rules); <paramref name="ExcludeVisitId"/> keeps that visit out of the frequency check;
-/// <paramref name="ForQuote"/> plans a price quote (no patient, no duplicates against a visit, no frequency check).
+/// <paramref name="ForQuote"/> plans a price quote (no patient, no duplicates against a visit, no frequency check);
+/// <paramref name="ExistingTests"/> are the tests of those live services with the service that orders each one
+/// (test-level duplicates, validation O-3; <see cref="Visit.LiveTestHolders"/>).
 /// </summary>
 public sealed record OrderContext(
     OrderPatient? Patient,
@@ -26,7 +28,8 @@ public sealed record OrderContext(
     Guid? ExcludeVisitId,
     DateTimeOffset NowUtc,
     int UtcOffsetMinutes,
-    bool ForQuote = false);
+    bool ForQuote = false,
+    IReadOnlyDictionary<Guid, string>? ExistingTests = null);
 
 /// <summary>A planned line: the domain item plus what the screen shows about it.</summary>
 public sealed record PlannedLine(
@@ -69,7 +72,7 @@ public sealed record OrderPlan(
 
     public static DomainFault FaultOf(string code) => code switch
     {
-        RegistrationCodes.DuplicateService or RegistrationCodes.FrequencyPrevented or RegistrationCodes.FrequencyConfirmationRequired => DomainFault.Conflict,
+        RegistrationCodes.DuplicateService or RegistrationCodes.DuplicateTests or RegistrationCodes.FrequencyPrevented or RegistrationCodes.FrequencyConfirmationRequired => DomainFault.Conflict,
         _ => DomainFault.Validation,
     };
 }
@@ -168,16 +171,19 @@ public sealed class OrderPlanner(ICatalogueLookup catalogue, IOrderRulesLookup r
         // 5. per entry: refusals (manual) or skips (automatic), then the item
         var planned = new List<(Entry Entry, PlannedLine Line, IReadOnlyList<CatalogueServiceInfo> Parts)>();
         var plannedIds = new HashSet<Guid>();
+        var orderedTests = new Dictionary<Guid, string>(context.ExistingTests ?? new Dictionary<Guid, string>());
+        var repeatedTests = new Dictionary<Guid, string>();
         foreach (var entry in entries)
         {
-            var refusal = Check(entry, services, tests, quote, context, plannedIds, out var service, out var parts);
+            var refusal = Check(entry, services, tests, quote, context, plannedIds, out var service, out var parts)
+                ?? CheckRepeatedTests(service!, parts, tests, orderedTests, repeatedTests);
             if (refusal is not null)
             {
                 if (entry.Origin == Origin.Manual)
                 {
                     issues.Add(refusal);
                 }
-                else if (service is not null && refusal.Code != RegistrationCodes.DuplicateService)
+                else if (service is not null && refusal.Code is not (RegistrationCodes.DuplicateService or RegistrationCodes.DuplicateTests))
                 {
                     warnings.Add(Warning(RegistrationCodes.WarningSkippedCompanion, service, refusal.Message, null));
                 }
@@ -215,6 +221,11 @@ public sealed class OrderPlanner(ICatalogueLookup catalogue, IOrderRulesLookup r
             if (line.Precaution is { } precaution)
             {
                 warnings.Add(new OrderWarning(RegistrationCodes.WarningPrecaution, item.ServiceId, item.ServiceCode, item.ServiceNameEn, item.ServiceNameAr, precaution, null, null, null, null));
+            }
+
+            if (repeatedTests.TryGetValue(item.ServiceId, out var repeated))
+            {
+                warnings.Add(new OrderWarning(RegistrationCodes.WarningRepeatedTests, item.ServiceId, item.ServiceCode, item.ServiceNameEn, item.ServiceNameAr, repeated, null, null, null, null));
             }
 
             if (entry.Origin == Origin.Rule)
@@ -301,6 +312,62 @@ public sealed class OrderPlanner(ICatalogueLookup catalogue, IOrderRulesLookup r
 
         return null;
     }
+
+    /// <summary>
+    /// Validation O-3 (assumption awaiting the business owner): a service whose every test is already on the visit through
+    /// another service is refused (REG-109, naming each test and the service that orders it); a service that adds at least
+    /// one new test is allowed and its repeated tests are remembered for the REG-206 warning. A service without tests
+    /// (additional services) is never refused here. The tests of an accepted service join <paramref name="orderedTests"/>.
+    /// </summary>
+    private static OrderIssue? CheckRepeatedTests(
+        CatalogueServiceInfo service,
+        IReadOnlyList<CatalogueServiceInfo> parts,
+        Dictionary<Guid, CatalogueTestInfo> tests,
+        Dictionary<Guid, string> orderedTests,
+        Dictionary<Guid, string> repeatedTests)
+    {
+        var own = new List<(Guid TestId, string Holder)>();
+        foreach (var part in parts)
+        {
+            var holder = part.Id == service.Id ? service.Code : $"{service.Code} › {part.Code}";
+            own.AddRange(part.TestIds.Where(testId => own.TrueForAll(known => known.TestId != testId)).Select(testId => (testId, holder)));
+        }
+
+        if (own.Count == 0)
+        {
+            return null;
+        }
+
+        var repeated = own.Where(test => orderedTests.ContainsKey(test.TestId)).ToList();
+        if (repeated.Count > 0)
+        {
+            var detail = string.Join(", ", repeated.Select(test => HolderLabel(CodeOf(test.TestId, tests), orderedTests[test.TestId])));
+            if (repeated.Count == own.Count)
+            {
+                return new OrderIssue(
+                    RegistrationCodes.DuplicateTests,
+                    service.Id,
+                    service.Code,
+                    $"Every test of '{service.Code}' is already on this visit: {detail}.",
+                    detail);
+            }
+
+            repeatedTests[service.Id] = detail;
+        }
+
+        foreach (var (testId, holder) in own)
+        {
+            orderedTests.TryAdd(testId, holder);
+        }
+
+        return null;
+    }
+
+    /// <summary>"CREA (RENAL)" for a test ordered through another service; "CREA" when the service is the test itself.</summary>
+    private static string HolderLabel(string testCode, string holder) =>
+        string.Equals(testCode, holder, StringComparison.OrdinalIgnoreCase) ? testCode : $"{testCode} ({holder})";
+
+    private static string CodeOf(Guid testId, Dictionary<Guid, CatalogueTestInfo> tests) => tests.TryGetValue(testId, out var test) ? test.Code : testId.ToString();
 
     private static VisitOrderItem BuildItem(
         CatalogueServiceInfo service,

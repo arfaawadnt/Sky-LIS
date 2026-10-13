@@ -41,6 +41,15 @@ public static class CatalogueBCodes
     public const string CommercialNameUnknown = "CAT-261";
     public const string DisplayOrderInvalid = "CAT-262";
 
+    /// <summary>A report-template image (logo or signature) is empty.</summary>
+    public const string TemplateImageEmpty = "CAT-270";
+
+    /// <summary>A report-template image exceeds 512 KB.</summary>
+    public const string TemplateImageTooLarge = "CAT-271";
+
+    /// <summary>A report-template image is not a PNG, JPEG or WebP image (decided by its bytes).</summary>
+    public const string TemplateImageTypeNotAllowed = "CAT-272";
+
     public const string CodeExists = "CAT-300";
     public const string NameExists = "CAT-301";
     public const string ReferenceInactive = "CAT-310";
@@ -59,4 +68,7 @@ public static class CatalogueBCodes
     public const string AntibioticNotFound = "CAT-391";
     public const string OrganismNotFound = "CAT-392";
     public const string SensitivityValueNotFound = "CAT-393";
+
+    /// <summary>The report template has no logo (or no signature) to show or remove.</summary>
+    public const string TemplateImageNotFound = "CAT-394";
 }

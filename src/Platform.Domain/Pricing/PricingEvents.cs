@@ -6,11 +6,17 @@ namespace Platform.Domain.Pricing;
 
 public sealed record PayerCreated(Guid PayerId, string SearchKey, PayerType Type, bool IsDefault, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
+/// <summary>P2 Edit changed the name, search key, type or web portal (validation v0.5.0 O-5); the field changes carry before / after.</summary>
+public sealed record PayerUpdated(Guid PayerId, string SearchKey, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
 public sealed record PayerDeactivated(Guid PayerId, string SearchKey, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
 public sealed record PayerReactivated(Guid PayerId, string SearchKey, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
 public sealed record ContractTierAdded(Guid PayerId, Guid ContractTierId, bool IsDefault, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+/// <summary>P6 Rename tier (validation v0.5.0 O-5).</summary>
+public sealed record ContractTierRenamed(Guid PayerId, Guid ContractTierId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
 public sealed record ContractTierDeactivated(Guid PayerId, Guid ContractTierId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
@@ -18,6 +24,9 @@ public sealed record ContractTierReactivated(Guid PayerId, Guid ContractTierId, 
 
 /// <summary>A new base list, empty (L1) or copied from another list (L4, <paramref name="CopiedFromListId"/> set).</summary>
 public sealed record BasePriceListCreated(Guid ListId, string Code, int Year, Guid? CopiedFromListId, int LineCount, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+/// <summary>L2 Edit changed the name or the year (validation v0.5.0 O-5).</summary>
+public sealed record BasePriceListUpdated(Guid ListId, string Code, int Year, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
 /// <summary>Prices of a list changed (L3). Contracts are not re-priced: Apply is explicit (BR-07).</summary>
 public sealed record BasePriceListPricesChanged(Guid ListId, string Code, int Added, int Changed, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);

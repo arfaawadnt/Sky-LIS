@@ -74,6 +74,49 @@ public sealed class ValidationProblemRulesTests(ApiFactory factory) : IClassFixt
         }
     }
 
+    /// <summary>
+    /// Validation F-17: a caller without the permission who sends an incomplete or unreadable body is refused with 403, as
+    /// with a well-formed one; the request's field rules are disclosed only to a caller who may send it.
+    /// </summary>
+    [DatabaseFact]
+    public async Task An_unauthorized_caller_with_an_invalid_body_is_refused_before_the_body_is_checked()
+    {
+        var reception = await SignedInClientAsync(["registration.view"]);
+
+        using (var empty = new StringContent("{}", Encoding.UTF8, "application/json"))
+        {
+            var settings = await reception.PutAsync("/api/v1/settings", empty);
+            Assert.Equal(HttpStatusCode.Forbidden, settings.StatusCode);
+            Assert.Equal(ProblemCodes.Forbidden, await CodeOfAsync(settings));
+        }
+
+        using (var incomplete = new StringContent("{\"code\": \"X1\"}", Encoding.UTF8, "application/json"))
+        {
+            var branch = await reception.PostAsync("/api/v1/organization/branches", incomplete);
+            Assert.Equal(HttpStatusCode.Forbidden, branch.StatusCode);
+            Assert.DoesNotContain("rules", await branch.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+
+        using (var unreadable = new StringContent("{\"subject\": 12, ", Encoding.UTF8, "application/json"))
+        {
+            var ticket = await reception.PostAsync(Tickets, unreadable);
+            Assert.Equal(HttpStatusCode.Forbidden, ticket.StatusCode);
+        }
+
+        // control: the same incomplete body from a caller who holds the permission still reports the fields
+        var manager = await SignedInClientAsync(["settings.view", "settings.manage"]);
+        using var again = new StringContent("{}", Encoding.UTF8, "application/json");
+        var allowed = await manager.PutAsync("/api/v1/settings", again);
+        Assert.Equal(HttpStatusCode.BadRequest, allowed.StatusCode);
+        Assert.Equal(ProblemCodes.ValidationFailed, await CodeOfAsync(allowed));
+    }
+
+    private static async Task<string?> CodeOfAsync(HttpResponseMessage response)
+    {
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return document.RootElement.GetProperty("code").GetString();
+    }
+
     private async Task<HttpClient> SignedInClientAsync(IReadOnlyList<string> permissions)
     {
         var (username, _, _) = await factory.SeedUserAsync(permissions: permissions);

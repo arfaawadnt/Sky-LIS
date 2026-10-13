@@ -20,6 +20,27 @@ public sealed class RegistrationUseCaseTests
 
     private FakeCatalogue Catalogue => _world.Catalogue;
 
+    [Theory]
+    [InlineData("010 1919 9912", 10, "1019199912")]
+    [InlineData("1019199912", 10, "1019199912")]
+    [InlineData("01019199912", null, "01019199912")]
+    public async Task F08_the_visit_register_searches_a_mobile_without_its_trunk_0_for_the_laboratory_country(string typed, int? length, string searched)
+    {
+        // Validation v0.5.0 F-08: a file stored as 1019199912 was not found by 01019199912 (CP-10 mobile search).
+        var visits = new InMemoryVisits();
+        var country = new FixedLaboratoryCountry(length is { } national ? new Platform.Application.Patients.LaboratoryCountry("EG", national) : null);
+        var handler = new Platform.Application.Registration.Queries.SearchVisitsHandler(visits, null!, new FakePatients(), null!, new FakePayers(), null!, new FakeRegistrationPrivileges(), country);
+
+        await handler.Handle(new Platform.Application.Registration.Queries.SearchVisitsQuery(null, null, null, typed, null, null, null, null, null, null, null, 1, 20), CancellationToken.None);
+
+        Assert.Equal(searched, visits.LastFilter!.Mobile);
+    }
+
+    private sealed class FixedLaboratoryCountry(Platform.Application.Patients.LaboratoryCountry? country) : Platform.Application.Patients.ILaboratoryCountry
+    {
+        public Task<Platform.Application.Patients.LaboratoryCountry?> FindAsync(CancellationToken cancellationToken) => Task.FromResult(country);
+    }
+
     [Fact]
     public async Task S_V1_ok_registers_with_tubes_numbers_warnings_and_one_commit()
     {
@@ -95,6 +116,58 @@ public sealed class RegistrationUseCaseTests
         // A single-test service keeps its own code.
         var again = await Register(_world.Female.Id, confirm: true, Catalogue.Creatinine.Id);
         Assert.Equal("CREA", Assert.Single(again.Warnings, warning => warning.Code == RegistrationCodes.WarningFrequency).ServiceCode);
+    }
+
+    [Fact]
+    public async Task S_V1_a_service_whose_every_test_is_already_ordered_is_refused_naming_the_test_and_its_service()
+    {
+        // Validation O-3 (2026-10-11): V14-CREA was accepted next to V14-PKG ⊃ V14-RFT ⊃ CREA and charged again.
+        var inProfile = await Refused(() => Register(_world.Female.Id, Catalogue.Renal.Id, Catalogue.Creatinine.Id));
+        Assert.Equal((RegistrationCodes.DuplicateTests, DomainFault.Conflict), (inProfile.Code, inProfile.Fault));
+        Assert.Equal("Every test of 'CREA' is already on this visit: CREA (RENAL).", inProfile.Message);
+
+        var inPackage = await Refused(() => Register(_world.Female.Id, Catalogue.Wellness.Id, Catalogue.Creatinine.Id));
+        Assert.Equal("Every test of 'CREA' is already on this visit: CREA (WELL › RENAL).", inPackage.Message);
+        Assert.Empty(_world.Visits.Items);
+
+        var planner = new OrderPlanner(Catalogue, _world.Rules, _world.Prices, _world.Visits);
+        var plan = await planner.PlanAsync(
+            new OrderContext(null, _world.PayerId, _world.TierId, null, [new OrderLineRequest(Catalogue.Wellness.Id, false), new OrderLineRequest(Catalogue.Creatinine.Id, false)], new HashSet<Guid>(), null, RegistrationWorld.Now, 0),
+            CancellationToken.None);
+        var issue = Assert.Single(plan.Issues);
+        Assert.Equal((RegistrationCodes.DuplicateTests, Catalogue.Creatinine.Id, "CREA", "CREA (WELL › RENAL)"), (issue.Code, issue.ServiceId!.Value, issue.ServiceCode, issue.Detail));
+        Assert.Equal(["WELL"], plan.Lines.Select(line => line.Item.ServiceCode).ToArray());
+    }
+
+    [Fact]
+    public async Task S_V1_a_service_that_adds_a_new_test_is_allowed_with_a_warning_naming_the_repeated_tests()
+    {
+        var response = await Register(_world.Female.Id, Catalogue.Creatinine.Id, Catalogue.Renal.Id, Catalogue.HomeVisit.Id);
+
+        var warning = Assert.Single(response.Warnings, candidate => candidate.Code == RegistrationCodes.WarningRepeatedTests);
+        Assert.Equal((Catalogue.Renal.Id, "RENAL", "CREA"), (warning.ServiceId!.Value, warning.ServiceCode, warning.Detail));
+        Assert.Equal(3, _world.Visits.Items.Single().Lines.Count);
+
+        // A package whose profile repeats UREA (already ordered alone) but adds CREA and GLU: allowed; the warning names the
+        // repeated test where it is already ordered (the UREA service itself, so its code alone).
+        var package = await Register(_world.Male.Id, Catalogue.Urea.Id, Catalogue.Wellness.Id);
+        var repeat = Assert.Single(package.Warnings, candidate => candidate.Code == RegistrationCodes.WarningRepeatedTests);
+        Assert.Equal(("WELL", "UREA"), (repeat.ServiceCode, repeat.Detail));
+    }
+
+    [Fact]
+    public async Task S_V2_adding_a_service_whose_tests_are_on_the_saved_visit_is_refused_and_the_check_names_them()
+    {
+        await Register(_world.Female.Id, Catalogue.Wellness.Id);
+        var visit = _world.Visits.Items.Single();
+        Assert.Equal("WELL › RENAL", visit.LiveTestHolders()[Catalogue.Creatinine.Members[0].MemberId]);
+
+        var refused = await Refused(() => AddLinesHandler().Handle(new AddVisitLinesCommand(visit.Id, [new OrderLineRequest(Catalogue.Creatinine.Id, false)], null, false), CancellationToken.None));
+        Assert.Equal(RegistrationCodes.DuplicateTests, refused.Code);
+        Assert.Contains("CREA (WELL › RENAL)", refused.Message, StringComparison.Ordinal);
+
+        var added = await AddLinesHandler().Handle(new AddVisitLinesCommand(visit.Id, [new OrderLineRequest(Catalogue.Cbc.Id, false)], null, false), CancellationToken.None);
+        Assert.DoesNotContain(added.Warnings, warning => warning.Code == RegistrationCodes.WarningRepeatedTests);
     }
 
     [Fact]

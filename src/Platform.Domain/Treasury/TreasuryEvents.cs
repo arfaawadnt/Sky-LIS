@@ -6,6 +6,9 @@ namespace Platform.Domain.Treasury;
 
 public sealed record TreasuryCreated(Guid TreasuryId, string Code, Guid BranchId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
+/// <summary>T7 Rename changed the name (validation v0.5.0 O-5); the field changes carry before / after.</summary>
+public sealed record TreasuryUpdated(Guid TreasuryId, string Code, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
 public sealed record TreasuryDeactivated(Guid TreasuryId, string Code, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
 public sealed record TreasuryReactivated(Guid TreasuryId, string Code, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);

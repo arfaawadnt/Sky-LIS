@@ -40,6 +40,38 @@ public sealed class PatientQueryRulesTests
     }
 
     [Fact]
+    public void F08_with_the_laboratory_country_a_mobile_typed_with_the_trunk_0_also_finds_a_file_stored_without_it()
+    {
+        // Validation v0.5.0 F-08: PAT-2026-00020 stored 1019199912; a search for 01019199912 found nothing.
+        Assert.Equal("1019199912", PatientSearchTerms.Parse("010 1919 9912", 10)!.Digits);
+        Assert.Equal("1019199912", PatientSearchTerms.Parse("٠١٠١٩١٩٩٩١٢", 10)!.Digits);
+        Assert.Equal("01019199912", PatientSearchTerms.Parse("01019199912")!.Digits);
+        Assert.Equal("01019199912", PatientSearchTerms.Parse("01019199912", 10)!.Number);   // the number search is unchanged
+    }
+
+    [Fact]
+    public async Task F08_the_form_settings_carry_the_laboratory_country()
+    {
+        var withCountry = await new GetPatientFormSettingsHandler(new NoSettings(), new FixedCountry(new LaboratoryCountry("EG", 10))).Handle(new GetPatientFormSettingsQuery(), CancellationToken.None);
+        Assert.Equal(("EG", 10), (withCountry.CountryCode, withCountry.CountryMobileLength!.Value));
+
+        var without = await new GetPatientFormSettingsHandler(new NoSettings(), new FixedCountry(null)).Handle(new GetPatientFormSettingsQuery(), CancellationToken.None);
+        Assert.Equal((null, null, false, false, true), (without.CountryCode, without.CountryMobileLength, without.MandatoryMobile, without.MandatoryNationalId, without.SimilarNameWarning));
+    }
+
+    private sealed class FixedCountry(LaboratoryCountry? country) : ILaboratoryCountry
+    {
+        public Task<LaboratoryCountry?> FindAsync(CancellationToken cancellationToken) => Task.FromResult(country);
+    }
+
+    private sealed class NoSettings : Platform.Application.Abstractions.Settings.ITenantSettings
+    {
+        public ValueTask<T> GetAsync<T>(Platform.Domain.Settings.SettingDescriptor<T> descriptor, CancellationToken cancellationToken) => ValueTask.FromResult(descriptor.Parse(null));
+
+        public ValueTask<IReadOnlyDictionary<string, string>> GetAllAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>());
+    }
+
+    [Fact]
     public void S_SIM_Similar_candidates_are_classified_exact_mobile_or_name()
     {
         var key = PatientNameNormalizer.Normalize("mohamed  ahmed");

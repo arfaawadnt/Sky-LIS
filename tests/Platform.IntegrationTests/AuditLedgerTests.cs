@@ -35,7 +35,7 @@ public sealed class AuditLedgerTests(DatabaseFixture fixture)
         {
             var treasuries = scope.ServiceProvider.GetRequiredService<ITreasuryRepository>();
             var treasury = (await treasuries.GetForUpdateAsync(treasuryId, CancellationToken.None))!;
-            treasury.Rename(new LocalizedText("Main drawer", "الخزينة الرئيسية"));
+            treasury.Rename(new LocalizedText("Main drawer", "الخزينة الرئيسية"), Now.AddMinutes(4));
             treasury.Deactivate(Now.AddMinutes(5));
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
         }
@@ -60,17 +60,20 @@ public sealed class AuditLedgerTests(DatabaseFixture fixture)
         Assert.Equal(("Mona Adel", actor, "corr-1"), (changes[1].ActorName, changes[1].ActorUserId, changes[1].CorrelationId));
 
         var trail = await context.Set<AuditTrailEntry>().OrderBy(entry => entry.Sequence).ToListAsync();
-        Assert.Equal([1L, 2L], trail.Select(entry => entry.Sequence).ToArray());
+        // the rename is an event of its own (validation v0.5.0 O-5), so the edit is in the trail beside its field changes
+        Assert.Equal([1L, 2L, 3L], trail.Select(entry => entry.Sequence).ToArray());
         Assert.Equal(typeof(TreasuryCreated).FullName, trail[0].EventType);
-        Assert.Equal(typeof(TreasuryDeactivated).FullName, trail[1].EventType);
+        Assert.Equal(typeof(TreasuryUpdated).FullName, trail[1].EventType);
+        Assert.Equal(typeof(TreasuryDeactivated).FullName, trail[2].EventType);
         Assert.Null(trail[0].PrevHash);
         Assert.Equal(trail[0].EntryHash, trail[1].PrevHash);
-        Assert.Equal("corr-1", trail[1].CorrelationId);
-        Assert.Equal(nameof(Domain.Treasury.Treasury), trail[1].AggregateType);
-        Assert.Equal(treasuryId.ToString(), trail[1].AggregateId);
+        Assert.Equal(trail[1].EntryHash, trail[2].PrevHash);
+        Assert.Equal("corr-1", trail[2].CorrelationId);
+        Assert.Equal(nameof(Domain.Treasury.Treasury), trail[2].AggregateType);
+        Assert.Equal(treasuryId.ToString(), trail[2].AggregateId);
 
         var verified = await reader.ServiceProvider.GetRequiredService<IAuditReader>().VerifyChainAsync(CancellationToken.None);
-        Assert.Equal(new ChainVerificationResult(true, 2, null), verified);
+        Assert.Equal(new ChainVerificationResult(true, 3, null), verified);
     }
 
     [DatabaseFact]

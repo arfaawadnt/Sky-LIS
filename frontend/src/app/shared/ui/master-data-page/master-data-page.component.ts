@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, ElementRef, Injector, computed, contentChildren, effect, inject, input, linkedSignal, resource, signal, untracked } from '@angular/core';
-import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors, type ValidatorFn, Validators } from '@angular/forms';
 
 import { DEFAULT_PAGE_SIZE, type PageRequest, firstPage } from '../../../core/api/paging';
 import { type ProblemDetails, ProblemError, isProblem, ProblemCodes } from '../../../core/api/problem-details';
@@ -8,7 +8,7 @@ import { PermissionsService } from '../../../core/permissions/permissions.servic
 import { type LocalizedTextGroup, localizedFromDto, localizedTextGroup, localizedToDto } from '../../forms/localized-text';
 import { markAllTouched } from '../../forms/mark-all-touched';
 import { problemMessage } from '../../forms/problem-text';
-import { clearLinkedServerErrors, problemToFormErrors } from '../../forms/problem-to-form-errors';
+import { SERVER_ERROR_KEY, clearLinkedServerErrors, problemToFormErrors } from '../../forms/problem-to-form-errors';
 import type { ServerSort } from '../../forms/paging';
 import { SaveShortcutDirective } from '../../forms/save-shortcut.directive';
 import { UppercaseDirective } from '../../forms/uppercase.directive';
@@ -248,6 +248,7 @@ export class MasterDataPageComponent<TItem, TDto> {
       return;
     }
 
+    this.markPatternFieldsAsTyped(form);
     const groups = this.config().linkedFields ?? [];
     if (this.serverErrorSnapshot !== null && groups.length > 0 && clearLinkedServerErrors(form, groups, this.serverErrorSnapshot)) {
       this.serverErrorSnapshot = null;
@@ -255,6 +256,16 @@ export class MasterDataPageComponent<TItem, TDto> {
 
     if (this.blocked() && form.valid) {
       this.blocked.set(false);
+    }
+  }
+
+  /** C-09 live check: a field with a `pattern` shows its verdict from the first keystroke, not only after it loses focus or on Save. */
+  private markPatternFieldsAsTyped(form: DynamicForm): void {
+    for (const field of this.config().fields) {
+      const control = form.controls[field.name];
+      if (field.pattern !== undefined && control?.dirty && !control.touched) {
+        control.markAsTouched();
+      }
     }
   }
 
@@ -442,7 +453,7 @@ export class MasterDataPageComponent<TItem, TDto> {
         return new FormControl<string | null>({ value, disabled }, { validators: field.required ? [Validators.required] : [] });
       }
       case 'code': {
-        const validators = [codeValidator, Validators.maxLength(field.maxLength ?? 32)];
+        const validators = [codeValidator, Validators.maxLength(field.maxLength ?? 32), ...this.patternValidators(field)];
         if (field.required ?? true) {
           validators.unshift(requiredText);
         }
@@ -452,7 +463,7 @@ export class MasterDataPageComponent<TItem, TDto> {
         return new FormControl<string>({ value, disabled }, { nonNullable: true, validators });
       }
       default: {
-        const validators = [Validators.maxLength(field.maxLength ?? (field.kind === 'textarea' ? 2000 : 200))];
+        const validators = [Validators.maxLength(field.maxLength ?? (field.kind === 'textarea' ? 2000 : 200)), ...this.patternValidators(field)];
         if (field.required) {
           validators.unshift(requiredText);
         }
@@ -461,6 +472,27 @@ export class MasterDataPageComponent<TItem, TDto> {
         return new FormControl<string>({ value, disabled }, { nonNullable: true, validators });
       }
     }
+  }
+
+  /**
+   * The `pattern` of a text or code field: `{ pattern }` plus the field's own message under the kit's ready-text key
+   * (`SERVER_ERROR_KEY`), which `app-form-field` shows as it is. An empty value is left to `required`.
+   */
+  private patternValidators(field: FieldSchema): ValidatorFn[] {
+    const pattern = field.pattern;
+    if (pattern === undefined || (field.kind !== 'text' && field.kind !== 'code')) {
+      return [];
+    }
+
+    const message = field.patternMessage ?? 'shared.validation.pattern';
+    return [
+      (control: AbstractControl): ValidationErrors | null => {
+        const value: unknown = control.value;
+        const text = typeof value === 'string' ? value.trim() : '';
+        pattern.lastIndex = 0;   // a global or sticky expression keeps state between calls
+        return text === '' || pattern.test(text) ? null : { pattern: { requiredPattern: String(pattern) }, [SERVER_ERROR_KEY]: this.i18n.t(message) };
+      },
+    ];
   }
 
   private readValue(form: DynamicForm): FormValue {

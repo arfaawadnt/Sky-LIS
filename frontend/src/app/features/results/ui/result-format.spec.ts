@@ -1,4 +1,4 @@
-import { ageText, delayClass, flagSymbol, formatDuration, initialDraft, localDayStart, logValueText, pickName, testLabel, toValueItem } from './result-format';
+import { ageText, delayClass, flagSymbol, formatDateTime, formatDuration, formatPrintDateTime, initialDraft, localDayStart, logValueText, patientLabel, pickName, testLabel, toValueItem } from './result-format';
 import { resultRow } from '../testing/results.fixtures';
 
 describe('result-format', () => {
@@ -49,5 +49,23 @@ describe('result-format', () => {
     expect(testLabel({ testCode: 'GLU', testNameEn: null, testNameAr: null }, 'en')).toBe('GLU');
     expect(logValueText(null, '95.0')).toBe('— → 95.0');
     expect(logValueText(null, null)).toBe('');
+  });
+
+  it('writes on-screen dates in the digits of the language and printed ones in Latin digits (decision 2026-10-12, R3-02)', () => {
+    const utc = '2026-10-12T09:30:00Z';
+    expect(formatDateTime(utc, 'ar')).toMatch(/[٠-٩]/);
+    expect(formatDateTime(utc, 'en')).toMatch(/^12\/10\/2026, \d{2}:\d{2}$/);
+    expect(formatPrintDateTime(utc, 'ar')).not.toMatch(/[٠-٩]/);
+    expect(formatPrintDateTime(utc, 'ar')).toContain('2026');
+    expect(formatPrintDateTime(utc, 'en')).toBe(formatDateTime(utc, 'en'));
+    expect(formatDateTime(null, 'ar')).toBe('—');
+    expect(formatPrintDateTime('nope', 'ar')).toBe('—');
+  });
+
+  it('labels a masked VIP row with the dictionary text, others with their name (A-03 on the worklist)', () => {
+    const masked = { patientNumber: 'PAT-2026-00010', patientName: 'VIP patient', patientNameAr: null, patientMasked: true };
+    expect(patientLabel(masked, 'ar', 'مريض من كبار الشخصيات')).toBe('PAT-2026-00010 · مريض من كبار الشخصيات');
+    expect(patientLabel(masked, 'en')).toBe('PAT-2026-00010 · VIP patient');
+    expect(patientLabel({ patientNumber: null, patientName: 'Mona', patientNameAr: 'منى', patientMasked: false }, 'ar', 'x')).toBe('منى');
   });
 });

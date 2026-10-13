@@ -1,4 +1,3 @@
-import type { ReportTemplateListItem } from '../../../core/api/catalogue-b.contracts';
 import { microbiologyTabOf } from './microbiology.page';
 import { toRequest } from './report-templates.page';
 
@@ -9,34 +8,13 @@ describe('Catalogue B page helpers', () => {
     expect(microbiologyTabOf('/catalogue/microbiology')).toBe('drug-types');
   });
 
-  it('keeps the logo and signature of a report template and sends empty texts as null', () => {
-    const item: ReportTemplateListItem = {
-      id: 't1',
-      nameEn: 'Results A4',
-      nameAr: 'النتائج',
-      type: 'Results',
-      logoFileId: 'file-logo',
-      signatureFileId: null,
-      showQr: false,
-      language: 'Both',
-      headerTextEn: null,
-      headerTextAr: null,
-      footerTextEn: null,
-      footerTextAr: null,
-      isActive: true,
-    };
-
-    const request = toRequest(
-      { name: { en: ' Results A4 ', ar: 'النتائج' }, type: 'Culture', language: 'En', showQr: true, headerText: { en: 'Header', ar: 'رأس' }, footerText: { en: ' ', ar: '' } },
-      item,
-    );
+  it('sends the texts of a report template, empty ones as null, and never the logo or signature (their own calls, F-02)', () => {
+    const request = toRequest({ name: { en: ' Results A4 ', ar: 'النتائج' }, type: 'Culture', language: 'En', showQr: true, headerText: { en: 'Header', ar: 'رأس' }, footerText: { en: ' ', ar: '' } });
 
     expect(request).toEqual({
       nameEn: 'Results A4',
       nameAr: 'النتائج',
       type: 'Culture',
-      logoFileId: 'file-logo',
-      signatureFileId: null,
       showQr: true,
       language: 'En',
       headerTextEn: 'Header',

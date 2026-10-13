@@ -192,9 +192,9 @@ public sealed class CatalogueBFlowTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal("CAT-204", await AuthClient.CodeOf(comment));
         Assert.Equal(HttpStatusCode.Created, (await editor.PostAsJsonAsync($"{Base}/comment-templates", new CreateCommentTemplateRequest("hemo", "Hemolysed sample.", "عينة متحللة.", null))).StatusCode);
 
-        var halfHeader = await editor.PostAsJsonAsync($"{Base}/report-templates", new ReportTemplateRequest("Results A4", "النتائج", "Results", null, null, true, "Both", "Header", null, null, null));
+        var halfHeader = await editor.PostAsJsonAsync($"{Base}/report-templates", new ReportTemplateRequest("Results A4", "النتائج", "Results", true, "Both", "Header", null, null, null));
         Assert.Equal(HttpStatusCode.BadRequest, halfHeader.StatusCode);
-        var template = await editor.PostAsJsonAsync($"{Base}/report-templates", new ReportTemplateRequest("Results A4", "النتائج", "Results", null, null, true, "Both", "Header", "رأس", null, null));
+        var template = await editor.PostAsJsonAsync($"{Base}/report-templates", new ReportTemplateRequest("Results A4", "النتائج", "Results", true, "Both", "Header", "رأس", null, null));
         Assert.Equal(HttpStatusCode.Created, template.StatusCode);
         var listed = await editor.GetFromJsonAsync<Paged<ReportTemplateListItem>>($"{Base}/report-templates?type=Results");
         Assert.Equal(("Header", "رأس", "Both"), (Assert.Single(listed!.Items).HeaderTextEn, listed.Items[0].HeaderTextAr, listed.Items[0].Language));
@@ -243,6 +243,13 @@ public sealed class CatalogueBFlowTests(ApiFactory factory) : IClassFixture<ApiF
         // the doctor's branches by their codes, not their count
         var doctors = await TextOf(await exporter.GetAsync($"{Base}/doctors/export"));
         Assert.Contains("D7,Dr. Amal,د. أمل,,,NORTH,10,,Yes", doctors, StringComparison.Ordinal);
+
+        // validation v0.5.0: the register returns the codes it shows (server join), so no reader ever sees a branch id
+        var listed = await editor.GetFromJsonAsync<Paged<DoctorListItem>>($"{Base}/doctors?search=D7");
+        var branchOfDoctor = Assert.Single(Assert.Single(listed!.Items).Branches);
+        Assert.Equal((branchId, "NORTH", "North", "الشمال"), (branchOfDoctor.Id, branchOfDoctor.Code, branchOfDoctor.NameEn, branchOfDoctor.NameAr));
+        var single = await editor.GetFromJsonAsync<DoctorListItem>($"{Base}/doctors/{listed.Items[0].Id}");
+        Assert.Equal(["NORTH"], single!.Branches.Select(branchItem => branchItem.Code).ToArray());
     }
 
     private static async Task<string> TextOf(HttpResponseMessage response)

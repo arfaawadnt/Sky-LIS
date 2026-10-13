@@ -21,7 +21,10 @@ builder.Services.AddSingleton(provider => SecurityConfiguration.ReadHost(provide
 builder.Services.AddSingleton(provider => SecurityConfiguration.ReadOptions(provider.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton(provider => SecurityConfiguration.ReadSessionPolicy(provider.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton(provider => SecurityConfiguration.ReadOutbox(provider.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton(provider => SecurityConfiguration.ReadNotifications(provider.GetRequiredService<IConfiguration>()));   // pickup directory, SMTP, HTTP SMS
 builder.Services.AddHostedService<OutboxHostedService>();   // 01 §7; Lis:Outbox:Enabled=false keeps the loop idle
+builder.Services.AddSingleton(provider => SecurityConfiguration.ReadWalletCharge(provider.GetRequiredService<IConfiguration>()));
+builder.Services.AddHostedService<WalletChargeHostedService>();   // W2 monthly subscription charge; Lis:Jobs:WalletCharge:Enabled=false keeps it idle
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(provider =>

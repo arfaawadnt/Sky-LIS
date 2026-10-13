@@ -90,10 +90,29 @@ public static class ResultRights
         new(rights.CanEdit, rights.CanReview, rights.CanVerify, rights.CanPrint, rights.CanModifyVerified, rights.CanPreviewWithoutVerify);
 }
 
-/// <summary>What BR-08 needs of the patient: sex, age (calendar units) and condition.</summary>
-public sealed record PatientProfile(GenderRestriction Sex, CatalogueAge Age, Guid? ConditionId)
+/// <summary>
+/// What BR-08 needs of the patient: sex, age (calendar units) and condition. <paramref name="AgeKnown"/> is false when the
+/// file holds neither a date of birth nor a stated age (the age then reads 0 days, which a formula must not use).
+/// </summary>
+public sealed record PatientProfile(GenderRestriction Sex, CatalogueAge Age, Guid? ConditionId, bool AgeKnown = true)
 {
-    public static PatientProfile Unknown { get; } = new(GenderRestriction.Any, CatalogueAge.FromDays(0), null);
+    public static PatientProfile Unknown { get; } = new(GenderRestriction.Any, CatalogueAge.FromDays(0), null, false);
+
+    /// <summary>
+    /// The patient variables of a formula (<see cref="FormulaVariables"/>): <c>@AGE</c> in completed years, <c>@FEMALE</c>
+    /// 1 or 0; null when the age or the sex is unknown, so a formula that reads them waits (validation v0.5.0, MDRD eGFR).
+    /// </summary>
+    public void AddFormulaVariables(IDictionary<string, decimal?> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        values[FormulaVariables.Age] = AgeKnown ? Age.Years : null;
+        values[FormulaVariables.Female] = Sex switch
+        {
+            GenderRestriction.Female => 1m,
+            GenderRestriction.Male => 0m,
+            _ => null,
+        };
+    }
 
     public static PatientProfile From(PatientSummary? summary, DateOnly today)
     {
@@ -110,6 +129,7 @@ public sealed record PatientProfile(GenderRestriction Sex, CatalogueAge Age, Gui
         };
 
         CatalogueAge age;
+        var ageKnown = summary.DateOfBirth is not null || summary.Age.Years > 0 || summary.Age.Months > 0 || summary.Age.Days > 0;
         if (summary.DateOfBirth is { } birth && birth <= today)
         {
             age = CatalogueAge.Between(birth, today);
@@ -120,7 +140,7 @@ public sealed record PatientProfile(GenderRestriction Sex, CatalogueAge Age, Gui
             age = CatalogueAge.FromDays(Math.Max(0, days));
         }
 
-        return new PatientProfile(sex, age, summary.PatientConditionId is { } condition && condition != Guid.Empty ? condition : null);
+        return new PatientProfile(sex, age, summary.PatientConditionId is { } condition && condition != Guid.Empty ? condition : null, ageKnown);
     }
 }
 
@@ -186,6 +206,7 @@ internal static class FormulaRecalculator
             {
                 var test = tests[formula.TestId];
                 var values = InputValues(visitResults, tests, formula, test.FormulaReferences);
+                patient.AddFormulaVariables(values);
                 var evaluation = evaluator.Evaluate(test.FormulaExpression!, values);
                 if (!evaluation.HasValue)
                 {

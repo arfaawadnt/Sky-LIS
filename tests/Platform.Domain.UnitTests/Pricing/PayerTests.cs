@@ -58,11 +58,25 @@ public sealed class PayerTests
     public void P2_Update_changes_details_and_clears_the_username_when_the_portal_is_off()
     {
         var payer = Axa();
+        payer.ClearDomainEvents();
 
-        payer.Update(new LocalizedText("AXA", "أكسا"), "axa-eg", PayerType.Credit, false, null);
+        payer.Update(new LocalizedText("AXA", "أكسا"), "axa-eg", PayerType.Credit, false, null, Now);
 
         Assert.Equal(("AXA-EG", PayerType.Credit, false, (string?)null), (payer.SearchKey, payer.Type, payer.WebPortalEnabled, payer.WebUsername));
         Assert.Equal("أكسا", payer.Name.Ar);
+        var raised = Assert.IsType<PayerUpdated>(Assert.Single(payer.DomainEvents));   // validation v0.5.0 O-5: the trail records the edit
+        Assert.Equal((payer.Id, "AXA-EG", Now), (raised.PayerId, raised.SearchKey, raised.OccurredAtUtc));
+    }
+
+    [Fact]
+    public void P2_Update_without_a_change_raises_nothing()
+    {
+        var payer = Axa();
+        payer.ClearDomainEvents();
+
+        payer.Update(new LocalizedText("AXA Insurance", "أكسا للتأمين"), "axa", PayerType.Insurance, true, "axa.portal", Now);
+
+        Assert.Empty(payer.DomainEvents);
     }
 
     [Fact]
@@ -79,12 +93,12 @@ public sealed class PayerTests
         Assert.IsType<ContractTierAdded>(cash.DomainEvents.Last());
 
         Assert.Equal(PricingCodes.DefaultPayerLocked, Assert.Throws<DomainException>(() => cash.Deactivate(Now)).Code);
-        Assert.Equal(PricingCodes.DefaultPayerLocked, Assert.Throws<DomainException>(() => cash.Update(new LocalizedText("Cash", "نقدي"), "CASH", PayerType.Credit, false, null)).Code);
+        Assert.Equal(PricingCodes.DefaultPayerLocked, Assert.Throws<DomainException>(() => cash.Update(new LocalizedText("Cash", "نقدي"), "CASH", PayerType.Credit, false, null, Now)).Code);
         Assert.Equal(PricingCodes.DefaultTierLocked, Assert.Throws<DomainException>(() => cash.DeactivateTier(tier.Id, Now)).Code);
         Assert.True(cash.IsActive);
         Assert.True(tier.IsActive);
 
-        cash.Update(new LocalizedText("Cash patients", "مرضى نقدي"), "CASH", PayerType.Cash, false, null);
+        cash.Update(new LocalizedText("Cash patients", "مرضى نقدي"), "CASH", PayerType.Cash, false, null, Now);
         Assert.Equal("Cash patients", cash.Name.En);
     }
 
@@ -132,12 +146,18 @@ public sealed class PayerTests
         var gold = payer.AddTier(new LocalizedText("Gold", "ذهبي"), Now);
         var silver = payer.AddTier(new LocalizedText("Silver", "فضي"), Now);
 
-        payer.RenameTier(gold.Id, new LocalizedText("Gold plus", "ذهبي بلس"));
-        Assert.Equal("Gold plus", gold.Name.En);
-        payer.RenameTier(silver.Id, new LocalizedText("Silver", "فضي معدل"));   // its own name is not a clash
+        payer.ClearDomainEvents();
 
-        Assert.Equal(PricingCodes.TierNameExists, Assert.Throws<DomainException>(() => payer.RenameTier(silver.Id, new LocalizedText("Gold plus", "x"))).Code);
-        var missing = Assert.Throws<DomainException>(() => payer.RenameTier(Guid.CreateVersion7(), new LocalizedText("Y", "ي")));
+        payer.RenameTier(gold.Id, new LocalizedText("Gold plus", "ذهبي بلس"), Now);
+        Assert.Equal("Gold plus", gold.Name.En);
+        var renamed = Assert.IsType<ContractTierRenamed>(Assert.Single(payer.DomainEvents));   // validation v0.5.0 O-5
+        Assert.Equal((payer.Id, gold.Id), (renamed.PayerId, renamed.ContractTierId));
+        payer.RenameTier(gold.Id, new LocalizedText("Gold plus", "ذهبي بلس"), Now);   // the same name: no event
+        Assert.Single(payer.DomainEvents);
+        payer.RenameTier(silver.Id, new LocalizedText("Silver", "فضي معدل"), Now);   // its own name is not a clash
+
+        Assert.Equal(PricingCodes.TierNameExists, Assert.Throws<DomainException>(() => payer.RenameTier(silver.Id, new LocalizedText("Gold plus", "x"), Now)).Code);
+        var missing = Assert.Throws<DomainException>(() => payer.RenameTier(Guid.CreateVersion7(), new LocalizedText("Y", "ي"), Now));
         Assert.Equal((PricingCodes.TierNotFound, DomainFault.NotFound), (missing.Code, missing.Fault));
     }
 

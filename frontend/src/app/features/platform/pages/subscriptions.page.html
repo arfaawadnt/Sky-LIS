@@ -14,6 +14,8 @@
             }
           </select>
         </label>
+        <button type="button" class="btn sm" *appCan="permissions.tenancyManage" [disabled]="facade.runCharges.pending()" (click)="runCharges()"
+                [title]="i18n.t('platform.wallet.runChargesHint')"><app-icon name="refresh" [size]="15" />{{ i18n.t('platform.wallet.runCharges') }}</button>
         @if (wallet()) {
           <button type="button" class="btn primary sm" *appCan="permissions.tenancyManage" (click)="openTopUp(null)"><app-icon name="plus" [size]="15" />{{ i18n.t('platform.wallet.topUp') }}</button>
         }
@@ -113,6 +115,9 @@
 <app-drawer [(open)]="planDrawerOpen" [title]="i18n.t(editingPlan() === null ? 'platform.plans.add' : 'platform.plans.edit')">
   @if (planForm(); as form) {
     <form id="platform-plan-form" [formGroup]="form" appSaveShortcut (appSaveShortcut)="savePlan()" (ngSubmit)="savePlan()" novalidate>
+      @if (planBlocked.blocked()) {
+        <p class="problem" role="alert">{{ i18n.t('shared.masterData.invalid') }}</p>
+      }
       @if (planProblem(); as problem) {
         <p class="problem" role="alert">{{ problemText(problem) }}</p>
       }

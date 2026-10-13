@@ -191,6 +191,62 @@ public sealed class AccountFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.True((await factory.LoadUserAsync(userId)).IsLockedOut);
     }
 
+    /// <summary>
+    /// Security rule SEC-LOCK-02 (intake LIS-INT-FND-001 §6, decided 2026-10-12 after LIS-VR-002): a wrong current password
+    /// on Change password is a credential check like sign-in. It feeds the same counter, reaches the same threshold and locks
+    /// the account the same way, so a stolen session cannot guess the password without limit.
+    /// </summary>
+    [DatabaseFact]
+    public async Task S_A2_wrong_current_passwords_share_the_sign_in_counter_and_lock_the_account_as_sign_in_does()
+    {
+        var (username, _, userId) = await factory.SeedUserAsync();
+        var auth = new AuthClient(factory.CreateClient());
+        var (signedIn, _, _) = await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password);
+        var client = Authorized(auth.Http, signedIn.AccessToken!);
+
+        // two wrong passwords at sign-in, from another browser
+        var guesser = new AuthClient(factory.CreateClient());
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            Assert.Equal(ProblemCodes.InvalidCredentials, await AuthClient.CodeOf(await guesser.SignInAsync(username, "sign-in-wrong-" + attempt)));
+        }
+
+        Assert.Equal(2, (await factory.LoadUserAsync(userId)).FailedPasswordAttempts);
+
+        // the same counter goes on at Change password: attempts three and four are refused as a wrong current password
+        for (var attempt = 3; attempt <= 4; attempt++)
+        {
+            var wrong = await ChangePasswordAsync(auth, client, "change-wrong-" + attempt, "Another-Secret-2026");
+            Assert.Equal((HttpStatusCode.Forbidden, "ACC-010"), (wrong.StatusCode, await AuthClient.CodeOf(wrong)));
+            Assert.Equal(attempt, (await factory.LoadUserAsync(userId)).FailedPasswordAttempts);
+        }
+
+        // the fifth (the sign-in threshold) locks the account for the sign-in lockout duration
+        Assert.Equal("ACC-011", await AuthClient.CodeOf(await ChangePasswordAsync(auth, client, "change-wrong-5", "Another-Secret-2026")));
+        var locked = await factory.LoadUserAsync(userId);
+        Assert.Equal((5, true), (locked.FailedPasswordAttempts, locked.IsLockedOut));
+        var lockoutEnd = factory.Clock.UtcNow.AddMinutes(30);
+        Assert.InRange(locked.LockoutEndUtc ?? DateTimeOffset.MinValue, lockoutEnd.AddSeconds(-1), lockoutEnd.AddSeconds(1));
+        Assert.False(locked.IsLockedByAdministrator);
+
+        // locked as after five wrong sign-ins: the right password is refused at sign-in (AUTH-003) and at Change password
+        var signIn = await new AuthClient(factory.CreateClient()).SignInAsync(username, ApiFactory.Password);
+        Assert.Equal((HttpStatusCode.Unauthorized, ProblemCodes.AccountLocked), (signIn.StatusCode, await AuthClient.CodeOf(signIn)));
+        Assert.Equal("ACC-011", await AuthClient.CodeOf(await ChangePasswordAsync(auth, client, ApiFactory.Password, "Another-Secret-2026")));
+
+        // and the lockout ends by itself, like the sign-in one
+        factory.Clock.Advance(TimeSpan.FromMinutes(31));
+        try
+        {
+            Assert.Equal(HttpStatusCode.OK, (await new AuthClient(factory.CreateClient()).SignInAsync(username, ApiFactory.Password)).StatusCode);
+            Assert.Equal(0, (await factory.LoadUserAsync(userId)).FailedPasswordAttempts);
+        }
+        finally
+        {
+            factory.Clock.Advance(TimeSpan.FromMinutes(-31));
+        }
+    }
+
     [DatabaseFact]
     public async Task S_D1_the_dashboard_answers_for_the_session_branch_and_refuses_without_one()
     {

@@ -23,7 +23,12 @@ public sealed record ResultVisibility(bool Unrestricted, IReadOnlyList<Guid> All
         || (GroupIdsByBranch.TryGetValue(branchId, out var groups) && groups.Contains(clinicalGroupId));
 }
 
-/// <summary>Filters of the worklist (CP-18, intake §14): collection window, group, test, analyser (its mapped tests), sample status, payer, statuses, delayed, search, branch; <c>Sort</c> orders the whole list before paging (validation v0.5.0 B-03, <see cref="ResultsSortKeys.Worklist"/>).</summary>
+/// <summary>
+/// Filters of the worklist (CP-18, intake §14): collection window, group, test, analyser (its mapped tests), sample status,
+/// payer, statuses, delayed, search, branch; <c>Sort</c> orders the whole list before paging (validation v0.5.0 B-03,
+/// <see cref="ResultsSortKeys.Worklist"/>). <c>LatePercent</c> is the tenant's <c>delayLatePercent</c>: "Delayed only" and the
+/// Delayed counter take an open result as late exactly when its row colour is Late (<see cref="Platform.Domain.Results.TurnaroundClock.IsLate"/>, F-15).
+/// </summary>
 public sealed record WorklistFilter(
     DateTimeOffset? CollectedFromUtc,
     DateTimeOffset? CollectedToUtc,
@@ -36,7 +41,9 @@ public sealed record WorklistFilter(
     bool DelayedOnly,
     string? Search,
     Guid? BranchId,
-    ListSort Sort = default);
+    ListSort Sort = default,
+    bool IncludeVip = true,
+    int LatePercent = 100);
 
 /// <summary>A worklist row before the delay is computed: the result, its sample, patient, test and group as stored; <c>DateOfBirth</c> is the known date of birth or the one implied by the stated age.</summary>
 public sealed record WorklistRow(
@@ -68,11 +75,16 @@ public sealed record WorklistRow(
     string? TextValue,
     ResultFlag? Flag,
     int PrintCount,
-    ResultSource Source);
+    ResultSource Source,
+    bool IsVip = false);
 
+/// <summary>A page of the worklist; <c>Delayed</c> counts the open results of the whole filter that are late by <see cref="WorklistFilter.LatePercent"/>.</summary>
 public sealed record WorklistSlice(IReadOnlyList<WorklistRow> Rows, long TotalCount, long Requests, long Samples, long Delayed);
 
-/// <summary>The query panel of CP-19: accession, patient number or name (<c>%</c> wildcard), statuses, analyser, flags, registration window.</summary>
+/// <summary>
+/// The query panel of CP-19: accession, patient number or name (<c>%</c> wildcard), statuses, analyser, flags, registration
+/// window. <c>IncludeVip</c> false (no See-VIP right, rule A-03) keeps VIP files out of a name match only.
+/// </summary>
 public sealed record ResultVisitFilter(
     string? Accession,
     string? PatientNumber,
@@ -85,12 +97,10 @@ public sealed record ResultVisitFilter(
     bool DeltaOnly,
     DateTimeOffset? RegisteredFromUtc,
     DateTimeOffset? RegisteredToUtc,
-    Guid? BranchId);
+    Guid? BranchId,
+    bool IncludeVip = true);
 
 public sealed record ResultVisitRow(Guid VisitId, string Accession, DateTimeOffset RegisteredAtUtc, Guid PatientId, Guid BranchId, ResultStatus Status, int Results, int Units, bool HasPanic, bool HasDelta, bool AnyPrinted);
-
-/// <summary>Figures of the results for the dashboard (CP-05).</summary>
-public sealed record ResultKpis(int PendingResults, int UnverifiedBacklog, int DelayedTests, int VerifiedInWindow);
 
 /// <summary>Write side plus the projections of the module's registers and documents. Every read is bounded to the current tenant.</summary>
 public interface IResultRepository : IRepository<Result>
@@ -137,8 +147,6 @@ public interface IResultRepository : IRepository<Result>
     Task<WorklistSlice> WorklistAsync(WorklistFilter filter, ResultVisibility visibility, PageRequest page, DateTimeOffset nowUtc, CancellationToken cancellationToken);
 
     Task<Paged<ResultVisitRow>> SearchVisitsAsync(ResultVisitFilter filter, ResultVisibility visibility, PageRequest page, CancellationToken cancellationToken);
-
-    Task<ResultKpis> KpisAsync(Guid? branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc, DateTimeOffset nowUtc, CancellationToken cancellationToken);
 
     /// <summary>INV-RES-009 for Registration: true when a line has a Verified or Printed result.</summary>
     Task<bool> AnyVerifiedAsync(IReadOnlyCollection<Guid> lineIds, CancellationToken cancellationToken);

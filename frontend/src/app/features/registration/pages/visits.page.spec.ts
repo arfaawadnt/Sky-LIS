@@ -88,7 +88,7 @@ describe('VisitsPage (CP-10)', () => {
 
     const text = await blobs[0]!.text();
     expect(text).not.toContain('2026-10-11T07:28:26');
-    expect(text).toContain(new Intl.DateTimeFormat('en-GB', { dateStyle: 'short', timeStyle: 'short' }).format(new Date('2026-10-11T07:28:26.129944+00:00')));
+    expect(text).toContain(new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date('2026-10-11T07:28:26.129944+00:00')));
   });
 
   it('lists the visits with the services styled by status, the balance and every row action for a full role', async () => {

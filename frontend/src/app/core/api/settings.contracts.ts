@@ -33,10 +33,13 @@ export interface TenantSettingsResponse {
   readonly settings: readonly TenantSettingItem[];
 }
 
-/** A value to store, in its text form; the server validates it against the key (`SET-001` unknown key, `SET-002` invalid value). */
+/**
+ * A value to store, in its text form; the server validates it against the key (`SET-001` unknown key, `SET-002` invalid
+ * value). `null` removes the tenant's own value ("Use default", validation F-13): the key reads the inherited value again.
+ */
 export interface SettingValueItem {
   readonly key: string;
-  readonly value: string;
+  readonly value: string | null;
 }
 
 export interface UpdateTenantSettingsRequest {

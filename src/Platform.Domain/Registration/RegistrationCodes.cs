@@ -61,12 +61,18 @@ public static class RegistrationCodes
     public const string BookingNotBooked = "REG-107";
     public const string BookingPatientMismatch = "REG-108";
 
+    /// <summary>Validation O-3: every test the service orders is already on the visit through another service (assumption).</summary>
+    public const string DuplicateTests = "REG-109";
+
     /// <summary>Advisory warnings of the order planner (dry run and registration responses).</summary>
     public const string WarningFrequency = "REG-201";
     public const string WarningContractAlert = "REG-202";
     public const string WarningPrecaution = "REG-203";
     public const string WarningAddedByRule = "REG-204";
     public const string WarningAddedByDiagnosis = "REG-205";
+
+    /// <summary>Validation O-3: the service adds new tests but repeats some already on the visit; the detail names them.</summary>
+    public const string WarningRepeatedTests = "REG-206";
     public const string WarningSkippedCompanion = "REG-207";
 
     public const string VisitNotFound = "REG-404";

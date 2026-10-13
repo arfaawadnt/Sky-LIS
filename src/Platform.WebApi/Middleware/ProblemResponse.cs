@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Platform.Contracts.Common;
+using Platform.WebApi.Security;
 
 namespace Platform.WebApi.Middleware;
 
@@ -58,9 +60,19 @@ public static class ProblemResponse
 
     private static readonly IReadOnlyDictionary<string, object> FormatRule = new Dictionary<string, object>(StringComparer.Ordinal) { ["rule"] = "Format" };
 
+    /// <summary>
+    /// A body the binder could not read or that misses a required member: 400 with the <c>Format</c> rule per field, but only
+    /// for a caller who may send the action's requests. Anyone else receives the pipeline's 401/403 first (validation F-17:
+    /// authorization before validation on every path, so a refusal never discloses the request's rules).
+    /// </summary>
     public static IActionResult InvalidModelState(ActionContext actionContext)
     {
         ArgumentNullException.ThrowIfNull(actionContext);
+        if (actionContext.ActionDescriptor is ControllerActionDescriptor action)
+        {
+            ActionRequestPolicies.Demand(action, actionContext.HttpContext.RequestServices);   // throws the refusal; DomainExceptionHandler writes it
+        }
+
         var errors = actionContext.ModelState
             .Where(entry => entry.Value is { Errors.Count: > 0 })
             .ToDictionary(entry => entry.Key, entry => entry.Value!.Errors.Select(error => string.IsNullOrEmpty(error.ErrorMessage) ? "invalid" : error.ErrorMessage).ToArray(), StringComparer.Ordinal);

@@ -1,9 +1,12 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input, model, output } from '@angular/core';
+import { Router } from '@angular/router';
 
 import { AuthStore } from '../core/auth/auth.store';
 import { displayNameFor } from '../core/auth/display-name';
 import { roleNameFor } from '../core/auth/role-name';
 import { I18nService } from '../core/i18n/i18n.service';
+import { changeBranchUrl } from '../features/account/account.guards';
+import { SessionBranches } from '../features/account/state/session-branches.service';
 import { IconComponent } from '../shared/ui/icon/icon.component';
 import { SearchBoxComponent } from '../shared/ui/search-box/search-box.component';
 import { LabBrandComponent } from './lab-brand.component';
@@ -13,7 +16,9 @@ import { LabBrandComponent } from './lab-brand.component';
  * as a drawer), the client laboratory (name and logo or initials, `LabBrandComponent`; the Sky LIS logo stays at the
  * top of the sidebar), the navigation search
  * (the Ctrl+K fallback when a page has no search box of its own), portal pill, language toggle, and the user
- * button with its menu (language, sign-out). The shell owns the state; this component renders it.
+ * button with its menu (language, change of branch, sign-out). The shell owns the state; this component renders it.
+ * Validation F-05 (CP-04): the client session's branch shows beside the portal pill and in the menu head; "Change branch"
+ * opens the branch selection in change mode, and only when the user has more than one branch.
  */
 @Component({
   selector: 'app-shell-topbar',
@@ -27,6 +32,8 @@ export class ShellTopbarComponent {
   protected readonly i18n = inject(I18nService);
   protected readonly auth = inject(AuthStore);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly router = inject(Router);
+  protected readonly sessionBranches = inject(SessionBranches);
 
   readonly portalLabel = input.required<string>();
   readonly mobileOpen = input(false);
@@ -61,6 +68,12 @@ export class ShellTopbarComponent {
       .join(''),
   );
 
+  /** F-05: the session's branch as "CODE · Name" in the language of the page, or null (no branch yet, or the platform portal). */
+  protected readonly branchLabel = computed(() => {
+    const branch = this.sessionBranches.current();
+    return branch === null ? null : `${branch.code} · ${this.i18n.lang() === 'ar' ? branch.nameAr : branch.nameEn}`;
+  });
+
   protected readonly otherLanguageLabel = computed(() => (this.i18n.lang() === 'en' ? 'العربية' : 'English'));
 
   protected toggleUserMenu(): void {
@@ -81,6 +94,12 @@ export class ShellTopbarComponent {
     }
 
     void this.auth.updateLanguage(language).catch(() => undefined);
+  }
+
+  /** F-05 (CP-04): the branch selection in change mode; it comes back to the page the user was on. */
+  protected onChangeBranch(): void {
+    this.menuOpen.set(false);
+    void this.router.navigateByUrl(changeBranchUrl(this.router, this.router.url));
   }
 
   protected onSignOut(): void {

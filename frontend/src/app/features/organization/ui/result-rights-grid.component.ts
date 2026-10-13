@@ -49,7 +49,7 @@ function grantsAnything(right: ResultRight): boolean {
           }
         </select>
       </label>
-      <span class="muted small">{{ i18n.tf('organization.results.configured', { count: value().length }) }}</span>
+      <span class="muted small">{{ i18n.tc('organization.results.configured', value().length) }}</span>
     </div>
 
     @if (groups().length === 0) {

@@ -14,7 +14,9 @@ using Platform.Application.Identity;
 using Platform.Application.Organization;
 using Platform.Application.Treasury;
 using Platform.Application.Tenancy;
+using Platform.Application.PlatformAdmin.Jobs;
 using Platform.Infrastructure.Audit;
+using Platform.Infrastructure.Jobs;
 using Platform.Infrastructure.Notifications;
 using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Persistence.Identity;
@@ -126,6 +128,11 @@ public static class InfrastructureServiceRegistration
         services.AddSingleton<DomainEventRegistry>();
         services.AddSingleton<OutboxProcessor>();
 
+        // Monthly wallet charge (W2, Lis:Jobs:WalletCharge): the same singleton serves the hosted loop and SA-05 "Run charges now".
+        services.TryAddSingleton(new WalletChargeOptions());
+        services.AddSingleton<WalletChargeJob>();
+        services.TryAddSingleton<IWalletChargeRun>(provider => provider.GetRequiredService<WalletChargeJob>());
+
         // Business modules register by convention (01 §3.1): every concrete class under Platform.Infrastructure.Persistence
         // or Platform.Infrastructure.Services that implements a port declared in Platform.Application is a scoped adapter.
         // Explicit registrations above win (TryAdd), and a port with two candidate adapters fails fast at start-up.
@@ -134,7 +141,14 @@ public static class InfrastructureServiceRegistration
         // Foundation defaults for ports a later module may own (platform notification templates, an SMS gateway):
         // registered after the convention with TryAdd, so a module adapter found by convention wins.
         services.TryAddScoped<INotificationTemplateSource, DefaultNotificationTemplateSource>();
-        services.TryAddScoped<INotificationSender, LoggingNotificationSender>();
+
+        // Delivery (Lis:Notifications): the host registers the options; a tool or test without them keeps the logging sender.
+        // Pickup directory, SMTP or the HTTP SMS gateway when configured; otherwise the logging sender stays the default.
+        services.TryAddSingleton(new NotificationOptions());
+        services.TryAddSingleton<NotificationTransports>();
+        services.TryAdd(ServiceDescriptor.Scoped<INotificationSender>(provider => provider.GetRequiredService<NotificationTransports>().Any
+            ? ActivatorUtilities.CreateInstance<DeliveringNotificationSender>(provider)
+            : ActivatorUtilities.CreateInstance<LoggingNotificationSender>(provider)));
 
         return services;
     }

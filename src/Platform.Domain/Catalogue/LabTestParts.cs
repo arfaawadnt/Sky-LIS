@@ -286,6 +286,11 @@ public sealed class ListValue : Entity, ITenantScoped
             CatalogueAGuard.Refuse(LabTestCodes.PlaceholderCritical, $"Value {displayOrder}: a placeholder is never critical.");
         }
 
+        if (spec.IsNormal && spec.IsCritical)
+        {
+            CatalogueAGuard.Refuse(LabTestCodes.ListValueNormalAndCritical, $"Value {displayOrder}: a value is Normal or Critical, not both.");
+        }
+
         return new ListValue(Guid.CreateVersion7(), labTestId, value, spec, colour, displayOrder);
     }
 }

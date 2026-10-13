@@ -33,7 +33,11 @@ public static class TenantSettingSources
 
 public sealed record TenantSettingsResponse(IReadOnlyList<TenantSettingItem> Settings);
 
-/// <summary>A value to store; the text form is validated against the key's descriptor (<c>SET-001</c> unknown key, <c>SET-002</c> invalid value).</summary>
-public sealed record SettingValueItem(string Key, string Value);
+/// <summary>
+/// A value to store; the text form is validated against the key's descriptor (<c>SET-001</c> unknown key, <c>SET-002</c> invalid
+/// value, <c>SET-003</c> unknown time zone). A <c>null</c> <see cref="Value"/> removes the tenant's own value ("Use default",
+/// validation F-13): the row is deleted and the key reads the inherited value again (<c>IsDefault</c> true, no update stamp).
+/// </summary>
+public sealed record SettingValueItem(string Key, string? Value);
 
 public sealed record UpdateTenantSettingsRequest(IReadOnlyList<SettingValueItem> Settings);

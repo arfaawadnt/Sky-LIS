@@ -5,8 +5,10 @@ import { TestBed } from '@angular/core/testing';
 import type { FormGroup } from '@angular/forms';
 import { provideRouter } from '@angular/router';
 
-import { PLATFORM_API } from '../../../core/api/platform.contracts';
+import { PLATFORM_API, type WalletChargeRunSummary } from '../../../core/api/platform.contracts';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
+import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
+import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { WalletsFacade } from '../state/wallets.facade';
 import { SubscriptionsPage } from './subscriptions.page';
 
@@ -73,5 +75,79 @@ describe('Plan monthly fee (C-05)', () => {
     expect((request.request.body as { monthlyFee: number }).monthlyFee).toBe(14.15);
     request.flush({ id: 'p1' });
     await saving;
+  });
+});
+
+/**
+ * Validation LIS-VR-002 §7 (C-8): the wallet ledger held top-ups only because no billing run existed. SA-05 now offers
+ * "Run charges now" (tenancy.manage): after a confirmation it posts the charge run, reports charged / skipped / failed
+ * and re-reads the selected wallet; without the permission the button is not there.
+ */
+describe('Run charges now (W2)', () => {
+  const summary: WalletChargeRunSummary = {
+    runAtUtc: '2026-10-12T10:00:00Z',
+    charged: 2,
+    skipped: 1,
+    failed: 0,
+    atOrBelowZero: 1,
+    items: [{ tenantId: 'c1', outcome: 'Charged', reason: null, period: '2026-10', amount: -1500, balanceAfter: 500 }],
+  };
+
+  async function render(canManage: boolean): Promise<{ backend: HttpTestingController; host: HTMLElement }> {
+    await TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        WalletsFacade,
+        { provide: PermissionsService, useValue: { can: () => canManage } satisfies Pick<PermissionsService, 'can'> },
+        { provide: ConfirmService, useValue: { confirm: () => Promise.resolve(true) } satisfies Pick<ConfirmService, 'confirm'> },
+      ],
+    }).compileComponents();
+    const backend = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(SubscriptionsPage);
+    TestBed.tick();
+    await settle();
+    backend.match(() => true).forEach((request) => request.flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 0 }));
+    await settle();
+    fixture.detectChanges();
+    return { backend, host: fixture.nativeElement as HTMLElement };
+  }
+
+  function runButton(host: HTMLElement): HTMLButtonElement | undefined {
+    return Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((button) => button.textContent?.includes('platform.wallet.runCharges'));
+  }
+
+  it('posts the charge run after the confirmation and reports the summary', async () => {
+    const { backend, host } = await render(true);
+    const button = runButton(host);
+    expect(button).toBeDefined();
+
+    button?.click();
+    await settle();
+    const request = backend.expectOne((candidate) => candidate.url === PLATFORM_API.walletChargeRun && candidate.method === 'POST');
+    request.flush(summary);
+    await settle();
+
+    expect(TestBed.inject(ToastService).toasts().some((toast) => toast.kind === 'success')).toBe(true);
+    TestBed.tick();
+    await settle();
+    expect(backend.match((candidate) => candidate.url.startsWith(PLATFORM_API.clients)).length).toBeGreaterThan(0);   // the client list (wallet balances) is re-read
+  });
+
+  it('warns when a charge failed', async () => {
+    const { backend, host } = await render(true);
+    runButton(host)?.click();
+    await settle();
+    backend.expectOne(PLATFORM_API.walletChargeRun).flush({ ...summary, failed: 1 });
+    await settle();
+    expect(TestBed.inject(ToastService).toasts().some((toast) => toast.kind === 'warn')).toBe(true);
+  });
+
+  it('is not offered without tenancy.manage', async () => {
+    const { backend, host } = await render(false);
+    expect(runButton(host)).toBeUndefined();
+    backend.expectNone(PLATFORM_API.walletChargeRun);
   });
 });

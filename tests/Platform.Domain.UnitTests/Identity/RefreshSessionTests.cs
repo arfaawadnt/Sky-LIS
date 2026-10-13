@@ -32,6 +32,21 @@ public sealed class RefreshSessionTests
     }
 
     [Fact]
+    public void A_session_is_idle_once_nothing_renewed_it_for_longer_than_the_timeout_and_a_rotation_starts_the_count_again_F_01()
+    {
+        var session = OpenBrowserSession();
+        var timeout = TimeSpan.FromMinutes(30);
+
+        Assert.False(session.IsIdleAt(FixedClock.Instant.AddMinutes(30), timeout));
+        Assert.True(session.IsIdleAt(FixedClock.Instant.AddMinutes(30).AddSeconds(1), timeout));
+        Assert.False(session.IsIdleAt(FixedClock.Instant.AddHours(1), TimeSpan.Zero));   // no timeout, no idle end
+
+        var successor = session.Rotate(Hash(2), FixedClock.Instant.AddMinutes(20), Sliding);
+        Assert.False(successor.IsIdleAt(FixedClock.Instant.AddMinutes(45), timeout));
+        Assert.True(successor.IsIdleAt(FixedClock.Instant.AddMinutes(51), timeout));
+    }
+
+    [Fact]
     public void A_hash_of_the_wrong_length_or_an_absolute_lifetime_below_the_sliding_one_is_refused()
     {
         Assert.Equal(IdentityCodes.SessionTokenHashInvalid, Assert.Throws<DomainException>(() => RefreshSession.Open(User, Tenant, SessionKind.Browser, SessionScope.Full, [1, 2, 3], FixedClock.Instant, Sliding, Absolute)).Code);

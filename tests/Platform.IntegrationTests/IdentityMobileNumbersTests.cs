@@ -9,6 +9,7 @@ using Platform.IntegrationTests.Support;
 using Platform.SharedKernel.Localization;
 using Platform.SharedKernel.MultiTenancy;
 using Platform.SharedKernel.Primitives;
+using Platform.TestSupport;
 
 namespace Platform.IntegrationTests;
 
@@ -20,7 +21,6 @@ namespace Platform.IntegrationTests;
 public sealed class IdentityMobileNumbersTests(DatabaseFixture fixture)
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 11, 9, 0, 0, TimeSpan.Zero);
-    private static int _isoCounter;
 
     [DatabaseFact]
     public async Task A_national_or_international_mobile_is_stored_in_E164_by_the_country_rules()
@@ -90,8 +90,7 @@ public sealed class IdentityMobileNumbersTests(DatabaseFixture fixture)
 
     private async Task<Country> SeedCountryAsync(string dialCode, int mobileLength)
     {
-        var n = Interlocked.Increment(ref _isoCounter);
-        var iso = "X" + (char)('A' + (n % 26));
+        var iso = TestCountryCodes.Next();
         var country = Country.Create(new CountryData("Mobileland " + iso, "أرض " + iso, iso, dialCode, "Pound", "EGP", "ar", "Africa/Cairo", mobileLength, null, null));
         using var scope = fixture.AppScope(null);
         scope.ServiceProvider.GetRequiredService<ICountryRepository>().Add(country);

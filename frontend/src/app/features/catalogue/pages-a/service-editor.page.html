@@ -27,6 +27,9 @@
   </div>
 
   <form class="editor" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+    @if (blocked() && form.invalid) {
+      <p class="problem" role="alert">{{ i18n.t('shared.masterData.invalid') }}</p>
+    }
     <div role="tabpanel" [hidden]="activeTab() !== 'general'">
       @if (generalProblem(); as problem) {
         <p class="problem" role="alert">{{ problemText(problem) }}</p>

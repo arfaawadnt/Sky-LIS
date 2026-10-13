@@ -116,6 +116,7 @@ public class FormulaEvaluator : IFormulaEvaluator
     {
         NumberNode number => number.Value.ToString(CultureInfo.InvariantCulture),
         ReferenceNode reference => $"[{reference.Code}]",
+        VariableNode variable => variable.Name,
         UnaryNode unary => unary.Operator + Render(unary.Operand),
         BinaryNode binary => $"{Render(binary.Left)} {binary.Operator} {Render(binary.Right)}",
         GroupNode group => $"({Render(group.Inner)})",
@@ -179,6 +180,23 @@ public class FormulaEvaluator : IFormulaEvaluator
                 tokens.Add(new Token(TokenKind.Reference, code, position));
                 i = close + 1;
             }
+            else if (c == '@')
+            {
+                // a patient variable (@AGE, @FEMALE): filled by the caller from the patient, never a test code
+                var start = ++i;
+                while (i < text.Length && (char.IsAsciiLetterOrDigit(text[i]) || text[i] == '_'))
+                {
+                    i++;
+                }
+
+                var name = "@" + text[start..i].ToUpperInvariant();
+                if (!FormulaVariables.All.Contains(name, StringComparer.Ordinal))
+                {
+                    throw new FormulaSyntaxException($"Unknown patient variable '{name}'. Use {string.Join(" or ", FormulaVariables.All)}.", position);
+                }
+
+                tokens.Add(new Token(TokenKind.Variable, name, position));
+            }
             else if (char.IsAsciiLetter(c) || c == '_')
             {
                 var start = i;
@@ -241,6 +259,7 @@ public class FormulaEvaluator : IFormulaEvaluator
     {
         Number,
         Reference,
+        Variable,
         Identifier,
         Operator,
         LeftParen,
@@ -257,6 +276,8 @@ public class FormulaEvaluator : IFormulaEvaluator
 
     private sealed record ReferenceNode(string Code) : FormulaNode;
 
+    private sealed record VariableNode(string Name) : FormulaNode;
+
     private sealed record UnaryNode(string Operator, FormulaNode Operand) : FormulaNode;
 
     private sealed record BinaryNode(string Operator, FormulaNode Left, FormulaNode Right) : FormulaNode;
@@ -265,7 +286,7 @@ public class FormulaEvaluator : IFormulaEvaluator
 
     private sealed record CallNode(string Name, IReadOnlyList<FormulaNode> Arguments) : FormulaNode;
 
-    /// <summary>Grammar: comparison := additive [cmp additive]; additive := multiplicative {(+|-) multiplicative}; multiplicative := unary {(*|/) unary}; unary := (-|+) unary | power; power := primary [^ unary]; primary := number | reference | name '(' args ')' | '(' comparison ')'.</summary>
+    /// <summary>Grammar: comparison := additive [cmp additive]; additive := multiplicative {(+|-) multiplicative}; multiplicative := unary {(*|/) unary}; unary := (-|+) unary | power; power := primary [^ unary]; primary := number | reference | variable | name '(' args ')' | '(' comparison ')'.</summary>
     private sealed class Parser(List<Token> tokens)
     {
         private static readonly HashSet<string> Comparisons = new(StringComparer.Ordinal) { "<", "<=", ">", ">=", "=", "<>" };
@@ -369,6 +390,9 @@ public class FormulaEvaluator : IFormulaEvaluator
                 case TokenKind.Reference:
                     Advance();
                     return new ReferenceNode(token.Text);
+                case TokenKind.Variable:
+                    Advance();
+                    return new VariableNode(token.Text);
                 case TokenKind.Identifier when tokens[_index + 1].Kind == TokenKind.LeftParen:
                     return ParseCall();
                 case TokenKind.Identifier:
@@ -449,6 +473,7 @@ public class FormulaEvaluator : IFormulaEvaluator
         {
             NumberNode number => number.Value,
             ReferenceNode reference => Value(reference.Code),
+            VariableNode variable => Value(variable.Name),
             UnaryNode unary => -Eval(unary.Operand),
             GroupNode group => Eval(group.Inner),
             BinaryNode binary => Binary(binary),

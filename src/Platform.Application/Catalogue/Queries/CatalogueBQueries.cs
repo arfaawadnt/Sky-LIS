@@ -2,6 +2,7 @@ using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
 using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
+using Platform.Application.Organization;
 using Platform.Contracts.Catalogue;
 using Platform.Contracts.Common;
 using Platform.Domain.Authorization;
@@ -88,19 +89,56 @@ public sealed class ListDoctorsValidator : AbstractValidator<ListDoctorsQuery>
     }
 }
 
-public sealed class ListDoctorsHandler(IDoctorRepository doctors) : IQueryHandler<ListDoctorsQuery, Paged<DoctorListItem>>
+public sealed class ListDoctorsHandler(IDoctorRepository doctors, IBranchLookup branches) : IQueryHandler<ListDoctorsQuery, Paged<DoctorListItem>>
 {
-    public Task<Paged<DoctorListItem>> Handle(ListDoctorsQuery query, CancellationToken cancellationToken) =>
-        doctors.ListAsync(new CatalogueBFilter(query.Search, query.IsActive, ListSort.Of(query.Sort, query.Direction)), query.BranchId, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+    public async Task<Paged<DoctorListItem>> Handle(ListDoctorsQuery query, CancellationToken cancellationToken)
+    {
+        var page = await doctors.ListAsync(new CatalogueBFilter(query.Search, query.IsActive, ListSort.Of(query.Sort, query.Direction)), query.BranchId, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        return page with { Items = await DoctorBranches.JoinAsync(branches, page.Items, cancellationToken) };
+    }
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
 public sealed record GetDoctorQuery(Guid DoctorId) : IQuery<DoctorListItem>;
 
-public sealed class GetDoctorHandler(IDoctorRepository doctors) : IQueryHandler<GetDoctorQuery, DoctorListItem>
+public sealed class GetDoctorHandler(IDoctorRepository doctors, IBranchLookup branches) : IQueryHandler<GetDoctorQuery, DoctorListItem>
 {
-    public async Task<DoctorListItem> Handle(GetDoctorQuery query, CancellationToken cancellationToken) =>
-        await doctors.GetListItemAsync(query.DoctorId, cancellationToken) ?? throw CatalogueBRules.NotFound(CatalogueBCodes.DoctorNotFound, "Doctor");
+    public async Task<DoctorListItem> Handle(GetDoctorQuery query, CancellationToken cancellationToken)
+    {
+        var doctor = await doctors.GetListItemAsync(query.DoctorId, cancellationToken) ?? throw CatalogueBRules.NotFound(CatalogueBCodes.DoctorNotFound, "Doctor");
+        return (await DoctorBranches.JoinAsync(branches, [doctor], cancellationToken))[0];
+    }
+}
+
+/// <summary>
+/// The branches of the doctors on a page by code and name, read through the Organization port for the whole tenant (not the
+/// user's own branches): the register shows codes, never ids, whichever branches the reader works in (validation v0.5.0).
+/// A branch the port no longer knows is left out.
+/// </summary>
+public static class DoctorBranches
+{
+    public static async Task<IReadOnlyList<DoctorListItem>> JoinAsync(IBranchLookup branches, IReadOnlyList<DoctorListItem> doctors, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(branches);
+        ArgumentNullException.ThrowIfNull(doctors);
+        var ids = doctors.SelectMany(doctor => doctor.BranchIds).Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return doctors;
+        }
+
+        var known = await branches.GetManyAsync(ids, cancellationToken);
+        return doctors
+            .Select(doctor => doctor with
+            {
+                Branches = doctor.BranchIds
+                    .Where(known.ContainsKey)
+                    .Select(id => known[id])
+                    .Select(branch => new DoctorBranch(branch.Id, branch.Code, branch.NameEn, branch.NameAr))
+                    .ToList(),
+            })
+            .ToList();
+    }
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]

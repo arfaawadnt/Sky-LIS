@@ -34,6 +34,7 @@
   "dashboard.noChart": "Registrations appear here once registration is live.",
   "dashboard.chartBar": "{date}: {count} registrations",
   "dashboard.chartBarOne": "{date}: 1 registration",
+  "dashboard.chartBarNone": "{date}: no registrations",
   "dashboard.quickActions": "Quick actions",
   "dashboard.action.registration": "New registration",
   "dashboard.action.searchRegistrations": "Search registrations",

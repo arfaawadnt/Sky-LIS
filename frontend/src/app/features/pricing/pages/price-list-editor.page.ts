@@ -226,7 +226,7 @@ export class PriceListEditorPage {
 
     const confirmed = await this.confirm.confirm({
       title: this.i18n.t('pricing.editor.apply'),
-      message: this.i18n.tf('pricing.editor.confirmApply', { code: detail.code, count: detail.derivedContracts.length }),
+      message: this.i18n.tc('pricing.editor.confirmApply', detail.derivedContracts.length, { code: detail.code }),
       confirmLabel: this.i18n.t('pricing.editor.apply'),
     });
     if (!confirmed) {
@@ -235,7 +235,7 @@ export class PriceListEditorPage {
 
     const result = await this.facade.apply.execute(detail.id);
     if (result !== null) {
-      this.toast.success(this.i18n.tf('pricing.editor.applied', { contracts: result.contractsApplied, prices: result.pricesChanged }));
+      this.toast.success(this.i18n.tf('pricing.editor.applied', { contracts: this.i18n.tc('pricing.editor.appliedContracts', result.contractsApplied), prices: this.i18n.tc('pricing.editor.appliedPrices', result.pricesChanged) }));
     }
   }
 

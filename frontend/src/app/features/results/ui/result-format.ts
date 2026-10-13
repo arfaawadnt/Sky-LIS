@@ -79,8 +79,22 @@ export interface DurationUnits {
   readonly minutes: string;
 }
 
-/** `2d 12h 38m` style (LDM §6 "Delay"); empty below a minute. */
-export function formatDuration(seconds: number, units: DurationUnits): string {
+/**
+ * A number on screen in the digits of the language: Arabic-Indic in Arabic (validation v0.5.0 F-09: ages, percentages and
+ * counts stayed Latin beside Arabic-Indic dates). Never grouped, at most two decimals. Printed documents and exported
+ * files keep Latin digits ({@link latinNumber}).
+ */
+export function screenNumber(value: number, lang: string): string {
+  return new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 2, useGrouping: false }).format(value);
+}
+
+/** A number on a printed document or in an exported file: Latin digits in every language. */
+export function latinNumber(value: number): string {
+  return String(value);
+}
+
+/** `2d 12h 38m` style (LDM §6 "Delay"); empty below a minute. `digits` writes the numbers (Latin by default). */
+export function formatDuration(seconds: number, units: DurationUnits, digits: (value: number) => string = latinNumber): string {
   if (seconds < 60) {
     return '';
   }
@@ -90,22 +104,34 @@ export function formatDuration(seconds: number, units: DurationUnits): string {
   const minutes = Math.floor((seconds % 3600) / 60);
   const parts: string[] = [];
   if (days > 0) {
-    parts.push(`${days}${units.days}`);
+    parts.push(`${digits(days)}${units.days}`);
   }
 
   if (hours > 0) {
-    parts.push(`${hours}${units.hours}`);
+    parts.push(`${digits(hours)}${units.hours}`);
   }
 
   if (minutes > 0 && days === 0) {
-    parts.push(`${minutes}${units.minutes}`);
+    parts.push(`${digits(minutes)}${units.minutes}`);
   }
 
   return parts.join(' ');
 }
 
-/** Date and time in the user's language (Latin digits in both, as on the reports). */
+/**
+ * Date and time on screen in the user's language and its digits (Arabic-Indic in Arabic), like the rest of the portal
+ * (decision 2026-10-12 after validation R3-02). Printed documents and exported files use {@link formatPrintDateTime}.
+ */
 export function formatDateTime(iso: string | null | undefined, lang: string): string {
+  return format(iso, lang === 'ar' ? 'ar-EG' : 'en-GB');
+}
+
+/** Date and time of the printed reports, worklists and exported files: the user's language with Latin digits in both. */
+export function formatPrintDateTime(iso: string | null | undefined, lang: string): string {
+  return format(iso, lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB');
+}
+
+function format(iso: string | null | undefined, locale: string): string {
   if (!iso) {
     return '—';
   }
@@ -115,7 +141,7 @@ export function formatDateTime(iso: string | null | undefined, lang: string): st
     return '—';
   }
 
-  return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
 /** A local calendar day (`yyyy-MM-dd`) as the UTC instant of its start, for the API's date windows. */
@@ -163,21 +189,27 @@ export function toValueItem(row: ResultRowView, draft: string): ResultValueItem 
   return { resultId: row.id, numericValue: null, textValue: text, paragraphs: null, culture: null };
 }
 
-/** `40y 3m` / `5m 12d` / `9d` from the age parts. */
-export function ageText(years: number | null, months: number | null, days: number | null, units: { readonly y: string; readonly m: string; readonly d: string }): string {
+/** `40y 3m` / `5m 12d` / `9d` from the age parts; `digits` writes the numbers (Latin by default, {@link screenNumber} on screen). */
+export function ageText(
+  years: number | null,
+  months: number | null,
+  days: number | null,
+  units: { readonly y: string; readonly m: string; readonly d: string },
+  digits: (value: number) => string = latinNumber,
+): string {
   if (years === null && months === null && days === null) {
     return '—';
   }
 
   if ((years ?? 0) > 0) {
-    return (months ?? 0) > 0 && (years ?? 0) < 5 ? `${years}${units.y} ${months}${units.m}` : `${years}${units.y}`;
+    return (months ?? 0) > 0 && (years ?? 0) < 5 ? `${digits(years ?? 0)}${units.y} ${digits(months ?? 0)}${units.m}` : `${digits(years ?? 0)}${units.y}`;
   }
 
   if ((months ?? 0) > 0) {
-    return `${months}${units.m} ${days ?? 0}${units.d}`;
+    return `${digits(months ?? 0)}${units.m} ${digits(days ?? 0)}${units.d}`;
   }
 
-  return `${days ?? 0}${units.d}`;
+  return `${digits(days ?? 0)}${units.d}`;
 }
 
 /** The text of the reader's language, the other one when it is empty, `—` when both are. */
@@ -188,8 +220,16 @@ export function pickName(en: string | null | undefined, ar: string | null | unde
 }
 
 /** A patient line (`PAT-… · Name`) from a list item. */
-export function patientLabel(item: { readonly patientNumber: string | null; readonly patientName: string | null; readonly patientNameAr: string | null }, lang: string): string {
-  const name = pickName(item.patientName, item.patientNameAr, lang);
+/**
+ * "number · name" of a row; a VIP name masked by the server (`patientMasked`, rule A-03) reads `maskedName` (the
+ * dictionary's "VIP patient") when the caller passes it.
+ */
+export function patientLabel(
+  item: { readonly patientNumber: string | null; readonly patientName: string | null; readonly patientNameAr: string | null; readonly patientMasked?: boolean },
+  lang: string,
+  maskedName?: string,
+): string {
+  const name = item.patientMasked === true && maskedName !== undefined ? maskedName : pickName(item.patientName, item.patientNameAr, lang);
   return item.patientNumber ? `${item.patientNumber} · ${name}` : name;
 }
 
@@ -214,11 +254,11 @@ export function delayClass(state: DelayState): string {
   }
 }
 
-/** A short age/sex line: `36y · F`. */
-export function ageSex(ageYears: number | null, gender: string | null, units: { readonly y: string }, genderLabel: (gender: string) => string): string {
+/** A short age/sex line: `36y · F`; `digits` writes the age (Latin by default). */
+export function ageSex(ageYears: number | null, gender: string | null, units: { readonly y: string }, genderLabel: (gender: string) => string, digits: (value: number) => string = latinNumber): string {
   const parts: string[] = [];
   if (ageYears !== null) {
-    parts.push(`${ageYears}${units.y}`);
+    parts.push(`${digits(ageYears)}${units.y}`);
   }
 
   if (gender) {

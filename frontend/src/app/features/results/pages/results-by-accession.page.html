@@ -60,7 +60,7 @@
 </app-section-card>
 
 <div class="split" [class.collapsed]="listCollapsed()">
-  <app-section-card class="visits" [title]="i18n.tf('results.case.matching', { count: matchingCount() })" [padded]="false">
+  <app-section-card class="visits" [title]="matchingTitle()" [padded]="false">
     @if (current()) {
       <button cardActions type="button" class="btn sm ghost" (click)="listCollapsed.set(!listCollapsed())">
         {{ listCollapsed() ? i18n.t('results.case.showList') : i18n.t('results.case.hideList') }}
@@ -165,7 +165,7 @@
                     {{ unitName(unit) }}
                     <app-badge [status]="unit.status">{{ statusLabel(unit.status) }}</app-badge>
                     @if (unit.isPrinted) {
-                      <app-badge tone="neutral"><app-icon name="printer" [size]="12" />{{ i18n.tf('results.case.printedTimes', { count: unit.printCount }) }}</app-badge>
+                      <app-badge tone="neutral"><app-icon name="printer" [size]="12" />{{ i18n.tf('results.case.printedTimes', { count: num(unit.printCount) }) }}</app-badge>
                     }
                     @if (unit.hasPanic) {
                       <app-badge tone="bad">{{ i18n.t('results.grid.panic') }}</app-badge>
@@ -195,7 +195,7 @@
                 </div>
                 <div class="unit-actions">
                   @if (canEnter(unit)) {
-                    <button type="button" class="btn sm primary" [disabled]="busy() || facade.dirtyCount() === 0" (click)="save(unit)"><app-icon name="check" [size]="14" />{{ i18n.t('results.case.save') }}@if (facade.dirtyCount() > 0) { ({{ facade.dirtyCount() }}) }</button>
+                    <button type="button" class="btn sm primary" [disabled]="busy() || facade.dirtyCount() === 0" (click)="save(unit)"><app-icon name="check" [size]="14" />{{ i18n.t('results.case.save') }}@if (facade.dirtyCount() > 0) { ({{ num(facade.dirtyCount()) }}) }</button>
                   }
                   @if (canReview(unit)) {
                     <button type="button" class="btn sm soft" [disabled]="busy()" (click)="review(unit)">{{ i18n.t('results.case.review') }}</button>
@@ -210,7 +210,13 @@
                     <button type="button" class="btn sm ghost" [disabled]="busy()" (click)="preview(unit)"><app-icon name="eye" [size]="14" />{{ i18n.t('results.case.preview') }}</button>
                   }
                   @if (canPrint(unit)) {
-                    <button type="button" class="btn sm" [disabled]="busy()" (click)="print(unit)"><app-icon name="printer" [size]="14" />{{ i18n.t('results.case.print') }}</button>
+                    <button
+                      type="button"
+                      class="btn sm"
+                      [disabled]="busy() || printBlocked(view)"
+                      [attr.title]="printBlocked(view) ? i18n.t('results.case.printVipBlocked') : null"
+                      (click)="print(unit)"
+                    ><app-icon name="printer" [size]="14" />{{ i18n.t('results.case.print') }}</button>
                   }
                 </div>
               </div>
@@ -232,6 +238,9 @@
                 (acknowledge)="openAcknowledge($event)"
                 (amend)="openAmend($event)"
               />
+              @if (canPrint(unit) && printBlocked(view)) {
+                <p class="unit-foot small muted vip-print" role="note">{{ i18n.t('results.case.printVipBlocked') }}</p>
+              }
               <p class="unit-foot small muted">{{ i18n.t('results.case.gridHelp') }}</p>
             </div>
           }
@@ -285,13 +294,19 @@
 
 <app-dialog [(open)]="previewOpen" [title]="i18n.t('results.case.previewTitle')" size="lg">
   @if (previewOpen() && previewDoc(); as doc) {
-    <div class="preview-paper"><app-results-report-document [doc]="doc" /></div>
+    <div class="preview-paper"><app-results-report-document [doc]="doc" [images]="previewImages()" [texts]="previewTexts()" /></div>
   }
   <ng-container dialogFooter>
     <button type="button" class="btn" (click)="previewOpen.set(false)">{{ i18n.t('results.close') }}</button>
     @if (unit(); as unit) {
       @if (canPrint(unit)) {
-        <button type="button" class="btn primary" [disabled]="busy()" (click)="print(unit)"><app-icon name="printer" [size]="14" />{{ i18n.t('results.case.print') }}</button>
+        <button
+          type="button"
+          class="btn primary"
+          [disabled]="busy() || printBlocked(current())"
+          [attr.title]="printBlocked(current()) ? i18n.t('results.case.printVipBlocked') : null"
+          (click)="print(unit)"
+        ><app-icon name="printer" [size]="14" />{{ i18n.t('results.case.print') }}</button>
       }
     }
   </ng-container>

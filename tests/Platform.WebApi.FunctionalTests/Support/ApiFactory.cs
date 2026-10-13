@@ -17,6 +17,7 @@ using Platform.Domain.Identity;
 using Platform.Domain.Organization;
 using Platform.Domain.Tenancy;
 using Platform.Infrastructure;
+using Platform.Infrastructure.Notifications;
 using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Security;
 using Platform.SharedKernel.Abstractions;
@@ -242,6 +243,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["Lis:DataProtection:MasterKey"] = MasterKey,
                 ["Lis:Security:AllowedOrigins:0"] = "http://localhost",
                 ["Lis:Outbox:Enabled"] = "false",   // the loop stays idle unless a test turns it on through Overrides
+                ["Lis:Jobs:WalletCharge:Enabled"] = "false",   // no background wallet charges under the tests' balances; SA-05 "Run charges now" still runs the pass
             };
             foreach (var (key, value) in Overrides)
             {
@@ -255,9 +257,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.RemoveAll<IClock>();
             services.AddSingleton(Clock);
             services.AddSingleton<IClock>(Clock);
-            services.RemoveAll<INotificationSender>();
             services.AddSingleton(Notifications);
-            services.AddSingleton<INotificationSender>(Notifications);
+            if (!Overrides.ContainsKey(NotificationOptions.PickupDirectoryKey))
+            {
+                // A test that configures a pickup directory exercises the production sender (NotificationDeliveryFlowTests).
+                services.RemoveAll<INotificationSender>();
+                services.AddSingleton<INotificationSender>(Notifications);
+            }
         });
     }
 

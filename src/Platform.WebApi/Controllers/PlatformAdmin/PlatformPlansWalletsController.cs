@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Platform.Application.PlatformAdmin.Commands;
+using Platform.Application.PlatformAdmin.Jobs;
 using Platform.Application.PlatformAdmin.Queries;
 using Platform.Contracts.Common;
 using Platform.Contracts.PlatformAdmin;
@@ -67,6 +68,11 @@ public sealed class PlatformWalletsController(ISender sender) : ControllerBase
         var created = await sender.Send(new TopUpWalletCommand(tenantId, request.Amount, request.Reference, request.Note, request.TopUpRequestId), cancellationToken);
         return Created($"/api/v1/platform/wallets/{tenantId}/transactions", created);
     }
+
+    /// <summary>SA-05 "Run charges now" (W2): the hosted monthly charge pass, on demand; returns charged / skipped / failed.</summary>
+    [HttpPost("charge-run")]
+    public async Task<ActionResult<WalletChargeRunSummary>> ChargeRun(CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new RunWalletChargesCommand(), cancellationToken));
 
     [HttpPost("{tenantId:guid}/top-up-requests/{requestId:guid}/decline")]
     public async Task<IActionResult> Decline(Guid tenantId, Guid requestId, CancellationToken cancellationToken)

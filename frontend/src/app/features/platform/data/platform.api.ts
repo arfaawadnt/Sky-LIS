@@ -36,6 +36,7 @@ import {
   type TemplatePlaceholders,
   type TopUpWalletRequest,
   type UpdateClientRequest,
+  type WalletChargeRunSummary,
   type WalletDetail,
   type WalletTransactionItem,
   type WalletTransactionKind,
@@ -105,6 +106,11 @@ export class PlatformApi {
 
   topUpWallet(tenantId: string, request: TopUpWalletRequest): Promise<CreatedResource> {
     return firstValueFrom(this.http.post<CreatedResource>(`${PLATFORM_API.wallets}/${encodeURIComponent(tenantId)}/top-up`, request));
+  }
+
+  /** SA-05 "Run charges now": the monthly subscription charge pass; returns charged / skipped / failed. */
+  runWalletCharges(): Promise<WalletChargeRunSummary> {
+    return firstValueFrom(this.http.post<WalletChargeRunSummary>(PLATFORM_API.walletChargeRun, null));
   }
 
   declineTopUpRequest(tenantId: string, requestId: string): Promise<void> {

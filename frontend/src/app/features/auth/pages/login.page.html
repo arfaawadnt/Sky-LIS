@@ -13,6 +13,10 @@
   <h1>{{ i18n.t('auth.title') }}</h1>
   <p class="muted">{{ i18n.t('auth.subtitle') }}</p>
 
+  @if (endedIdle()) {
+    <p class="info-strip" role="status">{{ i18n.t('auth.sessionEndedIdle') }}</p>
+  }
+
   <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
     <div class="field">
       <label for="username">{{ i18n.t('auth.username') }}</label>

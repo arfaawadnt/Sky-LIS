@@ -26,7 +26,9 @@ public enum ReportTemplateLanguage
 /// <summary>
 /// A print template (SRS CP-54; LDM §12 report templates <c>new_test</c>, <c>new_mega</c>, culture, text; logo,
 /// signature image, QR option). The SPA's print kit renders the documents; this record holds the layout choices.
-/// Logo and signature are file ids of the Files module. Header and footer texts are optional and bilingual.
+/// Logo and signature are file ids of the Files module (intake A10): they change only through <see cref="AttachImage"/>
+/// and <see cref="RemoveImage"/> (the upload use case stores the bytes first), never through the edit of the texts.
+/// Header and footer texts are optional and bilingual.
 /// </summary>
 public sealed class ReportTemplate : CatalogueBRecord
 {
@@ -58,17 +60,17 @@ public sealed class ReportTemplate : CatalogueBRecord
 
     public LocalizedText? FooterText { get; private set; }
 
-    /// <summary>T1 Create (<c>catalogue.create</c>).</summary>
-    public static ReportTemplate Create(LocalizedText name, ReportTemplateType type, Guid? logoFileId, Guid? signatureFileId, bool showQr, ReportTemplateLanguage language, LocalizedText? headerText, LocalizedText? footerText, DateTimeOffset nowUtc)
+    /// <summary>T1 Create (<c>catalogue.create</c>): a new template has no images yet.</summary>
+    public static ReportTemplate Create(LocalizedText name, ReportTemplateType type, bool showQr, ReportTemplateLanguage language, LocalizedText? headerText, LocalizedText? footerText, DateTimeOffset nowUtc)
     {
         var template = new ReportTemplate(Guid.CreateVersion7());
-        template.Update(name, type, logoFileId, signatureFileId, showQr, language, headerText, footerText);
+        template.Update(name, type, showQr, language, headerText, footerText);
         template.Raise(new ReportTemplateCreated(template.Id, template.Type, template.Name.En, nowUtc));
         return template;
     }
 
-    /// <summary>T2 Edit (<c>catalogue.edit</c>).</summary>
-    public void Update(LocalizedText name, ReportTemplateType type, Guid? logoFileId, Guid? signatureFileId, bool showQr, ReportTemplateLanguage language, LocalizedText? headerText, LocalizedText? footerText)
+    /// <summary>T2 Edit (<c>catalogue.edit</c>): the texts and choices; the images are kept.</summary>
+    public void Update(LocalizedText name, ReportTemplateType type, bool showQr, ReportTemplateLanguage language, LocalizedText? headerText, LocalizedText? footerText)
     {
         ArgumentNullException.ThrowIfNull(name);
         Require(Enum.IsDefined(type), CatalogueBCodes.TextInvalid, "The template type is unknown.", DomainFault.Validation);
@@ -76,15 +78,58 @@ public sealed class ReportTemplate : CatalogueBRecord
 
         Name = name;
         Type = type;
-        LogoFileId = logoFileId == Guid.Empty ? null : logoFileId;
-        SignatureFileId = signatureFileId == Guid.Empty ? null : signatureFileId;
         ShowQr = showQr;
         Language = language;
         HeaderText = headerText;
         FooterText = footerText;
     }
 
+    /// <summary>The file id of one image, or <see langword="null"/> when none is attached.</summary>
+    public Guid? FileIdOf(ReportTemplateImage image) => image switch
+    {
+        ReportTemplateImage.Logo => LogoFileId,
+        ReportTemplateImage.Signature => SignatureFileId,
+        _ => throw UnknownImage(),
+    };
+
+    /// <summary>
+    /// T2 Edit (<c>catalogue.edit</c>): attaches or replaces the logo or the signature with a file the Files module has
+    /// stored (its content was accepted by <see cref="ReportTemplateImageFiles.Inspect"/>). The previous file stays in the
+    /// store (BR-15: no business deletion of stored files).
+    /// </summary>
+    public void AttachImage(ReportTemplateImage image, Guid fileId, DateTimeOffset nowUtc)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(fileId, Guid.Empty);
+        SetImage(image, fileId);
+        Raise(new ReportTemplateImageChanged(Id, image, fileId, nowUtc));
+    }
+
+    /// <summary>T2 Edit (<c>catalogue.edit</c>): clears the logo or the signature (CAT-394 when none is attached).</summary>
+    public void RemoveImage(ReportTemplateImage image, DateTimeOffset nowUtc)
+    {
+        Require(FileIdOf(image) is not null, CatalogueBCodes.TemplateImageNotFound, "The template has no such image.", DomainFault.NotFound);
+        SetImage(image, null);
+        Raise(new ReportTemplateImageChanged(Id, image, null, nowUtc));
+    }
+
     protected override IDomainEvent Deactivated(DateTimeOffset nowUtc) => new ReportTemplateDeactivated(Id, nowUtc);
 
     protected override IDomainEvent Reactivated(DateTimeOffset nowUtc) => new ReportTemplateReactivated(Id, nowUtc);
+
+    private static DomainException UnknownImage() => new(CatalogueBCodes.TextInvalid, "The template image is unknown.", DomainFault.Validation);
+
+    private void SetImage(ReportTemplateImage image, Guid? fileId)
+    {
+        switch (image)
+        {
+            case ReportTemplateImage.Logo:
+                LogoFileId = fileId;
+                break;
+            case ReportTemplateImage.Signature:
+                SignatureFileId = fileId;
+                break;
+            default:
+                throw UnknownImage();
+        }
+    }
 }

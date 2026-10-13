@@ -1,32 +1,39 @@
 /**
- * Number and date presentation of the Billing screens and documents. Arabic uses Latin digits (`-u-nu-latn`) so
- * receipt, accession and reference numbers read the same in both languages on paper.
+ * Number and date presentation of the Billing screens and documents (validation v0.5.0 F-09). On screen an Arabic page
+ * shows Arabic-Indic digits like the rest of the portal (`formatMoney`, `formatDateTime`); printed documents keep
+ * Latin digits (`-u-nu-latn`, `formatPrintMoney`, `formatPrintDateTime`) so receipt, accession and reference numbers
+ * read the same in both languages on paper.
  */
 
 const moneyFormats = new Map<string, Intl.NumberFormat>();
 const dateFormats = new Map<string, Intl.DateTimeFormat>();
 
-function locale(lang: string): string {
-  return lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB';
+type Digits = 'screen' | 'print';
+
+function locale(lang: string, digits: Digits): string {
+  if (lang !== 'ar') {
+    return 'en-GB';
+  }
+
+  return digits === 'print' ? 'ar-EG-u-nu-latn' : 'ar-EG';
 }
 
-/** `1234.5` → `1,234.50` (two decimals, intake Q15); empty values render as an em dash. */
-export function formatMoney(value: number | null | undefined, lang: string): string {
+function money(value: number | null | undefined, lang: string, digits: Digits): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
     return '—';
   }
 
-  let format = moneyFormats.get(lang);
+  const key = `${lang}.${digits}`;
+  let format = moneyFormats.get(key);
   if (format === undefined) {
-    format = new Intl.NumberFormat(locale(lang), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    moneyFormats.set(lang, format);
+    format = new Intl.NumberFormat(locale(lang, digits), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    moneyFormats.set(key, format);
   }
 
   return format.format(value);
 }
 
-/** An instant of the API (ISO 8601, UTC) in the reader's local time. */
-export function formatDateTime(iso: string | null | undefined, lang: string): string {
+function dateTime(iso: string | null | undefined, lang: string, digits: Digits): string {
   if (iso === null || iso === undefined || iso === '') {
     return '—';
   }
@@ -36,13 +43,39 @@ export function formatDateTime(iso: string | null | undefined, lang: string): st
     return '—';
   }
 
-  let format = dateFormats.get(lang);
+  const key = `${lang}.${digits}`;
+  let format = dateFormats.get(key);
   if (format === undefined) {
-    format = new Intl.DateTimeFormat(locale(lang), { dateStyle: 'medium', timeStyle: 'short' });
-    dateFormats.set(lang, format);
+    format = new Intl.DateTimeFormat(locale(lang, digits), { dateStyle: 'medium', timeStyle: 'short' });
+    dateFormats.set(key, format);
   }
 
   return format.format(date);
+}
+
+/** On screen: `1234.5` → `1,234.50` / `١٬٢٣٤٫٥٠` (two decimals, intake Q15); empty values render as an em dash. */
+export function formatMoney(value: number | null | undefined, lang: string): string {
+  return money(value, lang, 'screen');
+}
+
+/** On a printed document: two decimals with Latin digits in both languages. */
+export function formatPrintMoney(value: number | null | undefined, lang: string): string {
+  return money(value, lang, 'print');
+}
+
+/** On screen: an instant of the API (ISO 8601, UTC) in the reader's local time and the language's digits. */
+export function formatDateTime(iso: string | null | undefined, lang: string): string {
+  return dateTime(iso, lang, 'screen');
+}
+
+/** On a printed document: the instant with Latin digits in both languages. */
+export function formatPrintDateTime(iso: string | null | undefined, lang: string): string {
+  return dateTime(iso, lang, 'print');
+}
+
+/** A whole count on screen in the language's digits (Arabic-Indic in Arabic). */
+export function formatCount(value: number, lang: string): string {
+  return new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { maximumFractionDigits: 0 }).format(value);
 }
 
 /** The value of an `<input type="datetime-local">` for a date (local time, minutes). */

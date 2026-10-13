@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRender, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -91,6 +91,8 @@ export class ServiceEditorPage {
   private readonly access = inject(PermissionsService);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector = inject(Injector);
 
   protected readonly permissions = CATALOGUE_A_PERMISSIONS;
   protected readonly types = SERVICE_TYPES;
@@ -139,6 +141,8 @@ export class ServiceEditorPage {
   protected readonly conditions = signal<readonly SampleConditionView[]>([]);
   protected readonly activeTab = signal<string | null>('general');
   protected readonly saving = signal(false);
+  /** A save the form refused (validation v0.5.0 round 4): the page says so, like the drawer editors, until the form is valid. */
+  protected readonly blocked = signal(false);
   protected readonly generalProblem = signal<ProblemDetails | null>(null);
   protected readonly membersProblem = signal<ProblemDetails | null>(null);
 
@@ -312,9 +316,12 @@ export class ServiceEditorPage {
 
     if (!markAllTouched(this.form)) {
       this.activeTab.set('general');
+      this.blocked.set(true);
+      afterNextRender({ read: () => this.focusFirstInvalid() }, { injector: this.injector });
       return;
     }
 
+    this.blocked.set(false);
     this.saving.set(true);
     this.generalProblem.set(null);
     this.membersProblem.set(null);
@@ -327,6 +334,12 @@ export class ServiceEditorPage {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  /** The first marked field of the general data, in document order. */
+  private focusFirstInvalid(): void {
+    const selector = ['input', 'select', 'textarea'].map((tag) => `form.editor ${tag}.ng-invalid:not([disabled])`).join(', ');
+    this.host.querySelector<HTMLElement>(selector)?.focus();
   }
 
   protected async toggleActive(): Promise<void> {

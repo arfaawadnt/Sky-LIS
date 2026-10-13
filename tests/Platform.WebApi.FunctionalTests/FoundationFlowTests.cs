@@ -226,6 +226,12 @@ public sealed class FoundationFlowTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
         Assert.Equal("SET-002", await AuthClient.CodeOf(invalid));
 
+        // LIS-VR-002 round 4: an unknown time zone names its reason, so the field can say "This time zone is not known."
+        var unknownZone = await adminClient.PutAsJsonAsync(Settings, new UpdateTenantSettingsRequest([new SettingValueItem("timeZone", "Mars/Olympus")]));
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "SET-003"), (unknownZone.StatusCode, await AuthClient.CodeOf(unknownZone)));
+        var blankZone = await adminClient.PutAsJsonAsync(Settings, new UpdateTenantSettingsRequest([new SettingValueItem("timeZone", " ")]));
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "SET-002"), (blankZone.StatusCode, await AuthClient.CodeOf(blankZone)));
+
         var empty = await adminClient.PutAsJsonAsync(Settings, new UpdateTenantSettingsRequest([]));
         Assert.Equal(HttpStatusCode.BadRequest, empty.StatusCode);
 
@@ -233,6 +239,58 @@ public sealed class FoundationFlowTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
 
         Assert.Equal("3", (await viewerClient.GetFromJsonAsync<TenantSettingsResponse>(Settings))!.Settings.Single(item => item.Key == "labelCopies").Value);
+    }
+
+    /// <summary>
+    /// Validation F-13: "Use default" sends a null value, which deletes the tenant's own row; the key then reads the inherited
+    /// value again (<c>isDefault</c> true, no update stamp) and follows a later platform default. An unknown key is still
+    /// SET-001; removing a row that does not exist changes nothing.
+    /// </summary>
+    [DatabaseFact]
+    public async Task Use_default_removes_the_tenant_row_instead_of_storing_the_default()
+    {
+        var tenant = Guid.CreateVersion7();
+        var (admin, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["settings.view", "settings.manage"]);
+        var adminClient = await SignedInClientAsync(admin);
+
+        // the state F-13 left behind: a row that holds the default value
+        var stored = await adminClient.PutAsJsonAsync(Settings, new UpdateTenantSettingsRequest([new SettingValueItem("sessionTimeoutMinutes", "30"), new SettingValueItem("labelCopies", "3")]));
+        Assert.Equal(HttpStatusCode.OK, stored.StatusCode);
+        var before = (await stored.Content.ReadFromJsonAsync<TenantSettingsResponse>())!.Settings.Single(item => item.Key == "sessionTimeoutMinutes");
+        Assert.Equal(("30", false), (before.Value, before.IsDefault));
+        Assert.NotNull(before.UpdatedAtUtc);
+
+        var reset = await adminClient.PutAsJsonAsync(Settings, new UpdateTenantSettingsRequest([new SettingValueItem("sessionTimeoutMinutes", null), new SettingValueItem("labelCopies", null), new SettingValueItem("otpLength", null)]));
+        Assert.Equal(HttpStatusCode.OK, reset.StatusCode);
+        foreach (var key in new[] { "sessionTimeoutMinutes", "labelCopies", "otpLength" })
+        {
+            var item = (await adminClient.GetFromJsonAsync<TenantSettingsResponse>(Settings))!.Settings.Single(setting => setting.Key == key);
+            Assert.True(item.IsDefault, key);
+            Assert.Null(item.UpdatedAtUtc);
+            Assert.Null(item.UpdatedByUserId);
+            Assert.Equal(item.InheritedValue, item.Value);
+        }
+
+        var unknown = await adminClient.PutAsJsonAsync(Settings, new UpdateTenantSettingsRequest([new SettingValueItem("noSuchKey", null)]));
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "SET-001"), (unknown.StatusCode, await AuthClient.CodeOf(unknown)));
+    }
+
+    /// <summary>F-13 on the Super Admin parameters (SA-19): the platform tenant's own row is removed the same way.</summary>
+    [DatabaseFact]
+    public async Task Use_default_on_the_platform_parameters_removes_the_platform_row()
+    {
+        var (admin, _, _) = await factory.SeedUserAsync(tenantId: TenantIds.Platform, permissions: ["settings.view", "settings.manage"]);
+        var adminClient = await SignedInClientAsync(admin);
+
+        // a row equal to the code default: no other test sees a different value while it exists
+        var stored = await adminClient.PutAsJsonAsync(Settings, new UpdateTenantSettingsRequest([new SettingValueItem("masterDataUpdatePolicy", "propose")]));
+        Assert.Equal(HttpStatusCode.OK, stored.StatusCode);
+        Assert.False((await stored.Content.ReadFromJsonAsync<TenantSettingsResponse>())!.Settings.Single(item => item.Key == "masterDataUpdatePolicy").IsDefault);
+
+        var reset = await adminClient.PutAsJsonAsync(Settings, new UpdateTenantSettingsRequest([new SettingValueItem("masterDataUpdatePolicy", null)]));
+        Assert.Equal(HttpStatusCode.OK, reset.StatusCode);
+        var item = (await reset.Content.ReadFromJsonAsync<TenantSettingsResponse>())!.Settings.Single(setting => setting.Key == "masterDataUpdatePolicy");
+        Assert.Equal(("propose", true, (DateTimeOffset?)null, TenantSettingSources.Default), (item.Value, item.IsDefault, item.UpdatedAtUtc, item.Source));
     }
 
     private static Task<HttpResponseMessage> StartRecoveryAsync(AuthClient auth, string identifier) =>

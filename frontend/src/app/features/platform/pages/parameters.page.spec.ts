@@ -3,6 +3,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
+import platformAr from '../../../../../public/i18n/platform.ar.json';
+import platformEn from '../../../../../public/i18n/platform.en.json';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { SETTINGS_API, type TenantSettingItem, type TenantSettingsResponse } from '../../../core/api/settings.contracts';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
@@ -89,6 +92,46 @@ describe('ParametersPage (SA-19)', () => {
     backend.verify();
   });
 
+  it('validation F-13: "Use default" removes the platform value instead of storing the default, and says "1 parameter saved."', async () => {
+    const stored: TenantSettingsResponse = {
+      settings: [
+        { ...item('otpLength', 'Int', '8', '6'), isDefault: false, updatedAtUtc: '2026-10-12T10:00:00Z' },
+        { ...item('passwordMinLength', 'Int', '8'), isDefault: false, updatedAtUtc: '2026-10-12T10:00:00Z' },   // a row equal to the default
+        item('trialDays', 'Int', '14'),
+      ],
+    };
+    vi.stubGlobal('fetch', (url: string) => Promise.resolve(new Response(JSON.stringify(url.includes('/platform.en.json') ? platformEn : {}), { status: 200 })));
+    try {
+      const success = vi.spyOn(TestBed.inject(ToastService), 'success');
+      const fixture = TestBed.createComponent(ParametersPage);
+      TestBed.tick();
+      await settle();
+      backend.expectOne((request) => request.method === 'GET' && request.url === SETTINGS_API.settings).flush(stored);
+      await settle();
+      await fixture.whenStable();
+      const host = fixture.nativeElement as HTMLElement;
+      const useDefaultButtons = (): HTMLButtonElement[] => [...host.querySelectorAll<HTMLButtonElement>('button')].filter((button) => button.textContent?.trim() === platformEn['parameters.useDefault']);
+
+      expect(useDefaultButtons().length).toBe(2);   // otpLength (modified) and passwordMinLength (a row of its own); not trialDays
+      useDefaultButtons()[1]?.click();   // passwordMinLength
+      await fixture.whenStable();
+      expect(useDefaultButtons().length).toBe(1);
+
+      host.querySelector<HTMLFormElement>('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await settle();
+      const put = backend.expectOne((request) => request.method === 'PUT' && request.url === SETTINGS_API.settings);
+      expect(put.request.body).toEqual({ settings: [{ key: 'passwordMinLength', value: null }] });
+      put.flush({ settings: [stored.settings[0], item('passwordMinLength', 'Int', '8'), item('trialDays', 'Int', '14')] });
+      await settle();
+      expect(success).toHaveBeenCalledWith('1 parameter saved.');
+      TestBed.tick();
+      await settle();
+      backend.expectOne((request) => request.method === 'GET' && request.url === SETTINGS_API.settings).flush(stored);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   describe('the time zone (round 3 R3-03)', () => {
     const withZone: TenantSettingsResponse = { settings: [...response.settings, item('timeZone', 'String', 'Africa/Cairo')] };
 
@@ -155,6 +198,47 @@ describe('ParametersPage (SA-19)', () => {
       await settle();
       expect(zone.getAttribute('aria-invalid')).toBe('true');
       expect(host.querySelector('.banner, app-alert, [role="alert"].page-problem')).toBeNull();
+    });
+
+    it('LIS-VR-002 round 4: an unknown zone (SET-003) reads "This time zone is not known." under the field, also when other values were sent', async () => {
+      // the page's dictionary, served as the app serves it
+      vi.stubGlobal('fetch', (url: string) => Promise.resolve(new Response(JSON.stringify(url.includes('/platform.en.json') ? platformEn : {}), { status: 200 })));
+      try {
+        const { fixture, host, zone } = await renderZone();
+        zone.value = 'Mars/Olympus';
+        zone.dispatchEvent(new Event('input', { bubbles: true }));
+        const trial = Array.from(host.querySelectorAll<HTMLInputElement>('input[type="number"]'))[2];
+        if (trial) {
+          trial.value = '30';
+          trial.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        await fixture.whenStable();
+
+        submit(host);
+        await settle();
+        const put = backend.expectOne((request) => request.method === 'PUT' && request.url === SETTINGS_API.settings);
+        expect((put.request.body as { settings: unknown[] }).settings.length).toBe(2);
+        put.flush({ code: 'SET-003', title: 'Unknown time zone', status: 422, detail: "'Mars/Olympus' is not a time zone this host knows for 'timeZone'." }, { status: 422, statusText: 'Unprocessable Entity' });
+        await settle();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        TestBed.tick();
+        await settle();
+
+        expect(zone.getAttribute('aria-invalid')).toBe('true');
+        expect(zone.closest('app-form-field')?.textContent).toContain('This time zone is not known.');
+        expect(host.textContent).not.toContain('One of the values is outside its allowed range.');
+        expect(TestBed.inject(I18nService).t('platform.parameters.error.SET-003')).toBe('This time zone is not known.');
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('LIS-VR-002 round 4: the unknown-zone text exists in both languages', () => {
+      const en: Record<string, string> = platformEn;
+      const ar: Record<string, string> = platformAr;
+      expect(en['parameters.error.SET-003']).toBe('This time zone is not known.');
+      expect(ar['parameters.error.SET-003']).toBe('هذه المنطقة الزمنية غير معروفة.');
     });
   });
 });

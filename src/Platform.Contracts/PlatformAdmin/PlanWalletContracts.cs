@@ -73,3 +73,14 @@ public sealed record TopUpWalletRequest(decimal Amount, string Reference, string
 
 /// <summary>CP-66 "Request top-up" (client tenant, <c>wallet.create</c>).</summary>
 public sealed record CreateTopUpRequest(decimal Amount, string? Note);
+
+/// <summary>
+/// W2 monthly subscription charge run (SA-05 "Run charges now" and the hosted job <c>Lis:Jobs:WalletCharge</c>): how many
+/// due wallets were charged, skipped (trial or inactive client, or already charged by a concurrent run) and failed
+/// (no plan, plan currency differs from the wallet currency, or an unexpected error), and how many charged wallets are
+/// at or below zero afterwards. <see cref="Items"/> holds one row per due wallet the run looked at.
+/// </summary>
+public sealed record WalletChargeRunSummary(DateTimeOffset RunAtUtc, int Charged, int Skipped, int Failed, int AtOrBelowZero, IReadOnlyList<WalletChargeRunItem> Items);
+
+/// <summary>One due wallet of a charge run. Outcome: <c>Charged</c>, <c>Skipped</c> or <c>Failed</c>; Reason: <c>trial</c>, <c>inactive</c>, <c>not-due</c>, <c>no-wallet</c>, <c>no-plan</c>, <c>currency-mismatch</c>, <c>error</c>.</summary>
+public sealed record WalletChargeRunItem(Guid TenantId, string Outcome, string? Reason, string? Period, decimal? Amount, decimal? BalanceAfter);

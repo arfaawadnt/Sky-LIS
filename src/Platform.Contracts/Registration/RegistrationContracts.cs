@@ -44,8 +44,8 @@ public sealed record CheckOrderRequest(
     IReadOnlyList<OrderLineRequest> Lines,
     int? UtcOffsetMinutes);
 
-/// <summary>A refusal the planner found (the same code Register would answer).</summary>
-public sealed record OrderIssue(string Code, Guid? ServiceId, string? ServiceCode, string Message);
+/// <summary>A refusal the planner found (the same code Register would answer); <c>Detail</c> names what a REG-109 refusal repeats.</summary>
+public sealed record OrderIssue(string Code, Guid? ServiceId, string? ServiceCode, string Message, string? Detail = null);
 
 /// <summary>An advisory warning (REG-2xx): frequency alert, contract alert, precaution, added by rule or diagnosis, skipped companion.</summary>
 public sealed record OrderWarning(
@@ -384,7 +384,9 @@ public sealed record RegistrationPageSettings(
     bool CanTransfer,
     bool CanPay,
     bool CanSeeVip,
-    string Currency);
+    string Currency,
+    string? BranchNameEn,
+    string? BranchNameAr);
 
 // ---- bookings (CP-07) ----------------------------------------------------------------------------------------------
 
@@ -529,7 +531,10 @@ public sealed record SendingLabOption(
 
 public sealed record RegistrationLetterhead(string LabNameEn, string LabNameAr, string? BranchNameEn, string? BranchNameAr);
 
-/// <summary>One label per live tube (LDM §2.2 label content); printed <see cref="VisitLabelsDocument.Copies"/> times each.</summary>
+/// <summary>
+/// One label per live tube (LDM §2.2 label content); printed <see cref="VisitLabelsDocument.Copies"/> times each. The
+/// label marks an urgent visit ("!") and a biohazard visit ("BIO", validation 2026-10-11).
+/// </summary>
 public sealed record SampleLabel(
     Guid TubeId,
     string SampleNumber,
@@ -548,7 +553,8 @@ public sealed record SampleLabel(
     string? BranchNameEn,
     string? BranchNameAr,
     bool Urgent,
-    IReadOnlyList<string> ServiceCodes);
+    IReadOnlyList<string> ServiceCodes,
+    bool Biohazard);
 
 public sealed record VisitLabelsDocument(RegistrationLetterhead Letterhead, string Accession, int Copies, int UtcOffsetMinutes, IReadOnlyList<SampleLabel> Labels);
 

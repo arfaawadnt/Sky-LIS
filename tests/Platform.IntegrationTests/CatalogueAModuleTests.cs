@@ -175,6 +175,35 @@ public sealed class CatalogueAModuleTests(DatabaseFixture fixture)
         Assert.Equal(2, await reader.ServiceProvider.GetRequiredService<AppDbContext>().Set<SampleCondition>().CountAsync(row => row.TenantId == target));
     }
 
+    [DatabaseFact]
+    public async Task The_cloner_copies_a_legacy_Normal_and_Critical_list_value_as_Critical_only_CAT_061()
+    {
+        var (source, target) = (Guid.CreateVersion7(), Guid.CreateVersion7());
+        var seeded = await SeedCatalogueAsync(source);
+        using (var legacy = fixture.AppScope(source))
+        {
+            // a row stored before CAT-061 (validation v0.5.0 O-2): the domain no longer writes it, so the test writes it in SQL
+            var context = legacy.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Equal(1, await context.Database.ExecuteSqlInterpolatedAsync($"update app.test_list_values set is_normal = true where tenant_id = {source} and lab_test_id = {seeded.ListTestId} and value = 'Positive'"));
+        }
+
+        CatalogueACloneResult result;
+        using (var scope = fixture.AppScope(target))
+        {
+            using (scope.ServiceProvider.GetRequiredService<ICurrentTenantSetter>().Elevate())
+            {
+                result = await scope.ServiceProvider.GetRequiredService<ICatalogueACloner>().CloneAsync(source, target, CancellationToken.None);
+                await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+            }
+        }
+
+        Assert.True(result.Tests.ContainsKey(seeded.ListTestId));   // the test is copied, not skipped
+        using var reader = fixture.AppScope(target);
+        var list = (await reader.ServiceProvider.GetRequiredService<ICatalogueLookup>().GetTestAsync(result.Tests[seeded.ListTestId], CancellationToken.None))!;
+        var positive = Assert.Single(list.ListValues, value => value.Value == "Positive");
+        Assert.Equal((false, true), (positive.IsNormal, positive.IsCritical));
+    }
+
     private sealed record Seeded(Guid GroupId, Guid SampleTypeId, Guid ConditionId, Guid UnitId, Guid PatientConditionId, Guid TestId, Guid ListTestId, Guid ServiceId);
 
     /// <summary>A small catalogue: Chemistry, Serum (fasting, random), mg/dL, Pregnant, GLU (2 bands) + URINE (list), service GLU.</summary>

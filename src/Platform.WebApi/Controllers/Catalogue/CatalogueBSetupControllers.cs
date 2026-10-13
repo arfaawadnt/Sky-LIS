@@ -5,6 +5,7 @@ using Platform.Application.Catalogue.Commands;
 using Platform.Application.Catalogue.Queries;
 using Platform.Contracts.Catalogue;
 using Platform.Contracts.Common;
+using Platform.Domain.Catalogue;
 
 namespace Platform.WebApi.Controllers.Catalogue;
 
@@ -216,6 +217,9 @@ public sealed class ReasonsController(ISender sender) : ControllerBase
 [Route("api/v1/catalogue/report-templates")]
 public sealed class ReportTemplatesController(ISender sender) : ControllerBase
 {
+    /// <summary>The image limit plus room for the multipart envelope; the command refuses anything above the limit itself.</summary>
+    private const long MaxImageRequestBytes = ReportTemplateImageFiles.MaxSizeBytes + (64 * 1024);
+
     [HttpGet]
     public async Task<ActionResult<Paged<ReportTemplateListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? type, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new ListReportTemplatesQuery(search, isActive, type, page, pageSize, sort, direction), cancellationToken));
@@ -236,7 +240,7 @@ public sealed class ReportTemplatesController(ISender sender) : ControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
         var created = await sender.Send(
-            new CreateReportTemplateCommand(request.NameEn, request.NameAr, request.Type, request.LogoFileId, request.SignatureFileId, request.ShowQr, request.Language, request.HeaderTextEn, request.HeaderTextAr, request.FooterTextEn, request.FooterTextAr),
+            new CreateReportTemplateCommand(request.NameEn, request.NameAr, request.Type, request.ShowQr, request.Language, request.HeaderTextEn, request.HeaderTextAr, request.FooterTextEn, request.FooterTextAr),
             cancellationToken);
         return Created($"/api/v1/catalogue/report-templates/{created.Id}", created);
     }
@@ -246,7 +250,7 @@ public sealed class ReportTemplatesController(ISender sender) : ControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
         await sender.Send(
-            new UpdateReportTemplateCommand(id, request.NameEn, request.NameAr, request.Type, request.LogoFileId, request.SignatureFileId, request.ShowQr, request.Language, request.HeaderTextEn, request.HeaderTextAr, request.FooterTextEn, request.FooterTextAr),
+            new UpdateReportTemplateCommand(id, request.NameEn, request.NameAr, request.Type, request.ShowQr, request.Language, request.HeaderTextEn, request.HeaderTextAr, request.FooterTextEn, request.FooterTextAr),
             cancellationToken);
         return NoContent();
     }
@@ -262,6 +266,32 @@ public sealed class ReportTemplatesController(ISender sender) : ControllerBase
     public async Task<IActionResult> Reactivate(Guid id, CancellationToken cancellationToken)
     {
         await sender.Send(new SetCatalogueBRecordActiveCommand(CatalogueBList.ReportTemplates, id, true), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>The logo or the signature of a template (inline; any signed-in member of the tenant: the reports print it).</summary>
+    [HttpGet("{id:guid}/images/{image}")]
+    public async Task<IActionResult> GetImage(Guid id, string image, CancellationToken cancellationToken)
+    {
+        var content = await sender.Send(new GetReportTemplateImageQuery(id, image), cancellationToken);
+        return File(content.Content, content.ContentType);
+    }
+
+    /// <summary>Uploads or replaces the logo or the signature (multipart field <c>file</c>; PNG, JPEG or WebP up to 512 KB).</summary>
+    [HttpPost("{id:guid}/images/{image}")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxImageRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxImageRequestBytes)]
+    public async Task<ActionResult<ReportTemplateImageView>> UploadImage(Guid id, string image, IFormFile? file, CancellationToken cancellationToken)
+    {
+        await using var content = file?.OpenReadStream() ?? Stream.Null;
+        return Ok(await sender.Send(new UploadReportTemplateImageCommand(id, image, content), cancellationToken));
+    }
+
+    [HttpDelete("{id:guid}/images/{image}")]
+    public async Task<IActionResult> RemoveImage(Guid id, string image, CancellationToken cancellationToken)
+    {
+        await sender.Send(new RemoveReportTemplateImageCommand(id, image), cancellationToken);
         return NoContent();
     }
 }

@@ -92,12 +92,29 @@ export class RoleEditorFacade {
 
   readonly setActive = mutation((active: boolean) => this.api.setRoleActive(this.requireId(), active), { then: () => this.detail.reload() });
 
-  /** Re-reads the role and its lookups when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. */
+  /** Re-reads the role and its lookups when a page opens again: the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14). A load in flight is left alone. The refusal of an earlier save goes too (validation F-14). */
   refresh(): void {
     this.detail.reload();
     this.catalogue.reload();
     this.clinicalGroups.reload();
     this.branches.reload();
+    this.clearProblems();
+  }
+
+  /** Opens a role (null = a new one). Another role than the open one starts without the previous role's refusal (F-14). */
+  open(roleId: string | null): void {
+    if (roleId !== this.roleId()) {
+      this.clearProblems();
+    }
+
+    this.roleId.set(roleId);
+  }
+
+  /** Validation F-14: the facade outlives the page, so a refused save must not greet the next visit. */
+  private clearProblems(): void {
+    for (const write of [this.create, this.update, this.savePermissions, this.saveSpecialRights, this.saveResultRights, this.setActive]) {
+      write.reset();
+    }
   }
 
   private requireId(): string {

@@ -71,11 +71,27 @@ internal sealed class InMemoryResultRepository : IResultRepository
     public Task<IReadOnlyList<ResultLogEntry>> ReadLogAsync(Guid resultId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ResultLogEntry>>([.. Items.Single(result => result.Id == resultId).Log]);
 
-    public Task<WorklistSlice> WorklistAsync(WorklistFilter filter, ResultVisibility visibility, PageRequest page, DateTimeOffset nowUtc, CancellationToken cancellationToken) => throw new NotSupportedException();
+    /// <summary>The rows the worklist answers (the engine filters are tested in the integration suite); the last filter asked.</summary>
+    public List<WorklistRow> WorklistRows { get; } = [];
 
-    public Task<Paged<ResultVisitRow>> SearchVisitsAsync(ResultVisitFilter filter, ResultVisibility visibility, PageRequest page, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public WorklistFilter? LastWorklistFilter { get; private set; }
 
-    public Task<ResultKpis> KpisAsync(Guid? branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc, DateTimeOffset nowUtc, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public Task<WorklistSlice> WorklistAsync(WorklistFilter filter, ResultVisibility visibility, PageRequest page, DateTimeOffset nowUtc, CancellationToken cancellationToken)
+    {
+        LastWorklistFilter = filter;
+        return Task.FromResult(new WorklistSlice([.. WorklistRows], WorklistRows.Count, WorklistRows.Count, WorklistRows.Count, 0));
+    }
+
+    /// <summary>The rows the CP-19 search answers (the engine filters are tested in the integration suite); the last filter asked.</summary>
+    public List<ResultVisitRow> VisitRows { get; } = [];
+
+    public ResultVisitFilter? LastVisitFilter { get; private set; }
+
+    public Task<Paged<ResultVisitRow>> SearchVisitsAsync(ResultVisitFilter filter, ResultVisibility visibility, PageRequest page, CancellationToken cancellationToken)
+    {
+        LastVisitFilter = filter;
+        return Task.FromResult(new Paged<ResultVisitRow>([.. VisitRows], page.Page, page.PageSize, VisitRows.Count));
+    }
 
     public Task<bool> AnyVerifiedAsync(IReadOnlyCollection<Guid> lineIds, CancellationToken cancellationToken) =>
         Task.FromResult(Items.Any(result => lineIds.Contains(result.LineId) && ResultStatuses.IsSigned(result.Status)));

@@ -27,7 +27,7 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
 import { ResultsPrinter } from '../state/results-printer';
 import { WorklistFacade } from '../state/worklist.facade';
-import { type DurationUnits, delayClass, delayTone, formatDateTime, formatDuration, patientLabel, pickName, testLabel } from '../ui/result-format';
+import { type DurationUnits, delayClass, delayTone, formatDateTime, formatDuration, patientLabel, pickName, screenNumber, testLabel } from '../ui/result-format';
 
 /**
  * CP-18 Worklist (WF-06 step 1; LDM §6): one row per ordered test of the collection window of the branch, filtered
@@ -83,7 +83,7 @@ export class WorklistPage {
       { key: 'patientNumber', header: 'results.worklist.column.patientNumber', mono: true, width: '140px', secondary: true },
       { key: 'accession', header: 'results.worklist.column.accession', mono: true, width: '140px', sortable: true },
       { key: 'sampleNumber', header: 'results.worklist.column.sample', mono: true, width: '140px', secondary: true },
-      { key: 'patient', header: 'results.worklist.column.patient', value: (row) => patientLabel({ patientNumber: null, patientName: row.patientName, patientNameAr: row.patientNameAr }, lang), sortable: true },
+      { key: 'patient', header: 'results.worklist.column.patient', value: (row) => patientLabel({ ...row, patientNumber: null }, lang, this.i18n.t('results.vipMasked')), sortable: true },
       { key: 'ageSex', header: 'results.worklist.column.ageSex', width: '90px', secondary: true, value: (row) => this.ageSex(row) },
       { key: 'test', header: 'results.worklist.column.test', value: (row) => testLabel(row, lang), sortable: true },
       { key: 'status', header: 'results.worklist.column.status', width: '110px', sortable: true },
@@ -159,7 +159,7 @@ export class WorklistPage {
   protected ageSex(row: WorklistItem): string {
     const parts: string[] = [];
     if (row.ageYears !== null) {
-      parts.push(`${row.ageYears}${this.i18n.t('results.age.y')}`);
+      parts.push(`${this.num(row.ageYears)}${this.i18n.t('results.age.y')}`);
     }
 
     if (row.gender) {
@@ -170,7 +170,17 @@ export class WorklistPage {
   }
 
   protected delay(row: WorklistItem): string {
-    return formatDuration(row.delaySeconds, this.units());
+    return formatDuration(row.delaySeconds, this.units(), (value) => this.num(value));
+  }
+
+  /** Counts, ages, percentages and durations in the page language's digits (validation v0.5.0 F-09). */
+  protected num(value: number): string {
+    return screenNumber(value, this.i18n.lang());
+  }
+
+  /** "38%" / "٣٨٪": the share of the turnaround in the page language. */
+  protected percent(value: number): string {
+    return this.i18n.tf('results.worklist.percent', { value: this.num(value) });
   }
 
   protected delayBadgeTone(row: WorklistItem): ReturnType<typeof delayTone> {

@@ -1,3 +1,4 @@
+import billingAr from '../../../../../public/i18n/billing.ar.json';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
@@ -8,6 +9,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 
 import { BILLING_API, type CashClosingListItem, type CashClosingPreview, type Paged } from '../../../core/api/billing.contracts';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { BillingPrinter } from '../state/billing-printer';
@@ -112,5 +114,38 @@ describe('CashClosingPage (CP-30)', () => {
     await settle();
     backend.expectOne((candidate) => candidate.url === `${BILLING_API.cashClosings}/preview`).flush(preview({ overlapsClosedPeriod: true }));
     backend.expectOne((candidate) => candidate.url === BILLING_API.cashClosings && candidate.method === 'GET').flush(page<CashClosingListItem>([]));
+  });
+
+  it('F-09 / F-11: on an Arabic screen the counts read Arabic-Indic digits in their counted form, the amounts too', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) => new Response(JSON.stringify(String(input) === '/i18n/billing.ar.json' ? billingAr : {}), { status: 200 }));
+    const i18n = TestBed.inject(I18nService);
+    i18n.setLanguage('ar');
+    await i18n.load('billing');
+    try {
+      const harness = await RouterTestingHarness.create();
+      const component = (await harness.navigateByUrl('/billing/cash-closing', CashClosingPage)) as unknown as CashClosingInternals;
+      TestBed.tick();
+      await settle();
+      backend.expectOne(BILLING_API.treasuries).flush([{ id: 't-1', code: 'MAIN', nameEn: 'Main drawer', nameAr: 'الخزينة', branchId: 'b-1', isActive: true }]);
+      backend.expectOne((request) => request.url === BILLING_API.cashClosings).flush(page<CashClosingListItem>([]));
+      component.scopeForm.setValue({ treasuryId: 't-1', cashierUserId: '', from: '2026-10-09T00:00', to: '2026-10-09T16:00' });
+      component.preview();
+      TestBed.tick();
+      await settle();
+      backend.expectOne((request) => request.url === `${BILLING_API.cashClosings}/cashiers`).flush([]);
+      const base = preview();
+      backend.expectOne((candidate) => candidate.url === `${BILLING_API.cashClosings}/preview`).flush({ ...base, totals: { ...base.totals, paymentCount: 7, visitCount: 2 } });
+      TestBed.tick();
+      await settle();
+      harness.detectChanges();
+
+      const text = harness.routeNativeElement?.textContent ?? '';
+      expect(text).toContain('٧ إيصالات');
+      expect(text).toContain('زيارتان');
+      expect(text).not.toMatch(/\d+\.\d{2}/);   // no Latin amount on the Arabic screen
+    } finally {
+      i18n.setLanguage('en');
+      vi.restoreAllMocks();
+    }
   });
 });

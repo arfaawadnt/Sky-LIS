@@ -191,6 +191,27 @@ class PairHostComponent {
   };
 }
 
+/** A country-like page (validation v0.5.0 C-09 live check): the dial code carries a pattern with its own message key. */
+@Component({
+  selector: 'app-pattern-host',
+  imports: [MasterDataPageComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<app-master-data-page [config]="config" />`,
+})
+class PatternHostComponent {
+  readonly adapter = new FakeAdapter();
+
+  readonly config: MasterDataConfig<Item, ItemDto> = {
+    i18nPrefix: 'test.countries',
+    columns: [{ key: 'code', header: 'test.countries.column.code' }],
+    fields: [
+      { name: 'code', kind: 'text', required: true, maxLength: 5, pattern: /^\+[1-9]\d{0,3}$/, patternMessage: 'test.countries.error.dialCode' },
+      { name: 'name', kind: 'localizedText', required: true },
+    ],
+    adapter: this.adapter,
+  };
+}
+
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 function choose(select: HTMLSelectElement | null | undefined, label: string): void {
@@ -213,7 +234,7 @@ function setValue(input: HTMLInputElement | null, value: string): void {
 
 describe('MasterDataPageComponent (shared/ui)', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [HostComponent, DefaultsHostComponent, PairHostComponent, GatedHostComponent], providers: [provideZonelessChangeDetection(), { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> }] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [HostComponent, DefaultsHostComponent, PairHostComponent, GatedHostComponent, PatternHostComponent], providers: [provideZonelessChangeDetection(), { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> }] }).compileComponents();
   });
 
   async function render(): Promise<{ fixture: ReturnType<typeof TestBed.createComponent<HostComponent>>; host: HTMLElement; adapter: FakeAdapter }> {
@@ -560,6 +581,37 @@ describe('MasterDataPageComponent (shared/ui)', () => {
       setValue(dialog?.querySelector<HTMLInputElement>('input.code') ?? null, 'ok');
       await flush(fixture);
       expect(dialog?.querySelector('p.problem[role="alert"]')).toBeNull();   // the notice follows the form
+    });
+
+    it('C-09 live check: a pattern field shows its own message under the control as the user types, and blocks the save', async () => {
+      const fixture = TestBed.createComponent(PatternHostComponent);
+      await flush(fixture);
+      const host = fixture.nativeElement as HTMLElement;
+      host.querySelector<HTMLButtonElement>('app-page-header .btn.primary')?.click();
+      await fixture.whenStable();
+      const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+      const field = dialog?.querySelector<HTMLElement>('app-form-field');
+      const input = field?.querySelector<HTMLInputElement>('input') ?? null;
+      expect(field?.querySelector('.error')).toBeNull();
+
+      setValue(input, '998');   // typed, never blurred
+      await flush(fixture);
+      expect(field?.querySelector('.error')?.textContent).toContain('test.countries.error.dialCode');
+      expect(input?.getAttribute('aria-invalid')).toBe('true');
+
+      setValue(dialog?.querySelector<HTMLInputElement>('input[lang="en"]') ?? null, 'Uzbekistan');
+      setValue(dialog?.querySelector<HTMLInputElement>('input[lang="ar"]') ?? null, 'أوزبكستان');
+      dialog?.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
+      await flush(fixture);
+      expect(fixture.componentInstance.adapter.calls.filter((call) => call.startsWith('create'))).toEqual([]);
+      expect(dialog?.querySelector('p.problem[role="alert"]')?.textContent).toContain('masterData.invalid');
+
+      setValue(input, ' +998');   // trimmed before the check
+      await flush(fixture);
+      expect(field?.querySelector('.error')).toBeNull();
+      dialog?.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
+      await flush(fixture);
+      expect(fixture.componentInstance.adapter.calls.filter((call) => call.startsWith('create'))).toEqual(['create:{"code":"+998","nameEn":"Uzbekistan","nameAr":"أوزبكستان"}']);
     });
 
     it('B-03: a header click sorts on the server from page 1 and shows the rows in the server order', async () => {

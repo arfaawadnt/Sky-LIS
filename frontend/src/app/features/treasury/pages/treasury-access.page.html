@@ -1,14 +1,15 @@
 <app-page-header [title]="i18n.t('treasury.title')" [subtitle]="i18n.t('treasury.subtitle')">
   <button pageActions type="button" class="btn ghost" (click)="facade.refresh()"><app-icon name="refresh" [size]="15" />{{ i18n.t('treasury.refresh') }}</button>
+  <app-treasury-export-button pageActions ngProjectAs="[pageActions]" *appCan="permissions.export" [exporter]="exportCsv" />
 </app-page-header>
 
 <div class="layout">
   <app-section-card class="request-card" *appCan="permissions.create" [title]="i18n.t('treasury.requestTitle')" [subtitle]="i18n.t('treasury.device') + ': ' + facade.deviceId()">
     <form [formGroup]="form" (ngSubmit)="submitRequest()" appSaveShortcut (appSaveShortcut)="submitRequest()" novalidate>
-      <app-form-field [label]="i18n.t('treasury.treasury')">
+      <app-form-field [label]="i18n.t('treasury.treasury')" [hint]="i18n.t('treasury.pickerHint')">
         <select formControlName="treasuryId">
           <option value="">{{ i18n.t('treasury.chooseTreasury') }}</option>
-          @for (treasury of facade.treasuries.value()?.items ?? []; track treasury.id) {
+          @for (treasury of facade.requestableTreasuries(); track treasury.id) {
             <option [value]="treasury.id">{{ treasury.code }} · {{ i18n.lang() === 'ar' ? treasury.nameAr : treasury.nameEn }}</option>
           }
         </select>
@@ -18,7 +19,7 @@
         <input type="text" formControlName="deviceLabel" maxlength="100" autocomplete="off" />
       </app-form-field>
 
-      @if (facade.request.problem(); as problem) {
+      @if (requestProblem(); as problem) {
         <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
       }
 

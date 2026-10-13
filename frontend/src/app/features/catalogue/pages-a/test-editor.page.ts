@@ -1,7 +1,7 @@
 import { Location } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { type AbstractControl, FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { type AbstractControl, FormArray, FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors, type ValidatorFn, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs';
 
@@ -25,14 +25,14 @@ import {
   type SampleConditionView,
   type TestLookupItem,
 } from '../../../core/api/catalogue-a.contracts';
-import { type ProblemDetails, ProblemCodes } from '../../../core/api/problem-details';
+import { type FieldRule, type ProblemDetails, ProblemCodes } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import type { Mutation } from '../../../core/state/mutation';
 import { localizedPick, localizedTextGroup } from '../../../shared/forms/localized-text';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
-import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
+import { SERVER_ERROR_KEY, SERVER_RULES_KEY, problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
 import { UppercaseDirective } from '../../../shared/forms/uppercase.directive';
 import { codeValidator, requiredText } from '../../../shared/forms/validators';
@@ -121,6 +121,8 @@ export class TestEditorPage {
   private readonly access = inject(PermissionsService);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector = inject(Injector);
 
   protected readonly permissions = CATALOGUE_A_PERMISSIONS;
   protected readonly types = LAB_TEST_TYPES;
@@ -197,6 +199,8 @@ export class TestEditorPage {
 
   protected readonly activeTab = signal<string | null>('general');
   protected readonly saving = signal(false);
+  /** A save the forms refused (validation v0.5.0 round 4): the page says so, like the drawer editors, until the forms are valid. */
+  protected readonly blocked = signal(false);
   protected readonly problems = signal<Partial<Record<Section, ProblemDetails>>>({});
   protected readonly conditions = signal<readonly SampleConditionView[]>([]);
   private readonly rowsVersion = signal(0);
@@ -458,7 +462,7 @@ export class TestEditorPage {
     }
 
     if (!markAllTouched(this.general)) {
-      this.activeTab.set('general');
+      this.block('general');
       return;
     }
 
@@ -472,10 +476,11 @@ export class TestEditorPage {
       ] as const
     ).find(([, control]) => control !== null && !markAllTouched(control));
     if (invalid) {
-      this.activeTab.set(invalid[0]);
+      this.block(invalid[0]);
       return;
     }
 
+    this.blocked.set(false);
     this.saving.set(true);
     this.problems.set({});
     try {
@@ -487,6 +492,40 @@ export class TestEditorPage {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  /** True while a section the save checks is still invalid: the blocked-save notice follows the forms. */
+  protected stillInvalid(): boolean {
+    const allows = this.allows();
+    return this.general.invalid || this.timing.invalid || (allows.ranges && this.bands.invalid) || (allows.values && this.values.invalid) || (allows.paragraphs && this.paragraphs.invalid);
+  }
+
+  /** The text under a list value's flags: CAT-061 from the form itself, or the server's field error on them. */
+  protected flagsError(row: ValueForm): string | null {
+    if (row.hasError('normalAndCritical')) {
+      return this.i18n.t('catalogue-a.error.CAT-061');
+    }
+
+    const server: unknown = row.controls.isCritical.errors?.[SERVER_ERROR_KEY] ?? row.controls.isNormal.errors?.[SERVER_ERROR_KEY];
+    if (typeof server !== 'string') {
+      return null;
+    }
+
+    const rules = (row.controls.isCritical.errors?.[SERVER_RULES_KEY] ?? []) as readonly FieldRule[];
+    return rules.some((rule) => rule.rule === 'CAT-061') ? this.i18n.t('catalogue-a.error.CAT-061') : server;
+  }
+
+  /** A save the forms refused: the section opens, the notice shows and the first marked field takes the focus once rendered. */
+  private block(section: Section): void {
+    this.activeTab.set(section);
+    this.blocked.set(true);
+    afterNextRender({ read: () => this.focusFirstInvalid() }, { injector: this.injector });
+  }
+
+  private focusFirstInvalid(): void {
+    const panel = '.editor [role="tabpanel"]:not([hidden])';
+    const selector = ['input', 'select', 'textarea'].flatMap((tag) => [`${panel} ${tag}.ng-invalid:not([disabled])`, `${panel} ${tag}[aria-invalid="true"]:not([disabled])`]).join(', ');
+    this.host.querySelector<HTMLElement>(selector)?.focus();
   }
 
   protected async toggleActive(): Promise<void> {
@@ -674,8 +713,29 @@ export class TestEditorPage {
       problemToFormErrors(problem, control);
     }
 
+    if (problem.code === ProblemCodes.validationFailed && control === this.values) {
+      this.valueRowErrors(problem);
+    }
+
     this.problems.update((current) => ({ ...current, [section]: problem }));
     this.activeTab.set(section);
+  }
+
+  /** `values[1].isCritical` → the server error on that row's control, shown under the row like the form's own errors (O-2). */
+  private valueRowErrors(problem: ProblemDetails): void {
+    for (const [key, messages] of Object.entries(problem.errors ?? {})) {
+      const match = /^values\[(\d+)\]\.(\w+)$/i.exec(key);
+      const row = match ? (this.values.at(Number(match[1])) as ValueForm | undefined) : undefined;
+      const name = match?.[2] ?? '';
+      const target = row?.get(name.charAt(0).toLowerCase() + name.slice(1));
+      if (!target || messages.length === 0) {
+        continue;
+      }
+
+      const rules = problem.rules?.[key];
+      target.setErrors({ ...(target.errors ?? {}), [SERVER_ERROR_KEY]: messages.join(' '), ...(rules && rules.length > 0 ? { [SERVER_RULES_KEY]: rules } : {}) });
+      target.markAsTouched();
+    }
   }
 
   /** Back to an empty "new test": every section as a fresh page shows it. */
@@ -903,15 +963,24 @@ function bandForm(band: RangeBandItem | null, nextFrom: number, unit: RangeAgeUn
   });
 }
 
+/** Validation v0.5.0 O-2 (CAT-061): a list value reads as Normal or as Critical, never both. */
+export const normalOrCritical: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+  const flags = control.value as { isNormal?: boolean; isCritical?: boolean } | null;
+  return flags?.isNormal === true && flags.isCritical === true ? { normalAndCritical: true } : null;
+};
+
 function valueForm(value: ListValueItem | null): ValueForm {
-  return new FormGroup({
-    value: new FormControl(value?.value ?? '', { nonNullable: true, validators: [requiredText, Validators.maxLength(200)] }),
-    isNormal: new FormControl(value?.isNormal ?? true, { nonNullable: true }),
-    isCritical: new FormControl(value?.isCritical ?? false, { nonNullable: true }),
-    isDefault: new FormControl(value?.isDefault ?? false, { nonNullable: true }),
-    isPlaceholder: new FormControl(value?.isPlaceholder ?? false, { nonNullable: true }),
-    colour: new FormControl(value?.colour ?? '', { nonNullable: true, validators: [Validators.pattern(COLOUR)] }),
-  });
+  return new FormGroup(
+    {
+      value: new FormControl(value?.value ?? '', { nonNullable: true, validators: [requiredText, Validators.maxLength(200)] }),
+      isNormal: new FormControl(value?.isNormal ?? true, { nonNullable: true }),
+      isCritical: new FormControl(value?.isCritical ?? false, { nonNullable: true }),
+      isDefault: new FormControl(value?.isDefault ?? false, { nonNullable: true }),
+      isPlaceholder: new FormControl(value?.isPlaceholder ?? false, { nonNullable: true }),
+      colour: new FormControl(value?.colour ?? '', { nonNullable: true, validators: [Validators.pattern(COLOUR)] }),
+    },
+    { validators: [normalOrCritical] },
+  );
 }
 
 function paragraphForm(paragraph: ParagraphItem | null): ParagraphForm {

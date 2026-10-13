@@ -60,6 +60,12 @@ public sealed class CatalogueAFlowTests(ApiFactory factory) : IClassFixture<ApiF
         var urineId = await CreateAsync(client, "tests", TestRequest("URINE", "RestrictedList", groupId, null, null));
         var badDefault = await client.PutAsJsonAsync($"{Root}/tests/{urineId}/list-values", new ReplaceListValuesRequest([new ListValueItem("Negative", true, false, true, false, null)]));
         Assert.Equal("CAT-058", await AuthClient.CodeOf(badDefault));
+        // validation v0.5.0 O-2: Normal and Critical on one value is a field error naming CAT-061, under values[1].isCritical
+        var bothFlags = await client.PutAsJsonAsync($"{Root}/tests/{urineId}/list-values", new ReplaceListValuesRequest([new ListValueItem("Yellow", true, false, false, false, null), new ListValueItem("Red", true, true, false, false, null)]));
+        Assert.Equal(("VALIDATION-400", HttpStatusCode.BadRequest), (await AuthClient.CodeOf(bothFlags), bothFlags.StatusCode));
+        var bothFlagsBody = await bothFlags.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var bothFlagsRule = Assert.Single(bothFlagsBody.GetProperty("rules").EnumerateObject(), field => string.Equals(field.Name, "values[1].isCritical", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("CAT-061", bothFlagsRule.Value[0].GetProperty("rule").GetString());
         var values = await client.PutAsJsonAsync($"{Root}/tests/{urineId}/list-values", new ReplaceListValuesRequest([new ListValueItem(".", true, false, true, true, null), new ListValueItem("Negative", true, false, false, false, null)]));
         Assert.Equal(HttpStatusCode.NoContent, values.StatusCode);
 
@@ -68,6 +74,12 @@ public sealed class CatalogueAFlowTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal((true, "ROUND([GLU] / 18, 2)"), (check!.Valid, check.Normalized));
         var unknown = await (await client.PostAsJsonAsync($"{Root}/tests/formula/check", new CheckFormulaRequest("[NOPE] + 1", ratioId))).Content.ReadFromJsonAsync<FormulaCheckResult>();
         Assert.Equal((false, "CAT-064"), (unknown!.Valid, unknown.Code));
+
+        // validation v0.5.0 (MDRD eGFR): the patient variables are not test codes, an unknown one is a syntax error
+        var withPatient = await (await client.PostAsJsonAsync($"{Root}/tests/formula/check", new CheckFormulaRequest("round(175 * glu ^ -1.154 * @age ^ -0.203 * if(@female, 0.742, 1), 0)", ratioId))).Content.ReadFromJsonAsync<FormulaCheckResult>();
+        Assert.Equal((true, "ROUND(175 * [GLU] ^ -1.154 * @AGE ^ -0.203 * IF(@FEMALE, 0.742, 1), 0)", "GLU"), (withPatient!.Valid, withPatient.Normalized, string.Join(",", withPatient.References)));
+        var weight = await (await client.PostAsJsonAsync($"{Root}/tests/formula/check", new CheckFormulaRequest("[GLU] * @WEIGHT", ratioId))).Content.ReadFromJsonAsync<FormulaCheckResult>();
+        Assert.Equal((false, "CAT-063"), (weight!.Valid, weight.Code));
         var self = await client.PutAsJsonAsync($"{Root}/tests/{ratioId}/formula", new SetFormulaRequest("[RATIO] * 2"));
         Assert.Equal("CAT-065", await AuthClient.CodeOf(self));
         var formula = await client.PutAsJsonAsync($"{Root}/tests/{ratioId}/formula", new SetFormulaRequest("round(glu / 18, 2)"));

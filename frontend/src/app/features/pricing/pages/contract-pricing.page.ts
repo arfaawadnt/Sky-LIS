@@ -324,7 +324,7 @@ export class ContractPricingPage {
 
     const confirmed = await this.confirm.confirm({
       title: this.i18n.t('pricing.contract.apply'),
-      message: this.i18n.tf('pricing.contract.confirmApply', { tier: this.tierTitle(detail), excluded: this.facade.excludedCount() }),
+      message: this.i18n.tc('pricing.contract.confirmApply', this.facade.excludedCount(), { tier: this.tierTitle(detail) }),
       confirmLabel: this.i18n.t('pricing.contract.apply'),
     });
     if (!confirmed) {

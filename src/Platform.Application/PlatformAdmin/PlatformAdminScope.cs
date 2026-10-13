@@ -40,6 +40,9 @@ public static class PlatformAdminSecurityEvents
     public const string SubscriptionVerified = "SUBSCRIPTION_VERIFIED";
     public const string SubscriptionVerifyFailed = "SUBSCRIPTION_VERIFY_FAILED";
     public const string SubscriptionCompleted = "SUBSCRIPTION_COMPLETED";
+
+    /// <summary>W2: a due monthly charge was not taken (detail <c>tenant:&lt;id&gt; period:&lt;yyyy-MM&gt; reason:&lt;no-plan|currency-mismatch|error&gt;</c>); the wallet is left as it was.</summary>
+    public const string WalletChargeFailed = "WALLET_CHARGE_FAILED";
 }
 
 /// <summary>

@@ -56,6 +56,9 @@
 
 <app-drawer [(open)]="drawerOpen" [title]="drawerTitle()" size="lg" (closed)="onDrawerClosed()">
   <form [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+    @if (blockedSave.blocked()) {
+      <p class="problem" role="alert">{{ i18n.t('shared.masterData.invalid') }}</p>
+    }
     @if (saveProblem(); as problem) {
       <p class="problem" role="alert">{{ problemText(problem) }}</p>
     }

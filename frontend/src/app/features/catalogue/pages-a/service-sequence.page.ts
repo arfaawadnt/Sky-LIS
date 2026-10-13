@@ -155,7 +155,7 @@ export class ServiceSequencePage {
     const changes = this.changes();
     if ((await this.facade.save.execute(changes)) !== null) {
       this.edits.set({});
-      this.toast.success(this.i18n.tf('catalogue-a.sequence.saved', { count: changes.length }));
+      this.toast.success(this.i18n.tc('catalogue-a.sequence.saved', changes.length));
     }
   }
 

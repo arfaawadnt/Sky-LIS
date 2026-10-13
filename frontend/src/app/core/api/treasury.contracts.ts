@@ -69,6 +69,10 @@ export interface TreasuryAccessRequestListItem {
   readonly requestedAtUtc: string;
   readonly decidedAtUtc: string | null;
   readonly decidedByName: string | null;
+  /** The reason of a rejection or revocation, or the optional one of a cancellation (validation v0.5.0 D-05). */
+  readonly decisionReason: string | null;
+  /** The optional comment of the approval; kept after a revocation (D-05). */
+  readonly approvalComment: string | null;
 }
 
 export interface TreasuryAccessRequestFilter {

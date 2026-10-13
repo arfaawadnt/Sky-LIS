@@ -44,7 +44,16 @@ public interface IWalletRepository : IRepository<Wallet>
     Task<WalletDetail?> GetDetailAsync(Guid tenantId, DateTimeOffset monthStartUtc, CancellationToken cancellationToken);
 
     Task<Paged<WalletTransactionItem>> ListTransactionsAsync(Guid tenantId, WalletTransactionKind? kind, PageRequest page, CancellationToken cancellationToken);
+
+    /// <summary>W2: the clients whose wallet's next charge is due at <paramref name="nowUtc"/> (any status; the charger decides), oldest due first. Ids only, never paged: trial and inactive clients stay due and must not hide the chargeable ones behind a page limit.</summary>
+    Task<IReadOnlyList<Guid>> ListDueForChargeAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken);
+
+    /// <summary>W2: the client's status and its plan's fee, currency and code; <see langword="null"/> when the client or its plan is missing.</summary>
+    Task<WalletChargeTerms?> FindChargeTermsAsync(Guid tenantId, CancellationToken cancellationToken);
 }
+
+/// <summary>What the monthly charge reads besides the wallet: the client's life-cycle status and its plan's terms.</summary>
+public sealed record WalletChargeTerms(TenantStatus Status, decimal MonthlyFee, string PlanCurrencyCode, string PlanCode);
 
 public interface ICountryRepository : IRepository<Country>
 {

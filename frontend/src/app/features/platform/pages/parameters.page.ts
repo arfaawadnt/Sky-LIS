@@ -56,7 +56,10 @@ const GROUPS: readonly { readonly id: string; readonly keys: readonly string[] }
   { id: 'samples', keys: ['autoCollect', 'autoReceive', 'newBarcodeOnReject', 'reviewBeforeVerify'] },
 ];
 
-type ParameterForm = FormGroup<Record<string, AbstractControl<string | number | boolean | null>>>;
+/** `SettingCodes.UnknownTimeZone`: a well-formed zone name the server's host does not know. */
+const UNKNOWN_TIME_ZONE = 'SET-003';
+
+type ParameterForm =FormGroup<Record<string, AbstractControl<string | number | boolean | null>>>;
 
 interface ParameterGroupView {
   readonly id: string;
@@ -66,7 +69,9 @@ interface ParameterGroupView {
 /**
  * SA-19 Platform parameters: the platform tenant's settings, which are the defaults every laboratory starts from
  * (OTP length, password minimum, session timeout, trial days, currency, language, master-data update policy, delay
- * thresholds, discount cap, and the laboratory defaults of CP-57). Typed controls; only changed keys are saved.
+ * thresholds, discount cap, and the laboratory defaults of CP-57). Typed controls; only changed keys are saved. "Use
+ * default" removes the platform's own value (validation F-13): the key returns to the code default and the row is deleted,
+ * instead of storing the default as a value of its own.
  */
 @Component({
   selector: 'app-platform-parameters-page',
@@ -83,6 +88,8 @@ export class ParametersPage {
   protected readonly permissions = PLATFORM_PERMISSIONS;
   protected readonly form = signal<ParameterForm | null>(null);
   protected readonly saveProblem = signal<ProblemDetails | null>(null);
+  /** F-13: the keys whose stored platform value "Use default" removes with the next save. */
+  private readonly resets = signal<ReadonlySet<string>>(new Set());
 
   protected readonly groups = computed<readonly ParameterGroupView[]>(() => {
     const items = this.facade.items();
@@ -98,7 +105,10 @@ export class ParametersPage {
     this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14)
     effect(() => {
       const items = this.facade.items();
-      untracked(() => this.form.set(items.length === 0 ? null : this.buildForm(items)));
+      untracked(() => {
+        this.resets.set(new Set());
+        this.form.set(items.length === 0 ? null : this.buildForm(items));
+      });
     });
   }
 
@@ -130,10 +140,16 @@ export class ParametersPage {
     return this.textOf(item, form.controls[item.key]?.value ?? null) !== item.defaultValue;
   }
 
+  /** "Use default" is offered while the value differs from the default or the platform stores a value of its own (F-13). */
+  protected canUseDefault(form: ParameterForm, item: TenantSettingItem): boolean {
+    return this.isModified(form, item) || (!item.isDefault && !this.resets().has(item.key));
+  }
+
   protected resetToDefault(form: ParameterForm, item: TenantSettingItem): void {
     const control = form.controls[item.key];
     control?.setValue(this.valueOf(item, item.defaultValue));
     control?.markAsDirty();
+    this.resets.update((keys) => new Set([...keys, item.key]));
   }
 
   protected reload(): void {
@@ -155,7 +171,11 @@ export class ParametersPage {
     const changes: SettingValueItem[] = [];
     for (const item of this.facade.items()) {
       const text = this.textOf(item, form.controls[item.key]?.value ?? null);
-      if (text !== item.value) {
+      if (this.resets().has(item.key) && text === item.defaultValue) {
+        if (!item.isDefault) {
+          changes.push({ key: item.key, value: null });   // F-13: remove the row, do not store the default as a value
+        }
+      } else if (text !== item.value) {
         changes.push({ key: item.key, value: text });
       }
     }
@@ -167,14 +187,16 @@ export class ParametersPage {
 
     this.saveProblem.set(null);
     if ((await this.facade.save.execute(changes)) !== null) {
-      this.toast.success(this.i18n.tf('platform.parameters.saved', { count: changes.length }));
+      this.toast.success(this.i18n.tc('platform.parameters.saved', changes.length));
     } else {
       const problem = this.facade.save.problem();
       const only = changes.length === 1 ? form.controls[changes[0]?.key ?? ''] : undefined;
-      if (problem?.code === 'SET-002' && only) {
-        // one value sent and refused: the refusal belongs under that field, not in a generic banner (round 3 R3-03)
-        only.setErrors({ [SERVER_ERROR_KEY]: this.problemText(problem) });
-        only.markAsTouched();
+      // SET-003 names its field (an unknown time zone, LIS-VR-002 round 4) whatever else was sent; a SET-002 belongs to the
+      // one value sent. Either way the refusal goes under that field, not in a generic banner (round 3 R3-03).
+      const field = problem?.code === UNKNOWN_TIME_ZONE ? form.controls['timeZone'] : problem?.code === 'SET-002' ? only : undefined;
+      if (problem && field) {
+        field.setErrors({ [SERVER_ERROR_KEY]: this.problemText(problem) });
+        field.markAsTouched();
         this.saveProblem.set(null);
       } else {
         this.saveProblem.set(problem);

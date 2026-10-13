@@ -45,6 +45,22 @@ public sealed class BasePriceListTests
     }
 
     [Fact]
+    public void L2_Update_raises_BasePriceListUpdated_only_when_the_name_or_the_year_changes()
+    {
+        var list = Pl26();
+
+        list.Update(new LocalizedText("Main price list 2026", "قائمة 2026"), 2026, Now);
+        Assert.Empty(list.DomainEvents);
+
+        list.Update(new LocalizedText("Main price list 2026 (edited)", "قائمة 2026"), 2027, Now);
+
+        Assert.Equal(("PL26", 2027, "Main price list 2026 (edited)"), (list.Code, list.Year, list.Name.En));
+        var raised = Assert.IsType<BasePriceListUpdated>(Assert.Single(list.DomainEvents));   // validation v0.5.0 O-5
+        Assert.Equal((list.Id, "PL26", 2027), (raised.ListId, raised.Code, raised.Year));
+        Assert.Equal(PricingCodes.YearInvalid, Assert.Throws<DomainException>(() => list.Update(new LocalizedText("L", "ق"), 1999, Now)).Code);
+    }
+
+    [Fact]
     public void S_L3_ok_Upsert_adds_and_changes_and_reports_the_counts()
     {
         var list = Pl26();

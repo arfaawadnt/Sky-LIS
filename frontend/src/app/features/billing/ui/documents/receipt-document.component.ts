@@ -5,7 +5,7 @@ import { I18nService } from '../../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../../shared/forms/localized-text';
 import { Code128Component } from '../../../../shared/print/code128.component';
 import { DocumentFrameComponent } from '../../../../shared/print/document-frame.component';
-import { formatDateTime, formatMoney } from '../billing-format';
+import { formatPrintDateTime, formatPrintMoney } from '../billing-format';
 
 /** The payment receipt (A5, CP-23): one per payment, reprintable; a voided payment prints with a VOID banner. */
 @Component({
@@ -69,11 +69,11 @@ export class ReceiptDocumentComponent {
   protected readonly treasury = computed(() => localizedPick({ en: this.doc().treasuryNameEn, ar: this.doc().treasuryNameAr }, this.i18n.lang()));
 
   protected money(value: number): string {
-    return formatMoney(value, this.i18n.lang());
+    return formatPrintMoney(value, this.i18n.lang());
   }
 
   protected at(value: string): string {
-    return formatDateTime(value, this.i18n.lang());
+    return formatPrintDateTime(value, this.i18n.lang());
   }
 }
 

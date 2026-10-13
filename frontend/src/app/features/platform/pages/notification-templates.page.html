@@ -51,6 +51,9 @@
 <app-drawer [(open)]="drawerOpen" [title]="i18n.t(editing() === null ? 'platform.templates.add' : canManage() ? 'platform.templates.edit' : 'platform.templates.view')" size="lg">
   @if (form(); as form) {
     <form id="platform-template-form" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+      @if (blockedSave.blocked()) {
+        <p class="problem" role="alert">{{ i18n.t('shared.masterData.invalid') }}</p>
+      }
       @if (saveProblem(); as problem) {
         <p class="problem" role="alert">{{ problemText(problem) }}</p>
       }

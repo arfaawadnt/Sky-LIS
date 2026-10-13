@@ -8,12 +8,13 @@ import { type CountryRequest, PLATFORM_API } from '../../../core/api/platform.co
 import { ProblemError } from '../../../core/api/problem-details';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
-import { CountriesPage } from './countries.page';
+import { isDialCodeValid } from '../ui/validators';
+import { CountriesPage, DIAL_CODE_AS_TYPED } from './countries.page';
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 interface CountryAdapterPage {
-  readonly config: { readonly adapter: { create(dto: CountryRequest): Promise<unknown>; update(id: string, dto: CountryRequest): Promise<unknown> } };
+  readonly config: { readonly fields: readonly { readonly name: string; readonly pattern?: RegExp; readonly patternMessage?: string }[]; readonly adapter: { create(dto: CountryRequest): Promise<unknown>; update(id: string, dto: CountryRequest): Promise<unknown> } };
 }
 
 const uzbekistan: CountryRequest = {
@@ -100,5 +101,13 @@ describe('Countries page dial code (C-09)', () => {
     expect((request.request.body as CountryRequest).dialCode).toBe('+998');
     request.flush({ id: 'uz' });
     await saving;
+  });
+
+  it('C-09 live check: the dial code field carries the GEO-002 rule as a pattern with its message, the same rule as Save', () => {
+    const field = page.config.fields.find((candidate) => candidate.name === 'dialCode');
+    expect([field?.pattern, field?.patternMessage]).toEqual([DIAL_CODE_AS_TYPED, 'platform.countries.error.GEO-002']);
+    for (const typed of ['+20', '+998', '+1', '+1234', '+ 20', '+9 98', '20', '+0', '+020', '+12345', '+', '+2a', '++20']) {
+      expect([typed, DIAL_CODE_AS_TYPED.test(typed.trim())]).toEqual([typed, isDialCodeValid(typed)]);
+    }
   });
 });

@@ -94,7 +94,8 @@ export class PriceQueryPage {
   protected issueText(issue: OrderIssue): string {
     const key = `registration.error.${issue.code}`;
     const prefix = issue.serviceCode ? `${issue.serviceCode}: ` : '';
-    return `${prefix}${this.i18n.has(key) ? this.i18n.t(key) : issue.message}`;
+    // REG-109 names the repeated tests and the services that order them (validation O-3).
+    return `${prefix}${this.i18n.has(key) ? this.i18n.tf(key, { detail: issue.detail ?? '' }) : issue.message}`;
   }
 
   protected value(event: Event): string {

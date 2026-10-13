@@ -85,6 +85,22 @@ public sealed class TreasuryAccessRequest : AggregateRoot, ITenantScoped
         return request;
     }
 
+    /// <summary>
+    /// T1 guard of intake Q3 (validation v0.5.0 O-4; an assumption awaiting the business owner): a user asks for access only
+    /// to a treasury of a branch they may work in. <paramref name="userBranchIds"/> is the membership's assignment as stored:
+    /// empty means every branch of the laboratory. Refused with TRS-015 (422; the client shows it under the treasury field).
+    /// </summary>
+    public static void EnsureRequesterWorksIn(Treasury treasury, IReadOnlyCollection<Guid> userBranchIds)
+    {
+        ArgumentNullException.ThrowIfNull(treasury);
+        ArgumentNullException.ThrowIfNull(userBranchIds);
+        Require(
+            userBranchIds.Count == 0 || userBranchIds.Contains(treasury.BranchId),
+            TreasuryCodes.TreasuryOutsideUserBranches,
+            "This treasury belongs to a branch you are not assigned to.",
+            DomainFault.Validation);
+    }
+
     /// <summary>T2 Approve (<c>treasury.approve</c>, approval gate): Pending only (TRS-013); SOD-TRS-001; records the approval; the request is frozen afterwards.</summary>
     public void Approve(Guid actorUserId, DateTimeOffset nowUtc, string? comment = null)
     {

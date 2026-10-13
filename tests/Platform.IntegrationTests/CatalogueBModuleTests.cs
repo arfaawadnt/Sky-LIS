@@ -3,11 +3,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Catalogue;
+using Platform.Application.PlatformAdmin;
 using Platform.Contracts.Common;
 using Platform.Domain.Catalogue;
 using Platform.Infrastructure.Persistence;
 using Platform.IntegrationTests.Support;
 using Platform.SharedKernel.Localization;
+using Platform.SharedKernel.MultiTenancy;
 using Platform.SharedKernel.Primitives;
 
 namespace Platform.IntegrationTests;
@@ -43,7 +45,7 @@ public sealed class CatalogueBModuleTests(DatabaseFixture fixture)
                 ShortcutSet.Create("ICU", Text("ICU"), [Guid.CreateVersion7()], Now),
                 TestRule.Create(Text("A>>B"), null, [Guid.CreateVersion7()], [Guid.CreateVersion7()], Now),
                 Reason.Create(ReasonKind.Cancellation, Text("Patient request"), Now),
-                ReportTemplate.Create(Text("Results A4"), ReportTemplateType.Results, null, null, true, ReportTemplateLanguage.Both, null, null, Now),
+                ReportTemplate.Create(Text("Results A4"), ReportTemplateType.Results, true, ReportTemplateLanguage.Both, null, null, Now),
                 drugType,
                 commercialName,
                 Antibiotic.Create("AMC", Text("Amoxicillin"), "AMC", commercialName, Now),
@@ -195,7 +197,7 @@ public sealed class CatalogueBModuleTests(DatabaseFixture fixture)
         await SaveAsync(tenant, context =>
         {
             var doctor = Doctor.Create("D1", Text("Dr. A"), null, null, [branch], 15m, null, Now);
-            var template = ReportTemplate.Create(Text("Culture A4"), ReportTemplateType.Culture, null, null, false, ReportTemplateLanguage.En, null, Text("Footer"), Now);
+            var template = ReportTemplate.Create(Text("Culture A4"), ReportTemplateType.Culture, false, ReportTemplateLanguage.En, null, Text("Footer"), Now);
             (doctorId, templateId) = (doctor.Id, template.Id);
             context.Add(doctor);
             context.Add(template);
@@ -227,14 +229,16 @@ public sealed class CatalogueBModuleTests(DatabaseFixture fixture)
             retired.Deactivate(Now);
             context.AddRange(drugType, commercialName, antibiotic, retired);
             context.Add(Reason.Create(ReasonKind.Discount, Text("Staff"), Now));
-            context.Add(ReportTemplate.Create(Text("Receipt"), ReportTemplateType.Receipt, Guid.CreateVersion7(), null, true, ReportTemplateLanguage.Both, null, null, Now));
+            var receipt = ReportTemplate.Create(Text("Receipt"), ReportTemplateType.Receipt, true, ReportTemplateLanguage.Both, null, null, Now);
+            receipt.AttachImage(ReportTemplateImage.Logo, Guid.CreateVersion7(), Now);   // a file id whose content is not in the store
+            context.Add(receipt);
             context.Add(Preparation.Create("MED", Text("Medication?"), PreparationAnswerType.Text, null, PreparationGender.Any, null, Now));
             context.Add(Doctor.Create("D1", Text("Dr. Platform"), null, null, null, 0m, null, Now));
             return new[] { drugType.Id, commercialName.Id, antibiotic.Id };
         });
 
         CatalogueBCloneSummary summary;
-        using (var scope = fixture.AppScope(null))
+        using (var scope = fixture.AppScope(laboratory))   // images are copied into the current (target) tenant's store
         {
             using (scope.ServiceProvider.GetRequiredService<ICurrentTenantSetter>().Elevate())
             {
@@ -252,7 +256,7 @@ public sealed class CatalogueBModuleTests(DatabaseFixture fixture)
         Assert.DoesNotContain(antibiotic.Id, sourceIds);
         Assert.Equal((commercialName.Id, drugType.Id), (antibiotic.CommercialNameId!.Value, commercialName.DrugTypeId));
         Assert.Equal("Staff", (await context.Set<Reason>().SingleAsync()).Name.En);
-        Assert.Null((await context.Set<ReportTemplate>().SingleAsync()).LogoFileId);
+        Assert.Null((await context.Set<ReportTemplate>().SingleAsync()).LogoFileId);   // the missing content is dropped, never shared
         Assert.Equal(0, await context.Set<Doctor>().CountAsync());
 
         // a repeated clone adds nothing that already exists
@@ -262,6 +266,43 @@ public sealed class CatalogueBModuleTests(DatabaseFixture fixture)
             var second = await again.ServiceProvider.GetRequiredService<ICatalogueBCloner>().CloneAsync(platform, laboratory, CancellationToken.None);
             Assert.All(second.RowsCopied.Values, count => Assert.Equal(0, count));
         }
+    }
+
+    [DatabaseFact]
+    public async Task Provisioning_links_each_copied_clinical_group_to_the_laboratorys_own_copy_of_its_template()
+    {
+        // validation Z-02: Catalogue A copies the groups before the templates exist in the laboratory; the link must survive
+        var (platform, laboratory) = (Guid.CreateVersion7(), Guid.CreateVersion7());
+        var sourceTemplate = await SaveAsync(platform, context =>
+        {
+            var template = ReportTemplate.Create(Text("Chemistry A4"), ReportTemplateType.Results, false, ReportTemplateLanguage.Both, null, null, Now);
+            context.Add(template);
+            context.Add(ReportTemplate.Create(Text("Unused A4"), ReportTemplateType.Results, false, ReportTemplateLanguage.En, null, null, Now));
+            context.Add(ClinicalGroup.Create("CHEM", "C", Text("Chemistry"), null, template.Id, 1, Now));
+            context.Add(ClinicalGroup.Create("HEMA", "H", Text("Haematology"), null, null, 2, Now));
+            return template.Id;
+        });
+
+        using (var scope = fixture.AppScope(TenantIds.Platform))
+        {
+            var masterData = scope.ServiceProvider.GetRequiredService<IMasterDataCloner>();
+            await scope.ServiceProvider.GetRequiredService<ITenantProvisioningScope>().RunAsync(laboratory, async ct =>
+            {
+                await masterData.StageAsync(platform, laboratory, ct);   // the order of the provisioning: A, the handler's flush, B
+                await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(ct);
+                await masterData.ApplyAsync(platform, laboratory, ct);
+            }, CancellationToken.None);
+        }
+
+        using var reader = fixture.AppScope(laboratory);
+        var context = reader.ServiceProvider.GetRequiredService<AppDbContext>();
+        var copy = (await context.Set<ReportTemplate>().ToListAsync()).Single(template => template.Name.En == "Chemistry A4");
+        Assert.NotEqual(sourceTemplate, copy.Id);
+        var links = await context.Set<ClinicalGroup>().ToDictionaryAsync(group => group.Code, group => group.ReportTemplateId);
+        Assert.Equal(copy.Id, links["CHEM"]);   // the laboratory's own copy, never the platform's template
+        Assert.Null(links["HEMA"]);
+        var port = reader.ServiceProvider.GetRequiredService<IReportTemplateLookup>();
+        Assert.Equal("Chemistry A4", (await port.GetAsync(links["CHEM"]!.Value, CancellationToken.None))!.NameEn);
     }
 
     [DatabaseFact]

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, viewChild } from '@angular/core';
 
 import {
   CATALOGUE_B_PERMISSIONS,
@@ -13,6 +13,7 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { type LocalizedText, localizedPick } from '../../../shared/forms/localized-text';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CellTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
+import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
 import { sortParams } from '../../../shared/forms/paging';
 import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
@@ -20,6 +21,7 @@ import type { FormValue, MasterDataConfig } from '../../../shared/ui/master-data
 import { CatalogueBApi } from '../data-b/catalogue-b.api';
 import { ListedFilter } from '../data-b/listed-filter';
 import { CatalogueBExportButtonComponent } from '../ui-b/catalogue-b-export-button.component';
+import { ReportTemplateImagesComponent } from '../ui-b/report-template-images.component';
 
 /**
  * The option labels of the drawer's Document type and Language selects, in both languages (UAT R2-03). The options are
@@ -43,13 +45,15 @@ export const TEMPLATE_LANGUAGE_LABELS: Readonly<Record<ReportTemplateLanguage, r
 };
 
 /**
- * Report templates (SRS CP-54): print layouts by document type with language, QR and optional bilingual header and
- * footer texts. Logo and signature are files of the Files module: the register shows whether one is attached and
- * the editor keeps them (choosing the file waits for the Files upload API, intake A10).
+ * Report templates (SRS CP-54; SA-12 on the Super Admin portal): print layouts by document type with language, QR and
+ * optional bilingual header and footer texts. Logo and signature are files of the Files module (intake A10, validation
+ * F-02): the register shows whether one is attached, and the row action "Logo, signature and preview" opens a drawer
+ * with a thumbnail of each, upload / replace / remove for `catalogue.edit`, and a sample result report laid out with
+ * the template. The edit drawer saves the texts only; the images keep their own calls.
  */
 @Component({
   selector: 'app-catalogue-b-report-templates-page',
-  imports: [MasterDataPageComponent, CellTemplateDirective, BadgeComponent, CatalogueBExportButtonComponent],
+  imports: [MasterDataPageComponent, CellTemplateDirective, BadgeComponent, CatalogueBExportButtonComponent, DrawerComponent, ReportTemplateImagesComponent],
   template: `
     <app-master-data-page [config]="config">
       <ng-template appCell="assets" [appCellOf]="config" let-row>
@@ -65,6 +69,11 @@ export const TEMPLATE_LANGUAGE_LABELS: Readonly<Record<ReportTemplateLanguage, r
       </ng-template>
       <app-catalogue-b-export-button pageActions [export]="exportCsv" />
     </app-master-data-page>
+    <app-drawer [(open)]="imagesOpen" [title]="imagesTitle()" size="xl" (closed)="imagesOf.set(null)">
+      @if (imagesOpen() && imagesOf(); as template) {
+        <app-report-template-images [template]="template" (changed)="onImagesChanged()" />
+      }
+    </app-drawer>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -73,6 +82,12 @@ export class ReportTemplatesPage {
   private readonly api = inject(CatalogueBApi);
 
   private readonly listed = new ListedFilter();
+  private readonly page = viewChild.required(MasterDataPageComponent);
+
+  /** The template whose images and preview the drawer shows. */
+  protected readonly imagesOf = signal<ReportTemplateListItem | null>(null);
+  protected readonly imagesOpen = signal(false);
+  protected readonly imagesTitle = signal('');
 
   protected readonly exportCsv = (): Promise<void> => this.api.reportTemplates.exportCsv(this.listed.query());
 
@@ -111,13 +126,25 @@ export class ReportTemplatesPage {
       update: (id, dto) => this.api.reportTemplates.update(id, dto),
       setActive: (id, active) => this.api.reportTemplates.setActive(id, active),
     },
-    toDto: (value, item) => toRequest(value, item),
+    toDto: (value) => toRequest(value),
+    rowActions: [{ id: 'images', label: 'catalogue-b.reportTemplates.images.open', icon: 'eye', run: (row) => this.openImages(row) }],
     permissions: { create: CATALOGUE_B_PERMISSIONS.create, update: CATALOGUE_B_PERMISSIONS.edit, activate: CATALOGUE_B_PERMISSIONS.manage },
     drawerSize: 'lg',
   };
 
   constructor() {
     void this.i18n.load('catalogue-b');
+  }
+
+  protected openImages(template: ReportTemplateListItem): void {
+    this.imagesTitle.set(this.i18n.tf('catalogue-b.reportTemplates.images.title', { name: localizedPick({ en: template.nameEn, ar: template.nameAr }, this.i18n.lang()) }));
+    this.imagesOf.set(template);
+    this.imagesOpen.set(true);
+  }
+
+  /** An image was uploaded or removed: the register's Logo / Signature badges follow. */
+  protected onImagesChanged(): void {
+    this.page().reload();
   }
 }
 
@@ -126,8 +153,8 @@ function optional(value: unknown): string | null {
   return text === '' ? null : text;
 }
 
-/** Empty header/footer languages travel as null; logo and signature are kept from the record (no file picker yet). */
-export function toRequest(value: FormValue, item: ReportTemplateListItem | null): ReportTemplateRequest {
+/** Empty header/footer languages travel as null; logo and signature are not part of the request (their own calls, A10). */
+export function toRequest(value: FormValue): ReportTemplateRequest {
   const name = value['name'] as LocalizedText;
   const header = value['headerText'] as LocalizedText | undefined;
   const footer = value['footerText'] as LocalizedText | undefined;
@@ -135,8 +162,6 @@ export function toRequest(value: FormValue, item: ReportTemplateListItem | null)
     nameEn: name.en.trim(),
     nameAr: name.ar.trim(),
     type: (value['type'] as ReportTemplateType | null) ?? 'Results',
-    logoFileId: item?.logoFileId ?? null,
-    signatureFileId: item?.signatureFileId ?? null,
     showQr: value['showQr'] === true,
     language: (value['language'] as ReportTemplateLanguage | null) ?? 'Both',
     headerTextEn: optional(header?.en),

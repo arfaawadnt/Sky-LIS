@@ -7,8 +7,8 @@ import type { ProblemDetails } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { PortalService } from '../../../core/portal/portal.service';
+import { blockedSave } from '../../../shared/forms/blocked-save';
 import { localizedPick, localizedTextGroup } from '../../../shared/forms/localized-text';
-import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
@@ -26,6 +26,7 @@ import { RoleEditorFacade } from '../state/roles.facade';
 import { PrivilegeMatrixComponent, sortKeys } from '../ui/privilege-matrix.component';
 import { type BranchOption, ResultRightsGridComponent } from '../ui/result-rights-grid.component';
 import { isDiscountCapValid, SpecialRightsFormComponent } from '../ui/special-rights-form.component';
+import { catalogueInScope, splitByScope } from './role-permission-scope';
 
 export type RoleTab = 'general' | 'permissions' | 'special' | 'results';
 
@@ -92,7 +93,7 @@ export class RoleEditorPage {
   protected readonly tabs = computed<readonly TabItem[]>(() => {
     const items: TabItem[] = [
       { id: 'general', label: this.i18n.t('organization.roles.tab.general') },
-      { id: 'permissions', label: this.i18n.t('organization.roles.tab.permissions'), badge: this.keys().size },
+      { id: 'permissions', label: this.i18n.t('organization.roles.tab.permissions'), badge: this.matrixKeyCount() },
     ];
     if (!this.isPlatform()) {
       items.push(
@@ -114,6 +115,23 @@ export class RoleEditorPage {
   protected readonly special = linkedSignal<SpecialRights>(() => this.facade.role()?.specialRights ?? NO_SPECIAL_RIGHTS);
   protected readonly results = linkedSignal<readonly ResultRight[]>(() => this.facade.role()?.resultRights ?? []);
 
+  /**
+   * O-7: the matrix shows the keys of the delivered release only; the role's keys of hidden (Release 2) modules are kept
+   * and sent back unchanged with every save, never dropped.
+   */
+  private readonly scopedKeys = computed(() => splitByScope(this.keys()));
+  protected readonly shownKeys = computed(() => this.scopedKeys().shown);
+  protected readonly keptKeyCount = computed(() => this.scopedKeys().kept.length);
+
+  /** Validation F-07: the held keys the matrix lists (never more than it offers; a platform-only key of a laboratory role is not counted). */
+  protected readonly matrixKeyCount = computed(() => {
+    const keys = this.keys();
+    return this.catalogue().modules.reduce((sum, module) => sum + module.actions.filter((action) => keys.has(`${module.key}.${action}`)).length, 0);
+  });
+
+  /** Validation F-03: a refused save of the general tab says so and focuses the first marked field. */
+  protected readonly blockedSave = blockedSave();
+
   protected readonly permissionsDirty = computed(() => !sameKeys(this.keys(), this.facade.role()?.permissionKeys ?? []));
   protected readonly specialDirty = computed(() => {
     const role = this.facade.role();
@@ -124,7 +142,8 @@ export class RoleEditorPage {
     return role !== null && !sameResults(role.resultRights, this.results());
   });
 
-  protected readonly catalogue = computed(() => (this.facade.catalogue.hasValue() ? this.facade.catalogue.value() : { modules: [], actions: [] }));
+  /** O-7: the modules of the delivered release (RELEASE_SCOPE); the server catalogue lists every module. */
+  protected readonly catalogue = computed(() => catalogueInScope(this.facade.catalogue.hasValue() ? this.facade.catalogue.value() : { modules: [], actions: [] }));
   protected readonly groups = computed(() => (this.facade.clinicalGroups.hasValue() ? this.facade.clinicalGroups.value() : []));
   protected readonly branches = computed<readonly BranchOption[]>(() => (this.facade.branches.hasValue() ? this.facade.branches.value() : []));
 
@@ -148,13 +167,14 @@ export class RoleEditorPage {
     this.facade.refresh();   // the facade outlives the page: re-read on open (UAT D-14)
     effect(() => {
       const id = this.roleId();
-      untracked(() => this.facade.roleId.set(id ?? null));
+      untracked(() => this.facade.open(id ?? null));   // another role starts without the previous refusal (F-14)
     });
     effect(() => {
       const role = this.facade.role();
       untracked(() => {
         if (role !== null) {
           this.form.reset({ name: { en: role.nameEn, ar: role.nameAr }, description: role.description ?? '' });
+          this.blockedSave.reset();
         }
 
         if (!this.canEdit()) {
@@ -164,8 +184,9 @@ export class RoleEditorPage {
     });
   }
 
+  /** A change of the matrix (the shown keys): the held keys of hidden modules stay with the role. */
   protected setKeys(keys: readonly string[]): void {
-    this.keys.set(new Set(keys));
+    this.keys.set(new Set([...keys, ...this.scopedKeys().kept]));
   }
 
   protected problemText(problem: ProblemDetails): string {
@@ -191,7 +212,7 @@ export class RoleEditorPage {
   }
 
   protected async saveGeneral(): Promise<void> {
-    if (!this.canEdit() || !markAllTouched(this.form)) {
+    if (!this.canEdit() || !this.blockedSave.check(this.form, '#role-general')) {
       return;
     }
 
@@ -232,7 +253,7 @@ export class RoleEditorPage {
     if (role !== null && role.memberCount > 0) {
       const confirmed = await this.confirm.confirm({
         title: this.i18n.t('organization.roles.confirmPropagate.title'),
-        message: this.i18n.tf('organization.roles.confirmPropagate.message', { count: role.memberCount }),
+        message: this.i18n.tc('organization.roles.confirmPropagate.message', role.memberCount),
       });
       if (!confirmed) {
         return;

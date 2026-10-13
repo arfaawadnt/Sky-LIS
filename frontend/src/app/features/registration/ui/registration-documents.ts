@@ -6,14 +6,15 @@ import { I18nService, type Language } from '../../../core/i18n/i18n.service';
 import { CODE128, encodeCode128 } from '../../../shared/print/code128';
 import { Code128Component } from '../../../shared/print/code128.component';
 import { DocumentFrameComponent } from '../../../shared/print/document-frame.component';
-import { dateOnly, dateTime, money, pick } from '../data/registration-format';
+import { labelDateTime, pick, printDateTime, printMoney } from '../data/registration-format';
 
 const LINE = 'display:flex;gap:1.5mm;align-items:baseline;white-space:nowrap;overflow:hidden;';
 const CLIP = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
 
 /**
  * Barcode labels of a visit (CP-06 "save prints labels", LDM §2.2 label content): unit letter, accession, date/time,
- * patient, the sample number as Code 128, sample type · condition, branch and the services; one `.print-page` per label
+ * patient, the sample number as Code 128, sample type · condition, branch and the services; the marks "!" (urgent) and
+ * "BIO" (biohazard); the date in Latin digits in every language, like the printed reports; one `.print-page` per label
  * and copy, sized for 50 × 25 mm stock. Inline styles so the rendered HTML carries the layout into the print frame.
  */
 @Component({
@@ -27,6 +28,10 @@ const CLIP = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
           <span style="font-weight:600;">{{ label.accession }}</span>
           @if (label.urgent) {
             <b>!</b>
+          }
+          @if (label.biohazard) {
+            <!-- plain text in a box: every label font and thermal printer has it, unlike the ☣ glyph (validation 2026-10-11) -->
+            <b class="biohazard" style="border:0.25mm solid #000;padding:0 0.5mm;">BIO</b>
           }
           <span style="margin-inline-start:auto;">{{ when(label) }}</span>
         </div>
@@ -65,7 +70,7 @@ export class RegistrationLabelsDocument {
   }
 
   protected when(label: SampleLabel): string {
-    return dateTime(label.registeredAtUtc, this.lang());
+    return labelDateTime(label.registeredAtUtc);
   }
 
   protected patient(label: SampleLabel): string {
@@ -221,8 +226,8 @@ export class JobOrderDocumentComponent {
   readonly document = input.required<JobOrderDocument>();
 
   protected readonly branch = computed(() => pick(this.document().letterhead.branchNameEn, this.document().letterhead.branchNameAr, this.i18n.lang()) || null);
-  protected readonly printedAt = computed(() => dateTime(this.document().printedAtUtc, this.i18n.lang()));
-  protected readonly registeredAt = computed(() => dateTime(this.document().registeredAtUtc, this.i18n.lang()));
+  protected readonly printedAt = computed(() => printDateTime(this.document().printedAtUtc, this.i18n.lang()));
+  protected readonly registeredAt = computed(() => printDateTime(this.document().registeredAtUtc, this.i18n.lang()));
   protected readonly patientName = computed(() => pick(this.document().patient.fullName, this.document().patient.nameAr, this.i18n.lang()));
   protected readonly contract = computed(() => {
     const contract = this.document().contract;
@@ -235,11 +240,11 @@ export class JobOrderDocumentComponent {
   }
 
   protected expected(utc: string | null): string {
-    return dateTime(utc, this.i18n.lang());
+    return printDateTime(utc, this.i18n.lang());
   }
 
   protected amount(value: number): string {
-    return money(value, this.i18n.lang());
+    return printMoney(value, this.i18n.lang());
   }
 }
 
@@ -320,7 +325,7 @@ export class PriceQuoteDocumentComponent {
   readonly document = input.required<PriceQuoteDocument>();
 
   protected readonly branch = computed(() => pick(this.document().letterhead.branchNameEn, this.document().letterhead.branchNameAr, this.i18n.lang()) || null);
-  protected readonly printedAt = computed(() => dateTime(this.document().printedAtUtc, this.i18n.lang()));
+  protected readonly printedAt = computed(() => printDateTime(this.document().printedAtUtc, this.i18n.lang()));
   protected readonly contract = computed(() => {
     const contract = this.document().contract;
     return contract === null ? '' : `${pick(contract.payerNameEn, contract.payerNameAr, this.i18n.lang())} / ${pick(contract.tierNameEn, contract.tierNameAr, this.i18n.lang())}`;
@@ -331,11 +336,11 @@ export class PriceQuoteDocumentComponent {
   }
 
   protected expected(utc: string | null): string {
-    return dateOnly(utc, this.i18n.lang()) === '—' ? '—' : dateTime(utc, this.i18n.lang());
+    return printDateTime(utc, this.i18n.lang());
   }
 
   protected amount(value: number): string {
-    return money(value, this.i18n.lang());
+    return printMoney(value, this.i18n.lang());
   }
 }
 
@@ -390,9 +395,9 @@ export class RegistrationReceiptDocument {
   readonly document = input.required<PaymentReceiptDocument>();
 
   protected readonly branch = computed(() => pick(this.document().letterhead.branchNameEn, this.document().letterhead.branchNameAr, this.i18n.lang()) || null);
-  protected readonly printedAt = computed(() => dateTime(this.document().printedAtUtc, this.i18n.lang()));
+  protected readonly printedAt = computed(() => printDateTime(this.document().printedAtUtc, this.i18n.lang()));
 
   protected amount(value: number): string {
-    return money(value, this.i18n.lang());
+    return printMoney(value, this.i18n.lang());
   }
 }

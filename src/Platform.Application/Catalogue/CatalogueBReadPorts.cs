@@ -90,7 +90,8 @@ public sealed record CatalogueBCloneSummary(IReadOnlyDictionary<string, int> Row
 /// Copies the global Catalogue B templates (the platform tenant's active rows) to a newly provisioned tenant with
 /// fresh ids (BR-25): preparations, comment library, diagnoses, shortcut sets, test rules, reasons, report templates
 /// and the microbiology masters. Doctors and sending labs are laboratory-specific and are not copied; report-template
-/// file ids are cleared. Service and clinical-group ids are remapped by <b>code</b> to the target tenant's Catalogue A
+/// images are copied into the target tenant's file store with new file ids (intake A10), so the clone must run in the
+/// target tenant's scope. Service and clinical-group ids are remapped by <b>code</b> to the target tenant's Catalogue A
 /// rows, so Catalogue A's cloner must have run first. Runs inside the provisioning's elevated scope (it reads one
 /// tenant and writes another) and writes immediately with set-based SQL in the ambient transaction.
 /// </summary>

@@ -7,13 +7,16 @@ using Platform.Contracts.Settings;
 using Platform.Domain.Authorization;
 using Platform.Domain.Settings;
 using Platform.SharedKernel.Abstractions;
+using Platform.SharedKernel.Primitives;
 
 namespace Platform.Application.Settings.Commands;
 
 /// <summary>
 /// SRS CP-57 "Toggle; edit": stores one or more parameter values. Every key must be catalogued (<c>SET-001</c>) and
-/// every value well-formed for its type and range (<c>SET-002</c>); the whole request is refused before anything is
-/// staged, then committed once. Returns the full, effective parameter list.
+/// every value well-formed for its type and range (<c>SET-002</c>; a time-zone name the host does not know <c>SET-003</c>); the whole request is refused before anything is
+/// staged, then committed once. A null value removes the tenant's own row ("Use default", validation F-13): the key reads the
+/// inherited value again (the platform's, else the code default); removing a row that does not exist changes nothing.
+/// Returns the full, effective parameter list.
 /// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Settings, PermissionAction.Manage)]
 public sealed record UpdateTenantSettingsCommand(IReadOnlyList<SettingValueItem> Settings) : ICommand<TenantSettingsResponse>;
@@ -26,7 +29,7 @@ public sealed class UpdateTenantSettingsCommandValidator : AbstractValidator<Upd
         RuleForEach(command => command.Settings).ChildRules(item =>
         {
             item.RuleFor(setting => setting.Key).NotEmpty().MaximumLength(SettingDescriptor.MaxKeyLength);
-            item.RuleFor(setting => setting.Value).NotNull().MaximumLength(SettingDescriptor.MaxValueLength);
+            item.RuleFor(setting => setting.Value).MaximumLength(SettingDescriptor.MaxValueLength);   // null = remove the override (F-13)
         });
     }
 }
@@ -37,19 +40,33 @@ public sealed class UpdateTenantSettingsCommandHandler(ITenantSettingsStore stor
     {
         // Validate everything first (the catalogue decides, with its codes), then stage, then one commit.
         var cleaned = command.Settings
-            .Select(item => (item.Key.Trim(), Value: item.Value.Trim()))
-            .GroupBy(item => item.Item1, StringComparer.Ordinal)
+            .Select(item => (Key: item.Key.Trim(), Value: item.Value?.Trim()))
+            .GroupBy(item => item.Key, StringComparer.Ordinal)
             .Select(group => group.Last())
             .ToList();
         foreach (var (key, value) in cleaned)
         {
-            SettingKeys.Validate(key, value);
+            if (value is null)
+            {
+                _ = SettingKeys.Find(key) ?? throw new DomainException(SettingCodes.UnknownKey, $"Unknown setting '{key}'.", DomainFault.Validation);
+            }
+            else
+            {
+                SettingKeys.Validate(key, value);
+            }
         }
 
         var now = clock.UtcNow;
         foreach (var (key, value) in cleaned)
         {
-            await store.UpsertAsync(key, value, user.UserId, now, cancellationToken);
+            if (value is null)
+            {
+                await store.RemoveAsync(key, cancellationToken);
+            }
+            else
+            {
+                await store.UpsertAsync(key, value, user.UserId, now, cancellationToken);
+            }
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);

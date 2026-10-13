@@ -45,6 +45,14 @@ export interface FieldSchema {
   readonly min?: number;
   readonly max?: number;
   readonly step?: number;
+  /**
+   * `text` and `code`: the format the trimmed value must match (an empty value is left to `required`). Checked as the
+   * user types: the field is marked from its first edit and shows `patternMessage` under the control (validation v0.5.0
+   * C-09 live check), and a save with a wrong value is blocked like any other invalid field.
+   */
+  readonly pattern?: RegExp;
+  /** i18n key of the text shown when `pattern` does not match; defaults to `shared.validation.pattern`. */
+  readonly patternMessage?: string;
   /** `select` and `multiSelect`: static options or an async provider (resolved once when the page opens). */
   readonly options?: SelectOptionsSource;
   /** Cannot change once created (a code); disabled in the edit drawer. */

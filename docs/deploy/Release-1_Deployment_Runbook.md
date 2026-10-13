@@ -33,7 +33,7 @@ for its responses and by `web.config` for the SPA's.
 | Configuration file | `C:\lis-app\NTLIS\config\appsettings.Production.json` (secrets inside; ACL: SYSTEM, Administrators, the service account) |
 | IIS site / pool / path | `lis-ui` on `C:\inetpub\wwwroot\lis-ui`; test `lis-ui-test` (port 8081) on `C:\inetpub\wwwroot\lis-ui-test` |
 | Database / roles | `lis`, owner `lis_owner` (migrations, backups), runtime `lis_app`; test `lis_test`; restore drills `lis_drill` |
-| Data, backups | `E:\lis-data\files` (uploads), `E:\lis-data\postgres.env` (database credentials for the backup scripts), `E:\lis-backups` |
+| Data, backups | `E:\lis-data\files` (uploads), `E:\lis-data\mail-pickup` (notification pickup files; test `E:\lis-data\mail-pickup-test`), `E:\lis-data\postgres.env` (database credentials for the backup scripts), `E:\lis-backups` |
 | Release staging on the server | `E:\lis-data\releases\<version>` (package copy; removable after the installation) |
 | Package on the build box | `E:\LIS\publish\<version>\{api, tools, ui, manifest.json}` |
 
@@ -144,6 +144,7 @@ icacls E:\lis-data\postgres.env /inheritance:r /grant:r "SYSTEM:(R)" "BUILTIN\Ad
    | `Lis:Jwt:SigningKeyId` | a short key id, e.g. `2026-10-k1` (changes with every signing-key rotation) |
    | `Lis:Jwt:SubjectEncryptionKey`, `Lis:DataProtection:MasterKey` | two different values of 32 random bytes, base64 |
    | `Lis:Platform:PortalDomain` | the domain under which client portals are addressed (default `skylis.app`) |
+   | `Lis:Notifications:*` | how one-time codes leave the host (§8.1): keep `PickupDirectory` = `E:\lis-data\mail-pickup` while there is no gateway; fill `Smtp:*` and `Sms:*` (password and API key included) only when a gateway contract exists, otherwise leave them empty |
 
    Generation commands are in `deploy/SECRETS.md` (Node one-liners, run on the build box). Without Node, 32 random
    bytes in Windows PowerShell (cryptographic generator, never `Get-Random`):
@@ -165,7 +166,9 @@ The script copies the package to `C:\lis-app\NTLIS\app`, installs the configurat
 `C:\lis-app\NTLIS\config\appsettings.Production.json` (and a copy next to the binaries, both readable only by SYSTEM,
 Administrators and `NT SERVICE\NTLIS`), creates or updates the service (`delayed-auto`, restart on failure,
 `ASPNETCORE_ENVIRONMENT=Production` pinned in the service's own environment block), creates `E:\lis-data\files` with
-modify rights for the service account, starts the service and waits for `http://127.0.0.1:5100/health/ready` (200 =
+modify rights for the service account, creates the notification pickup folder (`Lis:Notifications:PickupDirectory`,
+refused unless it lies under `E:\lis-data`) readable only by SYSTEM, Administrators and the service account, since
+its files hold one-time codes, starts the service and waits for `http://127.0.0.1:5100/health/ready` (200 =
 database reachable and no pending migration). On failure it prints where to look and the rollback command.
 
 ### 5.5 IIS site
@@ -244,7 +247,8 @@ and the script re-validates, re-installs the file and restarts. Rotation procedu
 The same scripts with `-Test` install `NTLIS_TEST` (5180), `lis-ui-test` (http 8081, or https with
 `-CertificateThumbprint`) and a separate configuration under `C:\lis-app\NTLIS_TEST\config`. Its
 `appsettings.Production.json` must set `Kestrel:Endpoints:Http:Url` to `http://127.0.0.1:5180`, point at the database
-`lis_test` and list the test origin in `AllowedOrigins`. Create `lis_test` once, as the superuser:
+`lis_test`, list the test origin in `AllowedOrigins` and set `Lis:Notifications:PickupDirectory` to
+`E:\lis-data\mail-pickup-test`. Create `lis_test` once, as the superuser:
 
 ```sql
 CREATE DATABASE lis_test OWNER lis_owner ENCODING 'UTF8' TEMPLATE template0;
@@ -276,8 +280,30 @@ Every LIS key lives under `Lis`; the host reads no `ConnectionStrings`, `Jwt` or
 | `Lis:Security:RateLimits:*` | per-minute limits (global 600, tenant 3000, credential account 20 / 10 min, client 60, challenge 120, refresh 30, mutation burst 120 at 2/s) | — |
 | `Lis:Security:Envelope:*` | credential envelope: challenge 2 min, RSA key rotation 24 h, overlap 10 min, RSA 3072 | challenge ≤ 5 min, RSA ≥ 3072 |
 | `Lis:Outbox:*` | outbox worker: `Enabled`, poll 2 s, batch 50, lease 30 s, 10 attempts then dead letter | — |
+| `Lis:Jobs:WalletCharge:Enabled`, `PollInterval` | monthly subscription charge of the client wallets (W2, intake LIS-INT-PLT-001): every poll (default 1 h) charges each Active client whose next charge is due its plan's monthly fee once, then moves the date one month; trial and inactive clients are skipped; a plan currency other than the wallet's is not charged (`WALLET_CHARGE_FAILED` in the security ledger). SA-05 "Run charges now" runs the same pass | default `true`; safe with several instances (a period is charged once, guarded by the wallet's row version) |
 | `Lis:Files:Root` | uploaded files (`E:\lis-data\files`); created on demand | the service account needs modify rights (set by the install script) |
 | `Lis:Platform:PortalDomain` | domain of the client portals (`<tenant>.<domain>`) | default `skylis.app` |
+| `Lis:Notifications:PickupDirectory` | folder that receives one text file per SMS or e-mail without a gateway (`E:\lis-data\mail-pickup`; empty = log only) | absolute; in Production under `E:\lis-data`; the install script creates it readable by SYSTEM, Administrators and the service account only |
+| `Lis:Notifications:Smtp:Host`, `Port`, `EnableSsl`, `UserName`, `Password`, `From`, `Timeout` | e-mail through SMTP submission with STARTTLS (587; implicit TLS on 465 is not supported); empty `Host` = no SMTP | `From` an address; TLS may be off only for a loopback relay; a user name needs the password; timeout 1 s – 5 min |
+| `Lis:Notifications:Sms:Url`, `ApiKeyHeader`, `ApiKey`, `Sender`, `BodyTemplate`, `Timeout` | HTTP SMS gateway: one JSON POST per message, the key in the named header; empty `Url` = no gateway | https (http only on loopback); key and header name required; the template must be JSON with `{to}` and `{text}` inside quotes; timeout 1 s – 2 min |
+
+### 8.1 Notification delivery
+
+Each channel picks its delivery from the configuration: SMS goes to the HTTP gateway when `Sms:Url` is set, e-mail to
+SMTP when `Smtp:Host` is set; a channel without a gateway is written to the pickup folder when one is set, otherwise it
+is only logged (events 7200 / 7202, masked recipient, never the body or the code). With nothing configured the host
+keeps the logging sender. A gateway failure is logged at Error (event 7204, the kind of failure only) and does not fail
+the request: the person asks for a new code.
+
+Pickup files are named `<utc-stamp>-<channel>-<recipient-hash>.txt` (the hash is the first 12 hex digits of SHA-256
+over the trimmed, lower-case mobile or address) and hold `Channel`, `To`, `Template`, `Language`, `Subject`,
+`Created-Utc`, a blank line and the rendered text. Until a gateway exists an administrator reads the code there and
+passes it on (subscription wizard, password recovery). The files are not needed once the code has expired (5 minutes);
+remove old ones in the weekly checks (§11).
+
+The SMS body template's tokens `{to}`, `{text}`, `{sender}`, `{template}` and `{language}` are replaced by JSON-escaped
+values, e.g. `{"to":"{to}","from":"{sender}","text":"{text}"}`; in the JSON file the inner quotes are written `\"`.
+The SMTP password and the SMS API key are secrets (`deploy/SECRETS.md`).
 
 ## 9. Logs and diagnostics
 
@@ -323,7 +349,8 @@ with `-WhatIf`.
 silent refresh work in a browser (reload after 16 minutes stays signed in) · event log free of errors ·
 `app.previous` / `lis-ui.previous` present for rollback · release recorded in README "Release history".
 
-**Weekly**: last backup younger than 24 h · certificate expiry > 30 days · disk space of `E:\lis-data`, `E:\lis-backups`.
+**Weekly**: last backup younger than 24 h · certificate expiry > 30 days · disk space of `E:\lis-data`, `E:\lis-backups` ·
+old files removed from `E:\lis-data\mail-pickup`.
 
 ## 12. Open questions and assumptions
 

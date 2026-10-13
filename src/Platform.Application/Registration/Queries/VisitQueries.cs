@@ -58,12 +58,14 @@ public sealed class SearchVisitsHandler(
     IBranchLookup branches,
     IPayerLookup payers,
     IVisitBalanceLookup balances,
-    IUserPrivileges privileges) : IQueryHandler<SearchVisitsQuery, Paged<VisitListItem>>
+    IUserPrivileges privileges,
+    ILaboratoryCountry laboratoryCountry) : IQueryHandler<SearchVisitsQuery, Paged<VisitListItem>>
 {
     public async Task<Paged<VisitListItem>> Handle(SearchVisitsQuery query, CancellationToken cancellationToken)
     {
         var canSeeVip = privileges.SpecialRights.CanSeeVip;
-        var page = await visits.SearchAsync(VisitFilters.Of(query, canSeeVip), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        var mobileLength = (await laboratoryCountry.FindAsync(cancellationToken))?.MobileLength;
+        var page = await visits.SearchAsync(VisitFilters.Of(query, canSeeVip, mobileLength), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
         var items = await new VisitRowComposer(patients, branches, payers, balances, batches).ComposeAsync(page.Items, canSeeVip, cancellationToken);
         return new Paged<VisitListItem>(items, page.Page, page.PageSize, page.TotalCount);
     }
@@ -97,14 +99,15 @@ public sealed class ExportVisitsHandler(
     IBranchLookup branches,
     IPayerLookup payers,
     IVisitBalanceLookup balances,
-    IUserPrivileges privileges) : IQueryHandler<ExportVisitsQuery, IReadOnlyList<VisitListItem>>
+    IUserPrivileges privileges,
+    ILaboratoryCountry laboratoryCountry) : IQueryHandler<ExportVisitsQuery, IReadOnlyList<VisitListItem>>
 {
     public const int MaxRows = 10_000;
 
     public async Task<IReadOnlyList<VisitListItem>> Handle(ExportVisitsQuery query, CancellationToken cancellationToken)
     {
         var canSeeVip = privileges.SpecialRights.CanSeeVip;
-        var filter = VisitFilters.Of(new SearchVisitsQuery(query.Accession, query.PatientNumber, query.Name, query.Mobile, query.FromUtc, query.ToUtc, query.BranchId, query.PayerId, query.Status, query.PatientId, query.BatchId, null, null), canSeeVip);
+        var filter = VisitFilters.Of(new SearchVisitsQuery(query.Accession, query.PatientNumber, query.Name, query.Mobile, query.FromUtc, query.ToUtc, query.BranchId, query.PayerId, query.Status, query.PatientId, query.BatchId, null, null), canSeeVip, (await laboratoryCountry.FindAsync(cancellationToken))?.MobileLength);
         var rows = await visits.SearchAllAsync(filter, MaxRows, cancellationToken);
         if (rows.Count > MaxRows)
         {
@@ -182,7 +185,8 @@ public sealed class GetVisitLabelsHandler(
                 letterhead.BranchNameEn,
                 letterhead.BranchNameAr,
                 visit.Urgent,
-                [.. pair.Lines.OrderBy(line => line.Sequence).Select(line => line.ServiceCode)]))
+                [.. pair.Lines.OrderBy(line => line.Sequence).Select(line => line.ServiceCode)],
+                visit.Biohazard))
             .ToList();
 
         return new VisitLabelsDocument(letterhead, visit.Accession, Math.Max(1, copies), visit.UtcOffsetMinutes, labels);
@@ -340,7 +344,8 @@ public sealed class CheckOrderHandler(
                 visit?.LiveServiceIds ?? new HashSet<Guid>(),
                 visit?.Id,
                 clock.UtcNow,
-                visit?.UtcOffsetMinutes ?? RegistrationRules.UtcOffset(query.UtcOffsetMinutes)),
+                visit?.UtcOffsetMinutes ?? RegistrationRules.UtcOffset(query.UtcOffsetMinutes),
+                ExistingTests: visit?.LiveTestHolders()),
             cancellationToken);
         var currency = await settings.GetAsync(SettingKeys.DefaultCurrency, cancellationToken);
         return OrderPlanViews.ToCheckResult(plan, visit, currency);
@@ -385,11 +390,16 @@ public sealed class ResolveServiceEntryHandler(IServiceEntryFinder finder, IOrde
 [RequirePermissionPolicy(PermissionCatalog.Registration, PermissionAction.View)]
 public sealed record GetRegistrationSettingsQuery : IQuery<RegistrationPageSettings>;
 
-public sealed class GetRegistrationSettingsHandler(ITenantSettings settings, IUserPrivileges privileges) : IQueryHandler<GetRegistrationSettingsQuery, RegistrationPageSettings>
+/// <summary>
+/// The parameters and rights of the registration page, and the names of the session's branch (CP-04) for the page header
+/// (validation 2026-10-11: the new-registration header showed no branch).
+/// </summary>
+public sealed class GetRegistrationSettingsHandler(ITenantSettings settings, IUserPrivileges privileges, ICurrentUser user, IBranchLookup branches) : IQueryHandler<GetRegistrationSettingsQuery, RegistrationPageSettings>
 {
     public async Task<RegistrationPageSettings> Handle(GetRegistrationSettingsQuery query, CancellationToken cancellationToken)
     {
         var rights = privileges.SpecialRights;
+        var branch = user.BranchId is { } branchId ? await branches.FindAsync(branchId, cancellationToken) : null;
         return new RegistrationPageSettings(
             await settings.GetAsync(SettingKeys.AutoPrintLabels, cancellationToken),
             await settings.GetAsync(SettingKeys.AutoPrintJobOrder, cancellationToken),
@@ -403,7 +413,9 @@ public sealed class GetRegistrationSettingsHandler(ITenantSettings settings, IUs
             rights.CanTransfer,
             rights.CanPay,
             rights.CanSeeVip,
-            await settings.GetAsync(SettingKeys.DefaultCurrency, cancellationToken));
+            await settings.GetAsync(SettingKeys.DefaultCurrency, cancellationToken),
+            branch?.NameEn,
+            branch?.NameAr);
     }
 }
 
@@ -651,15 +663,15 @@ public sealed class ListSendingLabsHandler(ISendingLabLookup sendingLabs) : IQue
     public Task<IReadOnlyList<SendingLabOption>> Handle(ListSendingLabsQuery query, CancellationToken cancellationToken) => sendingLabs.ListActiveAsync(cancellationToken);
 }
 
-/// <summary>The register filter from the query (status name parsed; VIP rule of intake Q12).</summary>
+/// <summary>The register filter from the query (status name parsed; VIP rule of intake Q12; a mobile typed with the trunk 0 also finds a file stored without it, F-08).</summary>
 internal static class VisitFilters
 {
-    public static VisitSearchFilter Of(SearchVisitsQuery query, bool includeVip) =>
+    public static VisitSearchFilter Of(SearchVisitsQuery query, bool includeVip, int? mobileLength = null) =>
         new(
             Blank(query.Accession),
             Blank(query.PatientNumber),
             Blank(query.Name),
-            Blank(query.Mobile),
+            Blank(query.Mobile) is { } mobile ? Platform.Domain.Patients.Patient.MobileSearchDigits(new string(Platform.Domain.Patients.Patient.FoldDigits(mobile).Where(char.IsAsciiDigit).ToArray()), mobileLength) : null,
             query.FromUtc,
             query.ToUtc,
             query.BranchId,

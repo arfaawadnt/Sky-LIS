@@ -1,6 +1,7 @@
 using Platform.Application.Abstractions.Audit;
 using Platform.Application.Identity;
 using Platform.Infrastructure.Configuration;
+using Platform.Infrastructure.Notifications;
 using Platform.Infrastructure.Security;
 
 namespace Platform.WebApi.Startup;
@@ -72,6 +73,7 @@ public static class StartupGuards
 
         RefuseForbiddenKeys(app.Configuration);
         ConfigGuard.Enforce(app.Services.GetRequiredService<SecurityOptions>(), app.Services.GetRequiredService<SessionPolicy>());
+        ConfigGuard.EnforceNotifications(app.Services.GetRequiredService<NotificationOptions>(), app.Environment.IsProduction());
 
         var bindViolations = InspectBindings(ConfiguredBindings(app.Configuration).Concat(app.Urls));
         if (bindViolations.Count > 0)

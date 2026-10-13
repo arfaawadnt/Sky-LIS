@@ -256,6 +256,10 @@ public sealed class ReplaceListValuesValidator : AbstractValidator<ReplaceListVa
         {
             value.RuleFor(item => item.Value).NotEmpty().MaximumLength(ListValue.MaxValueLength);
             value.RuleFor(item => item.Colour).MaximumLength(7);
+
+            // validation v0.5.0 O-2: a value reads as Normal or as Critical, never both; the field error names the code
+            value.RuleFor(item => item.IsCritical).Equal(false).When(item => item.IsNormal)
+                .WithErrorCode(LabTestCodes.ListValueNormalAndCritical).WithMessage("A value is Normal or Critical, not both.");
         });
     }
 }

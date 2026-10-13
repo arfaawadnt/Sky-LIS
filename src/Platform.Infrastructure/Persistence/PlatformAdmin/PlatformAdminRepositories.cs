@@ -248,6 +248,23 @@ internal sealed class WalletRepository(AppDbContext context) : Repository<Wallet
             .ToList();
         return new Paged<WalletTransactionItem>(items, page.Page, page.PageSize, total);
     }
+
+    public async Task<IReadOnlyList<Guid>> ListDueForChargeAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken) =>
+        await Set.AsNoTracking()
+            .Where(wallet => wallet.NextChargeAtUtc <= nowUtc)
+            .OrderBy(wallet => wallet.NextChargeAtUtc).ThenBy(wallet => wallet.TenantId)
+            .Select(wallet => wallet.TenantId)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<WalletChargeTerms?> FindChargeTermsAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var row = await (
+            from tenant in Context.Set<Tenant>().AsNoTracking().Where(tenant => tenant.Id == tenantId)
+            join plan in Context.Set<Plan>().AsNoTracking() on tenant.PlanId equals plan.Id
+            select new { tenant.Status, plan.MonthlyFee, plan.CurrencyCode, plan.Code })
+            .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        return row is null ? null : new WalletChargeTerms(row.Status, row.MonthlyFee, row.CurrencyCode.Trim(), row.Code);
+    }
 }
 
 internal sealed class CountryRepository(AppDbContext context) : Repository<Country>(context), ICountryRepository

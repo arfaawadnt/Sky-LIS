@@ -6076,5 +6076,42 @@ BEGIN
     VALUES ('20261012021635_LaboratoryLogo', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261012135907_RemovePlatformKeysFromLaboratoryRoles') THEN
+    UPDATE app.roles AS r
+    SET permission_keys = ARRAY(
+            SELECT k FROM (SELECT DISTINCT unnest(r.permission_keys) AS k) AS d
+            WHERE split_part(k, '.', 1) NOT IN ('platform', 'tenancy')
+            ORDER BY k COLLATE "C"),
+        modified_at_utc = now(),
+        modified_by_display_name = 'Migration RemovePlatformKeysFromLaboratoryRoles'
+    WHERE r.tenant_id <> '00000000-0000-0000-0000-000000000001'
+      AND EXISTS (SELECT 1 FROM unnest(r.permission_keys) AS k WHERE split_part(k, '.', 1) IN ('platform', 'tenancy'));
+
+    UPDATE app.tenant_memberships AS m
+    SET added_permission_keys = ARRAY(
+            SELECT k FROM (SELECT DISTINCT unnest(m.added_permission_keys) AS k) AS d
+            WHERE split_part(k, '.', 1) NOT IN ('platform', 'tenancy')
+            ORDER BY k COLLATE "C"),
+        removed_permission_keys = ARRAY(
+            SELECT k FROM (SELECT DISTINCT unnest(m.removed_permission_keys) AS k) AS d
+            WHERE split_part(k, '.', 1) NOT IN ('platform', 'tenancy')
+            ORDER BY k COLLATE "C"),
+        modified_at_utc = now(),
+        modified_by_display_name = 'Migration RemovePlatformKeysFromLaboratoryRoles'
+    WHERE m.tenant_id <> '00000000-0000-0000-0000-000000000001'
+      AND EXISTS (SELECT 1 FROM unnest(m.added_permission_keys || m.removed_permission_keys) AS k WHERE split_part(k, '.', 1) IN ('platform', 'tenancy'));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261012135907_RemovePlatformKeysFromLaboratoryRoles') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261012135907_RemovePlatformKeysFromLaboratoryRoles', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

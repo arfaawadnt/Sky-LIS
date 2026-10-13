@@ -14,7 +14,7 @@ import { PermissionsService } from '../../../core/permissions/permissions.servic
 import type { TabItem } from '../../../shared/ui/tabs/tabs.component';
 import { CatalogueAOptions } from '../state-a/catalogue-a-options';
 import { TestEditorFacade } from '../state-a/test-editor.facade';
-import { TestEditorPage, formulaVerdict, isNewTestUrl } from './test-editor.page';
+import { TestEditorPage, formulaVerdict, isNewTestUrl, normalOrCritical } from './test-editor.page';
 
 /** The parts of the page the scenarios drive (the page keeps them protected). */
 interface TestEditorInternals {
@@ -26,6 +26,7 @@ interface TestEditorInternals {
   }>;
   readonly formula: FormControl<string>;
   readonly timing: FormGroup<{ durationHours: FormControl<number | null>; minDurationHours: FormControl<number | null> }>;
+  readonly values: FormArray<FormGroup<{ isNormal: FormControl<boolean>; isCritical: FormControl<boolean> }>>;
   readonly bands: FormArray<FormGroup<{ low: FormControl<number | null>; high: FormControl<number | null>; ageTo: FormControl<number | null> }>>;
   readonly detail: () => LabTestDetail | null;
   readonly testId: () => string | null;
@@ -382,5 +383,105 @@ describe('TestEditorPage (CP-41)', () => {
   it('says the position of a refused formula once (UAT B-13)', () => {
     expect(formulaVerdict('The formula is not valid.', '(position 12)', 'The formula ends too early. (position 12)')).toBe('The formula is not valid. (position 12) — The formula ends too early.');
     expect(formulaVerdict('The formula is not valid.', null, null)).toBe('The formula is not valid.');
+  });
+
+  describe('validation v0.5.0', () => {
+    const urine: LabTestDetail = {
+      ...glucose,
+      id: 'u1',
+      code: 'URC',
+      type: 'RestrictedList',
+      rangeBands: [],
+      listValues: [
+        { value: 'Yellow', isNormal: true, isCritical: false, isDefault: false, isPlaceholder: false, colour: null },
+        { value: 'Red', isNormal: true, isCritical: true, isDefault: false, isPlaceholder: false, colour: null },
+      ],
+    };
+
+    function root(): HTMLElement {
+      return harness.routeNativeElement as HTMLElement;
+    }
+
+    /** The rows of the list-value table, in order. */
+    function valueRows(): (HTMLTableRowElement | null)[] {
+      return [...root().querySelectorAll<HTMLInputElement>('input[formcontrolname="isCritical"]')].map((flag) => flag.closest('tr'));
+    }
+
+    async function rendered(): Promise<void> {
+      TestBed.tick();
+      await harness.fixture.whenStable();
+      await settle();
+    }
+
+    it('O-2: Normal and Critical on one value is refused under its flags (CAT-061), nothing is sent, the notice shows and the flag takes the focus', async () => {
+      const editor = await open('/catalogue/tests/u1', urine);
+      await rendered();
+      const rows = valueRows();
+      expect(rows[1]?.querySelector('.cell-error')?.textContent).toContain('error.CAT-061');
+      expect(rows[0]?.querySelector('.cell-error')).toBeNull();
+
+      editor.values.markAsDirty();
+      await editor.save();
+      await rendered();
+
+      backend.expectNone((request) => request.method === 'PUT');
+      expect(editor.activeTab()).toBe('values');
+      expect(root().querySelector('.editor > p.problem[role="alert"]')?.textContent).toContain('masterData.invalid');
+      const flag = rows[1]?.querySelector<HTMLInputElement>('input[formcontrolname="isCritical"]');
+      expect(flag?.getAttribute('aria-invalid')).toBe('true');
+      expect(document.activeElement).toBe(flag);
+
+      editor.values.at(1).controls.isNormal.setValue(false);
+      await rendered();
+      expect(root().querySelector('.cell-error')).toBeNull();
+      expect(root().querySelector('.editor > p.problem[role="alert"]')).toBeNull();   // the notice follows the forms
+
+      const saving = editor.save();
+      await settle();
+      const put = backend.expectOne(`${CATALOGUE_A_API.tests}/u1/list-values`);
+      expect((put.request.body as { values: { isNormal: boolean; isCritical: boolean }[] }).values.map((value) => [value.isNormal, value.isCritical])).toEqual([[true, false], [false, true]]);
+      put.flush(null, { status: 204, statusText: 'No Content' });
+      await saving;
+    });
+
+    it('O-2: the server field error on values[n].isCritical lands under that row with the CAT-061 text', async () => {
+      const editor = await open('/catalogue/tests/u1', { ...urine, listValues: urine.listValues.map((value) => ({ ...value, isNormal: !value.isCritical })) });
+      editor.values.markAsDirty();
+      const saving = editor.save();
+      await settle();
+      const problem: ProblemDetails = {
+        type: 'about:blank', title: 'Invalid', status: 400, code: 'VALIDATION-400', traceId: null, correlationId: null,
+        errors: { 'values[1].IsCritical': ['A value is Normal or Critical, not both.'] },
+        rules: { 'values[1].IsCritical': [{ rule: 'CAT-061' }] },
+      };
+      backend.expectOne(`${CATALOGUE_A_API.tests}/u1/list-values`).flush(problem, { status: 400, statusText: 'Bad Request' });
+      await saving;
+      await rendered();
+
+      expect(editor.activeTab()).toBe('values');
+      const rows = valueRows();
+      expect(rows[1]?.querySelector('.cell-error')?.textContent).toContain('error.CAT-061');
+      expect(rows[0]?.querySelector('.cell-error')).toBeNull();
+    });
+
+    it('O-2: the row validator', () => {
+      const flags = (isNormal: boolean, isCritical: boolean): { value: unknown } => ({ value: { isNormal, isCritical } });
+      expect(normalOrCritical(flags(true, true) as never)).toEqual({ normalAndCritical: true });
+      expect([normalOrCritical(flags(true, false) as never), normalOrCritical(flags(false, true) as never), normalOrCritical(flags(false, false) as never)]).toEqual([null, null, null]);
+    });
+
+    it('round 4: a save blocked by the forms shows the drawer notice and focuses the first marked field', async () => {
+      const editor = await open('/catalogue/tests/new', null);
+      await rendered();
+      expect(root().querySelector('.editor > p.problem[role="alert"]')).toBeNull();
+
+      await editor.save();
+      await rendered();
+
+      backend.expectNone((request) => request.method === 'POST');
+      expect(root().querySelector('.editor > p.problem[role="alert"]')?.textContent).toContain('masterData.invalid');
+      expect(document.activeElement).toBe(root().querySelector('input[formcontrolname="code"]'));
+      expect(editor.activeTab()).toBe('general');
+    });
   });
 });

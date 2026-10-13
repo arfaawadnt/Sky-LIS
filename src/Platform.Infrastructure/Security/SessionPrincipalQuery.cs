@@ -4,7 +4,9 @@ using Microsoft.Extensions.Caching.Memory;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Identity;
 using Platform.Domain.Organization;
+using Platform.Domain.Settings;
 using Platform.Infrastructure.Persistence;
+using Platform.Infrastructure.Persistence.Settings;
 using Platform.SharedKernel.MultiTenancy;
 
 namespace Platform.Infrastructure.Security;
@@ -16,7 +18,10 @@ namespace Platform.Infrastructure.Security;
 /// privileges (BR-17, intake LIS-INT-ORG-001 §5): permission keys = (role ∪ added − removed) within the catalogue and,
 /// outside the platform tenant, without platform-only modules; special rights = the user's override, else the role's;
 /// result rights = the role's. An inactive role grants nothing. Results are cached ≤ 10 s per session id and evicted
-/// on revocation and on every privilege change (<c>IPrincipalCacheInvalidator</c>).
+/// on revocation and on every privilege change (<c>IPrincipalCacheInvalidator</c>). The same read carries the idle
+/// timeout of the session's tenant (<c>sessionTimeoutMinutes</c>, validation F-01): the tenant's row and the platform's row
+/// of <c>app.tenant_settings</c> (readable here because the query is elevated), resolved as <c>ITenantSettings</c> does; a
+/// changed value applies to a session within the cache lifetime.
 /// </summary>
 public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAccessor tenant, IMemoryCache cache, ITenantStatusLookup tenantStatus) : ISessionPrincipalQuery
 {
@@ -31,6 +36,8 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
         }
 
         SessionPrincipal? principal;
+        var timeoutKey = SettingKeys.SessionTimeoutMinutes.Key;
+        var platformTenant = TenantIds.Platform;
         using (tenant.Elevate())
         {
             var row = await (
@@ -67,6 +74,9 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                     membership.RemovedPermissionKeys,
                     membership.SpecialRightsOverride,
                     RoleId = membership.RoleId,
+                    // F-01: the idle timeout of the session's tenant and the platform's, as two scalar subqueries of this one read
+                    OwnTimeout = context.Set<TenantSetting>().Where(s => s.TenantId == session.TenantId && s.Key == timeoutKey).Select(s => s.Value).FirstOrDefault(),
+                    PlatformTimeout = context.Set<TenantSetting>().Where(s => s.TenantId == platformTenant && s.Key == timeoutKey).Select(s => s.Value).FirstOrDefault(),
                 }).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
 
             if (row is null)
@@ -112,6 +122,7 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                     IsPrimaryAdministrator = row.IsPrimaryAdministrator ?? false,
                     MustChangePassword = row.MustChangePassword,
                     PasswordExpiresAtUtc = row.PasswordExpiresAtUtc,
+                    SessionTimeoutMinutes = SettingKeys.SessionTimeoutMinutes.Resolve(row.OwnTimeout, row.PlatformTimeout),
                 };
             }
         }

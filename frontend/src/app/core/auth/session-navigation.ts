@@ -49,3 +49,14 @@ export function signInUrl(returnUrl: string | null = null): string {
   const target = meaningfulReturnUrl(returnUrl);
   return target === null ? SIGN_IN_PATH : `${SIGN_IN_PATH}?returnUrl=${encodeURIComponent(target)}`;
 }
+
+/** Why a session ended, when the sign-in page should say so (`/login?reason=idle`, validation F-01). */
+export type SessionEndReason = 'idle';
+
+/** The `reason` query value of the sign-in page after an idle end (F-01). */
+export const IDLE_REASON: SessionEndReason = 'idle';
+
+/** `/login?reason=idle`: the sign-in page with the notice "Your session ended after inactivity" (F-01). */
+export function idleSignInUrl(): string {
+  return `${SIGN_IN_PATH}?reason=${IDLE_REASON}`;
+}

@@ -15,6 +15,7 @@ import {
 import { type ProblemDetails, ProblemError } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedTextGroup } from '../../../shared/forms/localized-text';
+import { blockedSave } from '../../../shared/forms/blocked-save';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
@@ -128,6 +129,8 @@ export class SubscriptionsPage {
   protected readonly editingPlan = signal<PlanListItem | null>(null);
   protected readonly planForm = signal<PlanForm | null>(null);
   protected readonly planProblem = signal<ProblemDetails | null>(null);
+  /** F-03 (validation v0.5.0): a refused save says so above the form and focuses the first marked field. */
+  protected readonly planBlocked = blockedSave();
 
   // top-up dialog
   protected readonly topUpOpen = signal(false);
@@ -220,6 +223,31 @@ export class SubscriptionsPage {
     }
   }
 
+  /** SA-05 "Run charges now" (W2): the monthly subscription charge of every due wallet, as the hosted job runs it; a period is never charged twice. */
+  protected async runCharges(): Promise<void> {
+    if (this.facade.runCharges.pending()) {
+      return;
+    }
+
+    const confirmed = await this.confirm.confirm({ title: this.i18n.t('platform.wallet.runCharges'), message: this.i18n.t('platform.wallet.confirmRunCharges') });
+    if (!confirmed) {
+      return;
+    }
+
+    const summary = await this.facade.runCharges.execute();
+    if (summary === null) {
+      this.toast.error(this.problemText(this.facade.runCharges.problem()));
+      return;
+    }
+
+    const text = this.i18n.tf('platform.wallet.chargesRun', { charged: this.number(summary.charged), skipped: this.number(summary.skipped), failed: this.number(summary.failed) });
+    if (summary.failed > 0) {
+      this.toast.warn(text);
+    } else {
+      this.toast.success(text);
+    }
+  }
+
   protected async declineRequest(request: TopUpRequestItem): Promise<void> {
     const confirmed = await this.confirm.confirm({ title: this.i18n.t('platform.wallet.decline'), message: this.i18n.tf('platform.wallet.confirmDecline', { amount: this.money(request.amount, this.wallet()?.currencyCode ?? null) }), danger: true });
     if (!confirmed) {
@@ -264,13 +292,14 @@ export class SubscriptionsPage {
   protected openPlan(plan: PlanListItem | null): void {
     this.editingPlan.set(plan);
     this.planProblem.set(null);
+    this.planBlocked.reset();
     this.planForm.set(this.buildPlanForm(plan));
     this.planDrawerOpen.set(true);
   }
 
   protected async savePlan(): Promise<void> {
     const form = this.planForm();
-    if (form === null || this.facade.savePlan.pending() || !markAllTouched(form)) {
+    if (form === null || this.facade.savePlan.pending() || !this.planBlocked.check(form, '#platform-plan-form')) {
       return;
     }
 

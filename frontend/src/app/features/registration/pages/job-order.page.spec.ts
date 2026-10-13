@@ -7,8 +7,11 @@ import { RouterTestingHarness } from '@angular/router/testing';
 
 import { REGISTRATION_API, type JobOrderDocument } from '../../../core/api/registration.contracts';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { PrintService } from '../../../shared/print/print.service';
 import { RegistrationPrinter } from '../state/registration-printer';
 import { settle, visitDetail } from '../testing/registration.fixtures';
+import { JobOrderDocumentComponent } from '../ui/registration-documents';
 import { JobOrderPage } from './job-order.page';
 
 interface JobOrderPageInternals {
@@ -108,5 +111,21 @@ describe('JobOrderPage (job order on screen)', () => {
 
     expect(harness.routeNativeElement?.querySelector('[role="alert"]')).not.toBeNull();
     expect(harness.routeNativeElement?.querySelector('app-reg-job-order-document')).toBeNull();
+  });
+});
+
+describe('Job order document digits (validation v0.5.0 F-10)', () => {
+  it('prints Latin digits from an Arabic screen, like every other printed document', () => {
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection()] });
+    const i18n = TestBed.inject(I18nService);
+    i18n.setLanguage('ar');
+    try {
+      const html = TestBed.inject(PrintService).render({ type: JobOrderDocumentComponent, inputs: { document: jobOrder() } });
+      expect(html).not.toMatch(/[٠-٩]/);   // no Arabic-Indic digit anywhere: dates, amounts, age, ordinal
+      expect(html).toMatch(/2026/);
+      expect(html).toContain('ACC-');
+    } finally {
+      i18n.setLanguage('en');
+    }
   });
 });

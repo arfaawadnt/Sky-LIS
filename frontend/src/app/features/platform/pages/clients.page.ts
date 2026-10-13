@@ -15,6 +15,7 @@ import {
 import { ProblemError } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedTextGroup } from '../../../shared/forms/localized-text';
+import { blockedSave } from '../../../shared/forms/blocked-save';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { problemToFormErrors, SERVER_ERROR_KEY } from '../../../shared/forms/problem-to-form-errors';
@@ -118,6 +119,8 @@ export class ClientsPage {
   protected readonly editing = signal<ClientDetail | null>(null);
   protected readonly form = signal<ClientForm | null>(null);
   protected readonly saveProblem = signal<ProblemError['problem'] | null>(null);
+  /** F-03 (validation v0.5.0): a refused save says so above the form and focuses the first marked field. */
+  protected readonly blockedSave = blockedSave();
   protected readonly saving = computed(() => this.facade.provision.pending() || this.facade.update.pending());
   protected readonly governorateOptions = computed(() => this.facade.governorates.value()?.items ?? []);
 
@@ -270,6 +273,7 @@ export class ClientsPage {
   protected openCreate(): void {
     this.editing.set(null);
     this.saveProblem.set(null);
+    this.blockedSave.reset();
     this.facade.drawerCountryId.set(null);
     this.form.set(this.buildForm(null));
     this.drawerOpen.set(true);
@@ -280,6 +284,7 @@ export class ClientsPage {
       const detail = await this.api.getClient(row.id);
       this.editing.set(detail);
       this.saveProblem.set(null);
+      this.blockedSave.reset();
       this.facade.drawerCountryId.set(detail.countryId);
       this.form.set(this.buildForm(detail));
       this.drawerOpen.set(true);
@@ -303,7 +308,7 @@ export class ClientsPage {
 
   protected async save(): Promise<void> {
     const form = this.form();
-    if (form === null || this.saving() || !markAllTouched(form)) {
+    if (form === null || this.saving() || !this.blockedSave.check(form, '#platform-client-form')) {
       return;
     }
 

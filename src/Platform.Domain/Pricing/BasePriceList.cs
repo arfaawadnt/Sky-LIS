@@ -100,12 +100,19 @@ public sealed class BasePriceList : AggregateRoot, ITenantScoped
         return list;
     }
 
-    /// <summary>L2 Edit (<c>pricing.edit</c>): name and year; the code never changes.</summary>
-    public void Update(LocalizedText name, int year)
+    /// <summary>L2 Edit (<c>pricing.edit</c>): name and year; the code never changes. Raises <see cref="BasePriceListUpdated"/> when something changed (validation v0.5.0 O-5).</summary>
+    public void Update(LocalizedText name, int year, DateTimeOffset nowUtc)
     {
         ArgumentNullException.ThrowIfNull(name);
-        Year = RequireYear(year);
+        var newYear = RequireYear(year);
+        if (newYear == Year && Name.Equals(name))
+        {
+            return;
+        }
+
+        Year = newYear;
         Name = name;
+        Raise(new BasePriceListUpdated(Id, Code, Year, nowUtc));
     }
 
     /// <summary>

@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection } from '@angular/core';
+import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
@@ -9,6 +9,7 @@ import { AuthStore } from '../core/auth/auth.store';
 import { I18nService } from '../core/i18n/i18n.service';
 import { FakeBrowserNavigation, FakeSessionChannel, provideSessionTesting } from '../core/auth/session-testing';
 import { PLATFORM_TENANT_ID } from '../core/tenancy/tenant-ids';
+import { SessionBranches } from '../features/account/state/session-branches.service';
 import { LabBrandComponent } from './lab-brand.component';
 import { ShellComponent } from './shell.component';
 import { ShellTopbarComponent } from './shell-topbar.component';
@@ -16,6 +17,9 @@ import { ShellTopbarComponent } from './shell-topbar.component';
 /** The laboratory name has its own spec (lab-brand.component.spec.ts); here it would only wait for an unanswered request. */
 @Component({ selector: 'app-shell-lab-brand', template: '', changeDetection: ChangeDetectionStrategy.OnPush })
 class LabBrandStub {}
+
+/** The session branch has its own spec (shell-topbar.branch.spec.ts); here its request would only keep the fixture unstable. */
+const NO_BRANCHES: Pick<SessionBranches, 'current' | 'canChange'> = { current: signal(null), canChange: signal(false) };
 
 async function signIn(tenantId: string, permissions: readonly string[], roleNameAr: string | null = null, names: { readonly displayNameEn?: string; readonly displayNameAr?: string } = {}): Promise<void> {
   const store = TestBed.inject(AuthStore);
@@ -45,7 +49,7 @@ describe('ShellComponent', () => {
     channel = new FakeSessionChannel();
     await TestBed.configureTestingModule({
       imports: [ShellComponent],
-      providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(), ...provideSessionTesting(navigation, channel)],
+      providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(), ...provideSessionTesting(navigation, channel), { provide: SessionBranches, useValue: NO_BRANCHES }],
     })
       .overrideComponent(ShellTopbarComponent, { remove: { imports: [LabBrandComponent] }, add: { imports: [LabBrandStub] } })
       .compileComponents();

@@ -21,7 +21,8 @@ public static class ApplicationServiceRegistration
             configuration.RegisterServicesFromAssembly(assembly);
 
             // Fixed order (01 §3.4): Tracing → Logging → Authorization → Validation → Idempotency.
-            // Tracing, Logging and Idempotency are added by their own work packages; the order is asserted by InterceptorOrderTests.
+            // Tracing, Logging and Idempotency are added by their own work packages; Authorization before Validation is asserted by
+            // WebApiHardeningTests.The_request_pipeline_authorizes_before_it_validates (validation F-17; MVC's body check defers to it too).
             configuration.AddOpenBehavior(typeof(AuthorizationBehavior<,>));
             configuration.AddOpenBehavior(typeof(ValidationBehavior<,>));
         });

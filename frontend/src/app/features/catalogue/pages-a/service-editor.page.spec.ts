@@ -272,4 +272,22 @@ describe('ServiceEditorPage (CP-40)', () => {
     await editor.save();
     backend.expectNone((request) => request.method === 'PUT');
   });
+
+  it('validation v0.5.0 round 4: a save blocked by the form shows the drawer notice and focuses the first marked field', async () => {
+    const editor = await open('/catalogue/services/new', null);
+    TestBed.tick();
+    await harness.fixture.whenStable();
+    const root = harness.routeNativeElement as HTMLElement;
+    expect(root.querySelector('form.editor > p.problem[role="alert"]')).toBeNull();
+
+    await editor.save();
+    TestBed.tick();
+    await harness.fixture.whenStable();
+    await settle();
+
+    backend.expectNone((request) => request.method === 'POST');
+    expect(root.querySelector('form.editor > p.problem[role="alert"]')?.textContent).toContain('masterData.invalid');
+    expect(document.activeElement).toBe(root.querySelector('form.editor input.ng-invalid'));
+    expect(document.activeElement?.getAttribute('formcontrolname')).toBe('code');
+  });
 });

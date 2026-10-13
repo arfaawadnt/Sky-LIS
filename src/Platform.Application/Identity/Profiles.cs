@@ -24,7 +24,8 @@ public static class Profiles
             principal.MustChangePassword,
             principal.RoleNameAr,
             principal.DisplayNameEn,
-            principal.DisplayNameAr);
+            principal.DisplayNameAr,
+            principal.SessionTimeoutMinutes);
     }
 
     public static SessionResponse ToSession(SessionPrincipal principal)

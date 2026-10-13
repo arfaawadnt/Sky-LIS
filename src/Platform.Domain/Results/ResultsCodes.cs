@@ -49,6 +49,9 @@ public static class ResultsCodes
     public const string NoSeeRight = "RES-054";
     public const string NoModifyVerifiedRight = "RES-055";
 
+    /// <summary>The report of a VIP patient prints only for a user with the See-VIP special right (F-06, RES Q19).</summary>
+    public const string NoSeeVipToPrint = "RES-056";
+
     // Not found.
     public const string ResultNotFound = "RES-404";
     public const string ReportUnitNotFound = "RES-405";

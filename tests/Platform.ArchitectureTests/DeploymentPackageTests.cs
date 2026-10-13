@@ -305,6 +305,15 @@ public sealed partial class DeploymentPackageTests
         var lifetime = TimeSpan.Parse(Resolve(document.RootElement, "Lis:Security:Session:AccessTokenLifetime")!.Value.GetString()!, System.Globalization.CultureInfo.InvariantCulture);
         Assert.True(lifetime <= Platform.Application.Identity.SessionPolicy.MaxAccessTokenLifetime, "the template exceeds the 15-minute access token ceiling (D-01)");
         Assert.Equal(@"E:\lis-data\files", Resolve(document.RootElement, "Lis:Files:Root")!.Value.GetString());
+        var pickup = Resolve(document.RootElement, "Lis:Notifications:PickupDirectory")!.Value.GetString();
+        Assert.Equal(@"E:\lis-data\mail-pickup", pickup);
+        Assert.Empty(Platform.Infrastructure.Security.ConfigGuard.InspectNotifications(new Platform.Infrastructure.Notifications.NotificationOptions { PickupDirectory = pickup }, production: true));
+        foreach (var secret in new[] { "Lis:Notifications:Smtp:Password", "Lis:Notifications:Sms:ApiKey" })
+        {
+            Assert.Equal(string.Empty, Resolve(document.RootElement, secret)!.Value.GetString());   // optional secrets: empty, filled only on the server
+        }
+
+        Assert.True(Platform.Infrastructure.Notifications.HttpSmsTransport.IsValidTemplate(Resolve(document.RootElement, "Lis:Notifications:Sms:BodyTemplate")!.Value.GetString()), "the template's SMS body template is not valid JSON with {to} and {text}");
         Assert.NotEmpty(Resolve(document.RootElement, "Lis:Security:AllowedOrigins")!.Value.EnumerateArray());
     }
 
@@ -315,7 +324,7 @@ public sealed partial class DeploymentPackageTests
 
         // Evidence that the derivation looked at the right places (pitfall P-71).
         Assert.True(keys.Count >= 40, $"only {keys.Count} keys were derived from the source: {string.Join(", ", keys)}");
-        foreach (var expected in new[] { "Lis:Database:ConnectionString", "Lis:Jwt:SigningKey", "Lis:DataProtection:MasterKey", "Lis:Security:Session:AccessTokenLifetime", "Lis:Security:RateLimits:GlobalPerMinute", "Lis:Security:Envelope:RsaKeySize", "Lis:Outbox:Enabled", "Lis:Files:Root", "Lis:Platform:PortalDomain", "Lis:Security:AllowInsecureLocalDevelopment" })
+        foreach (var expected in new[] { "Lis:Database:ConnectionString", "Lis:Jwt:SigningKey", "Lis:DataProtection:MasterKey", "Lis:Security:Session:AccessTokenLifetime", "Lis:Security:RateLimits:GlobalPerMinute", "Lis:Security:Envelope:RsaKeySize", "Lis:Outbox:Enabled", "Lis:Files:Root", "Lis:Platform:PortalDomain", "Lis:Security:AllowInsecureLocalDevelopment", "Lis:Notifications:PickupDirectory", "Lis:Notifications:Smtp:Host", "Lis:Notifications:Smtp:Password", "Lis:Notifications:Sms:Url", "Lis:Notifications:Sms:ApiKey", "Lis:Notifications:Sms:BodyTemplate" })
         {
             Assert.Contains(expected, keys);
         }

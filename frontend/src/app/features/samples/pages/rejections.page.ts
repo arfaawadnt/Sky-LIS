@@ -172,7 +172,7 @@ export class RejectionsPage {
 
   protected async printLabel(sampleId: string): Promise<void> {
     if ((await this.facade.printLabel.execute(sampleId)) !== null) {
-      this.toast.success(this.i18n.tf('samples.labels.printed', { count: 1 }));
+      this.toast.success(this.i18n.tc('samples.labels.printed', 1));
     }
   }
 

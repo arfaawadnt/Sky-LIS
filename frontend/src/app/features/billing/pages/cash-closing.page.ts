@@ -26,7 +26,7 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
 import { BillingPrinter } from '../state/billing-printer';
 import { CashClosingFacade } from '../state/cash-closing.facade';
-import { formatDateTime, formatMoney, hasTwoDecimals, localInputToIso, roundMoney, startOfDay, toLocalInputValue } from '../ui/billing-format';
+import { formatDateTime, formatCount, formatMoney, hasTwoDecimals, localInputToIso, roundMoney, startOfDay, toLocalInputValue } from '../ui/billing-format';
 import { dayEndIso, dayStartIso, paymentTone, problemOf } from '../ui/billing-view';
 import { saveFile } from '../ui/save-file';
 
@@ -263,6 +263,11 @@ export class CashClosingPage {
 
   protected money(value: number | null): string {
     return formatMoney(value, this.i18n.lang());
+  }
+
+  /** A count in the page language's digits (validation v0.5.0 F-09). */
+  protected num(value: number): string {
+    return formatCount(value, this.i18n.lang());
   }
 
   protected problemText(problem: { code: string } | null): string {

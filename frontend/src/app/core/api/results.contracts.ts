@@ -98,6 +98,8 @@ export interface PatientHeaderView {
   readonly conditionNameEn: string | null;
   readonly conditionNameAr: string | null;
   readonly isVip: boolean;
+  /** A VIP patient shown to a user without the See-VIP right: "VIP patient", no Arabic name or date of birth (F-06); printing is refused (RES-056). */
+  readonly isMasked?: boolean;
 }
 
 export interface UnitSampleView {
@@ -288,6 +290,8 @@ export interface ResultVisitListItem {
   readonly hasPanic: boolean;
   readonly hasDelta: boolean;
   readonly anyPrinted: boolean;
+  /** A VIP file the user may not see (rule A-03): the server sends "VIP patient" and no Arabic name. */
+  readonly patientMasked?: boolean;
 }
 
 /** The query panel of CP-19 (LDM §5.2); `patientName` accepts `%`. */
@@ -373,6 +377,8 @@ export interface WorklistItem {
   readonly flag: ResultFlag | null;
   readonly isPrinted: boolean;
   readonly source: string;
+  /** A VIP file the user may not see (rule A-03): the server sends "VIP patient" and no Arabic name. */
+  readonly patientMasked?: boolean;
 }
 
 export interface WorklistCounters {
@@ -473,6 +479,8 @@ export interface LaboratoryReportDocument {
     readonly ageMonths: number | null;
     readonly ageDays: number | null;
     readonly dateOfBirth: string | null;
+    /** Previewed without the See-VIP right (F-06). */
+    readonly isMasked?: boolean;
   };
   readonly visit: {
     readonly accession: string;

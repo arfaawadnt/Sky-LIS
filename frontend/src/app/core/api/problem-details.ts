@@ -31,6 +31,8 @@ export const ProblemCodes = {
   noActiveMembership: 'AUTH-005',
   sessionRevokedOrExpired: 'AUTH-006',
   refreshTokenRejected: 'AUTH-012',
+  /** F-01: the session was idle longer than its tenant's timeout; the sign-in page says so. */
+  sessionIdleTimeout: 'AUTH-017',
   stepUpRequired: 'AUTH-STEPUP-REQUIRED',
   mfaEnrollmentRequired: 'MFA-ENROLL-REQUIRED',
   credentialEnvelopeMalformed: 'CRED-001',

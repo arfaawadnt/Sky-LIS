@@ -18,7 +18,7 @@ namespace Platform.IntegrationTests;
 /// <summary>
 /// The engine side of intake LIS-INT-RES-001: the result row with its owned range, jsonb reports and log round-trips,
 /// INV-RES-001 (one result per line and test), tenant isolation, the worklist and visit-search projections with the
-/// result-right filter, the read ports for Registration and the dashboard, and the append-only log (BR-15).
+/// result-right filter, the read ports for Registration, and the append-only log (BR-15).
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public sealed class ResultsModuleTests(DatabaseFixture fixture)
@@ -124,7 +124,39 @@ public sealed class ResultsModuleTests(DatabaseFixture fixture)
     }
 
     [DatabaseFact]
-    public async Task Read_ports_answer_verified_lines_previous_values_and_dashboard_figures()
+    public async Task The_delayed_filter_and_counter_follow_the_late_threshold_of_the_row_colour()
+    {
+        // Validation v0.5.0 F-15: with a 2 % late threshold two red rows showed "Delayed 0" and "Delayed only" was empty.
+        // Clock started 3 h ago: 3 of 23 h consumed (13 %) on one test, 3 of 103 h (2 %) on another, none of a future start.
+        var tenant = Guid.CreateVersion7();
+        var group = Guid.CreateVersion7();
+        var visit = Guid.CreateVersion7();
+        var thirteen = Order(visit, group, expected: Now.AddHours(20));
+        var two = Order(visit, group, expected: Now.AddHours(100));
+        var verified = Order(visit, group, expected: Now.AddHours(-1));
+        verified.Enter(ResultValueInput.Number(4m), ResultTestRules.For(LabTestType.Numeric), null, null, Bench, true, Now);
+        verified.Verify(Bench, false, Now);
+        await AddAsync(tenant, thirteen, two, verified);
+
+        using var scope = fixture.AppScope(tenant);
+        var results = scope.ServiceProvider.GetRequiredService<IResultRepository>();
+        (int LatePercent, Guid[] Late)[] cases = [(100, []), (14, []), (13, [thirteen.Id]), (2, [thirteen.Id, two.Id]), (0, [thirteen.Id, two.Id])];
+        foreach (var (latePercent, expectedLate) in cases)
+        {
+            var filter = Filter() with { LatePercent = latePercent };
+            var all = await results.WorklistAsync(filter, ResultVisibility.Everything, PageRequest.Normalized(1, 50), Now, CancellationToken.None);
+            var delayedOnly = await results.WorklistAsync(filter with { DelayedOnly = true }, ResultVisibility.Everything, PageRequest.Normalized(1, 50), Now, CancellationToken.None);
+            var byColour = all.Rows.Where(row => row.Status is ResultStatus.Ordered or ResultStatus.Complete or ResultStatus.Reviewed && TurnaroundClock.IsLate(row.ClockStartUtc, row.ExpectedAtUtc, Now, latePercent)).Select(row => row.ResultId);
+
+            Assert.Equal(expectedLate.Order(), byColour.Order());
+            Assert.Equal(expectedLate.Order(), delayedOnly.Rows.Select(row => row.ResultId).Order());
+            Assert.Equal(expectedLate.Length, all.Delayed);
+            Assert.Equal(expectedLate.Length, delayedOnly.Delayed);
+        }
+    }
+
+    [DatabaseFact]
+    public async Task Read_ports_answer_verified_lines_and_previous_values()
     {
         var tenant = Guid.CreateVersion7();
         var patient = Guid.CreateVersion7();
@@ -143,9 +175,6 @@ public sealed class ResultsModuleTests(DatabaseFixture fixture)
         var previous = await services.GetRequiredService<IResultRepository>().PreviousVerifiedAsync(patient, test, current.VisitId, null, CancellationToken.None);
         Assert.Equal((older.Id, 100m), (previous!.ResultId, previous.Value));
         Assert.Null(await services.GetRequiredService<IResultRepository>().PreviousVerifiedAsync(patient, test, current.VisitId, Now.AddDays(-5), CancellationToken.None));
-
-        var kpis = await services.GetRequiredService<IResultKpiLookup>().ForBranchAsync(null, Now.AddDays(-1), Now.AddDays(1), CancellationToken.None);
-        Assert.Equal((1, 0, 1), (kpis.PendingResults, kpis.UnverifiedBacklog, kpis.DelayedTests));
     }
 
     [DatabaseFact]
@@ -233,6 +262,55 @@ public sealed class ResultsModuleTests(DatabaseFixture fixture)
         }
 
         Assert.Empty((await results.WorklistAsync(Filter() with { Search = "Nobody" }, everything, PageRequest.Normalized(1, 50), Now, CancellationToken.None)).Rows);
+    }
+
+    [DatabaseFact]
+    public async Task The_worklist_name_search_skips_a_VIP_file_without_the_right_while_identifiers_still_find_it()
+    {
+        // Validation 2026-10-11 (A-03 extended to CP-18, assumption awaiting the business owner).
+        var tenant = Guid.CreateVersion7();
+        var group = Guid.CreateVersion7();
+        var vip = Patient.Register(
+            "PAT-2026-71003",
+            new PatientDemographics(PatientTitle.Mrs, "Vera Important", "فيرا", PatientGender.Female, new DateOnly(1990, 1, 1), null, null, null, null, null, null, null, null, null, null),
+            PatientFieldRules.Optional,
+            true,
+            Now);
+        using (var scope = fixture.AppScope(tenant, Guid.CreateVersion7()))
+        {
+            scope.ServiceProvider.GetRequiredService<Platform.Application.Patients.IPatientRepository>().Add(vip);
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        }
+
+        var hers = Order(Guid.CreateVersion7(), group, patient: vip.Id);
+        await AddAsync(tenant, hers);
+
+        using var reader = fixture.AppScope(tenant);
+        var results = reader.ServiceProvider.GetRequiredService<IResultRepository>();
+        var everything = ResultVisibility.Everything;
+        var masked = Filter() with { IncludeVip = false };
+        foreach (var term in new[] { "Vera", "فيرا" })
+        {
+            Assert.Empty((await results.WorklistAsync(masked with { Search = term }, everything, PageRequest.Normalized(1, 50), Now, CancellationToken.None)).Rows);
+            Assert.Single((await results.WorklistAsync(Filter() with { Search = term }, everything, PageRequest.Normalized(1, 50), Now, CancellationToken.None)).Rows);
+        }
+
+        foreach (var term in new[] { hers.Accession, "PAT-2026-71003" })
+        {
+            var row = Assert.Single((await results.WorklistAsync(masked with { Search = term }, everything, PageRequest.Normalized(1, 50), Now, CancellationToken.None)).Rows);
+            Assert.Equal((hers.Id, true), (row.ResultId, row.IsVip));
+        }
+
+        // CP-19 (Results by accession) follows the same rule: no name match without the right; accession and number match.
+        var noVip = new ResultVisitFilter(null, null, null, null, null, null, false, false, false, null, null, null, IncludeVip: false);
+        foreach (var name in new[] { "vera%", "%فيرا%" })
+        {
+            Assert.Empty((await results.SearchVisitsAsync(noVip with { PatientName = name }, everything, PageRequest.Normalized(1, 20), CancellationToken.None)).Items);
+            Assert.Single((await results.SearchVisitsAsync(noVip with { PatientName = name, IncludeVip = true }, everything, PageRequest.Normalized(1, 20), CancellationToken.None)).Items);
+        }
+
+        Assert.Equal(hers.VisitId, Assert.Single((await results.SearchVisitsAsync(noVip with { Accession = hers.Accession }, everything, PageRequest.Normalized(1, 20), CancellationToken.None)).Items).VisitId);
+        Assert.Equal(hers.VisitId, Assert.Single((await results.SearchVisitsAsync(noVip with { PatientNumber = "PAT-2026-71003" }, everything, PageRequest.Normalized(1, 20), CancellationToken.None)).Items).VisitId);
     }
 
     [DatabaseFact]

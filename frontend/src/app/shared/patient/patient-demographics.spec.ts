@@ -1,4 +1,5 @@
-import { ageBetween, ageParts, ageText, birthDateFromAge, defaultGender, fileSize, isValidAge, isValidMobile, localDigits, normalizeMobile, parseIso, todayIso } from './patient-demographics';
+import patientsAr from '../../../../public/i18n/patients.ar.json';
+import { ageBetween, ageParts, ageText, birthDateFromAge, defaultGender, fileSize, isValidAge, isValidMobile, localDigits, mobileForStorage, normalizeMobile, parseIso, todayIso } from './patient-demographics';
 
 describe('patient demographics (the server rules, mirrored)', () => {
   it('computes the age exactly like PatientAge.Between', () => {
@@ -46,9 +47,23 @@ describe('patient demographics (the server rules, mirrored)', () => {
     expect(isValidMobile('+20 100 123 4567')).toBe(true);
     expect(isValidMobile('1234567')).toBe(false);
     expect(isValidMobile('12ab5678')).toBe(false);
-    expect(isValidMobile('0100123456', 11)).toBe(false);
-    expect(isValidMobile('01001234567', 11)).toBe(true);
-    expect(isValidMobile('+201001234567', 11)).toBe(true);
+    expect(isValidMobile('+201001234567', 10)).toBe(true);
+  });
+
+  it('accepts an Egyptian mobile with or without the trunk 0 and stores both the same way (remaining point A-09)', () => {
+    // Egypt publishes 10 national digits: 1011140001 and 01011140001 are the same number
+    expect(isValidMobile('1011140001', 10)).toBe(true);
+    expect(isValidMobile('01011140001', 10)).toBe(true);
+    expect(isValidMobile('010 1114 0001', 10)).toBe(true);
+    expect(isValidMobile('0101114000', 10)).toBe(false);   // 10 digits starting with 0: a digit is missing
+    expect(isValidMobile('101114000', 10)).toBe(false);
+    expect(isValidMobile('001011140001', 10)).toBe(false);
+    expect(isValidMobile('12-34', 10)).toBe(false);
+    expect(mobileForStorage('1011140001', 10)).toBe('01011140001');
+    expect(mobileForStorage('01011140001', 10)).toBe('01011140001');
+    expect(mobileForStorage('٠١٠١١١٤٠٠٠١', 10)).toBe('01011140001');
+    expect(mobileForStorage('+20 101 114 0001', 10)).toBe('+201011140001');
+    expect(mobileForStorage('1011140001')).toBe('1011140001');   // any country: as typed
   });
 
   it('shows at most two age units and readable file sizes', () => {
@@ -77,5 +92,16 @@ describe('patient demographics (the server rules, mirrored)', () => {
     expect(ageText({ years: 52, months: 0, days: 0 }, 'en', english)).toBe('52 years');
     expect(localDigits(1974, 'ar')).toBe('١٩٧٤');   // never grouped
     expect(localDigits(1974, 'en')).toBe('1974');
+  });
+
+  it('F-11: the Arabic age units take their counted form (one, two, 3–10 plural, 11+ singular)', () => {
+    const dictionary = patientsAr as Record<string, string>;
+    const arabic = (key: string, params: Readonly<Record<string, string | number>>): string => (dictionary[key.slice('patients.'.length)] ?? key).replace('{value}', String(params['value']));
+
+    expect(ageText({ years: 52, months: 0, days: 0 }, 'ar', arabic)).toBe('٥٢ سنة');
+    expect(ageText({ years: 5, months: 0, days: 0 }, 'ar', arabic)).toBe('٥ سنوات');
+    expect(ageText({ years: 2, months: 1, days: 0 }, 'ar', arabic)).toBe('سنتان شهر واحد');
+    expect(ageText({ years: 0, months: 11, days: 3 }, 'ar', arabic)).toBe('١١ شهرًا ٣ أيام');
+    expect(ageText({ years: 0, months: 0, days: 0 }, 'ar', arabic)).toBe('٠ يوم');
   });
 });

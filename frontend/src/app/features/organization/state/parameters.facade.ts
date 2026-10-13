@@ -7,7 +7,8 @@ import { OrganizationApi } from '../data/organization.api';
 /**
  * Parameters (CP-57) over the foundation settings API: the effective values, the unsaved edits by key, and one save
  * that sends only what changed (`PUT /api/v1/settings` validates every value: SET-001, SET-002) and adopts the
- * effective list the server returns.
+ * effective list the server returns. "Use default" removes the laboratory's own value (an edit of `null`, validation F-13),
+ * so the key follows the platform value again, also a later one.
  */
 @Injectable()
 export class ParametersFacade {
@@ -15,8 +16,8 @@ export class ParametersFacade {
 
   readonly settings = resource({ loader: ({ abortSignal }) => this.api.settings(abortSignal) });
 
-  /** Unsaved values by key, in the stored text form. */
-  readonly edits = signal<ReadonlyMap<string, string>>(new Map());
+  /** Unsaved values by key, in the stored text form; `null` = remove the laboratory's own value (F-13). */
+  readonly edits = signal<ReadonlyMap<string, string | null>>(new Map());
 
   readonly byKey = computed(() => new Map<string, TenantSettingItem>((this.settings.hasValue() ? this.settings.value().settings : []).map((item) => [item.key, item])));
 
@@ -29,9 +30,20 @@ export class ParametersFacade {
     },
   });
 
-  /** The value shown for a key: the unsaved edit, else the effective value. */
+  /** The value shown for a key: the unsaved edit (a removal shows the inherited value), else the effective value. */
   valueOf(key: string): string {
-    return this.edits().get(key) ?? this.byKey().get(key)?.value ?? '';
+    const item = this.byKey().get(key);
+    const edit = this.edits().get(key);
+    if (edit === null) {
+      return item?.inheritedValue ?? item?.defaultValue ?? '';
+    }
+
+    return edit ?? item?.value ?? '';
+  }
+
+  /** True while the laboratory's own value of the key is to be removed with the next save. */
+  isReset(key: string): boolean {
+    return this.edits().get(key) === null;
   }
 
   set(key: string, value: string): void {
@@ -47,12 +59,27 @@ export class ParametersFacade {
     });
   }
 
-  /** Back to what the laboratory inherits: the platform value when the platform sets one, else the default (UAT C-09; saved with the next Save). */
+  /**
+   * "Use default": back to what the laboratory inherits, the platform value when the platform sets one, else the default
+   * (UAT C-09). The laboratory's own row is removed with the next Save (validation F-13), not overwritten with the inherited
+   * value, so a later platform change reaches the laboratory. A key without a value of its own only drops its edit.
+   */
   resetToDefault(key: string): void {
     const item = this.byKey().get(key);
-    if (item) {
-      this.set(key, item.inheritedValue ?? item.defaultValue);
+    if (!item) {
+      return;
     }
+
+    this.edits.update((current) => {
+      const next = new Map(current);
+      if (item.isDefault) {
+        next.delete(key);
+      } else {
+        next.set(key, null);
+      }
+
+      return next;
+    });
   }
 
   discard(): void {

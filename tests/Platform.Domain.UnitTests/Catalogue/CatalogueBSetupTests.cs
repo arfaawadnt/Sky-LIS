@@ -109,15 +109,52 @@ public sealed class CatalogueBSetupTests
     }
 
     [Fact]
-    public void A_report_template_clears_empty_file_ids_and_keeps_optional_texts()
+    public void A_report_template_starts_without_images_and_keeps_optional_texts()
     {
-        var template = ReportTemplate.Create(Text("Results A4"), ReportTemplateType.Results, Guid.Empty, Guid.CreateVersion7(), true, ReportTemplateLanguage.Both, Text("Header"), null, Now);
+        var template = ReportTemplate.Create(Text("Results A4"), ReportTemplateType.Results, true, ReportTemplateLanguage.Both, Text("Header"), null, Now);
 
         Assert.Null(template.LogoFileId);
-        Assert.NotNull(template.SignatureFileId);
+        Assert.Null(template.SignatureFileId);
         Assert.Equal("Header", template.HeaderText!.En);
         Assert.Null(template.FooterText);
         Assert.Equal(ReportTemplateType.Results, Assert.IsType<ReportTemplateCreated>(Assert.Single(template.DomainEvents)).Type);
+    }
+
+    [Fact]
+    public void Report_template_images_are_attached_replaced_and_removed_and_an_edit_keeps_them()
+    {
+        var template = ReportTemplate.Create(Text("Results A4"), ReportTemplateType.Results, true, ReportTemplateLanguage.Both, null, null, Now);
+        var (logo, signature, replacement) = (Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7());
+
+        template.AttachImage(ReportTemplateImage.Logo, logo, Now);
+        template.AttachImage(ReportTemplateImage.Signature, signature, Now);
+        template.AttachImage(ReportTemplateImage.Logo, replacement, Now);
+        Assert.Equal((replacement, signature), (template.LogoFileId!.Value, template.SignatureFileId!.Value));
+        Assert.Equal((ReportTemplateImage.Logo, (Guid?)replacement), (Assert.IsType<ReportTemplateImageChanged>(template.DomainEvents.Last()).Image, ((ReportTemplateImageChanged)template.DomainEvents.Last()).FileId));
+
+        template.Update(Text("Results A4 v2"), ReportTemplateType.Results, false, ReportTemplateLanguage.En, null, null);
+        Assert.Equal((replacement, signature), (template.FileIdOf(ReportTemplateImage.Logo)!.Value, template.FileIdOf(ReportTemplateImage.Signature)!.Value));
+
+        template.RemoveImage(ReportTemplateImage.Signature, Now);
+        Assert.Null(template.SignatureFileId);
+        Assert.Null(Assert.IsType<ReportTemplateImageChanged>(template.DomainEvents.Last()).FileId);
+        Assert.Equal(CatalogueBCodes.TemplateImageNotFound, Assert.Throws<DomainException>(() => template.RemoveImage(ReportTemplateImage.Signature, Now)).Code);
+        Assert.Equal(CatalogueBCodes.TextInvalid, Assert.Throws<DomainException>(() => template.AttachImage((ReportTemplateImage)7, logo, Now)).Code);
+    }
+
+    [Fact]
+    public void A_template_image_is_a_small_PNG_JPEG_or_WebP_decided_by_its_bytes()
+    {
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13];
+        byte[] jpeg = [0xFF, 0xD8, 0xFF, 0xE0];
+        byte[] webp = [.. "RIFF"u8.ToArray(), 26, 0, 0, 0, .. "WEBP"u8.ToArray()];
+
+        Assert.Equal("image/png", ReportTemplateImageFiles.Inspect(100, png));
+        Assert.Equal("image/jpeg", ReportTemplateImageFiles.Inspect(100, jpeg));
+        Assert.Equal("image/webp", ReportTemplateImageFiles.Inspect(100, webp));
+        Assert.Equal(CatalogueBCodes.TemplateImageTypeNotAllowed, Assert.Throws<DomainException>(() => ReportTemplateImageFiles.Inspect(100, "<svg xmlns"u8)).Code);
+        Assert.Equal(CatalogueBCodes.TemplateImageEmpty, Assert.Throws<DomainException>(() => ReportTemplateImageFiles.Inspect(0, png)).Code);
+        Assert.Equal(CatalogueBCodes.TemplateImageTooLarge, Assert.Throws<DomainException>(() => ReportTemplateImageFiles.Inspect(ReportTemplateImageFiles.MaxSizeBytes + 1, png)).Code);
     }
 
     [Fact]

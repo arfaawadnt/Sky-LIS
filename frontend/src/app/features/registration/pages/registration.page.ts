@@ -134,9 +134,17 @@ export class RegistrationPage {
     return this.facade.isEdit() ? this.i18n.tf('registration.editTitle', { accession: saved?.accession ?? '…' }) : this.i18n.t('registration.title');
   });
 
+  /** The visit's branch when editing, else the session's branch from the page settings (validation 2026-10-11: the new-registration header showed none). */
   protected readonly branchName = computed(() => {
     const saved = this.facade.saved();
-    return saved ? pick(saved.branchNameEn, saved.branchNameAr, this.i18n.lang()) : this.i18n.t('registration.sessionBranch');
+    const settings = this.facade.settings.value();
+    return saved ? pick(saved.branchNameEn, saved.branchNameAr, this.i18n.lang()) : pick(settings?.branchNameEn ?? null, settings?.branchNameAr ?? null, this.i18n.lang());
+  });
+
+  protected readonly subtitle = computed(() => {
+    const branch = this.branchName();
+    const text = this.i18n.t(this.facade.isEdit() ? 'registration.editSubtitle' : 'registration.deskSubtitle');
+    return branch === '' ? text : `${text} · ${branch}`;
   });
 
   protected readonly tubesByKey = computed(() => new Map<string, TubePreview>((this.facade.result()?.tubes ?? []).map((tube) => [tube.key, tube])));
@@ -301,6 +309,16 @@ export class RegistrationPage {
     return count(value, this.i18n.lang());
   }
 
+  /** "1 tube was issued." / "3 tubes were issued." in the language's grammar and digits (validation 2026-10-11). */
+  protected tubesText(tubes: number): string {
+    return this.countText('registration.success.tubes', tubes);
+  }
+
+  /** A counted sentence in its grammatical form (`I18nService.tc`, validation v0.5.0 F-11) with the language's digits. */
+  protected countText(key: string, value: number): string {
+    return this.i18n.tc(key, value, { count: this.num(value) });
+  }
+
   protected when(utc: string | null | undefined): string {
     return dateTime(utc, this.i18n.lang());
   }
@@ -320,7 +338,8 @@ export class RegistrationPage {
   protected issueText(issue: OrderIssue): string {
     const key = `registration.error.${issue.code}`;
     const prefix = issue.serviceCode ? `${issue.serviceCode}: ` : '';
-    return `${prefix}${this.i18n.has(key) ? this.i18n.t(key) : issue.message}`;
+    // REG-109 names the repeated tests and the services that order them (validation O-3).
+    return `${prefix}${this.i18n.has(key) ? this.i18n.tf(key, { detail: issue.detail ?? '' }) : issue.message}`;
   }
 
   protected warningText(warning: OrderWarning): string {
@@ -331,12 +350,12 @@ export class RegistrationPage {
       detail,
       date: warning.lastOrderedAtUtc ? this.when(warning.lastOrderedAtUtc) : '',
       accession: warning.lastAccession ?? '',
-      days: warning.windowDays ?? '',
+      days: warning.windowDays === null ? '' : this.countText('registration.dayCount', warning.windowDays),
     });
   }
 
   protected warningTone(code: string): 'warn' | 'info' | 'bad' {
-    return code === 'REG-201' || code === 'REG-207' ? 'bad' : code === 'REG-202' || code === 'REG-203' ? 'warn' : 'info';
+    return code === 'REG-201' || code === 'REG-207' ? 'bad' : code === 'REG-202' || code === 'REG-203' || code === 'REG-206' ? 'warn' : 'info';
   }
 
   protected blockerText(blocker: SaveBlocker): string {
@@ -476,7 +495,7 @@ export class RegistrationPage {
     const first = blockers[0];
     if (first !== undefined) {
       this.attempted.set(true);
-      this.toast.error(blockers.length === 1 ? this.blockerText(first) : this.i18n.tf('registration.validation.many', { count: this.num(blockers.length) }));
+      this.toast.error(blockers.length === 1 ? this.blockerText(first) : this.countText('registration.validation.many', blockers.length));
       this.focusBlocker(first);
       return;
     }

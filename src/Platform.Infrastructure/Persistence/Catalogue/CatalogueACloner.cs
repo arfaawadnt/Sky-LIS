@@ -102,7 +102,7 @@ internal sealed partial class CatalogueACloner(AppDbContext context, ICurrentTen
                             band.Low, band.High, band.PanicLow, band.PanicHigh, band.ReportableLow, band.ReportableHigh, band.TextRange))
                         .ToList(),
                     now);
-                copy.ReplaceListValues(source.ListValues.OrderBy(value => value.DisplayOrder).Select(value => new ListValueSpec(value.Value, value.IsNormal, value.IsCritical, value.IsDefault, value.IsPlaceholder, value.Colour)).ToList(), now);
+                copy.ReplaceListValues(source.ListValues.OrderBy(value => value.DisplayOrder).Select(value => CopyOf(value, source.Code)).ToList(), now);
                 copy.ReplaceParagraphs(source.Paragraphs.OrderBy(paragraph => paragraph.DisplayOrder).Select(paragraph => new ParagraphSpec(paragraph.Title, paragraph.Text)).ToList(), now);
                 if (source.FormulaExpression is not null)
                 {
@@ -171,6 +171,21 @@ internal sealed partial class CatalogueACloner(AppDbContext context, ICurrentTen
         return new CatalogueACloneResult(groups, sampleTypes, conditions, units, patientConditions, tests, services);
     }
 
+    /// <summary>
+    /// A list value as the copy takes it. A value stored before CAT-061 (validation v0.5.0 O-2) can be both Normal and
+    /// Critical; the copy keeps it Critical only (the panic flag still fires), so the whole test is not skipped.
+    /// </summary>
+    private ListValueSpec CopyOf(ListValue value, string testCode)
+    {
+        var bothFlags = value.IsNormal && value.IsCritical;
+        if (bothFlags)
+        {
+            NormalAndCriticalCopiedAsCritical(logger, testCode, value.Value);
+        }
+
+        return new ListValueSpec(value.Value, value.IsNormal && !bothFlags, value.IsCritical, value.IsDefault, value.IsPlaceholder, value.Colour);
+    }
+
     private IQueryable<TEntity> Source<TEntity>(Guid sourceTenantId)
         where TEntity : class, ITenantScoped =>
         context.Set<TEntity>().AsNoTracking().Where(entity => entity.TenantId == sourceTenantId);
@@ -207,4 +222,7 @@ internal sealed partial class CatalogueACloner(AppDbContext context, ICurrentTen
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Catalogue A clone skipped {Kind} {Code}: {Reason}")]
     private static partial void LogSkipped(ILogger logger, string kind, string code, string reason);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Catalogue A clone: list value {Value} of test {Code} was Normal and Critical; the copy keeps it Critical only (CAT-061).")]
+    private static partial void NormalAndCriticalCopiedAsCritical(ILogger logger, string code, string value);
 }

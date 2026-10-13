@@ -26,7 +26,7 @@ export function permissionKey(module: string, action: string): string {
   template: `
     <div class="matrix-toolbar">
       <app-search-box [placeholder]="i18n.t('organization.matrix.filter')" [label]="i18n.t('organization.matrix.filter')" (searchChange)="filter.set($event)" />
-      <span class="muted small count">{{ i18n.tf('organization.matrix.count', { selected: selected().size, total: totalKeys() }) }}</span>
+      <span class="muted small count">{{ i18n.tf('organization.matrix.count', { selected: selectedInMatrix(), total: totalKeys() }) }}</span>
       @if (!disabled()) {
         <span class="bulk">
           <button type="button" class="btn sm" (click)="setVisible(true)">{{ i18n.t('organization.matrix.grantAll') }}</button>
@@ -127,6 +127,13 @@ export class PrivilegeMatrixComponent {
   });
 
   protected readonly totalKeys = computed(() => this.modules().reduce((sum, module) => sum + module.actions.length, 0));
+
+  /**
+   * Validation F-07: the held keys the matrix shows. A role may hold keys of modules this matrix does not list (platform-only
+   * modules, modules of a later release); they are kept on save but never counted, so the counter cannot exceed the total.
+   */
+  protected readonly selectedInMatrix = computed(() =>
+    this.modules().reduce((sum, module) => sum + module.actions.filter((action) => this.selected().has(permissionKey(module.key, action))).length, 0));
 
   protected key(module: string, action: string): string {
     return permissionKey(module, action);

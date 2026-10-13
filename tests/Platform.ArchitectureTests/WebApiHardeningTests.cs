@@ -2,11 +2,16 @@ using System.Reflection;
 using System.Text.Json;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Configuration;
 using Platform.Application.Identity;
+using Platform.Application.Settings.Commands;
+using Platform.Application.Settings.Queries;
 using Platform.ArchitectureTests.Support;
 using Platform.Contracts.Common;
+using Platform.Contracts.Settings;
 using Platform.Infrastructure.Security;
+using Platform.WebApi.Security;
 using Platform.WebApi.Startup;
 
 namespace Platform.ArchitectureTests;
@@ -169,5 +174,63 @@ public sealed class WebApiHardeningTests
                 Assert.True(lines[i].Contains("using (", StringComparison.Ordinal) || lines[i].Contains("using var", StringComparison.Ordinal), $"{Path.GetFileName(path)}:{i + 1} elevates outside a using");
             }
         }
+    }
+
+    /// <summary>
+    /// Validation F-17: an unreadable body is reported only after the action's requests are authorized. That rests on the
+    /// map of each action to the commands and queries it sends, so every action must name at least one.
+    /// </summary>
+    [Fact]
+    public void Every_controller_action_names_the_requests_it_sends()
+    {
+        var actions = SolutionAssemblies.WebApiAssembly.GetTypes()
+            .Where(type => typeof(ControllerBase).IsAssignableFrom(type) && !type.IsAbstract)
+            .SelectMany(controller => controller.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .Where(method => method.GetCustomAttributes<HttpMethodAttribute>().Any())
+            .ToList();
+        Assert.True(actions.Count > 100, $"only {actions.Count} actions found");
+
+        var unmapped = actions.Where(action => ActionRequestPolicies.RequestTypesOf(action).Count == 0).Select(action => $"{action.DeclaringType!.Name}.{action.Name}").ToList();
+        Assert.True(unmapped.Count == 0, "Actions that send no recognisable command or query: " + string.Join(", ", unmapped));
+    }
+
+    [Fact]
+    public void The_action_map_follows_async_bodies_and_controller_helpers_and_ignores_actions_without_requests()
+    {
+        // gate self-test: the scanner finds requests built in the action, in its state machine and in a private helper
+        Assert.Equal([typeof(UpdateTenantSettingsCommand)], ActionRequestPolicies.RequestTypesOf(typeof(MapFixtureController).GetMethod(nameof(MapFixtureController.Put))!));
+        Assert.Equal([typeof(GetTenantSettingsQuery)], ActionRequestPolicies.RequestTypesOf(typeof(MapFixtureController).GetMethod(nameof(MapFixtureController.ViaHelper))!));
+        Assert.Empty(ActionRequestPolicies.RequestTypesOf(typeof(MapFixtureController).GetMethod(nameof(MapFixtureController.Nothing))!));
+    }
+
+    /// <summary>01 §3.4 and validation F-17: Authorization is registered before Validation, so a refusal never discloses a request's rules.</summary>
+    [Fact]
+    public void The_request_pipeline_authorizes_before_it_validates()
+    {
+        var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+        Platform.Application.ApplicationServiceRegistration.AddApplication(services);
+        var behaviors = services
+            .Where(descriptor => descriptor.ServiceType == typeof(IPipelineBehavior<,>))
+            .Select(descriptor => descriptor.ImplementationType)
+            .ToList();
+        var authorization = behaviors.IndexOf(typeof(Platform.Application.Behaviors.AuthorizationBehavior<,>));
+        var validation = behaviors.IndexOf(typeof(Platform.Application.Behaviors.ValidationBehavior<,>));
+        Assert.True(authorization >= 0 && validation >= 0, "both behaviors are registered");
+        Assert.True(authorization < validation, "AuthorizationBehavior must run before ValidationBehavior");
+
+        var problem = File.ReadAllText(Path.Combine(WebApiFolder, "Middleware", "ProblemResponse.cs"));
+        Assert.Contains("ActionRequestPolicies.Demand(", problem, StringComparison.Ordinal);   // the MVC body check defers to the same decision
+    }
+
+    private sealed class MapFixtureController(ISender sender) : ControllerBase
+    {
+        public async Task<IActionResult> Put(UpdateTenantSettingsRequest request, CancellationToken cancellationToken) =>
+            Ok(await sender.Send(new UpdateTenantSettingsCommand(request.Settings), cancellationToken));
+
+        public Task<IActionResult> ViaHelper(CancellationToken cancellationToken) => ReadAsync(cancellationToken);
+
+        public IActionResult Nothing() => Ok();
+
+        private async Task<IActionResult> ReadAsync(CancellationToken cancellationToken) => Ok(await sender.Send(new GetTenantSettingsQuery(), cancellationToken));
     }
 }

@@ -209,7 +209,8 @@ public sealed class AddVisitLinesHandler(
                 visit.LiveServiceIds,
                 visit.Id,
                 now,
-                visit.UtcOffsetMinutes),
+                visit.UtcOffsetMinutes,
+                ExistingTests: visit.LiveTestHolders()),
             cancellationToken);
         plan.ThrowIfRefused(command.ConfirmFrequencyWarnings);
 

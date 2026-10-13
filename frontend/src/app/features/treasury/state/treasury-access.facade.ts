@@ -1,10 +1,11 @@
 import { Injectable, computed, inject, resource, signal } from '@angular/core';
 
 import type { PageRequest } from '../../../core/api/paging';
-import type { TreasuryAccessRequestFilter, TreasuryAccessRequestListItem, TreasuryAccessStatus } from '../../../core/api/treasury.contracts';
+import type { TreasuryAccessRequestFilter, TreasuryAccessRequestListItem, TreasuryAccessStatus, TreasuryListItem } from '../../../core/api/treasury.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { mutation } from '../../../core/state/mutation';
+import { allPages } from '../data/csv-export';
 import { TreasuryApi } from '../data/treasury.api';
 
 /** Facade of 01 §6.3: reads through `resource()`, writes through the shared `mutation()` helper, state in signals. Provided at the feature route. */
@@ -25,6 +26,18 @@ export class TreasuryAccessFacade {
     loader: ({ abortSignal }) => this.api.listTreasuries(true, abortSignal),
   });
 
+  /**
+   * The picker of the request form: the active treasuries of the branches the user may work in (intake Q3, validation
+   * v0.5.0 O-4); a membership without assigned branches works in every branch and sees all. The server refuses the
+   * others with TRS-015.
+   */
+  readonly requestableTreasuries = computed<readonly TreasuryListItem[]>(() => {
+    const items = this.treasuries.hasValue() ? this.treasuries.value().items : [];
+    const branches = this.auth.branchIds();
+    return branches.length === 0 ? items : items.filter((treasury) => branches.includes(treasury.branchId));
+  });
+
+  /** This user's id on this browser (O-10: one per user and browser profile, see `DeviceIdentityService`). */
   readonly deviceId = computed(() => this.device.deviceId());
 
   readonly currentUserId = computed(() => this.auth.currentUser()?.id ?? null);
@@ -49,6 +62,12 @@ export class TreasuryAccessFacade {
   refresh(): void {
     this.requests.reload();
     this.treasuries.reload();
+  }
+
+  /** Every request of the current filter (status, mine), page after page, for the CSV export (D-05: with comments and reasons). */
+  allRequests(): Promise<readonly TreasuryAccessRequestListItem[]> {
+    const filter = this.filter();
+    return allPages((page, pageSize) => this.api.listRequests({ ...filter, page, pageSize }));
   }
 
   setStatus(status: TreasuryAccessStatus | null): void {

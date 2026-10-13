@@ -4,8 +4,10 @@ import { provideRouter, withComponentInputBinding, withViewTransitions } from '@
 
 import { routes } from './app.routes';
 import { AuthStore } from './core/auth/auth.store';
+import { provideIdleWatch } from './core/auth/idle-watcher';
 import { provideSessionSync } from './core/auth/session-channel';
 import { provideSaveShortcutGuard } from './shared/forms/save-shortcut.directive';
+import { provideReportDocumentRenderer } from './shared/print/report-template-images';
 import { authInterceptor } from './core/http/auth.interceptor';
 import { credentialEnvelopeInterceptor } from './core/http/credential-envelope.interceptor';
 import { csrfInterceptor } from './core/http/csrf.interceptor';
@@ -34,6 +36,9 @@ export const appConfig: ApplicationConfig = {
     ),
     provideSaveShortcutGuard(), // F10 / Ctrl+S never reach the browser (no "Save page as…", no menu focus); forms save through appSaveShortcut
     provideSessionSync(), // tabs tell each other of a sign-in, a sign-out (C-01) or a profile change (R2-01); BroadcastChannel, no web storage
+    // the results report renderer, lazily, for the report template preview of the catalogue (features never import each other)
+    provideReportDocumentRenderer(() => import('./features/results/ui/report.document').then((m) => m.ReportDocumentComponent)),
     provideAppInitializer(() => inject(AuthStore).hydrate()),
+    provideIdleWatch(), // F-01: the tenant's idle timeout (sessionTimeoutMinutes) — warning a minute before, sign-out at the end, shared across tabs
   ],
 };

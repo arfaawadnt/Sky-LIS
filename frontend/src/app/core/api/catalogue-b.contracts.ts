@@ -99,6 +99,15 @@ export interface DoctorListItem {
   readonly sharePercent: number;
   readonly phone: string | null;
   readonly isActive: boolean;
+  /** The code and name of each of `branchIds`, joined on the server: shown even to a user limited to other branches (validation v0.5.0). */
+  readonly branches: readonly DoctorBranch[];
+}
+
+export interface DoctorBranch {
+  readonly id: string;
+  readonly code: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
 }
 
 export interface CreateDoctorRequest {
@@ -259,18 +268,41 @@ export interface ReportTemplateListItem {
   readonly isActive: boolean;
 }
 
+/** Logo and signature are not part of the request: they are uploaded and removed on their own (`reportTemplateImageUrl`, intake A10). */
 export interface ReportTemplateRequest {
   readonly nameEn: string;
   readonly nameAr: string;
   readonly type: ReportTemplateType;
-  readonly logoFileId: string | null;
-  readonly signatureFileId: string | null;
   readonly showQr: boolean;
   readonly language: ReportTemplateLanguage;
   readonly headerTextEn: string | null;
   readonly headerTextAr: string | null;
   readonly footerTextEn: string | null;
   readonly footerTextAr: string | null;
+}
+
+/** The two images of a report template; the URL segment of `…/report-templates/{id}/images/{image}`. */
+export type ReportTemplateImageKind = 'logo' | 'signature';
+export const REPORT_TEMPLATE_IMAGE_KINDS: readonly ReportTemplateImageKind[] = ['logo', 'signature'];
+
+/** The answer of an upload: which image (`Logo` / `Signature`), its new file id, the type detected from its bytes and the size. */
+export interface ReportTemplateImageView {
+  readonly image: 'Logo' | 'Signature';
+  readonly fileId: string;
+  readonly contentType: string;
+  readonly sizeBytes: number;
+}
+
+/** PNG, JPEG or WebP up to 512 KB (the server decides by the bytes and refuses with CAT-270…272). */
+export const REPORT_TEMPLATE_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp';
+export const REPORT_TEMPLATE_IMAGE_MAX_BYTES = 512 * 1024;
+
+/**
+ * `GET` (any signed-in member of the tenant: reports print it), `POST` multipart field `file` and `DELETE`
+ * (`catalogue.edit`) of one template image. The image needs the bearer token, so it is read as a blob.
+ */
+export function reportTemplateImageUrl(templateId: string, image: ReportTemplateImageKind): string {
+  return `/api/v1/catalogue/report-templates/${encodeURIComponent(templateId)}/images/${image}`;
 }
 
 // CP-56 / SA-14 Microbiology

@@ -40,13 +40,14 @@ public sealed class ListPatientsValidator : AbstractValidator<ListPatientsQuery>
 /// special right VIP files are found only by their full number or national id and listed masked (validation A-03); the
 /// patient picker reads this page too.
 /// </summary>
-public sealed class ListPatientsHandler(IPatientRepository patients, IPatientVisitStatistics visits, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, IClock clock) : IQueryHandler<ListPatientsQuery, Paged<PatientListItem>>
+public sealed class ListPatientsHandler(IPatientRepository patients, IPatientVisitStatistics visits, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, ILaboratoryCountry laboratoryCountry, IClock clock) : IQueryHandler<ListPatientsQuery, Paged<PatientListItem>>
 {
     public async Task<Paged<PatientListItem>> Handle(ListPatientsQuery query, CancellationToken cancellationToken)
     {
         var confidential = privileges.Has(PatientPermissions.ViewConfidential);
         var canSeeVip = privileges.SpecialRights.CanSeeVip;
-        var filter = PatientFilters.From(query.Q, query.Gender, query.Vip, query.Status, confidential, canSeeVip) with { Sort = ListSort.Of(query.Sort, query.Direction) };
+        var mobileLength = (await laboratoryCountry.FindAsync(cancellationToken))?.MobileLength;
+        var filter = PatientFilters.From(query.Q, query.Gender, query.Vip, query.Status, confidential, canSeeVip, mobileLength) with { Sort = ListSort.Of(query.Sort, query.Direction) };
         var page = await patients.SearchAsync(filter, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
         var today = Patient.LocalDate(clock.UtcNow, await laboratoryZone.FindAsync(cancellationToken));   // the laboratory's day (R2-01)
         var figures = await visits.ForPatientsAsync([.. page.Items.Select(row => row.Id)], cancellationToken);
@@ -155,13 +156,19 @@ public sealed class FindSimilarPatientsHandler(IPatientRepository patients, ITen
 [RequirePermissionPolicy(PermissionCatalog.Patients, PermissionAction.View)]
 public sealed record GetPatientFormSettingsQuery : IQuery<PatientFormSettings>;
 
-public sealed class GetPatientFormSettingsHandler(ITenantSettings settings) : IQueryHandler<GetPatientFormSettingsQuery, PatientFormSettings>
+/// <summary>The form's parameters and the laboratory's country, the default mobile country of the form (F-08).</summary>
+public sealed class GetPatientFormSettingsHandler(ITenantSettings settings, ILaboratoryCountry laboratoryCountry) : IQueryHandler<GetPatientFormSettingsQuery, PatientFormSettings>
 {
-    public async Task<PatientFormSettings> Handle(GetPatientFormSettingsQuery query, CancellationToken cancellationToken) =>
-        new(
+    public async Task<PatientFormSettings> Handle(GetPatientFormSettingsQuery query, CancellationToken cancellationToken)
+    {
+        var country = await laboratoryCountry.FindAsync(cancellationToken);
+        return new(
             await settings.GetAsync(SettingKeys.MandatoryMobile, cancellationToken),
             await settings.GetAsync(SettingKeys.MandatoryNationalId, cancellationToken),
-            await settings.GetAsync(SettingKeys.SimilarNameWarning, cancellationToken));
+            await settings.GetAsync(SettingKeys.SimilarNameWarning, cancellationToken),
+            country?.IsoCode,
+            country?.MobileLength);
+    }
 }
 
 /// <summary>
@@ -194,7 +201,7 @@ public sealed class ExportPatientsValidator : AbstractValidator<ExportPatientsQu
     }
 }
 
-public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, IClock clock) : IQueryHandler<ExportPatientsQuery, ExportFile>
+public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, ILaboratoryCountry laboratoryCountry, IClock clock) : IQueryHandler<ExportPatientsQuery, ExportFile>
 {
     public const int MaxRows = 10_000;
 
@@ -205,7 +212,7 @@ public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPriv
     {
         var confidential = privileges.Has(PatientPermissions.ViewConfidential);
         var canSeeVip = privileges.SpecialRights.CanSeeVip;
-        var filter = PatientFilters.From(query.Q, query.Gender, query.Vip, query.Status, confidential, canSeeVip);
+        var filter = PatientFilters.From(query.Q, query.Gender, query.Vip, query.Status, confidential, canSeeVip, (await laboratoryCountry.FindAsync(cancellationToken))?.MobileLength);
         var rows = await patients.SearchAllAsync(filter, MaxRows + 1, cancellationToken);
         if (rows.Count > MaxRows)
         {
@@ -277,7 +284,7 @@ public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPriv
 /// <summary>The register filter from query parameters; the VIP filter is refused without the confidential right (PAT-031).</summary>
 internal static class PatientFilters
 {
-    public static PatientSearchFilter From(string? q, string? gender, bool? vip, string? status, bool confidential, bool canSeeVip)
+    public static PatientSearchFilter From(string? q, string? gender, bool? vip, string? status, bool confidential, bool canSeeVip, int? mobileLength = null)
     {
         if (vip is not null && !confidential)
         {
@@ -285,7 +292,7 @@ internal static class PatientFilters
         }
 
         return new PatientSearchFilter(
-            PatientSearchTerms.Parse(q),
+            PatientSearchTerms.Parse(q, mobileLength),
             string.IsNullOrEmpty(gender) ? null : Enum.Parse<PatientGender>(gender, ignoreCase: true),
             vip,
             string.IsNullOrEmpty(status) ? null : Enum.Parse<PatientStatus>(status, ignoreCase: true),

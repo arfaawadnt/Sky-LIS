@@ -62,7 +62,7 @@ public sealed class UpdatePayerValidator : AbstractValidator<UpdatePayerCommand>
     }
 }
 
-public sealed class UpdatePayerHandler(IPayerRepository payers, IUnitOfWork unitOfWork) : ICommandHandler<UpdatePayerCommand>
+public sealed class UpdatePayerHandler(IPayerRepository payers, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<UpdatePayerCommand>
 {
     public async Task Handle(UpdatePayerCommand command, CancellationToken cancellationToken)
     {
@@ -73,7 +73,7 @@ public sealed class UpdatePayerHandler(IPayerRepository payers, IUnitOfWork unit
         var username = Payer.CleanWebUsername(command.WebPortalEnabled, command.WebUsername);
         await PayerUniqueness.RequireAsync(payers, searchKey, username, payer.Id, cancellationToken);
 
-        payer.Update(new LocalizedText(command.NameEn, command.NameAr), searchKey, Enum.Parse<PayerType>(command.Type, ignoreCase: true), command.WebPortalEnabled, username);
+        payer.Update(new LocalizedText(command.NameEn, command.NameAr), searchKey, Enum.Parse<PayerType>(command.Type, ignoreCase: true), command.WebPortalEnabled, username, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

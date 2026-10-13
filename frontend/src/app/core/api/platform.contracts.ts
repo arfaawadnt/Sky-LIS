@@ -208,6 +208,29 @@ export interface TopUpWalletRequest {
   readonly topUpRequestId: string | null;
 }
 
+/** Outcome of one due wallet in a monthly charge run (W2). */
+export type WalletChargeOutcome = 'Charged' | 'Skipped' | 'Failed';
+
+/** One due wallet of a charge run; `amount` is the ledger amount (negative debit); reason: trial, inactive, not-due, no-wallet, no-plan, currency-mismatch, error. */
+export interface WalletChargeRunItem {
+  readonly tenantId: string;
+  readonly outcome: WalletChargeOutcome;
+  readonly reason: string | null;
+  readonly period: string | null;
+  readonly amount: number | null;
+  readonly balanceAfter: number | null;
+}
+
+/** SA-05 "Run charges now" (`tenancy.manage`): the same pass as the hosted monthly job. */
+export interface WalletChargeRunSummary {
+  readonly runAtUtc: string;
+  readonly charged: number;
+  readonly skipped: number;
+  readonly failed: number;
+  readonly atOrBelowZero: number;
+  readonly items: readonly WalletChargeRunItem[];
+}
+
 /** CP-66 "Request top-up" (client tenant, `wallet.create`). */
 export interface CreateTopUpRequest {
   readonly amount: number;
@@ -485,6 +508,8 @@ export const PLATFORM_API = {
   clients: '/api/v1/platform/clients',
   plans: '/api/v1/platform/plans',
   wallets: '/api/v1/platform/wallets',
+  /** W2 monthly subscription charge, on demand (SA-05 "Run charges now"). */
+  walletChargeRun: '/api/v1/platform/wallets/charge-run',
   countries: '/api/v1/platform/countries',
   governorates: '/api/v1/platform/governorates',
   templates: '/api/v1/platform/notification-templates',

@@ -234,7 +234,57 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Session timeout enforced (validation F-01).** The parameter *Session timeout (minutes)* now ends idle sessions: the
+  server refuses a refresh after the session of a laboratory (or of the platform) went unrenewed longer than its timeout
+  (`AUTH-017`, session revoked), and both portals warn a minute before the end ("Stay signed in / Sign out"), keep the
+  session alive while the user works in any tab, and sign out to the sign-in page with "Your session ended after
+  inactivity". No migration.
+- **Report template logo, signature and preview (validation F-02).** SA-12 report templates get a row action "Logo,
+  signature and preview": a thumbnail of each image, upload / replace / remove for `catalogue.edit` (PNG, JPEG or WebP up
+  to 512 KB, decided by the bytes; `CAT-270…272`, `CAT-394`) and a sample result report drawn by the results report
+  renderer. The images are Files-module files (`…/report-templates/{id}/images/{logo|signature}`), served only to
+  signed-in members of the tenant; a printed result report shows the template logo in its letterhead and the signature on
+  a verified report. A client provisioned from the platform catalogue gets its own copy of the images. The template
+  create / edit request no longer carries `logoFileId` / `signatureFileId`. No migration.
+- **Open points of the validation report closed (LIS-VR-002 §6, §7, §10).** Every point still open after v0.6.0 is fixed
+  with a test; where the specifications gave no rule, the chosen rule is recorded in the intake as an assumption awaiting the
+  business owner (test-level duplicates, treasury branches, lock-out on a wrong current password, on-screen digits, VIP).
+- **Notification delivery.** `Lis:Notifications:*` selects a pickup directory (one file per message; dev
+  `E:\LIS\.local\mail-pickup`, production `E:\lis-data\mail-pickup`, protected ACL set by the installer), SMTP e-mail
+  and a generic HTTP SMS gateway; inactive templates fall back to the built-in text. The subscription wizard, password
+  recovery and the template fallback can now be completed without a gateway.
+- **Treasury access.** Approving takes an optional comment; the comment and the decision reason show on the request rows
+  and in a new CSV export; a request is limited to treasuries of the user's branches (`TRS-015`); a device approval binds
+  the person on that browser (one device id per user); payer, tier, base-price-list and treasury edits are audit-trail events.
+- **Catalogue and privileges.** A list value is Normal or Critical, not both (`CAT-061`); Release-2 modules are hidden in
+  the role editor and the user overrides (held keys are kept); the report-template field is hidden where report templates are
+  not delivered; the dial code is checked as typed; doctors list their branch codes; formulas take the patient's age and sex
+  (`@AGE`, `@FEMALE`).
+- **Registration and results.** A service whose tests are all already ordered is refused (`REG-109`), one that adds a new
+  test is accepted with a warning (`REG-206`); labels carry a BIO mark for a biohazard visit; tube counts read in the
+  singular, dual and plural; the new-registration header names the branch; VIP names are masked on the worklist and the
+  Results-by-accession list; on-screen dates use the language's digits (printed documents keep Latin digits); Egyptian
+  mobiles are accepted with the trunk 0.
+- **Wallet charge run.** A hosted job (`Lis:Jobs:WalletCharge:{Enabled,PollInterval}`) and "Run charges now" on SA-05
+  (`POST /api/v1/platform/wallets/charge-run`) charge each due, active client its plan's monthly fee once per period
+  (guarded by the wallet's row version), move the next charge one month and write a ledger row; trial and inactive clients
+  are skipped, a currency mismatch is reported (`WALLET_CHARGE_FAILED`). SMS usage metering waits for a per-SMS price
+  (business decision, PLT intake Q12).
+- **Branch and roles.** "Change branch" in the user menu for users with several branches (other tabs follow); data
+  migration `RemovePlatformKeysFromLaboratoryRoles` removes platform-only keys from laboratory roles and overrides, and
+  the demo seed no longer grants them; the privilege counter counts only listed keys; a reopened role editor shows no old
+  refusal; "Use default" removes the stored value (`SettingValueItem.Value` null); a caller without the right gets 403
+  before any 400 about the body.
+- **Results, documents and digits.** An opened VIP case and its preview are masked without See-VIP, and printing a VIP
+  report needs the right (`RES-056`); the patient form opens on the laboratory's country and mobile search matches with
+  or without the trunk 0; Arabic screens use Arabic-Indic digits everywhere while printed documents (job order included)
+  use Latin digits; a report's captions, language and direction follow the report language; the worklist's delayed
+  counter and filter follow the late threshold of the row colour.
+- **Wording.** One count rule for both languages (`I18nService.tc`: none, one, two, few, many), no "(s)" plurals left
+  (a dictionary check enforces it), and the "not saved" notice on every editor including the Super Admin forms.
+- **Forms and messages.** Full-page editors (user, test, service, patient) show the "not saved" notice on a blocked save;
+  duplicate username, e-mail, mobile and employee code show under their fields; an unknown time zone is `SET-003` with its
+  own message; a wrong current password counts toward lock-out like a wrong sign-in (documented rule SEC-LOCK-02).
 
 ### v0.7.2 — 2026-10-12
 

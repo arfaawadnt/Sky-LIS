@@ -120,11 +120,13 @@ internal sealed class TreasuryAccessRequestRepository(AppDbContext context) : Re
                 request.RequestedAtUtc,
                 request.DecidedAtUtc,
                 DeciderName = decider == null ? null : decider.DisplayName,
+                request.DecisionReason,
+                ApprovalComment = request.Approval == null ? null : request.Approval.Comment,
             }).ToListAsync(cancellationToken).ConfigureAwait(false);
 
         var items = rows.Select(row => new TreasuryAccessRequestListItem(
             row.Id, row.Number, row.TreasuryId, row.Code, row.NameEn, row.NameAr, row.BranchId, row.RequestedByUserId, row.RequesterName,
-            row.DeviceId, row.DeviceLabel, row.Status.ToString(), row.RequestedAtUtc, row.DecidedAtUtc, row.DeciderName)).ToList();
+            row.DeviceId, row.DeviceLabel, row.Status.ToString(), row.RequestedAtUtc, row.DecidedAtUtc, row.DeciderName, row.DecisionReason, row.ApprovalComment)).ToList();
 
         return new Paged<TreasuryAccessRequestListItem>(items, page.Page, page.PageSize, total);
     }

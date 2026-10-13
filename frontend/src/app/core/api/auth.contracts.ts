@@ -23,6 +23,12 @@ export interface AuthProfile {
   readonly branchIds?: readonly string[];
   /** An administrator reset the password: the SPA sends the user to the change-password page first. */
   readonly mustChangePassword?: boolean;
+  /**
+   * Validation F-01: the idle timeout of the session's tenant (`sessionTimeoutMinutes`, 1–720; the platform's value when the
+   * laboratory set none, else 30). The idle watcher warns a minute before it and signs out at it; the server refuses a
+   * refresh after it with `AUTH-017`. Optional only until the generator lands; absent means 30.
+   */
+  readonly sessionTimeoutMinutes?: number | null;
 }
 
 /** CP-04: binds the current session to one of `AuthProfile.branchIds`. */

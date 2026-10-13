@@ -1,10 +1,14 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Platform.Contracts.Common;
 using Platform.Contracts.PlatformAdmin;
+using Platform.Infrastructure.Persistence;
 using Platform.SharedKernel.MultiTenancy;
 using Platform.WebApi.FunctionalTests.Support;
+using Platform.TestSupport;
 
 namespace Platform.WebApi.FunctionalTests;
 
@@ -32,7 +36,6 @@ public sealed class PlatformAdminFlowTests(ApiFactory factory) : IClassFixture<A
         "notifications.view", "notifications.manage", "integration.view", "integration.manage",
     ];
 
-    private static int _isoCounter;
 
     [DatabaseFact]
     public async Task A_platform_administrator_provisions_a_client_and_runs_its_life_cycle()
@@ -218,6 +221,48 @@ public sealed class PlatformAdminFlowTests(ApiFactory factory) : IClassFixture<A
     }
 
     [DatabaseFact]
+    public async Task Run_charges_now_debits_a_due_wallet_once_and_the_ledger_shows_the_subscription_row()
+    {
+        var admin = await AdminClientAsync();
+        var place = await CreatePlaceAsync(admin);   // plan fee 10 EGP
+        var slug = "charge-" + Guid.CreateVersion7().ToString("N")[^8..];
+        var provisioned = (await (await ProvisionAsync(admin, place, slug, "charge.admin." + slug[^8..], NewMobile())).Content.ReadFromJsonAsync<ProvisionedClient>())!;
+        Assert.Equal(HttpStatusCode.Created, (await admin.PostAsJsonAsync($"{Wallets}/{provisioned.Id}/top-up", new TopUpWalletRequest(100m, "INV-100", null, null))).StatusCode);
+
+        // A manual client's first charge falls a month after provisioning: bring it forward instead of moving the clock (tokens use the machine clock).
+        var dueAt = factory.Clock.UtcNow.AddDays(-1);
+        using (var scope = factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.ExecuteSqlInterpolatedAsync($"UPDATE saas.wallets SET next_charge_at_utc = {dueAt} WHERE tenant_id = {provisioned.Id}");
+        }
+
+        var run = await admin.PostAsync($"{Wallets}/charge-run", null);
+        Assert.Equal(HttpStatusCode.OK, run.StatusCode);
+        var summary = (await run.Content.ReadFromJsonAsync<WalletChargeRunSummary>())!;
+        var item = Assert.Single(summary.Items, row => row.TenantId == provisioned.Id);
+        Assert.Equal(("Charged", -10m, 90m), (item.Outcome, item.Amount, item.BalanceAfter));
+        Assert.True(summary.Charged >= 1);
+
+        var wallet = (await admin.GetFromJsonAsync<WalletDetail>($"{Wallets}/{provisioned.Id}"))!;
+        Assert.Equal(90m, wallet.Balance);
+        Assert.Equal(dueAt.AddMonths(1).ToUnixTimeSeconds(), wallet.NextChargeAtUtc.ToUnixTimeSeconds());
+        var ledger = (await admin.GetFromJsonAsync<Paged<WalletTransactionItem>>($"{Wallets}/{provisioned.Id}/transactions?kind=Subscription"))!;
+        var charge = Assert.Single(ledger.Items);
+        Assert.Equal((-10m, 90m), (charge.Amount, charge.BalanceAfter));
+        Assert.StartsWith($"SUB-{item.Period}-T", charge.Reference, StringComparison.Ordinal);   // SUB-<period>-<plan code>
+        Assert.Null(charge.ByUserId);   // a system movement
+
+        var again = (await (await admin.PostAsync($"{Wallets}/charge-run", null)).Content.ReadFromJsonAsync<WalletChargeRunSummary>())!;
+        Assert.DoesNotContain(again.Items, row => row.TenantId == provisioned.Id);   // same period: not due any more
+        Assert.Single((await admin.GetFromJsonAsync<Paged<WalletTransactionItem>>($"{Wallets}/{provisioned.Id}/transactions?kind=Subscription"))!.Items);
+
+        // tenancy.* is platform-only: a laboratory principal never runs the charges.
+        var (labUser, _, _) = await factory.SeedUserAsync(tenantId: provisioned.Id, permissions: ["tenancy.manage"]);
+        var refused = await (await SignedInClientAsync(labUser)).PostAsync($"{Wallets}/charge-run", null);
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+    }
+
+    [DatabaseFact]
     public async Task Sessions_templates_and_the_code_import_follow_their_rules()
     {
         var admin = await AdminClientAsync();
@@ -310,8 +355,7 @@ public sealed class PlatformAdminFlowTests(ApiFactory factory) : IClassFixture<A
 
     private async Task<Place> CreatePlaceAsync(HttpClient admin)
     {
-        var n = Interlocked.Increment(ref _isoCounter);
-        var iso = $"X{(char)('A' + (n % 26))}";
+        var iso = TestCountryCodes.Next();
         var country = await admin.PostAsJsonAsync(Countries, new CountryRequest("Testland " + iso, "أرض الاختبار", iso, "+20", "Pound", "EGP", "ar", "Africa/Cairo", 10, null, null));
         Assert.Equal(HttpStatusCode.Created, country.StatusCode);
         var countryId = (await country.Content.ReadFromJsonAsync<CreatedResource>())!.Id;

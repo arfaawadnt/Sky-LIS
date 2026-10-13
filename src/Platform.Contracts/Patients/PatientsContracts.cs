@@ -150,8 +150,11 @@ public sealed record SimilarPatientsResponse(bool WarningEnabled, IReadOnlyList<
 /// <summary>A patient condition a file may carry, as the patient screens show and offer it (<c>GET /api/v1/patients/conditions</c>, round 2 R2-04).</summary>
 public sealed record PatientConditionOption(Guid Id, string NameEn, string NameAr);
 
-/// <summary>The tenant parameters a patient form honours (CP-57).</summary>
-public sealed record PatientFormSettings(bool MandatoryMobile, bool MandatoryNationalId, bool SimilarNameWarning);
+/// <summary>
+/// The tenant parameters a patient form honours (CP-57) and the laboratory's country (<paramref name="CountryCode"/> ISO, with its national
+/// mobile length): the mobile country the form opens on (validation v0.5.0 F-08); null when the laboratory names none.
+/// </summary>
+public sealed record PatientFormSettings(bool MandatoryMobile, bool MandatoryNationalId, bool SimilarNameWarning, string? CountryCode = null, int? CountryMobileLength = null);
 
 /// <summary>
 /// The summary other modules read through <c>IPatientLookup</c> (Registration, Results): unmasked (the consumer

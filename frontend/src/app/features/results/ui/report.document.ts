@@ -4,15 +4,18 @@ import type { LaboratoryReportDocument, ReportLine, ReportSection } from '../../
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { DocumentFrameComponent } from '../../../shared/print/document-frame.component';
 import { QrCodeComponent } from '../../../shared/print/qr-code.component';
-import { ageText, flagSymbol, formatDateTime, pickName } from './result-format';
+import type { DocumentTexts } from '../../../shared/print/document-texts';
+import type { ReportTemplateImageUrls } from '../../../shared/print/report-template-images';
+import { ageText, flagSymbol, formatPrintDateTime, pickName } from './result-format';
 
 /**
  * The laboratory report of one report unit (A4; SRS CP-13/CP-19, LDM §5.7, BR-09/BR-20): letterhead, patient and
  * visit header, samples, the results by profile banner with unit, reference range and flag, culture isolates with
  * their sensitivity table, formatted paragraphs, the comments, the verifier's electronic signature, the QR code
  * with the accession, the preliminary marker (`printUnverified`), the amendment count, the print-list number and
- * the reprint count. Rendered by `PrintService` from the DTO of `GET …/report-units/{key}/documents/report`.
- * The document language follows the report (`doc.language`), not the screen.
+ * the reprint count; the template's logo and signature images when `images` carries them. Rendered by
+ * `PrintService` from the DTO of `GET …/report-units/{key}/documents/report`. The document language follows the report (`doc.language`) through
+ * `texts`, not the screen; its numbers and dates keep Latin digits.
  */
 @Component({
   selector: 'app-results-report-document',
@@ -30,8 +33,13 @@ import { ageText, flagSymbol, formatDateTime, pickName } from './result-format';
         [subtitle]="subtitle()"
         [printedBy]="doc().generatedBy"
         [printedAt]="at(doc().generatedAtUtc)"
+        [texts]="texts()"
       >
-        <img documentLogo src="/brand/sky-lis-logo.png" alt="" height="36" />
+        @if (images()?.logoUrl; as logoUrl) {
+          <img documentLogo class="template-logo" [src]="logoUrl" alt="" />
+        } @else {
+          <img documentLogo src="/brand/sky-lis-logo.png" alt="" height="36" />
+        }
         @if (doc().isPreview) {
           <p class="banner">{{ t('results.report.preview') }}</p>
         }
@@ -179,6 +187,9 @@ import { ageText, flagSymbol, formatDateTime, pickName } from './result-format';
         <div class="signature">
           <div>
             @if (doc().signature.verifiedByName; as verifier) {
+              @if (signatureUrl(); as signatureUrl) {
+                <img class="template-signature" [src]="signatureUrl" alt="" />
+              }
               <b>{{ verifier }}</b>
               <div class="muted small">{{ t('results.report.verifiedBy') }} · {{ at(doc().signature.verifiedAtUtc) }} · {{ t('results.report.eSignature') }}</div>
             } @else {
@@ -187,10 +198,10 @@ import { ageText, flagSymbol, formatDateTime, pickName } from './result-format';
           </div>
           <div class="muted small">
             @if (doc().amendmentCount > 0) {
-              <div>{{ tf('results.report.amended', { count: doc().amendmentCount }) }}</div>
+              <div>{{ tc('results.report.amended', doc().amendmentCount) }}</div>
             }
             @if (doc().printCount > 1) {
-              <div>{{ tf('results.report.reprint', { count: doc().printCount }) }}</div>
+              <div>{{ tc('results.report.reprint', doc().printCount) }}</div>
             }
             @if (doc().printListNumber; as list) {
               <div>{{ t('results.report.printList') }}: <span class="mono">{{ list }}</span></div>
@@ -296,6 +307,20 @@ import { ageText, flagSymbol, formatDateTime, pickName } from './result-format';
       page-break-inside: avoid;
     }
 
+    .template-logo {
+      max-width: 160px;
+      max-height: 56px;
+      object-fit: contain;
+    }
+
+    .template-signature {
+      display: block;
+      max-width: 180px;
+      max-height: 60px;
+      margin-bottom: 2px;
+      object-fit: contain;
+    }
+
     .mono {
       font-family: 'Cascadia Mono', Consolas, monospace;
     }
@@ -315,7 +340,23 @@ export class ReportDocumentComponent {
 
   readonly doc = input.required<LaboratoryReportDocument>();
 
-  protected readonly lang = computed(() => (this.doc().language === 'ar' ? 'ar' : 'en'));
+  /**
+   * The template's logo and signature as object URLs (`ReportTemplateImageLoader`, validation F-02): the logo replaces
+   * the Sky LIS mark in the letterhead; the signature image is printed above the verifier's name on a verified, final
+   * report only (never on a preliminary one).
+   */
+  readonly images = input<ReportTemplateImageUrls | null>(null);
+
+  protected readonly signatureUrl = computed(() => (this.doc().isPreliminary ? null : (this.images()?.signatureUrl ?? null)));
+
+  /**
+   * The report's texts in its own language (`doc.language`: the result-language parameter, or the template's language),
+   * loaded by the caller (`DocumentTextsLoader`; validation v0.5.0 F-12). Captions, frame language and direction all
+   * follow them; without them the whole document follows the screen, so the two never mix.
+   */
+  readonly texts = input<DocumentTexts | null>(null);
+
+  protected readonly lang = computed(() => this.texts()?.lang ?? this.i18n.lang());
 
   protected readonly dir = computed(() => (this.lang() === 'ar' ? 'rtl' : 'ltr'));
 
@@ -337,7 +378,10 @@ export class ReportDocumentComponent {
     return picked === '—' ? null : picked;
   });
 
-  protected readonly patientName = computed(() => pickName(this.doc().patient.fullName, this.doc().patient.nameAr, this.lang()));
+  /** A VIP patient previewed without the See-VIP right reads "VIP patient" (F-06; such a report does not print, RES-056). */
+  protected readonly patientName = computed(() =>
+    this.doc().patient.isMasked === true ? this.t('results.vipMasked') : pickName(this.doc().patient.fullName, this.doc().patient.nameAr, this.lang()),
+  );
 
   protected readonly age = computed(() => {
     const patient = this.doc().patient;
@@ -371,15 +415,20 @@ export class ReportDocumentComponent {
   }
 
   protected at(value: string | null | undefined): string {
-    return formatDateTime(value, this.lang());
+    return formatPrintDateTime(value, this.lang());
   }
 
   /** The texts of the document follow the report language (a laboratory prints Arabic reports from an English screen). */
   protected t(key: string): string {
-    return this.i18n.t(key);
+    return this.texts()?.t(key) ?? this.i18n.t(key);
   }
 
   protected tf(key: string, params: Readonly<Record<string, string | number>>): string {
-    return this.i18n.tf(key, params);
+    return this.texts()?.tf(key, params) ?? this.i18n.tf(key, params);
+  }
+
+  /** A counted sentence in its form (one, two, 3–10, 11+; F-11), the number in Latin digits like every printed figure. */
+  protected tc(key: string, count: number): string {
+    return this.texts()?.tc(key, count) ?? this.i18n.tc(key, count, { count: String(count) });
   }
 }

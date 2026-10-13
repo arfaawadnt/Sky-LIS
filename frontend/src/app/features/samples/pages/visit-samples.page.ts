@@ -105,7 +105,7 @@ export class VisitSamplesPage {
   protected async printOne(row: SampleListItem): Promise<void> {
     const number = await this.facade.printOne.execute(row.id);
     if (number !== null) {
-      this.toast.success(this.i18n.tf('samples.labels.printed', { count: 1 }));
+      this.toast.success(this.i18n.tc('samples.labels.printed', 1));
     }
   }
 
@@ -117,7 +117,7 @@ export class VisitSamplesPage {
 
     const count = await this.facade.printAll.execute(visit.visitId);
     if (count !== null) {
-      this.toast.success(this.i18n.tf('samples.labels.printed', { count }));
+      this.toast.success(this.i18n.tc('samples.labels.printed', count));
     }
   }
 

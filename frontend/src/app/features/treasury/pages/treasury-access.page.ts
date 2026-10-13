@@ -22,7 +22,12 @@ import { PaginatorComponent } from '../../../shared/ui/paginator/paginator.compo
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
+import { csvFileName, downloadCsv, toCsv } from '../data/csv-export';
 import { TreasuryAccessFacade } from '../state/treasury-access.facade';
+import { TreasuryExportButtonComponent } from '../ui/export-button.component';
+
+/** Refused by the server when the treasury is outside the user's branches (O-4); shown under the treasury field. */
+const OUTSIDE_USER_BRANCHES = 'TRS-015';
 
 /**
  * Treasury access (SRS CP-29): request access from this device, and decide on requests. The reference page of the
@@ -46,6 +51,7 @@ import { TreasuryAccessFacade } from '../state/treasury-access.facade';
     BadgeComponent,
     FormFieldComponent,
     IconComponent,
+    TreasuryExportButtonComponent,
   ],
   templateUrl: './treasury-access.page.html',
   styleUrl: './treasury-access.page.css',
@@ -66,9 +72,25 @@ export class TreasuryAccessPage {
     { key: 'requestedByName', header: 'treasury.requestedBy' },
     { key: 'device', header: 'treasury.device', value: (row) => row.deviceLabel ?? row.deviceId, secondary: true },
     { key: 'status', header: 'treasury.status', width: '120px' },
-    // the decision: who and when (UAT-ADM-07 expects the approver name and time on the row); the reason stays in the audit trail until the list carries it
+    // the decision: who and when (UAT-ADM-07 expects the approver name and time on the row)
     { key: 'decidedByName', header: 'treasury.decidedBy', secondary: true, value: (row) => this.decision(row) },
+    // D-05: the approval comment and the reason of a rejection, revocation or cancellation, for the requester and the approver
+    { key: 'note', header: 'treasury.note', value: (row) => this.note(row) },
   ];
+
+  /** "Comment: … · Reason: …" (either part only when present). */
+  protected note(row: TreasuryAccessRequestListItem): string {
+    const parts: string[] = [];
+    if (row.approvalComment) {
+      parts.push(this.i18n.tf('treasury.noteComment', { text: row.approvalComment }));
+    }
+
+    if (row.decisionReason) {
+      parts.push(this.i18n.tf('treasury.noteReason', { text: row.decisionReason }));
+    }
+
+    return parts.join(' · ');
+  }
 
   private decision(row: TreasuryAccessRequestListItem): string {
     if (row.decidedByName === null) {
@@ -119,16 +141,61 @@ export class TreasuryAccessPage {
     if (created !== null) {
       this.form.controls.treasuryId.reset();
       this.toast.success(this.i18n.t('treasury.requested'));
-    }
-  }
-
-  protected async approve(item: TreasuryAccessRequestListItem): Promise<void> {
-    const confirmed = await this.confirm.confirm({ title: this.i18n.t('treasury.approve'), message: this.i18n.tf('treasury.confirmApprove', { number: item.number }) });
-    if (!confirmed) {
       return;
     }
 
-    if ((await this.facade.approve.execute({ id: item.id, comment: null })) !== null) {
+    if (this.facade.request.problem()?.code === OUTSIDE_USER_BRANCHES) {
+      // O-4: a field error, under the treasury the server refused
+      const control = this.form.controls.treasuryId;
+      control.setErrors({ server: this.problemText(OUTSIDE_USER_BRANCHES) });
+      control.markAsTouched();
+    }
+  }
+
+  /** The banner of the request form; TRS-015 is shown under the treasury field instead. */
+  protected readonly requestProblem = computed(() => {
+    const problem = this.facade.request.problem();
+    return problem === null || problem.code === OUTSIDE_USER_BRANCHES ? null : problem;
+  });
+
+  /** CSV of the requests of the current filter, with the approval comments and the decision reasons (D-05). */
+  protected readonly exportCsv = async (): Promise<void> => {
+    const rows = await this.facade.allRequests();
+    const t = (key: string): string => this.i18n.t(`treasury.${key}`);
+    const when = (value: string | null): string => (value === null ? '' : formatDateTime(value, this.i18n.lang()));
+    downloadCsv(
+      csvFileName('treasury-access-requests'),
+      toCsv(rows, [
+        { header: t('number'), value: (row) => row.number },
+        { header: t('treasury'), value: (row) => this.treasuryName(row) },
+        { header: t('requestedBy'), value: (row) => row.requestedByName },
+        { header: t('csv.deviceLabel'), value: (row) => row.deviceLabel },
+        { header: t('csv.deviceId'), value: (row) => row.deviceId },
+        { header: t('status'), value: (row) => this.statusLabel(row.status) },
+        { header: t('csv.requestedAt'), value: (row) => when(row.requestedAtUtc) },
+        { header: t('decidedBy'), value: (row) => row.decidedByName },
+        { header: t('csv.decidedAt'), value: (row) => when(row.decidedAtUtc) },
+        { header: t('csv.approvalComment'), value: (row) => row.approvalComment },
+        { header: t('csv.decisionReason'), value: (row) => row.decisionReason },
+      ]),
+    );
+  };
+
+  /** T2 with the optional comment of the approval (D-05); the dialog's empty answer approves without one. */
+  protected async approve(item: TreasuryAccessRequestListItem): Promise<void> {
+    const comment = await this.confirm.promptReason({
+      title: this.i18n.t('treasury.approve'),
+      message: this.i18n.tf('treasury.confirmApprove', { number: item.number }),
+      label: this.i18n.t('treasury.approvalComment'),
+      confirmLabel: this.i18n.t('treasury.approve'),
+      required: false,
+      maxLength: 1000,
+    });
+    if (comment === null) {
+      return;
+    }
+
+    if ((await this.facade.approve.execute({ id: item.id, comment: comment === '' ? null : comment })) !== null) {
       this.toast.success(this.i18n.t('treasury.approved'));
     }
   }

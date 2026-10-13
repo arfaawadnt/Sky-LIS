@@ -1,4 +1,5 @@
 import type { PatientAge, PatientDetail, PatientGender, PatientListItem, PatientSummary, PatientTitle, SimilarPatient } from '../../core/api/patients.contracts';
+import { countKey } from '../../core/i18n/count-text';
 
 /**
  * Pure helpers of the patient form and picker, mirroring the server's rules so the screen agrees with the aggregate:
@@ -123,7 +124,8 @@ export function normalizeMobile(value: string | null | undefined): string {
 
 /**
  * True when the mobile is acceptable: optional `+` and 8–15 digits; with a local `countryLength` (from the platform
- * country list) a number without `+` must have exactly that many digits.
+ * country list, the national digits without the trunk prefix) a number without `+` is the national form (`1012345678`,
+ * not starting with 0) or the same with the trunk 0 (`01012345678`), as the server's country rule reads it (A-09).
  */
 export function isValidMobile(value: string, countryLength: number | null = null): boolean {
   const normalized = normalizeMobile(value);
@@ -134,10 +136,30 @@ export function isValidMobile(value: string, countryLength: number | null = null
   }
 
   if (!international && countryLength !== null && countryLength > 0) {
-    return digits.length === countryLength;
+    return nationalDigits(digits, countryLength) !== null;
   }
 
   return digits.length >= MOBILE_MIN_DIGITS && digits.length <= MOBILE_MAX_DIGITS;
+}
+
+/**
+ * The mobile as the patient file stores it: `normalizeMobile`, and with a local `countryLength` the trunk form
+ * (`01012345678`) whether the clerk typed the trunk 0 or not, so one number is stored one way (remaining point A-09).
+ */
+export function mobileForStorage(value: string, countryLength: number | null = null): string {
+  const normalized = normalizeMobile(value);
+  if (normalized.startsWith('+') || countryLength === null || countryLength <= 0) {
+    return normalized;
+  }
+
+  const national = nationalDigits(normalized, countryLength);
+  return national === null ? normalized : `0${national}`;
+}
+
+/** The national digits of a local number: `length` digits not starting with 0, optionally after the trunk 0. */
+function nationalDigits(digits: string, length: number): string | null {
+  const national = digits.length === length + 1 && digits.startsWith('0') ? digits.slice(1) : digits;
+  return /^\d+$/.test(national) && national.length === length && !national.startsWith('0') ? national : null;
 }
 
 /** "36 y 5 m" style text from the dictionary (`<prefix>.age.years|months|days`), largest units first, at most two. */
@@ -164,8 +186,10 @@ export function localDigits(value: number, language: string): string {
 }
 
 /**
- * The age text of the patient screens ("52 y", "٥٢ سنة"): {@link ageParts} through the `patients.age.<unit>` dictionary
- * entries, with the numbers in the language's digits (validation R-02: Arabic pages showed "52 سنة").
+ * The age text of the patient screens ("52 y", "٥٢ سنة", "٥ سنوات"): {@link ageParts} through the `patients.age.<unit>`
+ * dictionary entries in their counted form (`count-text.ts`: Arabic dual, 3–10 plural, 11+ singular; validation v0.5.0
+ * F-11), with the numbers in the language's digits (validation R-02: Arabic pages showed "52 سنة"). A missing form falls
+ * back to the base entry.
  */
 export function ageText(
   age: PatientAge,
@@ -173,7 +197,13 @@ export function ageText(
   translate: (key: string, params: Readonly<Record<string, string | number>>) => string,
 ): string {
   return ageParts(age)
-    .map((part) => translate(`patients.age.${part.unit}`, { value: localDigits(part.value, language) }))
+    .map((part) => {
+      const params = { value: localDigits(part.value, language) };
+      const base = `patients.age.${part.unit}`;
+      const key = countKey(base, part.value, language === 'ar' ? 'ar' : 'en');
+      const text = translate(key, params);
+      return key !== base && text === key ? translate(base, params) : text;
+    })
     .join(' ');
 }
 

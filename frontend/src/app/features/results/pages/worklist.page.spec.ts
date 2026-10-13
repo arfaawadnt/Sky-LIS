@@ -1,3 +1,4 @@
+import resultsAr from '../../../../../public/i18n/results.ar.json';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
@@ -6,6 +7,7 @@ import { provideRouter } from '@angular/router';
 
 import { RESULTS_API } from '../../../core/api/results.contracts';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { ResultsPrinter } from '../state/results-printer';
 import { WorklistFacade } from '../state/worklist.facade';
@@ -56,7 +58,7 @@ describe('WorklistPage (CP-18)', () => {
     await render();
     backend
       .expectOne((request) => request.url === RESULTS_API.worklist)
-      .flush(worklistPage([worklistItem(), worklistItem({ resultId: 'res-2', accession: 'ACC-2026-00002', visitId: 'visit-2', tubeId: 'tube-2', delayState: 'Late', delaySeconds: 7200, consumedPercent: 130, status: 'Complete' })]));
+      .flush(worklistPage([worklistItem(), worklistItem({ resultId: 'res-2', accession: 'ACC-2026-00002', visitId: 'visit-2', tubeId: 'tube-2', delayState: 'Late', delaySeconds: 7200, consumedPercent: 130, status: 'Complete', patientName: 'VIP patient', patientNameAr: null, patientMasked: true })]));
     backend.expectOne((request) => request.url === RESULTS_API.clinicalGroups).flush([{ id: 'grp-1', code: 'CHEM', nameEn: 'Chemistry', nameAr: 'الكيمياء' }]);
     backend.expectOne((request) => request.url === RESULTS_API.tests).flush([]);
     backend.expectOne((request) => request.url === RESULTS_API.payers).flush([]);
@@ -75,6 +77,9 @@ describe('WorklistPage (CP-18)', () => {
     expect(rows.length).toBe(2);
     expect(rows[1]?.classList.contains('delay-late')).toBe(true);
     expect(rows[0]?.classList.contains('delay-late')).toBe(false);
+    // A-03 on CP-18: a VIP row masked by the server reads the dictionary's "VIP patient"
+    expect(rows[1]?.textContent).toContain('results.vipMasked');
+    expect(rows[0]?.textContent).not.toContain('results.vipMasked');
     expect(host.querySelectorAll('app-stat-card').length).toBe(4);
     expect(host.textContent).toContain('results.worklist.delayed');
     const link = rows[0]?.querySelector<HTMLAnchorElement>('a.link');
@@ -117,5 +122,50 @@ describe('WorklistPage (CP-18)', () => {
     await render();
     expect(printer.printed).toEqual(['worklist:1']);
     backend.verify();
+  });
+
+  it('F-09 / F-15: on an Arabic page the counters, ages, shares and thresholds read Arabic-Indic digits; the counter is the late count of the server', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) => new Response(JSON.stringify(String(input) === '/i18n/results.ar.json' ? resultsAr : {}), { status: 200 }));
+    granted = new Set(['results.view']);
+    await TestBed.configureTestingModule({
+      imports: [WorklistPage],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        provideHttpClient(withInterceptors([problemDetailsInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+        { provide: ResultsPrinter, useValue: new PrinterStub() },
+        WorklistFacade,
+      ],
+    }).compileComponents();
+    const i18n = TestBed.inject(I18nService);
+    i18n.setLanguage('ar');
+    await i18n.load('results');
+    fixture = TestBed.createComponent(WorklistPage);
+    backend = TestBed.inject(HttpTestingController);
+    host = fixture.nativeElement as HTMLElement;
+    await render();
+    // the thresholds are 1 % / 2 %: two rows past 2 % are Late, and the server counts them as Delayed (F-15)
+    const late = { delayState: 'Late' as const, consumedPercent: 2 };
+    backend
+      .expectOne((request) => request.url === RESULTS_API.worklist)
+      .flush(worklistPage([worklistItem(late), worklistItem({ ...late, resultId: 'res-2', consumedPercent: 40 })], { warnPercent: 1, latePercent: 2 }));
+    backend.expectOne((request) => request.url === RESULTS_API.clinicalGroups).flush([]);
+    backend.expectOne((request) => request.url === RESULTS_API.tests).flush([]);
+    backend.expectOne((request) => request.url === RESULTS_API.payers).flush([]);
+    backend.expectOne((request) => request.url === RESULTS_API.analysers).flush([]);
+    await render();
+
+    const cards = [...host.querySelectorAll('app-stat-card')].map((card) => card.textContent ?? '');
+    expect(cards[3]).toContain('٢');
+    const rows = host.querySelectorAll<HTMLTableRowElement>('tbody tr[data-row]');
+    expect([...rows].every((row) => row.classList.contains('delay-late'))).toBe(true);
+    expect(rows[1]?.textContent).toContain('٤٠٪');
+    expect(rows[0]?.textContent).toContain('٣٦');
+    const text = host.textContent ?? '';
+    expect(text).toContain('≥ ٢٪ (متأخر)');
+    expect(text).not.toMatch(/\d+%/);
+    i18n.setLanguage('en');
   });
 });

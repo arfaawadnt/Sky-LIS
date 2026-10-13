@@ -67,10 +67,11 @@ public sealed class GetWorklistHandler(IResultRepository results, IResultAnalyse
             return new WorklistPage([], page.Page, page.PageSize, 0, new WorklistCounters(0, 0, 0, 0), warn, late);
         }
 
-        var filter = await Worklists.FilterAsync(query, analysers, user, cancellationToken);
+        var canSeeVip = privileges.SpecialRights.CanSeeVip;
+        var filter = await Worklists.FilterAsync(query, analysers, user, canSeeVip, late, cancellationToken);
         var now = clock.UtcNow;
         var slice = await results.WorklistAsync(filter, visibility, page, now, cancellationToken);
-        var items = slice.Rows.Select(row => Worklists.Item(row, now, warn, late)).ToList();
+        var items = slice.Rows.Select(row => Worklists.Item(row, now, warn, late, canSeeVip)).ToList();
         return new WorklistPage(items, page.Page, page.PageSize, slice.TotalCount, new WorklistCounters(slice.Requests, slice.TotalCount, slice.Samples, slice.Delayed), warn, late);
     }
 }
@@ -102,7 +103,8 @@ public sealed class GetWorklistDocumentHandler(
         var warn = await settings.GetAsync(SettingKeys.DelayWarnPercent, cancellationToken);
         var late = await settings.GetAsync(SettingKeys.DelayLatePercent, cancellationToken);
         var visibility = ResultRights.VisibilityOf(privileges);
-        var filter = await Worklists.FilterAsync(query.Filter, analysers, user, cancellationToken);
+        var canSeeVip = privileges.SpecialRights.CanSeeVip;
+        var filter = await Worklists.FilterAsync(query.Filter, analysers, user, canSeeVip, late, cancellationToken);
         var now = clock.UtcNow;
         var rows = new List<WorklistItem>();
         long total = 0;
@@ -110,7 +112,7 @@ public sealed class GetWorklistDocumentHandler(
         {
             var slice = await results.WorklistAsync(filter, visibility, PageRequest.Normalized(pageNumber, PageRequest.MaxPageSize), now, cancellationToken);
             total = slice.TotalCount;
-            rows.AddRange(slice.Rows.Select(row => Worklists.Item(row, now, warn, late)));
+            rows.AddRange(slice.Rows.Select(row => Worklists.Item(row, now, warn, late, canSeeVip)));
             if (slice.Rows.Count < PageRequest.MaxPageSize)
             {
                 break;
@@ -124,10 +126,18 @@ public sealed class GetWorklistDocumentHandler(
     }
 }
 
-/// <summary>Worklist filter and row mapping (BR-13 delay and colour).</summary>
+/// <summary>
+/// Worklist filter and row mapping (BR-13 delay and colour: one definition of "late" for the colour, the Delayed counter
+/// and "Delayed only", <see cref="TurnaroundClock.IsLate"/>, validation F-15). VIP rule A-03 (assumption awaiting the business owner, PAT
+/// and REG intakes): without the See-VIP special right a VIP patient's name reads "VIP patient" and a name search does not
+/// find the file; the accession, sample number and patient number still do.
+/// </summary>
 internal static class Worklists
 {
-    public static async Task<WorklistFilter> FilterAsync(GetWorklistQuery query, IResultAnalyserDirectory analysers, ICurrentUser user, CancellationToken cancellationToken)
+    /// <summary>The name of a masked VIP row (the clients show their own "VIP patient" text from <c>PatientMasked</c>).</summary>
+    public const string MaskedName = "VIP patient";
+
+    public static async Task<WorklistFilter> FilterAsync(GetWorklistQuery query, IResultAnalyserDirectory analysers, ICurrentUser user, bool canSeeVip, int latePercent, CancellationToken cancellationToken)
     {
         var analyserTests = query.AnalyserId is { } analyserId ? await analysers.MappedTestIdsAsync(analyserId, cancellationToken) : null;
         return new WorklistFilter(
@@ -142,11 +152,14 @@ internal static class Worklists
             query.DelayedOnly,
             string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim(),
             query.BranchOnly ? user.BranchId : null,
-            ListSort.Of(query.Sort, query.Direction));
+            ListSort.Of(query.Sort, query.Direction),
+            canSeeVip,
+            latePercent);
     }
 
-    public static WorklistItem Item(WorklistRow row, DateTimeOffset nowUtc, int warnPercent, int latePercent)
+    public static WorklistItem Item(WorklistRow row, DateTimeOffset nowUtc, int warnPercent, int latePercent, bool canSeeVip)
     {
+        var masked = row.IsVip && !canSeeVip;
         var done = ResultStatuses.IsSigned(row.Status);
         var end = done ? row.VerifiedAtUtc ?? nowUtc : nowUtc;
         var consumed = TurnaroundClock.ConsumedPercent(row.ClockStartUtc, row.ExpectedAtUtc, end);
@@ -159,8 +172,8 @@ internal static class Worklists
             row.Accession,
             row.PatientId,
             row.PatientNumber,
-            row.PatientName,
-            row.PatientNameAr,
+            masked ? MaskedName : row.PatientName,
+            masked ? null : row.PatientNameAr,
             row.Gender?.ToString(),
             age,
             row.TestId,
@@ -183,6 +196,7 @@ internal static class Worklists
             row.TextValue,
             row.Flag?.ToString(),
             row.PrintCount > 0,
-            row.Source.ToString());
+            row.Source.ToString(),
+            masked);
     }
 }

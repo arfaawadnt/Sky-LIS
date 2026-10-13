@@ -77,7 +77,8 @@
         "Release",
         "--no-build",
         "--",
-        "--Kestrel:Endpoints:Http:Url=http://127.0.0.1:5102"
+        "--Kestrel:Endpoints:Http:Url=http://127.0.0.1:5102",
+        "--Lis:Notifications:PickupDirectory=E:\\LIS\\.local\\mail-pickup\\validation"
       ],
       "port": 5102
     },

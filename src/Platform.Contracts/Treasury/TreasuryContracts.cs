@@ -19,7 +19,11 @@ public sealed record RevokeTreasuryAccessRequest(string Reason);
 
 public sealed record CancelTreasuryAccessRequest(string? Reason);
 
-/// <summary>Status names as stored and filtered: Pending, Approved, Rejected, Revoked, Cancelled.</summary>
+/// <summary>
+/// Status names as stored and filtered: Pending, Approved, Rejected, Revoked, Cancelled. <see cref="DecisionReason"/> is the
+/// reason of a rejection or revocation (or the optional one of a cancellation); <see cref="ApprovalComment"/> the optional
+/// comment of the approval, kept after a revocation (validation v0.5.0 D-05).
+/// </summary>
 public sealed record TreasuryAccessRequestListItem(
     Guid Id,
     string Number,
@@ -35,7 +39,9 @@ public sealed record TreasuryAccessRequestListItem(
     string Status,
     DateTimeOffset RequestedAtUtc,
     DateTimeOffset? DecidedAtUtc,
-    string? DecidedByName);
+    string? DecidedByName,
+    string? DecisionReason,
+    string? ApprovalComment);
 
 public sealed record ApprovalView(Guid ActorUserId, string ActorName, DateTimeOffset AtUtc, string? Comment);
 

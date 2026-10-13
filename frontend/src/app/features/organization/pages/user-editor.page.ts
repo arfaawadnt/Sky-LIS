@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, linkedSignal, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRender, computed, effect, inject, input, linkedSignal, signal, untracked } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 
@@ -19,7 +19,7 @@ import { PortalService } from '../../../core/portal/portal.service';
 import { localizedPick, localizedTextGroup } from '../../../shared/forms/localized-text';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
-import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
+import { SERVER_ERROR_KEY, problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
 import { mobileValidator } from '../../../shared/forms/validators';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
@@ -35,11 +35,20 @@ import { type TabItem, TabsComponent } from '../../../shared/ui/tabs/tabs.compon
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { DEFAULT_PASSWORD_MIN_LENGTH, UserEditorFacade } from '../state/users.facade';
 import { PrivilegeMatrixComponent, sortKeys } from '../ui/privilege-matrix.component';
+import { catalogueInScope, permissionInScope, splitByScope } from './role-permission-scope';
 import { type ResetPasswordInput, ResetPasswordDialogComponent } from '../ui/reset-password-dialog.component';
 import { isDiscountCapValid, SpecialRightsFormComponent } from '../ui/special-rights-form.component';
 import { USER_STATUS_TONES } from '../ui/user-status';
 
 export type UserTab = 'profile' | 'access' | 'privileges' | 'security';
+
+/** The profile field each uniqueness refusal is about (validation LIS-VR-002 O-6): shown under that field, not in a banner. */
+export const USER_FIELD_OF_CODE: Readonly<Partial<Record<string, 'username' | 'email' | 'mobile' | 'employeeCode'>>> = {
+  'ORG-102': 'username',
+  'ORG-103': 'email',
+  'ORG-104': 'mobile',
+  'ORG-105': 'employeeCode',
+};
 
 const TABS: readonly UserTab[] = ['profile', 'access', 'privileges', 'security'];
 
@@ -112,6 +121,8 @@ export class UserEditorPage {
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   protected readonly isPlatform = inject(PortalService).isPlatform;
 
   /** Route parameter (`withComponentInputBinding`); absent on the "new" route. */
@@ -160,6 +171,8 @@ export class UserEditorPage {
   });
 
   protected readonly passwordMismatch = signal(false);
+  /** A save refused by the form itself: the profile says so, as the drawer editors do (LIS-VR-002 round 4). */
+  protected readonly blocked = signal(false);
 
   /** Access tab: the role picked and the branch assignment (empty set + all = every active branch). */
   protected readonly roleChoice = linkedSignal(() => this.user()?.roleId ?? '');
@@ -175,7 +188,17 @@ export class UserEditorPage {
   protected readonly added = computed(() => sortKeys([...this.overrideKeys()].filter((key) => !this.baseline().has(key))));
   protected readonly removed = computed(() => sortKeys([...this.baseline()].filter((key) => !this.overrideKeys().has(key))));
 
-  protected readonly catalogue = computed(() => (this.facade.catalogue.hasValue() ? this.facade.catalogue.value() : { modules: [], actions: [] }));
+  /**
+   * O-7: the matrix offers the modules of the delivered release only (as the role editor). The selection and the role's
+   * keys it is compared with are cut to those modules; the user's overrides on hidden (Release 2) modules stay in
+   * `overrideKeys` and so in every save, never dropped.
+   */
+  protected readonly catalogue = computed(() => catalogueInScope(this.facade.catalogue.hasValue() ? this.facade.catalogue.value() : { modules: [], actions: [] }));
+  protected readonly shownOverrideKeys = computed(() => splitByScope(this.overrideKeys()).shown);
+  protected readonly shownBaseline = computed(() => splitByScope(this.baseline()).shown);
+  protected readonly shownAdded = computed(() => this.added().filter((key) => permissionInScope(key)));
+  protected readonly shownRemoved = computed(() => this.removed().filter((key) => permissionInScope(key)));
+  protected readonly keptOverrideCount = computed(() => this.added().length + this.removed().length - this.shownAdded().length - this.shownRemoved().length);
   protected readonly roles = computed(() => (this.facade.roles.hasValue() ? this.facade.roles.value() : []));
   protected readonly branches = computed(() => (this.facade.branches.hasValue() ? this.facade.branches.value() : []));
 
@@ -189,10 +212,11 @@ export class UserEditorPage {
     { label: this.title(), path: null },
   ]);
 
+  /** The banner: every refusal but a uniqueness one, which is shown under its field (O-6). */
   protected readonly problem = computed<ProblemDetails | null>(
     () =>
-      this.facade.create.problem() ??
-      this.facade.update.problem() ??
+      this.bannerOf(this.facade.create.problem()) ??
+      this.bannerOf(this.facade.update.problem()) ??
       this.facade.assignRole.problem() ??
       this.facade.assignBranches.problem() ??
       this.facade.setOverrides.problem() ??
@@ -274,9 +298,17 @@ export class UserEditorPage {
   }
 
   protected async saveProfile(): Promise<void> {
-    if (!this.canEditProfile() || !markAllTouched(this.form)) {
+    if (!this.canEditProfile()) {
       return;
     }
+
+    if (!markAllTouched(this.form)) {
+      this.blocked.set(true);
+      this.focusFirstInvalid();
+      return;
+    }
+
+    this.blocked.set(false);
 
     const value = this.form.getRawValue();
     const common = {
@@ -314,7 +346,7 @@ export class UserEditorPage {
         preferredLanguage: value.language,
       });
       if (created === null) {
-        problemToFormErrors(this.facade.create.problem(), this.form);
+        this.applyProfileProblem(this.facade.create.problem());
         return;
       }
 
@@ -324,7 +356,7 @@ export class UserEditorPage {
     }
 
     if ((await this.facade.update.execute({ ...common, preferredLanguage: value.language })) === null) {
-      problemToFormErrors(this.facade.update.problem(), this.form);
+      this.applyProfileProblem(this.facade.update.problem());
       return;
     }
 
@@ -398,8 +430,9 @@ export class UserEditorPage {
     }
   }
 
+  /** A change of the matrix (the shown keys): the effective keys of hidden modules stay as they are. */
   protected setOverrideKeys(keys: readonly string[]): void {
-    this.overrideKeys.set(new Set(keys));
+    this.overrideKeys.set(new Set([...keys, ...splitByScope(this.overrideKeys()).kept]));
   }
 
   protected onUseRoleSpecialRights(event: Event): void {
@@ -455,6 +488,38 @@ export class UserEditorPage {
   protected openReset(): void {
     this.facade.resetPassword.reset();
     this.resetOpen.set(true);
+  }
+
+  private bannerOf(problem: ProblemDetails | null): ProblemDetails | null {
+    return problem !== null && USER_FIELD_OF_CODE[problem.code] !== undefined ? null : problem;
+  }
+
+  /** A refused profile save: a uniqueness refusal goes under its field (O-6), field errors under theirs; the first one takes the focus. */
+  private applyProfileProblem(problem: ProblemDetails | null): void {
+    const field = problem === null ? undefined : USER_FIELD_OF_CODE[problem.code];
+    if (problem !== null && field !== undefined) {
+      const control = this.form.controls[field];
+      control.setErrors({ ...(control.errors ?? {}), [SERVER_ERROR_KEY]: this.problemText(problem) });
+      control.markAsTouched();
+    } else {
+      problemToFormErrors(problem, this.form);
+    }
+
+    this.focusFirstInvalid(true);
+  }
+
+  /**
+   * Focuses the first invalid field of the profile in document order. A field the form itself refuses is already rendered
+   * invalid; a server error arrives with the problem signal, so its mark is focused after that render.
+   */
+  private focusFirstInvalid(afterRender = false): void {
+    const selector = ['input', 'select', 'textarea'].map((tag) => `form ${tag}.ng-invalid:not([disabled])`).join(', ');
+    const focus = (): void => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus();
+    if (afterRender) {
+      afterNextRender({ read: focus }, { injector: this.injector });
+    } else {
+      focus();
+    }
   }
 
   private selectionOf(user: UserDetail | null): ReadonlySet<string> {

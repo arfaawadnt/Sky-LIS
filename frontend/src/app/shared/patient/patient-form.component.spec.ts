@@ -52,6 +52,29 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
     return { fixture, host: fixture.nativeElement as HTMLElement };
   }
 
+  it('says why a save was blocked and focuses the first marked field (validation round 4)', async () => {
+    const { fixture, host } = await render();
+    document.body.appendChild(host);
+
+    expect(fixture.componentInstance.form().submit()).toBe(false);
+    await fixture.whenStable();
+    expect(host.querySelector('.problem.blocked[role="alert"]')?.textContent).toContain('shared.masterData.invalid');
+    expect(document.activeElement).toBe(host.querySelector('[formcontrolname="fullName"]'));
+
+    type(host, 'fullName', 'Mona');
+    await fixture.whenStable();
+    expect(fixture.componentInstance.form().submit()).toBe(false);   // date of birth or age still missing
+    await fixture.whenStable();
+    expect(document.activeElement).toBe(host.querySelector('[formcontrolname="dateOfBirth"]'));
+
+    type(host, 'ageYears', '30');
+    await fixture.whenStable();
+    expect(fixture.componentInstance.form().submit()).toBe(true);
+    await fixture.whenStable();
+    expect(host.querySelector('.problem.blocked')).toBeNull();
+    host.remove();
+  });
+
   it('lets the title propose the gender', async () => {
     const { fixture, host } = await render();
 
@@ -169,6 +192,53 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
       await rendered.fixture.whenStable();
       return rendered;
     }
+
+    it('accepts an Egyptian mobile with the trunk 0 or without it and saves both as 01xxxxxxxxx (remaining point A-09)', async () => {
+      for (const typed of ['01011140001', '1011140001']) {
+        const { fixture, host } = await renderWithLists();
+        const country = host.querySelector<HTMLSelectElement>('.mobile select')!;
+        country.value = 'EG';
+        country.dispatchEvent(new Event('change'));
+        type(host, 'fullName', 'Walk In');
+        type(host, 'ageYears', '30');
+        type(host, 'mobile', typed);
+        await fixture.whenStable();
+
+        expect(fixture.componentInstance.form().submit()).toBe(true);
+        expect(fixture.componentInstance.saved.at(-1)?.mobile).toBe('01011140001');
+        fixture.destroy();
+      }
+    });
+
+    it('F-08: opens on the laboratory country, so a 10-digit number is stored with the trunk 0 without choosing Egypt', async () => {
+      const { fixture, host } = await renderWithLists();
+      fixture.componentInstance.settings.set({ mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true, countryCode: 'EG', countryMobileLength: 10 });
+      await fixture.whenStable();
+      const country = host.querySelector<HTMLSelectElement>('.mobile select')!;
+      expect(country.value).toBe('EG');
+      type(host, 'fullName', 'Mobile Ten');
+      type(host, 'ageYears', '30');
+      type(host, 'mobile', '1019199912');
+      await fixture.whenStable();
+      expect(fixture.componentInstance.form().submit()).toBe(true);
+      expect(fixture.componentInstance.saved.at(-1)?.mobile).toBe('01019199912');
+
+      // "Any", chosen on purpose, keeps the number as typed (PAT Q14)
+      country.value = '';
+      country.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+      expect(fixture.componentInstance.form().submit()).toBe(true);
+      expect(fixture.componentInstance.saved.at(-1)?.mobile).toBe('1019199912');
+      fixture.destroy();
+    });
+
+    it('F-08: stays on "Any" when the laboratory names no country or one without a mobile length', async () => {
+      const { fixture, host } = await renderWithLists();
+      fixture.componentInstance.settings.set({ mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true, countryCode: 'KW', countryMobileLength: 8 });
+      await fixture.whenStable();
+      expect(host.querySelector<HTMLSelectElement>('.mobile select')!.value).toBe('');
+      fixture.destroy();
+    });
 
     it('fills the empty date of birth, gender and governorate', async () => {
       const { fixture, host } = await renderWithLists();

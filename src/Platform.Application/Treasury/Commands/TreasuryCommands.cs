@@ -57,14 +57,14 @@ public sealed class RenameTreasuryValidator : AbstractValidator<RenameTreasuryCo
     }
 }
 
-public sealed class RenameTreasuryHandler(ITreasuryRepository treasuries, IUnitOfWork unitOfWork) : ICommandHandler<RenameTreasuryCommand>
+public sealed class RenameTreasuryHandler(ITreasuryRepository treasuries, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<RenameTreasuryCommand>
 {
     public async Task Handle(RenameTreasuryCommand command, CancellationToken cancellationToken)
     {
         var treasury = await treasuries.GetForUpdateAsync(command.TreasuryId, cancellationToken)
             ?? throw new DomainException(TreasuryCodes.TreasuryNotFound, "Treasury not found.", DomainFault.NotFound);
 
-        treasury.Rename(new LocalizedText(command.NameEn, command.NameAr));
+        treasury.Rename(new LocalizedText(command.NameEn, command.NameAr), clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

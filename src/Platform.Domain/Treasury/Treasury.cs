@@ -52,11 +52,17 @@ public sealed class Treasury : AggregateRoot, ITenantScoped
         return treasury;
     }
 
-    /// <summary>T7 Rename (<c>treasury.manage</c>); allowed in both states.</summary>
-    public void Rename(LocalizedText name)
+    /// <summary>T7 Rename (<c>treasury.manage</c>); allowed in both states. Raises <see cref="TreasuryUpdated"/> when the name changed, so the audit trail records the edit (validation v0.5.0 O-5).</summary>
+    public void Rename(LocalizedText name, DateTimeOffset nowUtc)
     {
         ArgumentNullException.ThrowIfNull(name);
+        if (Name == name)
+        {
+            return;
+        }
+
         Name = name;
+        Raise(new TreasuryUpdated(Id, Code, nowUtc));
     }
 
     /// <summary>T8 Deactivate (<c>treasury.manage</c>). Idempotent. Open access requests are not touched; new ones are refused (TRS-010).</summary>

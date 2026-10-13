@@ -11,6 +11,7 @@ using Platform.Domain.PlatformAdmin;
 using Platform.IntegrationTests.Support;
 using Platform.SharedKernel.Localization;
 using Platform.SharedKernel.MultiTenancy;
+using Platform.TestSupport;
 
 namespace Platform.IntegrationTests;
 
@@ -29,7 +30,7 @@ public sealed class AuditClientTests(DatabaseFixture fixture)
     public async Task The_platform_log_names_the_client_of_each_entry_and_filters_by_client()
     {
         var suffix = Guid.CreateVersion7().ToString("N");
-        var iso = "X" + (char)('A' + (Math.Abs(suffix.GetHashCode(StringComparison.Ordinal)) % 26));
+        var iso = TestCountryCodes.Next();
         var country = Country.Create(new CountryData("Auditland " + iso, "أرض " + iso, iso, "+20", "Pound", "EGP", "ar", "Africa/Cairo", 10, null, null));
         var governorate = Governorate.Create(country, "Gov " + suffix[..8], "محافظة", null, null);
         var plan = Plan.Create("A" + suffix[^8..].ToUpperInvariant(), new PlanTerms(new LocalizedText("Audit plan", "باقة"), 100m, "EGP", 1, 5, 100, 1));

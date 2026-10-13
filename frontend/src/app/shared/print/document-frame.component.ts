@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 
 import { I18nService } from '../../core/i18n/i18n.service';
+import type { DocumentTexts } from './document-texts';
 
 /**
  * `<app-document-frame [labNameEn]="…" [labNameAr]="…" [branchEn]="…" [branchAr]="…" [title]="…" [printedBy]="…" [printedAt]="…">
@@ -41,10 +42,10 @@ import { I18nService } from '../../core/i18n/i18n.service';
       <div class="doc-body"><ng-content /></div>
       <footer class="doc-foot">
         @if (printedBy(); as printedBy) {
-          <span>{{ i18n.t('shared.print.printedBy') }}: {{ printedBy }}</span>
+          <span>{{ caption('shared.print.printedBy') }}: {{ printedBy }}</span>
         }
         @if (printedAt(); as printedAt) {
-          <span>{{ i18n.t('shared.print.printedAt') }}: {{ printedAt }}</span>
+          <span>{{ caption('shared.print.printedAt') }}: {{ printedAt }}</span>
         }
         <ng-content select="[documentFooter]" />
       </footer>
@@ -159,6 +160,15 @@ export class DocumentFrameComponent {
   readonly printedBy = input<string | null>(null);
   /** Already formatted for the reader. */
   readonly printedAt = input<string | null>(null);
+  /**
+   * The document's own texts when its language is not the screen's (a laboratory report follows the report language,
+   * validation v0.5.0 F-12); without them the footer captions follow the screen.
+   */
+  readonly texts = input<DocumentTexts | null>(null);
+
+  protected caption(key: string): string {
+    return this.texts()?.t(key) ?? this.i18n.t(key);
+  }
 }
 
 function present(value: string | null): string | null {

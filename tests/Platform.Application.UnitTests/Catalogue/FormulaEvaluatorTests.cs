@@ -130,4 +130,51 @@ public sealed class FormulaEvaluatorTests
         Assert.Equal(FormulaOutcome.Invalid, Evaluator.Evaluate("(-8) ^ 0.5", new Dictionary<string, decimal?>()).Outcome);
         Assert.Equal(FormulaOutcome.Invalid, Evaluator.Evaluate("1 +", new Dictionary<string, decimal?>()).Outcome);
     }
+
+    private const string Mdrd = "round(175 * [crea] ^ -1.154 * @age ^ -0.203 * if(@female, 0.742, 1), 0)";
+
+    [Fact]
+    public void Patient_variables_parse_as_variables_not_test_references()
+    {
+        var parsed = Evaluator.Parse(Mdrd);
+
+        Assert.True(parsed.IsValid);
+        Assert.Equal("ROUND(175 * [CREA] ^ -1.154 * @AGE ^ -0.203 * IF(@FEMALE, 0.742, 1), 0)", parsed.Normalized);
+        Assert.Equal(["CREA"], parsed.References);
+        Assert.Equal(parsed.Normalized, Evaluator.Parse(parsed.Normalized).Normalized);
+    }
+
+    [Theory]
+    [InlineData("@WEIGHT * 2", 1)]
+    [InlineData("[CREA] * @", 10)]
+    public void An_unknown_patient_variable_is_a_syntax_error(string expression, int position)
+    {
+        var parsed = Evaluator.Parse(expression);
+
+        Assert.False(parsed.IsValid);
+        Assert.Equal(position, parsed.Position);
+        Assert.Contains("@AGE or @FEMALE", parsed.Error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(30, 1, 53)]   // 175 × 1.2^-1.154 × 30^-0.203 × 0.742 = 52.75
+    [InlineData(45, 0, 65)]   // 175 × 1.2^-1.154 × 45^-0.203 = 65.47
+    public void MDRD_eGFR_computes_from_creatinine_age_and_sex(int age, int female, int expected)
+    {
+        var values = new Dictionary<string, decimal?> { ["CREA"] = 1.2m, [FormulaVariables.Age] = age, [FormulaVariables.Female] = female };
+
+        var result = Evaluator.Evaluate(Mdrd, values);
+
+        Assert.Equal((FormulaOutcome.Value, (decimal?)expected), (result.Outcome, result.Value));
+    }
+
+    [Fact]
+    public void An_unknown_age_or_sex_waits_like_a_missing_test_value()
+    {
+        var noAge = Evaluator.Evaluate(Mdrd, new Dictionary<string, decimal?> { ["CREA"] = 1.2m, [FormulaVariables.Age] = null, [FormulaVariables.Female] = 1m });
+        var noSex = Evaluator.Evaluate(Mdrd, new Dictionary<string, decimal?> { ["CREA"] = 1.2m, [FormulaVariables.Age] = 30m });
+
+        Assert.Equal((FormulaOutcome.MissingValue, "@AGE"), (noAge.Outcome, noAge.Detail));
+        Assert.Equal((FormulaOutcome.MissingValue, "@FEMALE"), (noSex.Outcome, noSex.Detail));
+    }
 }

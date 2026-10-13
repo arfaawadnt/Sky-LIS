@@ -8,7 +8,7 @@ import { type NotificationTemplateListItem, PLATFORM_PERMISSIONS, TEMPLATE_CHANN
 import type { ProblemDetails } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
-import { markAllTouched } from '../../../shared/forms/mark-all-touched';
+import { blockedSave } from '../../../shared/forms/blocked-save';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
@@ -118,6 +118,8 @@ export class NotificationTemplatesPage {
   protected readonly editing = signal<NotificationTemplateListItem | null>(null);
   protected readonly form = signal<TemplateForm | null>(null);
   protected readonly saveProblem = signal<ProblemDetails | null>(null);
+  /** F-03 (validation v0.5.0): a refused save says so above the form and focuses the first marked field. */
+  protected readonly blockedSave = blockedSave();
   private lastFocused: { control: TextControl; element: HTMLTextAreaElement } | null = null;
 
   /** The live values of the open form, for the preview and the subject fields. */
@@ -179,6 +181,7 @@ export class NotificationTemplatesPage {
   protected openEdit(template: NotificationTemplateListItem | null): void {
     this.editing.set(template);
     this.saveProblem.set(null);
+    this.blockedSave.reset();
     this.lastFocused = null;
     const form = this.buildForm(template);
     if (!this.canManage()) {
@@ -191,7 +194,7 @@ export class NotificationTemplatesPage {
 
   protected async save(): Promise<void> {
     const form = this.form();
-    if (form === null || this.facade.save.pending() || !markAllTouched(form)) {
+    if (form === null || form.disabled || this.facade.save.pending() || !this.blockedSave.check(form, '#platform-template-form')) {
       return;
     }
 

@@ -58,13 +58,3 @@ public interface IResultReferenceLookup
 
     Task<IReadOnlyDictionary<Guid, NamedReference>> PatientConditionsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
 }
-
-/// <summary>
-/// The result figures of a branch for the dashboard (CP-05; MODULES.md §1 read port): pending results registered in the
-/// window, the unverified backlog, the delayed tests (expected time passed, not verified) and the verifications in the
-/// window. <paramref name="branchId"/> null = every branch.
-/// </summary>
-public interface IResultKpiLookup
-{
-    Task<ResultKpis> ForBranchAsync(Guid? branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken);
-}

@@ -8,6 +8,7 @@ using Platform.Application.Abstractions.Tokens;
 using Platform.Contracts.Common;
 using Platform.Contracts.Identity;
 using Platform.Domain.Identity;
+using Platform.Domain.Settings;
 using Platform.SharedKernel.Abstractions;
 using Platform.SharedKernel.Primitives;
 
@@ -39,6 +40,17 @@ namespace Platform.Application.Identity.Commands;
 /// (a sign-out response lost to a page navigation leaves it in the browser), not a stolen one: it is refused with
 /// <c>AUTH-012</c> without the reuse alarm and without touching the family, and written as <c>SESSION_CONTEXT_CHANGED</c>
 /// (info, <c>refresh_after_&lt;reason&gt;</c>). A rotated token, or one of a family already revoked for reuse, stays reuse.
+/// </para>
+/// <para>
+/// <b>Idle timeout of the tenant</b> (validation F-01, setting <c>sessionTimeoutMinutes</c>, 1–720, default 30). A live browser
+/// session whose last activity (<see cref="RefreshSession.LastSeenAtUtc"/>: the sign-in or the rotation that created it, i.e.
+/// the last refresh) is older than the timeout of its tenant — the platform's value when the laboratory set none, the
+/// platform tenant's own for platform administrators — is revoked (<see cref="RevocationReason.Expired"/>: an idle end is a
+/// tenant-shortened sliding expiry, and a new enum member would need a migration for its CHECK constraint, pitfall P-09),
+/// written as <c>SESSION_REVOKED</c> (info, <c>idle_timeout</c>, no reuse alarm) and refused <c>401 AUTH-017</c>. The SPA keeps
+/// an active user's session fresh: its idle watcher renews it (one refresh) on activity well inside the timeout. An access
+/// token issued before the idle end stays valid until it expires (15 minutes at most): tokens are not re-checked against
+/// the timeout, the next refresh is. Machine sessions have no idle timeout.
 /// </para>
 /// </summary>
 [AllowUnauthenticated]
@@ -108,6 +120,21 @@ public sealed class RefreshSessionCommandHandler(
             principals.Evict(session.Id);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             throw Rejected();
+        }
+
+        if (session.Kind == SessionKind.Browser)
+        {
+            // F-01: the tenant's idle timeout, from the one elevated session read (cached ≤ 10 s, evicted below).
+            var presented = await principals.ResolveAsync(session.Id, session.PlatformUserId, cancellationToken);
+            var idleTimeout = presented?.IdleTimeout ?? TimeSpan.FromMinutes(SettingKeys.SessionTimeoutMinutes.Default);
+            if (session.IsIdleAt(now, idleTimeout))
+            {
+                session.Revoke(RevocationReason.Expired, now);
+                principals.Evict(session.Id);
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                await events.WriteAsync(new SecurityEvent(SecurityEvents.SessionRevoked, SecurityEvent.Info, session.TenantId, session.PlatformUserId, IdleTimeoutDetail), cancellationToken);
+                throw new DomainException(AuthProblemCodes.SessionIdleTimeout, "Your session ended after inactivity.", DomainFault.Unauthenticated);
+            }
         }
 
         var user = await users.GetForUpdateAsync(session.PlatformUserId, cancellationToken);
@@ -190,6 +217,9 @@ public sealed class RefreshSessionCommandHandler(
         var accessToken = accessTokens.Issue(new AccessTokenSubject(user.Id, successor.Id, successor.TenantId, successor.Scope));
         return new RefreshResult(accessToken, null, successor.Kind, Profiles.ToProfile(principal, successor.Scope));
     }
+
+    /// <summary>The detail of the <c>SESSION_REVOKED</c> (info) event of an idle end (F-01).</summary>
+    internal const string IdleTimeoutDetail = "idle_timeout";
 
     /// <summary><c>refresh_after_logout</c>, <c>refresh_after_expired</c>, …: the detail of a refresh of an ended session (R2-06).</summary>
     internal static string EndedSessionDetail(RevocationReason reason) => reason switch

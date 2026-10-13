@@ -6,7 +6,7 @@ import type { WorklistItem, WorklistQuery } from '../../../core/api/results.cont
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { CSV_MAX_ROWS, type CsvColumn, downloadCsv, toCsv } from '../data/csv-export';
 import { ResultsApi } from '../data/results.api';
-import { type DurationUnits, flagSymbol, formatDateTime, formatDuration, patientLabel, pickName, testLabel } from '../ui/result-format';
+import { type DurationUnits, flagSymbol, formatDuration, formatPrintDateTime, patientLabel, pickName, testLabel } from '../ui/result-format';
 
 /** CSV export of the worklist (intake §14): every row of the current filter, up to {@link CSV_MAX_ROWS}, client side. */
 @Injectable({ providedIn: 'root' })
@@ -42,15 +42,15 @@ export class WorklistExport {
       { header: t('worklist.column.patientNumber'), value: (row) => row.patientNumber },
       { header: t('worklist.column.accession'), value: (row) => row.accession },
       { header: t('worklist.column.sample'), value: (row) => row.sampleNumber },
-      { header: t('worklist.column.patient'), value: (row) => patientLabel({ patientNumber: null, patientName: row.patientName, patientNameAr: row.patientNameAr }, lang) },
+      { header: t('worklist.column.patient'), value: (row) => patientLabel({ ...row, patientNumber: null }, lang, t('vipMasked')) },
       { header: t('worklist.column.age'), value: (row) => row.ageYears },
       { header: t('worklist.column.gender'), value: (row) => (row.gender ? t(`gender.${row.gender}`) : null) },
       { header: t('worklist.column.group'), value: (row) => pickName(row.groupNameEn, row.groupNameAr, lang) },
       { header: t('worklist.column.test'), value: (row) => testLabel(row, lang) },
       { header: t('worklist.column.status'), value: (row) => t(`status.${row.status}`) },
       { header: t('worklist.column.sampleStatus'), value: (row) => (row.sampleStatus ? t(`sampleStatus.${row.sampleStatus}`) : null) },
-      { header: t('worklist.column.collected'), value: (row) => (row.collectedAtUtc ? formatDateTime(row.collectedAtUtc, lang) : null) },
-      { header: t('worklist.column.expected'), value: (row) => formatDateTime(row.expectedAtUtc, lang) },
+      { header: t('worklist.column.collected'), value: (row) => (row.collectedAtUtc ? formatPrintDateTime(row.collectedAtUtc, lang) : null) },
+      { header: t('worklist.column.expected'), value: (row) => formatPrintDateTime(row.expectedAtUtc, lang) },
       { header: t('worklist.column.delay'), value: (row) => (row.delaySeconds > 0 ? formatDuration(row.delaySeconds, units) : null) },
       { header: t('worklist.column.consumed'), value: (row) => row.consumedPercent },
       { header: t('worklist.column.value'), value: (row) => row.textValue },

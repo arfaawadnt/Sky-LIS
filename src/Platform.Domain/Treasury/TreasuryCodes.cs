@@ -14,6 +14,9 @@ public static class TreasuryCodes
     public const string RequestNotPending = "TRS-013";
     public const string RequestNotApproved = "TRS-014";
 
+    /// <summary>The treasury belongs to a branch the requester is not assigned to (validation v0.5.0 O-4; intake Q3, an assumption).</summary>
+    public const string TreasuryOutsideUserBranches = "TRS-015";
+
     public const string RejectReasonRequired = "TRS-020";
     public const string RevokeReasonRequired = "TRS-021";
     public const string NotRequester = "TRS-030";

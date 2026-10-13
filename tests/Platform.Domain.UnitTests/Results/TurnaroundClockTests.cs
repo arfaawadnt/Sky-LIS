@@ -50,6 +50,31 @@ public sealed class TurnaroundClockTests
         Assert.Equal(state, TurnaroundClock.State(consumed, done, 80, 100));
     }
 
+    [Theory]
+    [InlineData(2, 28, 479, false)]   // 2 % of 24 h is 28 min 48 s: a tenth of a second before, it is still 1 %
+    [InlineData(2, 28, 480, true)]
+    [InlineData(100, 1440, 0, true)]
+    [InlineData(100, 1439, 599, false)]
+    [InlineData(0, 0, 0, true)]   // a zero threshold: every open test is late
+    public void F15_late_is_reached_exactly_at_the_threshold_instant_and_agrees_with_the_shown_percent(int latePercent, int minutes, int tenthsOfSecond, bool late)
+    {
+        // Validation v0.5.0 F-15: the colour used a rounded share while the Delayed counter used the expected time.
+        var at = FridayTen.AddMinutes(minutes).AddTicks(tenthsOfSecond * TimeSpan.TicksPerSecond / 10);
+        var expected = FridayTen.AddHours(24);
+
+        Assert.Equal(late, TurnaroundClock.IsLate(FridayTen, expected, at, latePercent));
+        Assert.Equal(late, TurnaroundClock.ConsumedPercent(FridayTen, expected, at) >= latePercent);
+        Assert.Equal(late, at >= FridayTen + ((expected - FridayTen) * latePercent / 100));
+    }
+
+    [Fact]
+    public void F15_the_shown_share_is_rounded_down()
+    {
+        Assert.Equal(99m, TurnaroundClock.ConsumedPercent(FridayTen, FridayTen.AddHours(24), FridayTen.AddHours(24).AddSeconds(-1)));
+        Assert.Equal(DelayState.Warning, TurnaroundClock.State(TurnaroundClock.ConsumedPercent(FridayTen, FridayTen.AddHours(24), FridayTen.AddHours(24).AddSeconds(-1)), false, 80, 100));
+        Assert.Equal(100m, TurnaroundClock.ConsumedPercent(FridayTen, FridayTen, FridayTen.AddSeconds(1)));
+    }
+
     [Fact]
     public void R_BR11_delta_percent_against_the_previous_value()
     {

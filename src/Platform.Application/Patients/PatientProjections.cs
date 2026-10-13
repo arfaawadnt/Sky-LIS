@@ -157,13 +157,15 @@ public enum SimilarMatch
 
 /// <summary>
 /// The search box of the register (REG-002): a patient number (or part of it), mobile digits, a national id, or
-/// name tokens in Latin or Arabic script (wildcards <c>*</c> / <c>%</c> are separators). Any of them matches.
+/// name tokens in Latin or Arabic script (wildcards <c>*</c> / <c>%</c> are separators). Any of them matches. With the
+/// laboratory's national mobile length a number typed with the trunk 0 also finds a file stored without it (F-08,
+/// <see cref="Patient.MobileSearchDigits"/>).
 /// </summary>
 public sealed record PatientSearchTerms(string Number, string? Digits, string? NationalId, IReadOnlyList<string> NameTokens)
 {
     public const int MaxLength = 200;
 
-    public static PatientSearchTerms? Parse(string? text)
+    public static PatientSearchTerms? Parse(string? text, int? mobileLength = null)
     {
         var raw = Patient.FoldDigits(text ?? string.Empty).Trim();
         if (raw.Length == 0)
@@ -178,7 +180,7 @@ public sealed record PatientSearchTerms(string Number, string? Digits, string? N
 
         return new PatientSearchTerms(
             upper,
-            looksNumeric && digitsOnly.Length >= 3 ? digitsOnly : null,
+            looksNumeric && digitsOnly.Length >= 3 ? Patient.MobileSearchDigits(digitsOnly, mobileLength) : null,
             compact.Length >= Patient.MinNationalIdLength ? compact : null,
             PatientNameNormalizer.Tokens(raw));
     }

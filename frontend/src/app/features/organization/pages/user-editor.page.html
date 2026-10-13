@@ -33,6 +33,9 @@
     @case ('profile') {
       <app-section-card role="tabpanel" [title]="i18n.t('organization.users.tab.profile')">
         <form class="form-grid" [formGroup]="form" (ngSubmit)="saveProfile()" novalidate>
+          @if (blocked() && form.invalid) {
+            <p class="problem full" role="alert">{{ i18n.t('shared.masterData.invalid') }}</p>
+          }
           @if (isNew()) {
             <app-form-field [label]="i18n.t('organization.users.field.username')" [hint]="i18n.t('organization.users.hint.username')">
               <input type="text" formControlName="username" autocomplete="off" maxlength="30" />
@@ -194,12 +197,12 @@
             }
           </div>
 
-          @if (added().length > 0 || removed().length > 0) {
+          @if (shownAdded().length > 0 || shownRemoved().length > 0) {
             <div class="chips" [attr.aria-label]="i18n.t('organization.users.overrideSummary')">
-              @for (key of added(); track key) {
+              @for (key of shownAdded(); track key) {
                 <span class="chip added">+ {{ key }}</span>
               }
-              @for (key of removed(); track key) {
+              @for (key of shownRemoved(); track key) {
                 <span class="chip removed">− {{ key }}</span>
               }
             </div>
@@ -208,11 +211,14 @@
           <app-privilege-matrix
             [modules]="catalogue().modules"
             [actions]="catalogue().actions"
-            [selected]="overrideKeys()"
-            [baseline]="baseline()"
+            [selected]="shownOverrideKeys()"
+            [baseline]="shownBaseline()"
             [disabled]="!canManage()"
             [caption]="i18n.t('organization.users.tab.privileges')"
             (selectedChange)="setOverrideKeys($event)" />
+          @if (keptOverrideCount() > 0) {
+            <p class="muted small kept-keys">{{ i18n.tc('organization.users.keptLaterRelease', keptOverrideCount()) }}</p>
+          }
 
           <fieldset class="special-override">
             <legend>{{ i18n.t('organization.roles.tab.special') }}</legend>

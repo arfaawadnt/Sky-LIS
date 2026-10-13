@@ -22,6 +22,7 @@ const doctor: DoctorListItem = {
   sharePercent: 12.5,
   phone: null,
   isActive: true,
+  branches: [{ id: 'b1', code: 'MAIN', nameEn: 'Main branch', nameAr: 'الفرع الرئيسي' }],
 };
 
 function page(items: DoctorListItem[]): Paged<DoctorListItem> {
@@ -145,5 +146,36 @@ describe('DoctorsPage (CP-48)', () => {
     await settle();
     backend.expectNone((request) => request.method === 'PUT');
     backend.verify();
+  });
+
+  it('validation v0.5.0: reception limited to MAIN sees the codes of the other branches of the doctor from the server, never an id', async () => {
+    granted = new Set(['catalogue.view']);
+    const eastId = '01a12d23-aaaa-bbbb-cccc-000000000002';
+    const twoBranches: DoctorListItem = {
+      ...doctor,
+      branchIds: ['b1', eastId],
+      branches: [
+        { id: 'b1', code: 'MAIN', nameEn: 'Main branch', nameAr: 'الفرع الرئيسي' },
+        { id: eastId, code: 'V14-EAST', nameEn: 'East', nameAr: 'الشرق' },
+      ],
+    };
+    const fixture = TestBed.createComponent(DoctorsPage);
+    TestBed.tick();
+    await settle();
+    backend.expectOne(ORGANIZATION_API.selectableBranches).flush({ currentBranchId: 'b1', branches: [{ id: 'b1', code: 'MAIN', nameEn: 'Main branch', nameAr: 'الفرع الرئيسي' }] });
+    backend.expectOne((request) => request.method === 'GET' && request.url === CATALOGUE_B_API.doctors).flush(page([twoBranches]));
+    await settle();
+    await fixture.whenStable();
+    const host = fixture.nativeElement as HTMLElement;
+    const row = host.querySelector('tbody tr[data-row="d1"]');
+    expect(row?.textContent).toContain('MAIN');
+    expect(row?.textContent).toContain('V14-EAST');
+    expect(row?.textContent?.toUpperCase()).not.toContain(eastId.slice(0, 8).toUpperCase());
+
+    host.querySelector<HTMLTableRowElement>('tbody tr[data-row="d1"]')?.click();
+    await fixture.whenStable();
+    const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.querySelector('app-catalogue-b-picker')?.textContent).toContain('V14-EAST');
+    expect(dialog?.textContent?.toUpperCase()).not.toContain(eastId.slice(0, 8).toUpperCase());
   });
 });

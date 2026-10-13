@@ -4,7 +4,7 @@
 | --- | --- |
 | Module | `catalogue` (second half, slot `cat2`). SRS pages CP-46 Preparations, CP-47 Comment library, CP-48 Doctors, CP-49 Diagnoses, CP-50 Sending labs, CP-51 Shortcut sets, CP-52 Test rules, CP-53 Reasons, CP-54 Report templates, CP-56 Drug types · Antibiotics · Organisms; admin SA-14 (adds Commercial names and Sensitivity values) and the catalogue-B lists of SA-12 / SA-13 under the platform tenant. Business rules BR-15, BR-24, BR-25. |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), the Sky LIS prototypes and the LDM synthesis. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.0 — 2026-10-09 |
+| Version | 1.1 — 2026-10-12 (report-template logo and signature images, preview and provisioning copy: validation F-02, A10) |
 | Implemented in | `src/Platform.Domain/Catalogue` (files `CatalogueB*.cs`, `Preparation.cs`, `CommentTemplate.cs`, `Doctor.cs`, `Diagnosis.cs`, `SendingLab.cs`, `ShortcutSet.cs`, `TestRule.cs`, `Reason.cs`, `ReportTemplate.cs`, `DrugType.cs`, `CommercialName.cs`, `Antibiotic.cs`, `Organism.cs`, `SensitivityValue.cs`), `src/Platform.Contracts/Catalogue/CatalogueBContracts.cs`, `src/Platform.Application/Catalogue/{CatalogueB*.cs, Commands/CatalogueB*.cs, Queries/CatalogueB*.cs}`, `src/Platform.Infrastructure/Persistence/Catalogue/CatalogueB*`, `src/Platform.WebApi/Controllers/Catalogue/*` (controllers of this intake), `frontend/src/app/features/catalogue/{pages-b,data-b,state-b,ui-b}`, `frontend/src/app/core/api/catalogue-b.contracts.ts` |
 | Shares with | Catalogue A (LIS-INT-CTA, slot `cat`: clinical groups, sample types, units, patient conditions, services, tests). This module references services and clinical groups **by id only**. |
 
@@ -36,8 +36,7 @@ status and list-specific filters; CSV export; the validation of a test rule (CP-
 consumed by Registration, Results and Reporting; the master-data cloner used when a laboratory is provisioned.
 
 Out of scope (later intakes or other modules): the "publish" action of SA-12/SA-13 and the master-data update policy
-(SA-33, setting `masterDataUpdatePolicy`); picking logo/signature **files** (the Files module's upload API is built in
-the same wave by `pat`; the template stores the file ids); the use of each list inside registration, results and
+(SA-33, setting `masterDataUpdatePolicy`); the use of each list inside registration, results and
 billing (those modules consume the read ports); doctor-income and representative reports (Reporting); culture result
 entry (Results).
 
@@ -86,7 +85,7 @@ All roots are `sealed`, tenant-scoped (`(tenant_id, id)`, query filter, FORCE RL
 | ShortcutSet | `Code` (1–20, unique, immutable), `Name` (LocalizedText ≤ 200), `ServiceIds` (1–200, ordered) | services |
 | TestRule | `Name` (LocalizedText ≤ 200, English name unique), `ClinicalGroupId?`, `TriggerServiceIds` (1–200), `AddedServiceIds` (1–200), disjoint | services, clinical group |
 | Reason | `Kind` (Rejection, Cancellation, Discount, Refund, Transfer; immutable), `Name` (LocalizedText ≤ 200, unique per kind) | — |
-| ReportTemplate | `Name` (LocalizedText ≤ 200, unique), `Type` (Results, Culture, Text, Claim, Receipt, Label, JobOrder), `LogoFileId?`, `SignatureFileId?`, `ShowQr`, `Language` (En, Ar, Both), `HeaderText?`, `FooterText?` (LocalizedText ≤ 400, both languages or none) | files (Files) |
+| ReportTemplate | `Name` (LocalizedText ≤ 200, unique), `Type` (Results, Culture, Text, Claim, Receipt, Label, JobOrder), `LogoFileId?`, `SignatureFileId?` (file ids of the Files module, changed only by T6 / T7, never by T1 / T2), `ShowQr`, `Language` (En, Ar, Both), `HeaderText?`, `FooterText?` (LocalizedText ≤ 400, both languages or none) | files (Files) |
 | DrugType | `Name` (LocalizedText ≤ 200, unique) | — |
 | CommercialName | `DrugTypeId`, `Name` (LocalizedText ≤ 200, unique) | drug type (composite FK) |
 | Antibiotic | `Code` (1–20, unique, immutable), `Name` (LocalizedText ≤ 200), `Abbreviation` (1–10, code pattern), `CommercialNameId?` | commercial name (composite FK) |
@@ -111,6 +110,8 @@ No children: id sets are `uuid[]` columns (the precedent of `TenantMembership.Br
 | T3 | Active → Inactive | Deactivate X | `catalogue.manage` | X exists; idempotent | — | — | — | `XDeactivated` | no |
 | T4 | Inactive → Active | Reactivate X | `catalogue.manage` | X exists; idempotent | — | — | — | `XReactivated` | no |
 | T5 | — | Validate test rule (query) | `catalogue.view` | none; returns errors CAT-203/240/241/242 and warnings CAT-243 (same triggers as another active rule), CAT-244 (rules feed each other in a loop), CAT-245 (an inactive service) | — | — | — | — | no |
+| T6 | Active/Inactive | Attach or replace a report-template image (logo or signature) | `catalogue.edit` | template exists (CAT-388); image name `logo`/`signature` (VALIDATION-400); content PNG, JPEG or WebP by its bytes (CAT-272), 1 byte … 512 KB (CAT-270 / CAT-271) | — | — | — | `ReportTemplateImageChanged` { ReportTemplateId, Image, FileId } | no |
+| T7 | Active/Inactive | Remove a report-template image | `catalogue.edit` | template exists (CAT-388); the image is attached (CAT-394) | — | — | — | `ReportTemplateImageChanged` { ReportTemplateId, Image, FileId = null } | no |
 
 ## 8. Invariants
 
@@ -128,6 +129,8 @@ No children: id sets are `uuid[]` columns (the precedent of `TenantMembership.Br
 | INV-CTB-010 | Id sets are distinct, non-empty ids, at most 200 | aggregate | CAT-209 | "Too many linked records." |
 | INV-CTB-011 | A report template's header and footer carry both languages or none | validator + `LocalizedText` | VALIDATION-400 | — |
 | INV-CTB-012 | A phone number matches `+?digits` (8–15 digits, spaces between groups) | aggregate | CAT-202 | "The phone number is invalid." |
+| INV-CTB-013 | A report-template image is a PNG, JPEG or WebP decided by its signature bytes (never the name or the declared type; SVG refused), 1 byte … 512 KB, stored by the Files module under `<tenant>/catalogue/<template>/<file id>` before the template keeps its file id | domain (`ReportTemplateImageFiles.Inspect`) + handler (bounded read, compensation delete when the commit fails) | CAT-270 / CAT-271 / CAT-272 | "The image must be a PNG, JPEG or WebP file." |
+| INV-CTB-014 | A template image is read only by a signed-in member of the template's tenant: the key is composed with the session's tenant, the template is read through the tenant filter and RLS | handler (`GetReportTemplateImageQuery`, `[RequireAuthenticatedActor]`) | CAT-388 / CAT-394 | "The template has no such image." |
 
 ## 9. Segregation-of-duties rules
 
@@ -151,6 +154,10 @@ Reacts:   none yet (audit trail only)
 Event:    <X>Deactivated / <X>Reactivated { <X>Id, OccurredAtUtc }
 Raised by: T3 / T4
 Reacts:   none yet; Registration reads the active flag at order time through the read ports
+
+Event:    ReportTemplateImageChanged { ReportTemplateId, Image (Logo, Signature), FileId (null = removed), OccurredAtUtc }
+Raised by: T6 / T7
+Reacts:   none (audit trail only); printed reports read the template's current images when they are printed
 ```
 
 No policy is defined by this module. All events are written to `ops.outbox_events` and `audit.audit_trail` in the
@@ -244,7 +251,7 @@ Open questions (assumed answers let the build proceed; confirm or change):
 | A7 | Long texts | Questions, comment texts, header and footer texts ≤ 400 characters per language (`LocalizedText.MaxLength`). |
 | A8 | Is a doctor without branches available everywhere? | Yes: empty branches = every branch (the registration doctor picker filters by the session branch). |
 | A9 | Are linked services required to be active? | They must exist in the tenant; inactive services may stay linked (the validator warns for test rules); the read ports return ids and registration applies the service's own active flag. |
-| A10 | Report template logo / signature | Stored as file ids of the Files module; the editor shows whether one is attached; choosing the file waits for the Files upload API. |
+| A10 | Report template logo / signature | **Built (2026-10-12, validation F-02).** The images are files of the Files module (`IFileStore`, `Lis:Files:Root`, key `<tenant>/catalogue/<template>/<file id>`); the template keeps only the file ids (`LogoFileId`, `SignatureFileId`; no migration). They are uploaded, replaced and removed on their own (`POST` / `DELETE /api/v1/catalogue/report-templates/{id}/images/{logo\|signature}`, multipart field `file`, `catalogue.edit`, T6 / T7): PNG, JPEG or WebP decided by the bytes, 512 KB at most like the laboratory logo (CAT-270…272); the create / edit request no longer carries them. `GET …/images/{logo\|signature}` serves an image inline to any signed-in member of the tenant (the results users who print reports hold no catalogue key), never to an anonymous caller or another tenant (CAT-388 / CAT-394); the SPA reads it with the bearer token as a blob and shows it through an object URL (CSP `img-src blob:`). The register's row action "Logo, signature and preview" (SA-12, and CP-54 when Release 2 opens it) shows a thumbnail of each, the upload / replace / remove buttons for `catalogue.edit`, and a preview: a sample verified result report laid out with the template, drawn by the results report renderer itself (`REPORT_DOCUMENT_RENDERER`, provided at the application root). A printed or previewed result report whose clinical group uses the template carries the logo in the letterhead (in place of the Sky LIS mark) and the signature above the verifier's name — on a verified, final report only, never on a preliminary one. **Provisioning (BR-25): copied, not shared.** The Catalogue B cloner copies each image of every template it inserts into the new laboratory's own store under the new template, with new file ids (`IFileStore.CopyAsync`, elevated scope only): a laboratory never reads the platform's files, and a later change on the platform template leaves the laboratory's copy alone; an image whose content is missing is dropped. Files are not transactional: a provisioning that rolls back afterwards leaves unreferenced copies behind (no business deletion, BR-15). Tests: `ReportTemplateImageFlowTests` (functional), `CatalogueBSetupTests` (domain), `LocalFileStoreTests` (copy), `CatalogueBModuleTests` (clone), `report-template-images.component.spec.ts`, `report-template-preview.spec.ts`, `report.document.spec.ts`. |
 | A11 | Cloning order (BR-25) | Catalogue A's cloner runs first (services and clinical groups must exist in the new tenant); links to services whose code is missing in the target are dropped and counted. |
 | A12 | CSV export | Server-side per list (`GET …/export`), English and Arabic columns, UTF-8 BOM, cells starting with `= + - @` prefixed with `'`. |
 | A13 | Who may read reasons / doctors in other modules' pickers? | `catalogue.view` (the same list endpoints with `isActive=true`); roles that register or cancel need it. |

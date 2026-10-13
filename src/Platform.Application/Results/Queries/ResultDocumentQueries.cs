@@ -39,7 +39,8 @@ public sealed record ResultReportPorts(
 /// <summary>
 /// The report of one unit. <paramref name="Preview"/>: refused while a value is missing (RES-022, LDM §5.7 "There are
 /// other results have no value") unless the user holds "preview without verify". Print copy: only when the unit is
-/// printable (RES-021, BR-09).
+/// printable (RES-021, BR-09). A VIP patient without the See-VIP right: the preview reads "VIP patient" and the print
+/// copy is refused (RES-056, F-06).
 /// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Results, PermissionAction.View)]
 public sealed record GetReportDocumentQuery(string ReportUnitKey, bool Preview) : IQuery<LaboratoryReportDocument>;
@@ -69,6 +70,7 @@ public sealed class GetReportDocumentHandler(
         var unit = await results.ReadByUnitsAsync([query.ReportUnitKey], cancellationToken);
         var live = ReportGuards.Visible(unit, privileges);
         var rights = ResultRights.For(privileges, live[0].ClinicalGroupId, live[0].BranchId);
+        var masked = ResultVip.IsMasked(await patients.GetAsync(live[0].PatientId, cancellationToken), privileges);
         if (query.Preview)
         {
             if (live.Any(result => !result.HasValue) && !rights.CanPreviewWithoutVerify)
@@ -78,6 +80,11 @@ public sealed class GetReportDocumentHandler(
         }
         else
         {
+            if (masked)
+            {
+                throw ResultVip.PrintRefusal();
+            }
+
             var printUnverified = await settings.GetAsync(SettingKeys.PrintUnverified, cancellationToken);
             var actor = new ResultActor(user.UserId ?? Guid.Empty, user.DisplayName, rights);
             foreach (var result in live)
@@ -88,7 +95,8 @@ public sealed class GetReportDocumentHandler(
 
         var printedBy = await ResultsActor.NameOfAsync(user, users, cancellationToken);
         var ports = new ResultReportPorts(catalogue, samples, users, patients, visits, references, doctors, templates, settings);
-        return await ports.Builder().BuildAsync(query.ReportUnitKey, unit, query.Preview, clock.UtcNow, printedBy, cancellationToken);
+        var document = await ports.Builder().BuildAsync(query.ReportUnitKey, unit, query.Preview, clock.UtcNow, printedBy, cancellationToken);
+        return masked ? document with { Patient = ResultVip.Mask(document.Patient) } : document;
     }
 }
 

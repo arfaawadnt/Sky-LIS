@@ -9,6 +9,7 @@ import { BILLING_API } from '../../../core/api/billing.contracts';
 import { PATIENTS_API } from '../../../core/api/patients.contracts';
 import { REGISTRATION_API, type RegisterVisitRequest } from '../../../core/api/registration.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
@@ -342,5 +343,53 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
     await tick();
     backend.expectOne(`${REGISTRATION_API.visits}/v-1`).flush(visitDetail());
     expect(TestBed.inject(ToastService).toasts().some((toast) => toast.kind === 'success')).toBe(true);
+  });
+
+  it('names the session branch in the header of a new registration (validation 2026-10-11)', async () => {
+    await open('/registration/new');
+    harness.detectChanges();
+
+    expect(harness.routeNativeElement?.querySelector('app-page-header')?.textContent).toContain('Main Branch');
+  });
+
+  it('shows a REG-109 refusal with the repeated tests, a REG-206 warning as a caution, and the tube count in the singular (validation O-3)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) =>
+      new Response(
+        JSON.stringify(
+          String(input) === '/i18n/registration.en.json'
+            ? {
+                'error.REG-109': 'Every test of this service is already on the visit: {detail}.',
+                'warning.REG-206': '{service} repeats tests already on this visit: {detail}.',
+                'success.tubesOne': '1 tube was issued.',
+                'success.tubes': '{count} tubes were issued.',
+              }
+            : {},
+        ),
+        { status: 200 },
+      ),
+    );
+    await TestBed.inject(I18nService).load('registration');
+    const page = await open('/registration/new');
+    facade().setPatient(patient);
+    page.onAdded([cbc, { serviceId: 's-crea', code: 'CREA', nameEn: 'Creatinine', nameAr: 'كرياتينين' }]);
+    await tick();
+    backend.expectOne(REGISTRATION_API.check).flush(
+      checkResult({
+        issues: [{ code: 'REG-109', serviceId: 's-crea', serviceCode: 'CREA', message: "Every test of 'CREA' is already on this visit: CREA (PKG › RFT).", detail: 'CREA (PKG › RFT)' }],
+        warnings: [{ code: 'REG-206', serviceId: 's-cbc', serviceCode: 'CBC', serviceNameEn: null, serviceNameAr: null, detail: 'HB (FBC)', detailAr: null, lastOrderedAtUtc: null, lastAccession: null, windowDays: null }],
+      }),
+    );
+    await tick();
+    harness.detectChanges();
+
+    const text = harness.routeNativeElement?.textContent ?? '';
+    expect(text).toContain('CREA: Every test of this service is already on the visit: CREA (PKG › RFT).');
+    expect(text).toContain('CBC repeats tests already on this visit: HB (FBC).');
+    expect(harness.routeNativeElement?.querySelector('li.warning.warn')?.textContent).toContain('HB (FBC)');
+
+    const internals = page as unknown as { tubesText(count: number): string };
+    expect(internals.tubesText(1)).toBe('1 tube was issued.');
+    expect(internals.tubesText(3)).toBe('3 tubes were issued.');
+    vi.restoreAllMocks();
   });
 });

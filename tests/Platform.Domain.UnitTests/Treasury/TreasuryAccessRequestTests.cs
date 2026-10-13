@@ -168,6 +168,18 @@ public sealed class TreasuryAccessRequestTests
         Assert.Equal(DomainFault.Refused, refusal.Fault);
         Assert.Equal(TreasuryAccessStatus.Pending, request.Status);
     }
+
+    [Fact]
+    public void T1_Request_is_limited_to_the_branches_of_the_requester_TRS_015()
+    {
+        var treasury = ActiveTreasury();
+
+        TreasuryAccessRequest.EnsureRequesterWorksIn(treasury, [treasury.BranchId, Guid.CreateVersion7()]);
+        TreasuryAccessRequest.EnsureRequesterWorksIn(treasury, []);   // no assignment = every branch of the laboratory
+        var refusal = Assert.Throws<DomainException>(() => TreasuryAccessRequest.EnsureRequesterWorksIn(treasury, [Guid.CreateVersion7()]));
+
+        Assert.Equal((TreasuryCodes.TreasuryOutsideUserBranches, DomainFault.Validation), (refusal.Code, refusal.Fault));
+    }
 }
 
 public sealed class TreasuryTests
@@ -196,5 +208,21 @@ public sealed class TreasuryTests
 
         Assert.True(treasury.IsActive);
         Assert.Equal(2, treasury.DomainEvents.Count);
+    }
+
+    [Fact]
+    public void T7_Rename_raises_TreasuryUpdated_only_when_the_name_changes()
+    {
+        var treasury = Domain.Treasury.Treasury.Create("main", new LocalizedText("Main drawer", "الخزينة الرئيسية"), Guid.CreateVersion7(), FixedClock.Instant);
+        treasury.ClearDomainEvents();
+
+        treasury.Rename(new LocalizedText("Main drawer", "الخزينة الرئيسية"), FixedClock.Instant);
+        Assert.Empty(treasury.DomainEvents);
+
+        treasury.Rename(new LocalizedText("Main cash desk", "الخزينة الرئيسية"), FixedClock.Instant);
+
+        Assert.Equal("Main cash desk", treasury.Name.En);
+        var raised = Assert.IsType<TreasuryUpdated>(Assert.Single(treasury.DomainEvents));   // validation v0.5.0 O-5
+        Assert.Equal((treasury.Id, "MAIN", FixedClock.Instant), (raised.TreasuryId, raised.Code, raised.OccurredAtUtc));
     }
 }

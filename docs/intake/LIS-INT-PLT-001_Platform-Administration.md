@@ -28,7 +28,7 @@ administrator, master-data copy), seed data (5 countries, 27 Egyptian governorat
 Out of scope (owned elsewhere or later): the public site and wizard pages (`acc`, wave 2, from
 `core/api/public-subscription.contracts.ts`); the CP-66 wallet page (`acc`); the global catalogue SA-12/13/14 (catalogue
 agents, reused components); roles and admin users SA-06/07 (`org`); the audit log SA-09 (foundation + `acc`); the
-monthly charge job and the SMS usage metering (scheduled jobs are not built yet; the domain methods exist); the sign-in
+SMS usage metering (no per-SMS price exists in the plan, the tenant or the settings: business decision, §16 Q12); the sign-in
 refusal itself (wired by the identity owner through `ITenantStatusLookup`); per-period patient/test/registration
 figures (registration and reporting modules fill `IClientActivityReader`).
 
@@ -109,7 +109,7 @@ Plans, countries, governorates, templates and library rows: active / inactive on
 | P5 | any | Change plan | `tenancy.edit` | plan active (PLN-010) | — | — | — | `TenantPlanChanged` | no |
 | P6 | any | Reset administrator password | `tenancy.manage` | administrator recorded (CLI-030), password policy (CLI-040/041); the new password travels in the credential envelope | — | — | — | `PlatformUserPasswordRecovered`, `RefreshSessionRevoked(PasswordChanged)` | no |
 | W1 | wallet | Top up | `tenancy.manage` | amount > 0 (WAL-001), reference (WAL-002); optional pending request (WAL-011) | — | — | — | `WalletToppedUp` | no |
-| W2 | wallet | Monthly charge | system (job, later) | — | — | — | — | `WalletDebited(Subscription)` | yes |
+| W2 | wallet | Monthly charge | system (job `Lis:Jobs:WalletCharge`) or SA-05 "Run charges now" (`tenancy.manage`) | client Active, next charge due, plan currency = wallet currency (§16 Q11) | — | — | — | `WalletDebited(Subscription)` | yes |
 | W3 | wallet | Usage debit | system (later) | balance covers the amount (WAL-010) | — | — | — | `WalletDebited(Usage)` | yes |
 | W4 | — → Pending | Request top-up (CP-66) | `wallet.create` (client tenant) | amount > 0 (WAL-001) | — | — | — | `WalletTopUpRequested` | no |
 | W5 | Pending → Declined | Decline top-up request | `tenancy.manage` | Pending (WAL-011) | — | — | — | — | no |
@@ -204,7 +204,8 @@ Asia/Riyadh, Asia/Dubai, Asia/Kuwait, Asia/Amman; language ar); the 27 governora
 1 branch, 5 users, 500 SMS, 1 analyser), STANDARD (3,500 EGP, 3, 20, 2,000, 5), ENTERPRISE (9,000 EGP, 20, 200,
 10,000, 50); templates `otp`, `password-recovery`, `portal-url`, `treasury-request`, `panic-value` (SMS, en/ar).
 
-Configuration: `Lis:Platform:PortalDomain` (default `skylis.app`). Platform parameters read from the platform
+Configuration: `Lis:Platform:PortalDomain` (default `skylis.app`); `Lis:Jobs:WalletCharge:{Enabled, PollInterval}` (default
+`true`, one hour) for the monthly charge (W2, §16 "Monthly charge run"). Platform parameters read from the platform
 tenant's settings: `trialDays` (14), `passwordMinLength` (8). The wizard's default plan is the active plan with the
 lowest monthly fee (ties by code).
 
@@ -253,6 +254,7 @@ Scenario S-P3: deactivation needs a reason (CLI-021), revokes the client's live 
 Scenario S-PLT-403: a client user whose role holds tenancy.view lists clients → 403 PLT-403
 Scenario S-W1: a top-up of 500 with a reference → balance +500, transaction TopUp with balance after; amount 0 → WAL-001
 Scenario S-W3: a usage debit larger than the balance → WAL-010, nothing changes
+Scenario S-W2: an Active client whose next charge is due is charged its plan's fee once (Subscription, reference SUB-yyyy-MM-PLAN), the next charge moves one month; a second run in the period charges nothing; a balance short of the fee goes below zero, the client stays Active and metered usage then refuses WAL-010; Trial / Inactive clients are skipped; a currency mismatch fails without a debit
 Scenario S-W4: a laboratory requests a top-up (wallet.create) → Pending; the platform tops up against it → Completed
 Scenario S-M3: deleting a country that has governorates → GEO-110
 Scenario S-NTF: a template with {unknown} → NTF-003; {lab} is served as {labName}
@@ -274,3 +276,15 @@ Open questions (the assumed answer is what is built):
 | Q8 | Branch and user counts on SA-04 cross tenants; how are they read without elevation? | A `SECURITY DEFINER` function `saas.client_usage_counts(uuid[])` owned by `lis_owner` returns only counts and only when the calling session's tenant is the platform tenant. |
 | Q9 | Retention of subscription requests | 30 days after expiry (purge job later). |
 | Q10 | Should the wizard confirm the password on the server? | No: one credential per request (the envelope consumes one nonce per request); the browser checks the confirmation. |
+| Q11 | Monthly charge (W2) where the intake is silent | Built 2026-10-12 (validation LIS-VR-002 §7, C-8). Charged: **Active** clients only (Trial — expired or not — and Inactive are skipped and stay due; once activated, the missed periods are charged **one per run**, oldest first — whether reactivation should reset the date instead is for the business owner). Amount: the plan's monthly fee as it is at the run. Insufficient balance: the domain rule applies (the subscription may take the balance below zero, the portal keeps working, CP-66; metered usage pauses at zero, WAL-010); the client is **not** suspended or marked, `WalletDebited` carries the balance after it and the SA-03 dashboard counts the wallet at or below zero. Plan currency ≠ wallet currency (Q5, OQ-02): **not charged**, `WALLET_CHARGE_FAILED` written to the security ledger every run until resolved. Idempotency: per tenant and period by the due-date check and the date move in the same commit, guarded by the wallet's row version (no period key, no migration). |
+| Q12 | SMS usage metering (W3) | **Not built — business decision.** Plans carry an SMS quota (`SmsQuota`) but no per-SMS price exists in the plan, the client record or the platform parameters, so nothing can be debited per message. Decide: price per SMS (per plan or platform parameter), whether SMS within the quota is free, and whether a refused debit (WAL-010) blocks the SMS. `Wallet.DebitUsage` and the "SMS used" figure (count of Usage movements) are ready. |
+
+### Monthly charge run (built 2026-10-12)
+
+`src/Platform.Application/PlatformAdmin/Jobs/WalletChargeRun.cs` (`WalletCharger`: one client, one commit; `RunWalletChargesCommand`
+[`tenancy.manage`, platform tenant]), `src/Platform.Infrastructure/Jobs/WalletChargeJob.cs` (the pass: lists the due wallets,
+charges each in its own scope bound to the platform tenant — no elevation, the saas tables carry no RLS — retries a lost
+row-version race, serialised in-process), `src/Platform.WebApi/Startup/WalletChargeHostedService.cs`,
+`POST /api/v1/platform/wallets/charge-run` → `WalletChargeRunSummary` (charged, skipped, failed, at or below zero, one row per
+due wallet). SA-05 "Run charges now" button. Tests: `tests/Platform.IntegrationTests/WalletChargeRunTests.cs`,
+`PlatformAdminFlowTests.Run_charges_now_…`, `frontend/…/subscriptions.page.spec.ts` ("Run charges now (W2)").

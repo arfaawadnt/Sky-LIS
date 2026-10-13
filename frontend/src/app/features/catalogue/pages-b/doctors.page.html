@@ -39,6 +39,9 @@
 
 <app-drawer [(open)]="drawerOpen" [title]="drawerTitle()" size="lg" (closed)="onDrawerClosed()">
   <form [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+    @if (blockedSave.blocked()) {
+      <p class="problem" role="alert">{{ i18n.t('shared.masterData.invalid') }}</p>
+    }
     @if (saveProblem(); as problem) {
       <p class="problem" role="alert">{{ problemText(problem) }}</p>
     }
@@ -61,7 +64,7 @@
       </app-form-field>
       <div class="full">
         <app-form-field [label]="i18n.t('catalogue-b.doctors.field.branchIds')" [hint]="i18n.t('catalogue-b.doctors.hint.branchIds')" [problem]="saveProblem()">
-          <app-catalogue-b-picker formControlName="branchIds" [search]="searchBranches" [known]="branches()" [label]="i18n.t('catalogue-b.doctors.field.branchIds')" [emptyText]="i18n.t('catalogue-b.common.allBranches')" />
+          <app-catalogue-b-picker formControlName="branchIds" [search]="searchBranches" [known]="knownBranches()" [label]="i18n.t('catalogue-b.doctors.field.branchIds')" [emptyText]="i18n.t('catalogue-b.common.allBranches')" />
         </app-form-field>
       </div>
     </div>

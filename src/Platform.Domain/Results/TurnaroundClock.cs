@@ -59,7 +59,12 @@ public static class TurnaroundClock
         return cursor + remaining;
     }
 
-    /// <summary>The share of the duration consumed at <paramref name="atUtc"/> in percent (0 when the clock has not started; 100 for a zero duration once due).</summary>
+    /// <summary>
+    /// The whole percent of the duration consumed at <paramref name="atUtc"/> (0 when the clock has not started; 100 for a
+    /// zero duration once due). Rounded down, so "consumed ≥ threshold" holds exactly when the threshold instant
+    /// <c>start + (expected − start) × threshold / 100</c> is reached: the row colour, the worklist's Delayed counter and
+    /// filter and the dashboard read the same "late" (validation v0.5.0 F-15).
+    /// </summary>
     public static decimal ConsumedPercent(DateTimeOffset startUtc, DateTimeOffset expectedUtc, DateTimeOffset atUtc)
     {
         var total = expectedUtc - startUtc;
@@ -74,9 +79,17 @@ public static class TurnaroundClock
             return 100m;
         }
 
-        var percent = (decimal)(elapsed.TotalSeconds / total.TotalSeconds) * 100m;
-        return Math.Round(Math.Min(percent, 99999m), 0, MidpointRounding.AwayFromZero);
+        var percent = elapsed.Ticks * 100m / total.Ticks;   // exact in decimal: a threshold instant reads its whole percent
+        return Math.Floor(Math.Min(percent, 99999m));
     }
+
+    /// <summary>
+    /// True when an open test is late at <paramref name="atUtc"/> by the tenant's <paramref name="latePercent"/>: the one
+    /// definition behind the Late colour, "Delayed only" and the Delayed counter (the repository's SQL states the same
+    /// predicate; F-15).
+    /// </summary>
+    public static bool IsLate(DateTimeOffset startUtc, DateTimeOffset expectedUtc, DateTimeOffset atUtc, int latePercent) =>
+        State(ConsumedPercent(startUtc, expectedUtc, atUtc), false, int.MaxValue, latePercent) == DelayState.Late;
 
     /// <summary>The colour of a test: Done once verified, else Late at or above <paramref name="latePercent"/>, Warning at or above <paramref name="warnPercent"/>.</summary>
     public static DelayState State(decimal consumedPercent, bool done, int warnPercent, int latePercent)

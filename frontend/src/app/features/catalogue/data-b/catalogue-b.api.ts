@@ -26,8 +26,11 @@ import {
   type PreparationListItem,
   type ReasonListItem,
   type ReasonRequest,
+  type ReportTemplateImageKind,
+  type ReportTemplateImageView,
   type ReportTemplateListItem,
   type ReportTemplateRequest,
+  reportTemplateImageUrl,
   type SendingLabListItem,
   type SendingLabRequest,
   type SensitivityValueListItem,
@@ -81,6 +84,21 @@ export class CatalogueBApi {
   readonly antibiotics = this.resource<AntibioticListItem, AntibioticRequest, AntibioticRequest>(CATALOGUE_B_API.antibiotics);
   readonly organisms = this.resource<OrganismListItem, OrganismRequest, OrganismRequest>(CATALOGUE_B_API.organisms);
   readonly sensitivityValues = this.resource<SensitivityValueListItem, SensitivityValueRequest, SensitivityValueRequest>(CATALOGUE_B_API.sensitivityValues);
+
+  /**
+   * Uploads or replaces the logo or the signature of a report template (`catalogue.edit`; multipart field `file`; PNG,
+   * JPEG or WebP up to 512 KB — the server decides by the bytes and refuses with CAT-270…272).
+   */
+  uploadReportTemplateImage(templateId: string, image: ReportTemplateImageKind, file: File): Promise<ReportTemplateImageView> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return firstValueFrom(this.http.post<ReportTemplateImageView>(reportTemplateImageUrl(templateId, image), form));
+  }
+
+  /** Removes the logo or the signature of a report template (`catalogue.edit`; CAT-394 when none is attached). */
+  removeReportTemplateImage(templateId: string, image: ReportTemplateImageKind): Promise<void> {
+    return firstValueFrom(this.http.delete<void>(reportTemplateImageUrl(templateId, image)), { defaultValue: undefined }).then(() => undefined);
+  }
 
   /** "Check rule" (CP-52 validate): errors and warnings of a candidate rule; nothing is saved. */
   validateTestRule(request: ValidateTestRuleRequest): Promise<TestRuleValidationResult> {

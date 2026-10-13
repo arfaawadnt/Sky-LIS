@@ -16,8 +16,7 @@ public sealed class AuthorizationBehavior<TRequest, TResponse>(ICurrentUser curr
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
 {
-    private static readonly RequestPolicyAttribute? Policy =
-        (RequestPolicyAttribute?)Attribute.GetCustomAttribute(typeof(TRequest), typeof(RequestPolicyAttribute), inherit: false);
+    private static readonly RequestPolicyAttribute? Policy = RequestAuthorization.PolicyOf(typeof(TRequest));
 
     private static readonly bool IsGated = RequestGating.IsGated(typeof(TRequest));
 
@@ -25,20 +24,48 @@ public sealed class AuthorizationBehavior<TRequest, TResponse>(ICurrentUser curr
     {
         ArgumentNullException.ThrowIfNull(next);
 
-        if (!IsGated)
+        if (IsGated)
         {
-            return next();
+            RequestAuthorization.Demand(typeof(TRequest), Policy, currentUser, privileges);
         }
 
-        switch (Policy)
+        return next();
+    }
+}
+
+/// <summary>
+/// The authorization decision of one request type, shared by <see cref="AuthorizationBehavior{TRequest,TResponse}"/> and
+/// the Web API's refusal of an unreadable body (validation F-17: an unauthorized caller learns nothing of a request's
+/// shape, so its 403 comes before any 400).
+/// </summary>
+public static class RequestAuthorization
+{
+    /// <summary>The request type's own policy attribute, or null.</summary>
+    public static RequestPolicyAttribute? PolicyOf(Type requestType)
+    {
+        ArgumentNullException.ThrowIfNull(requestType);
+        return (RequestPolicyAttribute?)Attribute.GetCustomAttribute(requestType, typeof(RequestPolicyAttribute), inherit: false);
+    }
+
+    /// <summary>True when the request type is open to anonymous callers (<see cref="AllowUnauthenticatedAttribute"/>).</summary>
+    public static bool AllowsAnonymous(Type requestType) => PolicyOf(requestType) is AllowUnauthenticatedAttribute;
+
+    /// <summary>Throws the refusal the pipeline gives for this request type and actor: NoPolicy, 401, unknown permission or 403.</summary>
+    public static void Demand(Type requestType, RequestPolicyAttribute? policy, ICurrentUser currentUser, IUserPrivileges privileges)
+    {
+        ArgumentNullException.ThrowIfNull(requestType);
+        ArgumentNullException.ThrowIfNull(currentUser);
+        ArgumentNullException.ThrowIfNull(privileges);
+
+        switch (policy)
         {
             case null:
                 throw new DomainException(
                     ProblemCodes.NoPolicy,
-                    $"Request '{typeof(TRequest).Name}' declares no authorization policy.",
+                    $"Request '{requestType.Name}' declares no authorization policy.",
                     DomainFault.Refused);
             case AllowUnauthenticatedAttribute:
-                return next();
+                return;
         }
 
         if (!currentUser.IsAuthenticated)
@@ -49,7 +76,7 @@ public sealed class AuthorizationBehavior<TRequest, TResponse>(ICurrentUser curr
                 DomainFault.Unauthenticated);
         }
 
-        var permitted = Policy switch
+        var permitted = policy switch
         {
             RequireAuthenticatedActorAttribute => true,
             RequirePermissionPolicyAttribute p when !PermissionCatalog.IsKnown(p.PermissionKey) =>
@@ -65,8 +92,6 @@ public sealed class AuthorizationBehavior<TRequest, TResponse>(ICurrentUser curr
                 "This action is not permitted for the current actor.",
                 DomainFault.Refused);
         }
-
-        return next();
     }
 }
 

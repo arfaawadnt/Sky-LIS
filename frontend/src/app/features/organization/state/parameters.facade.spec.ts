@@ -32,15 +32,21 @@ describe('ParametersFacade (CP-57)', () => {
     await settle();
   });
 
-  it('tracks only real changes and returns a value to its default', () => {
+  it('tracks only real changes and returns a value to its default by removing the laboratory value (validation F-13)', () => {
     expect(facade.valueOf('labelCopies')).toBe('2');
 
     facade.set('autoCollect', 'false');
     facade.set('autoCollect', 'true');   // back to the stored value: no change
     facade.resetToDefault('labelCopies');
+    facade.resetToDefault('resultLanguage');   // no value of its own: nothing to remove
 
-    expect(facade.changes()).toEqual([{ key: 'labelCopies', value: '1' }]);
+    expect(facade.changes()).toEqual([{ key: 'labelCopies', value: null }]);
+    expect(facade.valueOf('labelCopies')).toBe('1');
+    expect(facade.isReset('labelCopies')).toBe(true);
     expect(facade.dirty()).toBe(true);
+
+    facade.set('labelCopies', '4');   // a new value after "Use default" is a value again
+    expect(facade.changes()).toEqual([{ key: 'labelCopies', value: '4' }]);
 
     facade.discard();
     expect(facade.dirty()).toBe(false);
@@ -64,6 +70,22 @@ describe('ParametersFacade (CP-57)', () => {
   it('returns a value to what the laboratory inherits from the platform, not the built-in default (UAT C-09)', () => {
     facade.resetToDefault('receiptCopies');
 
-    expect(facade.changes()).toEqual([{ key: 'receiptCopies', value: '2' }]);
+    expect(facade.valueOf('receiptCopies')).toBe('2');
+    expect(facade.changes()).toEqual([{ key: 'receiptCopies', value: null }]);
+  });
+
+  it('validation F-13: "Use default" saves a removal, and the laboratory then reads the inherited value', async () => {
+    facade.resetToDefault('labelCopies');
+
+    const saving = facade.save.execute(facade.changes());
+    await settle();
+    const put = backend.expectOne({ method: 'PUT', url: ORGANIZATION_API.settings });
+    expect(put.request.body).toEqual({ settings: [{ key: 'labelCopies', value: null }] });
+    put.flush({ settings: [item('autoCollect', 'Bool', 'true', 'true'), item('labelCopies', 'Int', '1', '1'), item('resultLanguage', 'String', 'en', 'en')] });
+    await saving;
+
+    expect(facade.dirty()).toBe(false);
+    expect(facade.byKey().get('labelCopies')?.isDefault).toBe(true);
+    backend.verify();
   });
 });

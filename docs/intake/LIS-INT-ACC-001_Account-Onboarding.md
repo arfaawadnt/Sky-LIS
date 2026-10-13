@@ -124,7 +124,7 @@ laboratory administrator (CP-66, CP-67, CP-68), platform staff (SA-09, SA-21, su
 | INV-SUP-003 | A closed ticket changes no more | aggregate state guards | SUP-010 |
 | INV-SUP-004 | A laboratory sees only its own tickets; only the platform tenant sees all | repository scope + RLS policy `support_desk_scope` | 404 (SUP-404) |
 | INV-SUP-005 | At most 500 replies per ticket | aggregate | SUP-012 |
-| INV-ACC-001 | A password change needs the current password; wrong attempts count toward the lockout of sign-in | handler (hasher + `RecordFailedPasswordCheck`) | ACC-010 / ACC-011 |
+| INV-ACC-001 | A password change needs the current password; wrong attempts count toward the lockout of sign-in (security rule SEC-LOCK-02 of LIS-INT-FND-001 §6a, decided 2026-10-12) | handler (hasher + `RecordFailedPasswordCheck`) | ACC-010 / ACC-011 |
 | INV-ACC-002 | A changed password ends every other session of the user; the current session stays | handler (`ListLiveForUserAsync` minus the current session) | — |
 
 ## 9. Segregation-of-duties rules

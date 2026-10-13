@@ -303,6 +303,26 @@ describe('AuthStore (D-01, P-61)', () => {
       expect(store.isAuthenticated()).toBe(true);
     });
 
+    it('a change of branch tells the other tabs, which show the new branch (validation F-05)', async () => {
+      await signInAsMona();
+
+      const pending = store.selectBranch('b2');
+      http.expectOne(AUTH_API.selectBranch).flush(signedIn('ignored', 'b2').profile);
+      await pending;
+      expect(channel.posted.at(-1)).toEqual({ kind: 'branch-changed', userId: 'u1', tenantId: 't1', branchId: 'b2' });
+
+      // the other side: another tab of the same identity moved the shared session to b1
+      channel.deliver({ kind: 'branch-changed', userId: 'u1', tenantId: 't1', branchId: 'b1' });
+      expect(store.currentBranch()).toBe('b1');
+      expect(store.isAuthenticated()).toBe(true);
+      expect(navigation.loads).toEqual([]);
+
+      // another identity's branch is none of this tab's business
+      channel.deliver({ kind: 'branch-changed', userId: 'u2', tenantId: 't1', branchId: 'b9' });
+      channel.deliver({ kind: 'branch-changed', userId: 'u1', tenantId: 't2', branchId: 'b9' });
+      expect(store.currentBranch()).toBe('b1');
+    });
+
     it('announces its own profile change to the other tabs, and nothing when signed out (R2-01)', async () => {
       store.announceProfileChange();
       expect(channel.posted).toEqual([]);
@@ -346,6 +366,8 @@ describe('session channel and sign-in URL helpers', () => {
     expect(readSessionMessage({ kind: 'profile-changed', userId: 'u', tenantId: null })).toEqual({ kind: 'profile-changed', userId: 'u', tenantId: null });
     expect(readSessionMessage({ kind: 'profile-changed', userId: 'u' })).toBeNull();
     expect(readSessionMessage({ kind: 'signed-out' })).toEqual({ kind: 'signed-out' });
+    expect(readSessionMessage({ kind: 'branch-changed', userId: 'u', tenantId: 't', branchId: 'b' })).toEqual({ kind: 'branch-changed', userId: 'u', tenantId: 't', branchId: 'b' });
+    expect(readSessionMessage({ kind: 'branch-changed', userId: 'u', tenantId: 't' })).toBeNull();
     expect(readSessionMessage({ kind: 'signed-in', userId: 'u', tenantId: 't', extra: 1 })).toEqual({ kind: 'signed-in', userId: 'u', tenantId: 't' });
     expect(readSessionMessage({ kind: 'signed-in', userId: 1 })).toBeNull();
     expect(readSessionMessage('signed-out')).toBeNull();

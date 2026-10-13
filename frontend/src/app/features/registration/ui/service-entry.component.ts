@@ -8,7 +8,7 @@ import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { RegistrationApi } from '../data/registration.api';
-import { pick } from '../data/registration-format';
+import { count, pick } from '../data/registration-format';
 
 const SUGGEST_MIN_LENGTH = 2;
 const SUGGEST_LIMIT = 8;
@@ -434,7 +434,7 @@ export class ServiceEntryComponent {
 
       this.added.emit(result.services.map((item) => ({ serviceId: item.id, code: item.code, nameEn: item.nameEn, nameAr: item.nameAr })));
       if (result.kind === 'ShortcutSet') {
-        this.toast.success(this.i18n.tf('registration.services.setAdded', { code: result.setCode ?? text, count: result.services.length }));
+        this.toast.success(this.i18n.tc('registration.services.setAdded', result.services.length, { code: result.setCode ?? text, count: count(result.services.length, this.i18n.lang()) }));
       }
 
       this.text.set('');

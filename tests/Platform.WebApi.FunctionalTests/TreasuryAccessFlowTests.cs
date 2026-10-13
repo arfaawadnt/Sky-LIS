@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Platform.Contracts.Audit;
+using Platform.Contracts.Billing;
 using Platform.Contracts.Common;
 using Platform.Contracts.Organization;
 using Platform.Contracts.Treasury;
@@ -165,6 +167,75 @@ public sealed class TreasuryAccessFlowTests(ApiFactory factory) : IClassFixture<
 
         var unknownStatus = await cashierClient.GetAsync(Requests + "?status=flying");
         Assert.Equal(HttpStatusCode.BadRequest, unknownStatus.StatusCode);
+    }
+
+    [DatabaseFact]
+    public async Task Requests_stay_within_the_users_branches_and_an_approval_binds_the_person_on_a_shared_browser()
+    {
+        var tenant = Guid.CreateVersion7();
+        var north = Guid.CreateVersion7();
+        var east = Guid.CreateVersion7();
+        string[] cashierPermissions = ["treasury.view", "treasury.create", "treasury.cancel", "billing.view"];
+        var (manager, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: RequesterPermissions, displayName: "Treasury Manager");
+        var (first, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: cashierPermissions, displayName: "Cashier North", branchIds: [north]);
+        var (second, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: cashierPermissions, displayName: "Cashier Relief", branchIds: [north]);
+        var (approver, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ApproverPermissions, displayName: "Shift Manager");
+        var managerClient = await SignedInClientAsync(manager);
+        var firstClient = await SignedInClientAsync(first);
+        var secondClient = await SignedInClientAsync(second);
+        var approverClient = await SignedInClientAsync(approver);
+
+        var northCash = (await (await managerClient.PostAsJsonAsync(Treasuries, new CreateTreasuryRequest("N-CASH", "North cash", "خزينة الشمال", north))).Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+        var eastCash = (await (await managerClient.PostAsJsonAsync(Treasuries, new CreateTreasuryRequest("E-CASH", "East cash", "خزينة الشرق", east))).Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+
+        // O-4: a treasury of a branch the user is not assigned to is refused with its own code; the unrestricted manager may ask for any
+        var outside = await firstClient.PostAsJsonAsync(Requests, new RequestTreasuryAccessRequest(eastCash, "shared-browser", null));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, outside.StatusCode);
+        Assert.Equal("TRS-015", await AuthClient.CodeOf(outside));
+        Assert.Equal(HttpStatusCode.Created, (await managerClient.PostAsJsonAsync(Requests, new RequestTreasuryAccessRequest(eastCash, "manager-pc", null))).StatusCode);
+
+        // O-10: two people on one browser profile; the approval of the first does not open the drawer for the second
+        var firstRequest = (await (await firstClient.PostAsJsonAsync(Requests, new RequestTreasuryAccessRequest(northCash, "shared-browser", "Front desk"))).Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+        Assert.Equal(HttpStatusCode.NoContent, (await approverClient.PostAsJsonAsync($"{Requests}/{firstRequest}/approve", new ApproveTreasuryAccessRequest("  checked at the desk  "))).StatusCode);
+        Assert.Equal([northCash], (await firstClient.GetFromJsonAsync<List<BillingTreasuryItem>>("/api/v1/billing/my-treasuries?deviceId=shared-browser"))!.Select(item => item.Id));
+        Assert.Empty((await secondClient.GetFromJsonAsync<List<BillingTreasuryItem>>("/api/v1/billing/my-treasuries?deviceId=shared-browser"))!);
+
+        // D-05: a rejection needs a reason; the reason and the approval comment are on the rows of the requester and of the approver
+        var secondRequest = (await (await secondClient.PostAsJsonAsync(Requests, new RequestTreasuryAccessRequest(northCash, "shared-browser", "Front desk"))).Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+        var noReason = await approverClient.PostAsJsonAsync($"{Requests}/{secondRequest}/reject", new RejectTreasuryAccessRequest(" "));
+        Assert.Equal(HttpStatusCode.BadRequest, noReason.StatusCode);
+        Assert.Equal(ProblemCodes.ValidationFailed, await AuthClient.CodeOf(noReason));
+        Assert.Equal(HttpStatusCode.NoContent, (await approverClient.PostAsJsonAsync($"{Requests}/{secondRequest}/reject", new RejectTreasuryAccessRequest("use your own desk"))).StatusCode);
+
+        var firstRow = Assert.Single((await firstClient.GetFromJsonAsync<Paged<TreasuryAccessRequestListItem>>(Requests + "?mine=true"))!.Items);
+        Assert.Equal(("Approved", "checked at the desk", (string?)null), (firstRow.Status, firstRow.ApprovalComment, firstRow.DecisionReason));
+        var secondRow = Assert.Single((await secondClient.GetFromJsonAsync<Paged<TreasuryAccessRequestListItem>>(Requests + "?mine=true"))!.Items);
+        Assert.Equal(("Rejected", (string?)null, "use your own desk", "Shift Manager"), (secondRow.Status, secondRow.ApprovalComment, secondRow.DecisionReason, secondRow.DecidedByName));
+        var approverRows = (await approverClient.GetFromJsonAsync<Paged<TreasuryAccessRequestListItem>>(Requests))!.Items.ToDictionary(row => row.Id);
+        Assert.Equal("checked at the desk", approverRows[firstRequest].ApprovalComment);
+        Assert.Equal("use your own desk", approverRows[secondRequest].DecisionReason);
+
+        // a revocation keeps the approval comment beside its reason
+        Assert.Equal(HttpStatusCode.NoContent, (await approverClient.PostAsJsonAsync($"{Requests}/{firstRequest}/revoke", new RevokeTreasuryAccessRequest("desk closed"))).StatusCode);
+        var revoked = Assert.Single((await firstClient.GetFromJsonAsync<Paged<TreasuryAccessRequestListItem>>(Requests + "?mine=true"))!.Items);
+        Assert.Equal(("Revoked", "checked at the desk", "desk closed"), (revoked.Status, revoked.ApprovalComment, revoked.DecisionReason));
+    }
+
+    [DatabaseFact]
+    public async Task A_treasury_rename_is_an_event_of_the_audit_trail()
+    {
+        // validation v0.5.0 O-5
+        var tenant = Guid.CreateVersion7();
+        var (manager, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: [.. RequesterPermissions, "audit.view"], displayName: "Treasury Auditor");
+        var client = await SignedInClientAsync(manager);
+        var treasuryId = (await (await client.PostAsJsonAsync(Treasuries, new CreateTreasuryRequest("REN", "Rename drawer", "خزينة", Guid.CreateVersion7()))).Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Treasuries}/{treasuryId}/name", new RenameTreasuryRequest("Renamed drawer", "خزينة"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Treasuries}/{treasuryId}/name", new RenameTreasuryRequest("Renamed drawer", "خزينة"))).StatusCode);
+
+        var entries = (await client.GetFromJsonAsync<Paged<AuditEntryItem>>($"/api/v1/audit/entries?entityType=Treasury&entityId={treasuryId}&pageSize=50"))!.Items;
+        Assert.Equal(["TreasuryCreated", "TreasuryUpdated"], entries.Where(item => item.Kind == AuditEntryItem.KindEvent).OrderBy(item => item.Sequence).Select(item => item.Action));
+        Assert.Contains(entries, item => item.Kind == AuditEntryItem.KindFieldChange && item.Action == "Modified" && item.Changes!.Any(change => change.Field == "Name.En" && change.After == "Renamed drawer"));
     }
 
     private async Task<HttpClient> SignedInClientAsync(string username)

@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Abstractions.Files;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Catalogue;
+using Platform.Application.Catalogue.Commands;
+using Platform.Domain.Catalogue;
 using Platform.SharedKernel.Abstractions;
 
 namespace Platform.Infrastructure.Persistence.Catalogue;
@@ -13,10 +16,16 @@ namespace Platform.Infrastructure.Persistence.Catalogue;
 /// is skipped instead (a preparation or diagnosis that loses every linked service, a comment whose group is missing,
 /// a shortcut set without services, a rule that loses a trigger or every added service). Existing rows of the target
 /// win (<c>ON CONFLICT DO NOTHING</c>), so a repeated clone adds only what is missing. Doctors and sending labs are
-/// laboratory-specific and never copied; report-template file ids are cleared. The statements bypass the change
-/// tracker: the provisioning's own events record the clone.
+/// laboratory-specific and never copied. Report-template images (logo, signature) are <b>copied</b> into the target
+/// tenant's file store under the new template and get new file ids (decision 2026-10-12, intake LIS-INT-CTB-001 A10):
+/// a laboratory never reads the platform's files, and a later change of the platform template leaves the laboratory's
+/// copy alone; an image whose content is missing is dropped. Files are not transactional: a provisioning that rolls
+/// back afterwards leaves unreferenced copies behind (no business deletion, BR-15). The statements bypass the change
+/// tracker: the provisioning's own events record the clone. Last, every clinical group of the target that links no report
+/// template takes the target's copy of its source group's template (validation Z-02): Catalogue A copies the groups before
+/// the templates exist in the target, and a laboratory sets no link in Release 1, so its reports would never use one.
 /// </summary>
-internal sealed class CatalogueBCloner(AppDbContext context, ICurrentTenant tenant, ICurrentUser currentUser, IClock clock) : ICatalogueBCloner
+internal sealed class CatalogueBCloner(AppDbContext context, ICurrentTenant tenant, ICurrentUser currentUser, IClock clock, IFileStore files) : ICatalogueBCloner
 {
     private const string Provenance = "Platform provisioning";
 
@@ -166,6 +175,26 @@ internal sealed class CatalogueBCloner(AppDbContext context, ICurrentTenant tena
         ON CONFLICT DO NOTHING
         """;
 
+    // Validation Z-02: the clinical groups of the target (Catalogue A's flushed copies, matched by code) take the target's
+    // copy of the report template their source group links, matched by the case-insensitive English name (the unique key of
+    // report_templates); a group that already links a template keeps it. {0} source tenant, {1} target tenant.
+    private const string GroupTemplateLinksSql = """
+        UPDATE app.clinical_groups AS tg
+        SET report_template_id = tt.id
+        FROM app.clinical_groups AS sg
+        JOIN app.report_templates AS st ON st.tenant_id = sg.tenant_id AND st.id = sg.report_template_id
+        JOIN app.report_templates AS tt ON tt.tenant_id = {1} AND lower(tt.name_en) = lower(st.name_en) AND tt.is_active
+        WHERE sg.tenant_id = {0} AND tg.tenant_id = {1} AND tg.code = sg.code AND tg.report_template_id IS NULL
+        """;
+
+    // {0} target tenant, {1} target template, {2} logo file id, {3} signature file id (Guid.Empty = none).
+    private const string TemplateImagesSql = """
+        UPDATE app.report_templates
+        SET logo_file_id = NULLIF({2}, '00000000-0000-0000-0000-000000000000'::uuid),
+            signature_file_id = NULLIF({3}, '00000000-0000-0000-0000-000000000000'::uuid)
+        WHERE tenant_id = {0} AND id = {1}
+        """;
+
     // Links lost: the service references of the copied source rows minus those of the inserted target rows.
     private const string ServiceLinksLostSql = """
         SELECT (
@@ -242,12 +271,78 @@ internal sealed class CatalogueBCloner(AppDbContext context, ICurrentTenant tena
                 .ConfigureAwait(false);
             allOld.AddRange(sourceIds);
             allNew.AddRange(newIds);
+            if (table == "report_templates")
+            {
+                await CopyTemplateImagesAsync(sourceTenantId, targetTenantId, sourceIds, newIds, cancellationToken).ConfigureAwait(false);
+            }
         }
+
+        await context.Database.ExecuteSqlRawAsync(GroupTemplateLinksSql, [sourceTenantId, targetTenantId], cancellationToken).ConfigureAwait(false);
 
         var parameters = new object[] { sourceTenantId, targetTenantId, allOld.ToArray(), allNew.ToArray() };
         var servicesLost = await ScalarAsync(ServiceLinksLostSql, parameters, cancellationToken).ConfigureAwait(false);
         var groupsLost = await ScalarAsync(GroupLinksLostSql, parameters, cancellationToken).ConfigureAwait(false);
         return new CatalogueBCloneSummary(copied, servicesLost, groupsLost);
+    }
+
+    /// <summary>
+    /// Copies the logo and signature of every report template this clone inserted (a row skipped by <c>ON CONFLICT</c>
+    /// keeps its own images) into the target tenant's store, under the new template, and stamps the new file ids.
+    /// </summary>
+    private async Task CopyTemplateImagesAsync(Guid sourceTenantId, Guid targetTenantId, IReadOnlyList<Guid> sourceIds, Guid[] newIds, CancellationToken cancellationToken)
+    {
+        var sources = await context.Set<ReportTemplate>().IgnoreQueryFilters().AsNoTracking()
+            .Where(template => template.TenantId == sourceTenantId && sourceIds.Contains(template.Id) && (template.LogoFileId != null || template.SignatureFileId != null))
+            .Select(template => new { template.Id, template.LogoFileId, template.SignatureFileId })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (sources.Count == 0)
+        {
+            return;
+        }
+
+        var newIdOf = sourceIds.Select((id, index) => (id, index)).ToDictionary(pair => pair.id, pair => newIds[pair.index]);
+        var candidates = sources.Select(source => newIdOf[source.Id]).ToList();
+        var inserted = (await context.Set<ReportTemplate>().IgnoreQueryFilters().AsNoTracking()
+                .Where(template => template.TenantId == targetTenantId && candidates.Contains(template.Id))
+                .Select(template => template.Id)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false))
+            .ToHashSet();
+        if (inserted.Count == 0)
+        {
+            return;
+        }
+
+        if (tenant.TenantId != targetTenantId)
+        {
+            throw new InvalidOperationException("Template images are copied into the current tenant's store: run the clone in the target tenant's scope.");
+        }
+
+        foreach (var source in sources)
+        {
+            var targetId = newIdOf[source.Id];
+            if (!inserted.Contains(targetId))
+            {
+                continue;
+            }
+
+            var logo = await CopyImageAsync(sourceTenantId, source.Id, source.LogoFileId, targetId, cancellationToken).ConfigureAwait(false);
+            var signature = await CopyImageAsync(sourceTenantId, source.Id, source.SignatureFileId, targetId, cancellationToken).ConfigureAwait(false);
+            await context.Database.ExecuteSqlRawAsync(TemplateImagesSql, [targetTenantId, targetId, logo ?? Guid.Empty, signature ?? Guid.Empty], cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<Guid?> CopyImageAsync(Guid sourceTenantId, Guid sourceTemplateId, Guid? fileId, Guid targetTemplateId, CancellationToken cancellationToken)
+    {
+        if (fileId is not { } id)
+        {
+            return null;
+        }
+
+        var sourceKey = FileKeys.Compose(sourceTenantId, ReportTemplateImageStorage.Area, sourceTemplateId, id);
+        var copied = await files.CopyAsync(sourceKey, ReportTemplateImageStorage.Area, targetTemplateId, ReportTemplateImageFiles.MaxSizeBytes, cancellationToken).ConfigureAwait(false);
+        return copied?.FileId;
     }
 
     private async Task<IReadOnlyList<Guid>> SourceIdsAsync(string table, Guid sourceTenantId, CancellationToken cancellationToken) =>

@@ -280,6 +280,163 @@ public sealed class ResultsUseCaseTests
     }
 
     [Fact]
+    public async Task The_worklist_masks_a_VIP_name_and_asks_for_no_VIP_name_match_without_the_See_VIP_right()
+    {
+        // Validation 2026-10-11 (A-03 extended to CP-18): the worklist showed VIP names and found them by name.
+        var group = Guid.CreateVersion7();
+        var results = new InMemoryResultRepository();
+        results.WorklistRows.Add(Row(group, "PAT-2026-00010", "V14 Walk-in Two", "ووك إن", isVip: true));
+        results.WorklistRows.Add(Row(group, "PAT-2026-00009", "Mona Hassan", "منى حسن", isVip: false));
+        var privileges = new FakePrivileges { Special = new SpecialRights(10, true, false, false, false, false, false, false, false) }.Grant(group);
+        var handler = new GetWorklistHandler(results, new NoAnalysers(), new ResultsSettings(), privileges, new ResultsUser(Guid.CreateVersion7(), null), new ResultsClock(DateTimeOffset.UnixEpoch.AddYears(56)));
+        var query = new GetWorklistQuery(null, null, null, null, null, null, null, null, false, "V14", false, null, null);
+
+        var masked = await handler.Handle(query, CancellationToken.None);
+
+        Assert.False(results.LastWorklistFilter!.IncludeVip);
+        Assert.Equal(("PAT-2026-00010", "VIP patient", null, true), (masked.Items[0].PatientNumber, masked.Items[0].PatientName, masked.Items[0].PatientNameAr, masked.Items[0].PatientMasked));
+        Assert.Equal(("Mona Hassan", false), (masked.Items[1].PatientName, masked.Items[1].PatientMasked));
+
+        privileges.Special = SpecialRights.All;
+        var shown = await handler.Handle(query, CancellationToken.None);
+        Assert.True(results.LastWorklistFilter!.IncludeVip);
+        Assert.Equal(("V14 Walk-in Two", "ووك إن", false), (shown.Items[0].PatientName, shown.Items[0].PatientNameAr, shown.Items[0].PatientMasked));
+    }
+
+    [Fact]
+    public async Task Results_by_accession_lists_a_VIP_visit_masked_and_asks_for_no_VIP_name_match_without_the_See_VIP_right()
+    {
+        // A-03 extended to CP-19 (coordinator decision 2026-10-12): the matching list showed the VIP name.
+        var group = Guid.CreateVersion7();
+        var results = new InMemoryResultRepository();
+        var patients = new FakePatients();
+        var vip = FakePatients.Patient(Guid.CreateVersion7(), "Female", 30) with { Number = "PAT-2026-00010", FullName = "V14 Walk-in Two", NameAr = "ووك إن", IsVip = true };
+        var plain = FakePatients.Patient(Guid.CreateVersion7(), "Female", 30) with { Number = "PAT-2026-00009", FullName = "Mona Hassan", NameAr = "منى حسن" };
+        patients.Items[vip.Id] = vip;
+        patients.Items[plain.Id] = plain;
+        results.VisitRows.Add(new ResultVisitRow(Guid.CreateVersion7(), "ACC-2026-00027", DateTimeOffset.UnixEpoch, vip.Id, Guid.CreateVersion7(), ResultStatus.Ordered, 2, 1, false, false, false));
+        results.VisitRows.Add(new ResultVisitRow(Guid.CreateVersion7(), "ACC-2026-00026", DateTimeOffset.UnixEpoch, plain.Id, Guid.CreateVersion7(), ResultStatus.Ordered, 1, 1, false, false, false));
+        var privileges = new FakePrivileges { Special = new SpecialRights(10, true, false, false, false, false, false, false, false) }.Grant(group);
+        var handler = new SearchResultVisitsHandler(results, patients, privileges, new ResultsUser(Guid.CreateVersion7(), null));
+        var query = new SearchResultVisitsQuery(null, null, "walk", null, null, null, false, false, false, null, null, false, null, null);
+
+        var masked = await handler.Handle(query, CancellationToken.None);
+
+        Assert.False(results.LastVisitFilter!.IncludeVip);
+        Assert.Equal(("PAT-2026-00010", "VIP patient", null, true), (masked.Items[0].PatientNumber, masked.Items[0].PatientName, masked.Items[0].PatientNameAr, masked.Items[0].PatientMasked));
+        Assert.Equal(("Mona Hassan", "منى حسن", false), (masked.Items[1].PatientName, masked.Items[1].PatientNameAr, masked.Items[1].PatientMasked));
+
+        privileges.Special = SpecialRights.All;
+        var shown = await handler.Handle(query, CancellationToken.None);
+        Assert.True(results.LastVisitFilter!.IncludeVip);
+        Assert.Equal(("V14 Walk-in Two", false), (shown.Items[0].PatientName, shown.Items[0].PatientMasked));
+    }
+
+    [Fact]
+    public async Task F06_an_opened_VIP_case_reads_VIP_patient_without_the_See_VIP_right()
+    {
+        // Validation v0.5.0 F-06: opening a VIP visit on Results by accession showed the real name to uat.tech.
+        var world = new World();
+        world.MakeVipPatient();
+        await world.OrderedAsync(world.AddTest("GLU"));
+        world.Privileges.Special = NoSeeVip;
+
+        var masked = (await world.CaseAsync()).Patient;
+
+        Assert.Equal(("PAT-2026-00010", "VIP patient", null, true, true), (masked.Number, masked.FullName, masked.NameAr, masked.IsVip, masked.IsMasked));
+        Assert.Null(masked.DateOfBirth);
+        Assert.Equal(("Female", 30), (masked.Gender, masked.AgeYears!.Value));   // the bench keeps sex and age (ranges, formulas)
+
+        world.Privileges.Special = SpecialRights.All;
+        var shown = (await world.CaseAsync()).Patient;
+        Assert.Equal(("V14 Walk-in Two", "ووك إن", false), (shown.FullName, shown.NameAr, shown.IsMasked));
+    }
+
+    [Fact]
+    public async Task F06_a_VIP_report_previews_masked_and_does_not_print_without_the_See_VIP_right()
+    {
+        var world = new World();
+        world.MakeVipPatient();
+        var result = await world.OrderedAsync(world.AddTest("GLU"));
+        world.Samples.Received(world.Tube, world.Visit);
+        await world.SaveAsync(new ResultValueItem(result.Id, 5m, null, null, null));
+        await world.VerifyOneAsync(result.Id);
+        var key = ReportUnits.ForGroup(world.Visit, world.Group);
+        world.Privileges.Special = NoSeeVip;
+
+        var preview = await world.ReportAsync(key, preview: true);
+        Assert.Equal(("PAT-2026-00010", "VIP patient", null, true), (preview.Patient.Number, preview.Patient.FullName, preview.Patient.NameAr, preview.Patient.IsMasked));
+
+        var copy = await Assert.ThrowsAsync<DomainException>(() => world.ReportAsync(key, preview: false));
+        Assert.Equal((ResultsCodes.NoSeeVipToPrint, DomainFault.Refused), (copy.Code, copy.Fault));
+        var commits = world.UnitOfWork.Commits;
+        var print = await Assert.ThrowsAsync<DomainException>(() => world.PrintAsync(key));
+        Assert.Equal(ResultsCodes.NoSeeVipToPrint, print.Code);
+        Assert.Equal((0, commits, ResultStatus.Verified), (result.PrintCount, world.UnitOfWork.Commits, result.Status));
+
+        world.Privileges.Special = SpecialRights.All;
+        await world.PrintAsync(key);
+        var official = await world.ReportAsync(key, preview: false);
+        Assert.Equal(("V14 Walk-in Two", false, 1), (official.Patient.FullName, official.Patient.IsMasked, result.PrintCount));
+    }
+
+    [Fact]
+    public async Task F06_a_unit_the_user_cannot_see_answers_RES_405_before_the_VIP_rule()
+    {
+        var world = new World();
+        world.MakeVipPatient();
+        await world.OrderedAsync(world.AddTest("GLU"));
+        world.Privileges.Rights.Clear();
+        world.Privileges.Special = NoSeeVip;
+
+        var refusal = await Assert.ThrowsAsync<DomainException>(() => world.PrintAsync(ReportUnits.ForGroup(world.Visit, world.Group)));
+        Assert.Equal(ResultsCodes.ReportUnitNotFound, refusal.Code);
+    }
+
+    [Fact]
+    public async Task F15_the_worklist_colour_and_the_delayed_filter_use_the_tenant_late_threshold()
+    {
+        // Validation v0.5.0 F-15: with a 2 % late threshold red rows showed "Delayed 0" and "Delayed only" was empty.
+        var group = Guid.CreateVersion7();
+        var results = new InMemoryResultRepository();
+        results.WorklistRows.Add(Row(group, "PAT-2026-00009", "Mona Hassan", "منى حسن", isVip: false));
+        var settings = new ResultsSettings();
+        settings.Values[SettingKeys.DelayWarnPercent.Key] = "1";
+        settings.Values[SettingKeys.DelayLatePercent.Key] = "2";
+        var privileges = new FakePrivileges().Grant(group);
+        var now = DateTimeOffset.UnixEpoch.AddYears(1);   // about 1.75 % of the row's 57-year turnaround: floor 1 %
+        var handler = new GetWorklistHandler(results, new NoAnalysers(), settings, privileges, new ResultsUser(Guid.CreateVersion7(), null), new ResultsClock(now));
+        var query = new GetWorklistQuery(null, null, null, null, null, null, null, null, true, null, false, null, null);
+
+        var page = await handler.Handle(query, CancellationToken.None);
+
+        Assert.Equal((2, true), (results.LastWorklistFilter!.LatePercent, results.LastWorklistFilter.DelayedOnly));
+        var row = Assert.Single(page.Items);
+        Assert.Equal((1m, "Warning"), (row.ConsumedPercent, row.DelayState));
+        Assert.False(TurnaroundClock.IsLate(DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddYears(57), now, 2));
+        Assert.Equal((1, 2), (page.WarnPercent, page.LatePercent));
+
+        settings.Values[SettingKeys.DelayLatePercent.Key] = "1";
+        var late = Assert.Single((await handler.Handle(query, CancellationToken.None)).Items);
+        Assert.Equal("Late", late.DelayState);
+        Assert.True(TurnaroundClock.IsLate(DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddYears(57), now, 1));
+        Assert.Equal(1, results.LastWorklistFilter!.LatePercent);
+    }
+
+    private static readonly SpecialRights NoSeeVip = new(null, true, true, true, true, true, true, true, false);
+
+    private static WorklistRow Row(Guid group, string number, string name, string nameAr, bool isVip) =>
+        new(Guid.CreateVersion7(), Guid.CreateVersion7(), "ACC-2026-00001", Guid.CreateVersion7(), number, name, nameAr, null, null, Guid.CreateVersion7(), "GLU", "Glucose", "جلوكوز", group, "Chemistry", "الكيمياء",
+            ResultStatus.Ordered, null, null, null, null, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddYears(57), null, false, null, null, 0, ResultSource.Manual, isVip);
+
+    private sealed class NoAnalysers : IResultAnalyserDirectory
+    {
+        public Task<IReadOnlyList<Guid>> MappedTestIdsAsync(Guid analyserId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Guid>>([]);
+
+        public Task<IReadOnlyList<AnalyserOption>> ListAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<AnalyserOption>>([]);
+    }
+
+    [Fact]
     public void Visibility_combines_every_branch_and_branch_specific_rights()
     {
         var privileges = new FakePrivileges();
@@ -400,6 +557,16 @@ public sealed class ResultsUseCaseTests
 
         public Task AcknowledgeAsync(Guid id) =>
             new AcknowledgeDeltaHandler(Results, Catalogue, Privileges, new FakeDirectory(), UnitOfWork, User, Clock).Handle(new AcknowledgeDeltaCommand(id, "Checked."), CancellationToken.None);
+
+        public void MakeVipPatient() =>
+            Patients.Items[Patient] = FakePatients.Patient(Patient, "Female", 30) with { Number = "PAT-2026-00010", FullName = "V14 Walk-in Two", NameAr = "ووك إن", DateOfBirth = new DateOnly(1996, 1, 1), IsVip = true };
+
+        public Task<ResultCaseView> CaseAsync() =>
+            new GetResultCaseHandler(Results, Samples, Catalogue, Patients, new FakeDirectory(), Privileges, Visits, new FakeReferences(), new NoDoctors(), Settings)
+                .Handle(new GetResultCaseQuery(null, Visit, null), CancellationToken.None);
+
+        public Task PrintAsync(string key) =>
+            new PrintReportUnitHandler(Results, Settings, Privileges, new FakeDirectory(), Patients, UnitOfWork, User, Clock).Handle(new PrintReportUnitCommand(key), CancellationToken.None);
 
         public Task<LaboratoryReportDocument> ReportAsync(string key, bool preview) =>
             new GetReportDocumentHandler(Results, Catalogue, Samples, new FakeDirectory(), Patients, Visits, new FakeReferences(), new NoDoctors(), new NoTemplates(), Settings, Privileges, User, Clock)

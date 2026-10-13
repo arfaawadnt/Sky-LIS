@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -12,10 +12,11 @@ import {
   type StartPasswordRecoveryRequest,
 } from '../api/auth.contracts';
 import { ACCOUNT_API } from '../api/account.contracts';
+import { ProblemCodes, ProblemError, toProblemDetails } from '../api/problem-details';
 import { I18nService } from '../i18n/i18n.service';
 import { REFRESH_LOCK } from './refresh-lock';
 import { SESSION_CHANNEL, type SessionMessage } from './session-channel';
-import { BROWSER_NAVIGATION, SIGN_IN_PATH, signInUrl } from './session-navigation';
+import { BROWSER_NAVIGATION, SIGN_IN_PATH, type SessionEndReason, idleSignInUrl, signInUrl } from './session-navigation';
 
 export interface CurrentUser {
   readonly id: string;
@@ -52,7 +53,15 @@ export class AuthStore {
   private readonly hydrated = signal(false);
   private readonly profileRevisionState = signal(0);
   private readonly endedState = signal(false);
+  private readonly renewedAtState = signal<number | null>(null);
   private refreshInFlight: Promise<string | null> | null = null;
+
+  /**
+   * Validation F-01: when the session was last renewed on the server (`Date.now()` of the last sign-in or refresh, in this
+   * tab or — told through the channel — in another tab of the same identity). The server counts the idle timeout from that
+   * moment; the idle watcher keeps its own count no later than it.
+   */
+  readonly renewedAt = this.renewedAtState.asReadonly();
 
   /** The bearer token for the auth interceptor; `null` when signed out. */
   readonly token = this.accessToken.asReadonly();
@@ -177,11 +186,18 @@ export class AuthStore {
     return this.refreshInFlight;
   }
 
-  /** CP-04: binds the session to a branch; the server answers with the refreshed profile, which replaces the current one. */
+  /**
+   * CP-04: binds the session to a branch; the server answers with the refreshed profile, which replaces the current one.
+   * The session (and so the branch) is shared by every tab: the others are told (`branch-changed`, validation F-05).
+   */
   async selectBranch(branchId: string): Promise<AuthProfile> {
     const body: SelectBranchRequest = { branchId };
     const profile = await firstValueFrom(this.http.post<AuthProfile>(AUTH_API.selectBranch, body));
     this.profileState.set(profile);
+    if (profile.branchId) {
+      this.channel.post({ kind: 'branch-changed', userId: profile.userId, tenantId: profile.tenantId, branchId: profile.branchId });
+    }
+
     return profile;
   }
 
@@ -201,15 +217,16 @@ export class AuthStore {
    * Ends the session on the server, tells the other tabs and reloads the sign-in page without a return URL (A-01, B-11).
    * The token goes at once; the profile stays until the page unloads (round 2 R2-05: clearing it re-ran the open page's
    * resources, keyed by the user or the branch, and each reload was refused with a 401 before `/login` arrived).
+   * `reason: 'idle'` (the idle watcher, F-01) lands every tab on `/login?reason=idle`, which says why.
    */
-  async signOut(): Promise<void> {
+  async signOut(reason: SessionEndReason | null = null): Promise<void> {
     try {
       await firstValueFrom(this.http.post<void>(AUTH_API.signOut, null));
     } catch {
       // the server clears the cookie either way; the token is dropped below
     } finally {
-      this.channel.post({ kind: 'signed-out' });
-      this.leave(SIGN_IN_PATH);
+      this.channel.post(reason === 'idle' ? { kind: 'signed-out', reason } : { kind: 'signed-out' });
+      this.leave(reason === 'idle' ? idleSignInUrl() : SIGN_IN_PATH);
     }
   }
 
@@ -225,7 +242,14 @@ export class AuthStore {
     try {
       // C-02: one refresh at a time across the tabs; a waiting tab sends the cookie the previous refresh has just set
       response = await this.refreshLock(() => firstValueFrom(this.http.post<AuthResponse>(AUTH_API.refresh, null)));
-    } catch {
+    } catch (error: unknown) {
+      if (before !== null && problemCodeOf(error) === ProblemCodes.sessionIdleTimeout) {
+        // F-01: the server ended the session after inactivity; every tab lands on the sign-in page that says so
+        this.channel.post({ kind: 'signed-out', reason: 'idle' });
+        this.leave(idleSignInUrl());
+        return null;
+      }
+
       this.endSession(before, true);
       return null;
     }
@@ -242,6 +266,8 @@ export class AuthStore {
     }
 
     this.apply(response);
+    // F-01: the server counts the idle timeout from this refresh; the other tabs' watchers count from it too
+    this.channel.post({ kind: 'renewed', userId: response.profile.userId, tenantId: response.profile.tenantId });
     return response.accessToken;
   }
 
@@ -267,6 +293,32 @@ export class AuthStore {
     }
 
     const sameIdentity = message.kind !== 'signed-out' && message.userId === profile.userId && message.tenantId === profile.tenantId;
+    if (message.kind === 'activity') {
+      return;   // the idle watcher's business (F-01)
+    }
+
+    if (message.kind === 'renewed') {
+      if (sameIdentity) {
+        this.renewedAtState.set(Date.now());
+      }
+
+      return;
+    }
+
+    if (message.kind === 'signed-out' && message.reason === 'idle') {
+      this.leave(idleSignInUrl());
+      return;
+    }
+
+    if (message.kind === 'branch-changed') {
+      // F-05: another tab changed the branch of the shared session; the pages keyed by `currentBranch` re-read
+      if (sameIdentity && profile.branchId !== message.branchId) {
+        this.profileState.set({ ...profile, branchId: message.branchId });
+      }
+
+      return;
+    }
+
     if (message.kind === 'profile-changed') {
       if (sameIdentity) {
         this.profileRevisionState.update((revision) => revision + 1);
@@ -299,5 +351,15 @@ export class AuthStore {
     this.accessToken.set(response.accessToken);
     this.expiresAtUtc.set(response.expiresAtUtc ? new Date(response.expiresAtUtc) : null);
     this.profileState.set(response.profile);
+    this.renewedAtState.set(Date.now());
   }
+}
+
+/** The problem code of a failed refresh, whether the problem interceptor already typed it or not. */
+function problemCodeOf(error: unknown): string | null {
+  if (error instanceof ProblemError) {
+    return error.code;
+  }
+
+  return error instanceof HttpErrorResponse ? toProblemDetails(error).code : null;
 }

@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import type { WorklistDocument, WorklistItem } from '../../../core/api/results.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { DocumentFrameComponent } from '../../../shared/print/document-frame.component';
-import { formatDateTime, patientLabel, pickName, testLabel } from './result-format';
+import { formatPrintDateTime, patientLabel, pickName, testLabel } from './result-format';
 
 /**
  * The bench list of the worklist filter (A4 landscape; SRS CP-18 "print worklist", LDM §6): accession, sample,
@@ -57,7 +57,7 @@ import { formatDateTime, patientLabel, pickName, testLabel } from './result-form
         @if (doc().truncated) {
           <p class="muted">{{ i18n.t('results.worklist.documentTruncated') }}</p>
         }
-        <span documentFooter>{{ i18n.tf('results.worklist.documentCount', { count: doc().rows.length }) }}</span>
+        <span documentFooter>{{ i18n.tc('results.worklist.documentCount', doc().rows.length) }}</span>
       </app-document-frame>
     </div>
   `,
@@ -108,7 +108,7 @@ export class WorklistDocumentComponent {
   });
 
   protected patient(row: WorklistItem): string {
-    return patientLabel(row, this.i18n.lang());
+    return patientLabel(row, this.i18n.lang(), this.i18n.t('results.vipMasked'));
   }
 
   protected test(row: WorklistItem): string {
@@ -116,6 +116,6 @@ export class WorklistDocumentComponent {
   }
 
   protected at(value: string | null | undefined): string {
-    return formatDateTime(value, this.i18n.lang());
+    return formatPrintDateTime(value, this.i18n.lang());
   }
 }

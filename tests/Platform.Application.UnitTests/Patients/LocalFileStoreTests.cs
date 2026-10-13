@@ -83,6 +83,33 @@ public sealed class LocalFileStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Copy_reads_another_tenants_key_only_when_elevated_and_writes_a_new_key_of_the_current_tenant()
+    {
+        var bytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 1, 2, 3 };
+        var stored = await Store.SaveAsync("catalogue", Guid.CreateVersion7(), new MemoryStream(bytes), 1024, CancellationToken.None);
+        var targetTenant = Guid.CreateVersion7();
+        var owner = Guid.CreateVersion7();
+
+        var plain = new LocalFileStore(new FakeTenant { TenantId = targetTenant }, new RootConfiguration(_root));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => plain.CopyAsync(stored.StorageKey, "catalogue", owner, 1024, CancellationToken.None));
+
+        var elevated = new LocalFileStore(new FakeTenant { TenantId = targetTenant, IsElevated = true }, new RootConfiguration(_root));
+        var copy = await elevated.CopyAsync(stored.StorageKey, "catalogue", owner, 1024, CancellationToken.None);
+        Assert.NotNull(copy);
+        Assert.Matches($"^{targetTenant:N}/catalogue/{owner:N}/{copy.FileId:N}$", copy.StorageKey);
+        Assert.NotEqual(stored.FileId, copy.FileId);
+        Assert.Equal(stored.Sha256, copy.Sha256);
+        await using (var read = await plain.OpenReadAsync(copy.StorageKey, CancellationToken.None))
+        {
+            Assert.NotNull(read);   // the copy belongs to the target tenant
+        }
+
+        Assert.Null(await elevated.CopyAsync($"{_tenant.TenantId:N}/catalogue/{owner:N}/{Guid.CreateVersion7():N}", "catalogue", owner, 1024, CancellationToken.None));   // missing content
+        Assert.Null(await elevated.CopyAsync("../../windows/win.ini", "catalogue", owner, 1024, CancellationToken.None));   // malformed key
+        await Assert.ThrowsAsync<IOException>(() => elevated.CopyAsync(stored.StorageKey, "catalogue", owner, 4, CancellationToken.None));
+    }
+
+    [Fact]
     public void The_root_defaults_to_the_development_folder_and_follows_configuration()
     {
         Assert.Equal(Path.GetFullPath(LocalFileStore.DefaultRoot), new LocalFileStore(_tenant).Root);
@@ -101,7 +128,7 @@ public sealed class LocalFileStoreTests : IDisposable
     {
         public Guid? TenantId { get; init; }
 
-        public bool IsElevated => false;
+        public bool IsElevated { get; init; }
     }
 
     /// <summary>The one key the store reads; nothing else of IConfiguration is used.</summary>

@@ -15,6 +15,9 @@ import { fieldProblem, ianaTimeZones, isDialCodeValid } from '../ui/validators';
 import { sortParams } from '../../../shared/forms/paging';
 import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 
+/** `isDialCodeValid` as a pattern of the typed text: '+' and one to four digits, not starting with 0; spaces between them ignored. */
+export const DIAL_CODE_AS_TYPED = /^\+ *[1-9](?: *\d){0,3}$/;
+
 /**
  * SA-10 Countries: the validation data of a laboratory's details (dial code, currency, language, time zone, mobile
  * length). The ISO code is the natural key (immutable); a country with governorates or clients cannot be deleted
@@ -58,7 +61,8 @@ export class CountriesPage {
     fields: [
       { name: 'name', kind: 'localizedText', required: true, maxLength: 100 },
       { name: 'isoCode', kind: 'code', required: true, maxLength: 2, hint: 'platform.countries.hint.isoCode' },
-      { name: 'dialCode', kind: 'text', required: true, maxLength: 5, hint: 'platform.countries.hint.dialCode' },
+      // C-09 live check: the dial-code rule (GEO-002) shows under the field as the user types, not only on Save
+      { name: 'dialCode', kind: 'text', required: true, maxLength: 5, hint: 'platform.countries.hint.dialCode', pattern: DIAL_CODE_AS_TYPED, patternMessage: 'platform.countries.error.GEO-002' },
       { name: 'currency', kind: 'text', required: true, maxLength: 60 },
       { name: 'currencyCode', kind: 'code', required: true, maxLength: 3, immutable: false, hint: 'platform.countries.hint.currencyCode' },
       { name: 'language', kind: 'select', required: true, defaultValue: 'ar', options: [{ value: 'ar', label: 'Arabic', labelAr: 'العربية' }, { value: 'en', label: 'English', labelAr: 'الإنجليزية' }] },

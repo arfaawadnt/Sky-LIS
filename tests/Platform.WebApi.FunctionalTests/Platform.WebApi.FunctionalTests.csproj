@@ -16,6 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- one allocator of test country codes per process (validation round 2026-10-12: ISO collisions between classes) -->
+    <Compile Include="..\Shared\TestCountryCodes.cs" Link="Support\TestCountryCodes.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />

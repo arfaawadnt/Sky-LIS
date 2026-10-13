@@ -127,6 +127,18 @@
   font-size: 13px;
 }
 
+/* F-05: the session branch (the pill is hidden under 960px; the menu head keeps it) */
+.menu-branch {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.branch-pill {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .mi {
   display: flex;
   align-items: center;

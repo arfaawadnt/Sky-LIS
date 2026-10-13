@@ -24,7 +24,7 @@
       <div class="batch-head">
         <app-badge [tone]="batch.billedThroughClaims ? 'violet' : 'info'">{{ i18n.t('billing.batch.kind.' + batch.kind) }}</app-badge>
         <span class="muted">{{ i18n.t('billing.field.payer') }}: {{ payer(batch) }}</span>
-        <span class="muted">{{ i18n.tf('billing.batch.members', { count: batch.members.length }) }}</span>
+        <span class="muted">{{ i18n.tc('billing.batch.members', batch.members.length, { count: num(batch.members.length) }) }}</span>
       </div>
       @if (batch.billedThroughClaims) {
         <p class="info-strip">{{ i18n.t('billing.batch.labToLab') }}</p>

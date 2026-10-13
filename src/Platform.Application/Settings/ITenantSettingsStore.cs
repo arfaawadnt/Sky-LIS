@@ -19,4 +19,7 @@ public interface ITenantSettingsStore
 
     /// <summary>Stages a value for the key: a new row or an update of the existing one, stamped with the actor and the time.</summary>
     Task UpsertAsync(string key, string value, Guid? actorUserId, DateTimeOffset nowUtc, CancellationToken cancellationToken);
+
+    /// <summary>Stages the removal of the key's row, if any ("Use default", validation F-13): the key reads the inherited value again.</summary>
+    Task RemoveAsync(string key, CancellationToken cancellationToken);
 }

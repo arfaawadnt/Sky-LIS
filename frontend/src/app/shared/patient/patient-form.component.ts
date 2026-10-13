@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { type AbstractControl, FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors, type ValidatorFn, Validators } from '@angular/forms';
 
@@ -30,7 +30,7 @@ import { CanDirective } from '../ui/can.directive';
 import { FormFieldComponent } from '../ui/form-field/form-field.component';
 import { IconComponent } from '../ui/icon/icon.component';
 import { type NationalIdFacts, readEgyptianNationalId } from './egyptian-national-id';
-import { ageBetween, ageText, birthDateFromAge, defaultGender, isValidAge, isValidMobile, normalizeMobile, parseIso, todayIso } from './patient-demographics';
+import { ageBetween, ageText, birthDateFromAge, defaultGender, isValidAge, isValidMobile, localDigits, mobileForStorage, parseIso, todayIso } from './patient-demographics';
 
 /** What the user is typing in a new file, for the similar-patient lookup (BR-01). */
 export interface TypedIdentity {
@@ -84,6 +84,8 @@ const DETAIL_FIELDS = ['nationality', 'email', 'governorateId', 'city', 'address
 export class PatientFormComponent {
   protected readonly i18n = inject(I18nService);
   private readonly permissions = inject(PermissionsService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector = inject(Injector);
   private typedTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** The file being edited; `null` for a new one. */
@@ -111,9 +113,26 @@ export class PatientFormComponent {
 
   /** Which of the two the user gave last: that one is saved, the other is derived. */
   protected readonly birthSource = signal<'dob' | 'age' | null>(null);
-  private readonly mobileCountry = signal('');
+  /** The country the clerk picked for the mobile ('' = "Any"); null until they pick one. */
+  private readonly chosenMobileCountry = signal<string | null>(null);
+  /**
+   * The mobile country: the clerk's choice, else the laboratory's country (`settings.countryCode`, the client record's
+   * country; validation v0.5.0 F-08) when the platform publishes its mobile length, else "Any". So a 10-digit Egyptian
+   * number is stored in its trunk form without the clerk choosing Egypt.
+   */
+  protected readonly mobileCountry = computed(() => {
+    const chosen = this.chosenMobileCountry();
+    if (chosen !== null) {
+      return chosen;
+    }
+
+    const laboratory = this.settings()?.countryCode ?? null;
+    return laboratory !== null && this.mobileCountries().some((country) => country.code === laboratory) ? laboratory : '';
+  });
   /** The folded "More details" section: open while the clerk wants it, when it holds data or when a field in it is wrong. */
   protected readonly moreOpen = signal(false);
+  /** A save was refused on the client: the notice above the form says so until the next attempt (validation round 4). */
+  protected readonly blocked = signal(false);
 
   protected readonly mobileLength = computed(() => this.countries().find((country) => country.code === this.mobileCountry())?.mobileLength ?? null);
   protected readonly mobileCountries = computed(() => this.countries().filter((country) => country.mobileLength !== null));
@@ -219,6 +238,12 @@ export class PatientFormComponent {
       });
     });
 
+    // The mobile country decides the mobile rule: re-check the number when the laboratory's default arrives (F-08).
+    effect(() => {
+      this.mobileCountry();
+      untracked(() => this.form.controls.mobile.updateValueAndValidity());
+    });
+
     // Server refusals land on their field when they name one (VALIDATION-400 or a field code).
     effect(() => {
       const problem = this.problem();
@@ -259,8 +284,12 @@ export class PatientFormComponent {
 
     if (!markAllTouched(this.form)) {
       this.revealInvalidDetails();
+      this.blocked.set(true);
+      afterNextRender({ read: () => this.focusFirstInvalid() }, { injector: this.injector });
       return false;
     }
+
+    this.blocked.set(false);
 
     const value = this.form.getRawValue();
     const source = this.birthSource();
@@ -273,7 +302,7 @@ export class PatientFormComponent {
       dateOfBirth: source === 'age' ? null : blankToNull(value.dateOfBirth),
       age: source === 'age' && age !== null ? age : null,
       patientConditionId: blankToNull(value.patientConditionId),
-      mobile: blankToNull(normalizeMobile(value.mobile)),
+      mobile: blankToNull(mobileForStorage(value.mobile, this.mobileLength())),   // A-09: with or without the trunk 0, stored one way
       nationalId: blankToNull(value.nationalId),
       nationality: blankToNull(value.nationality),
       email: blankToNull(value.email),
@@ -410,12 +439,19 @@ export class PatientFormComponent {
     this.clearTimer();
     this.typedTimer = setTimeout(() => {
       this.typedTimer = null;
-      this.typed.emit({ name: this.form.controls.fullName.value.trim(), mobile: normalizeMobile(this.form.controls.mobile.value) });
+      this.typed.emit({ name: this.form.controls.fullName.value.trim(), mobile: mobileForStorage(this.form.controls.mobile.value, this.mobileLength()) });
     }, SIMILAR_DEBOUNCE_MS);
   }
 
   protected onMoreToggle(event: Event): void {
     this.moreOpen.set((event.target as HTMLDetailsElement).open);
+  }
+
+  /** The first marked field in document order; the date of birth when only "date of birth or age" is missing. */
+  private focusFirstInvalid(): void {
+    const selector = ['input', 'select', 'textarea'].map((tag) => `${tag}.ng-invalid:not([disabled])`).join(', ');
+    const target = this.host.querySelector<HTMLElement>(selector) ?? (this.form.hasError('birthOrAge') ? this.host.querySelector<HTMLElement>('[formcontrolname="dateOfBirth"]') : null);
+    target?.focus();
   }
 
   /** Opens "More details" when one of its fields holds an error, so the clerk sees why the save was refused. */
@@ -426,8 +462,13 @@ export class PatientFormComponent {
   }
 
   protected onMobileCountryChange(event: Event): void {
-    this.mobileCountry.set((event.target as HTMLSelectElement).value);
+    this.chosenMobileCountry.set((event.target as HTMLSelectElement).value);
     this.form.controls.mobile.updateValueAndValidity();
+  }
+
+  /** A number in the page language's digits (validation v0.5.0 F-09). */
+  protected num(value: number): string {
+    return localDigits(value, this.i18n.lang());
   }
 
   protected optionName(option: { readonly nameEn: string; readonly nameAr: string }): string {
@@ -455,6 +496,7 @@ export class PatientFormComponent {
 
   private fill(patient: PatientDetail): void {
     const estimated = patient.dateOfBirthIsEstimated;
+    this.chosenMobileCountry.set(null);
     this.form.reset({
       title: patient.title,
       fullName: patient.fullName,
@@ -477,15 +519,18 @@ export class PatientFormComponent {
     });
     this.birthSource.set(estimated ? 'age' : 'dob');
     this.moreOpen.set(DETAIL_FIELDS.some((field) => this.form.controls[field].value.trim() !== ''));
+    this.blocked.set(false);
     this.fromId.clear();
     this.idFilled.set([]);
   }
 
   private reset(name: string): void {
     this.form.reset();
+    this.chosenMobileCountry.set(null);
     this.form.controls.fullName.setValue(name);
     this.birthSource.set(null);
     this.moreOpen.set(false);
+    this.blocked.set(false);
     this.fromId.clear();
     this.idFilled.set([]);
   }

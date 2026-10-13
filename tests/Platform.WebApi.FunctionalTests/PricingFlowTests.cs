@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Pricing;
+using Platform.Contracts.Audit;
 using Platform.Contracts.Common;
 using Platform.Contracts.Pricing;
 using Platform.Domain.Pricing;
@@ -191,6 +192,34 @@ public sealed class PricingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.Equal(PricingCodes.TierNotFound, await AuthClient.CodeOf(unknownTier));
         var badType = await client.GetAsync($"{Payers}?type=gold");
         Assert.Equal(HttpStatusCode.BadRequest, badType.StatusCode);
+    }
+
+    [DatabaseFact]
+    public async Task Edits_of_payers_tiers_and_price_lists_are_events_of_the_audit_trail()
+    {
+        // validation v0.5.0 O-5: an edit wrote audit.field_changes only; it is now an event of the trail as well
+        var tenant = Guid.CreateVersion7();
+        var (accounts, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: [.. AccountsPermissions, "audit.view"], displayName: "Accounts Auditor");
+        var api = await SignedInClientAsync(accounts);
+
+        var payerId = await CreatedIdAsync(await api.PostAsJsonAsync(Payers, new CreatePayerRequest("Med Care", "ميد كير", "medcare", "Insurance", false, null)));
+        var tierId = await CreatedIdAsync(await api.PostAsJsonAsync($"{Payers}/{payerId}/tiers", new ContractTierRequest("Gold", "ذهبي")));
+        var listId = await CreatedIdAsync(await api.PostAsJsonAsync(Lists, new CreateBasePriceListRequest("o5", "List O-5", "قائمة", 2026)));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await api.PutAsJsonAsync($"{Payers}/{payerId}", new UpdatePayerRequest("Med Care Plus", "ميد كير بلس", "medcare", "Insurance", false, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await api.PutAsJsonAsync($"{Payers}/{payerId}/tiers/{tierId}", new ContractTierRequest("Gold Plus", "ذهبي بلس"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await api.PutAsJsonAsync($"{Lists}/{listId}", new UpdateBasePriceListRequest("List O-5 (edited)", "قائمة", 2027))).StatusCode);
+        // an edit that changes nothing raises nothing
+        Assert.Equal(HttpStatusCode.NoContent, (await api.PutAsJsonAsync($"{Lists}/{listId}", new UpdateBasePriceListRequest("List O-5 (edited)", "قائمة", 2027))).StatusCode);
+
+        async Task<string[]> EventsOf(string entityType, Guid id) =>
+            [.. (await api.GetFromJsonAsync<Paged<AuditEntryItem>>($"/api/v1/audit/entries?entityType={entityType}&entityId={id}&pageSize=50"))!.Items
+                .Where(item => item.Kind == AuditEntryItem.KindEvent)
+                .OrderBy(item => item.Sequence)
+                .Select(item => item.Action)];
+
+        Assert.Equal(["PayerCreated", "ContractTierAdded", "PayerUpdated", "ContractTierRenamed"], await EventsOf("Payer", payerId));
+        Assert.Equal(["BasePriceListCreated", "BasePriceListUpdated"], await EventsOf("BasePriceList", listId));
     }
 
     private async Task SeedLinesAsync(Guid tenantId, Guid listId, params (Guid ServiceId, decimal Price)[] lines)

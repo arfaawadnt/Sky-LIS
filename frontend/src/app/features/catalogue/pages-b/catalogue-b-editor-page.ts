@@ -5,7 +5,7 @@ import { CATALOGUE_B_PERMISSIONS } from '../../../core/api/catalogue-b.contracts
 import { type ProblemDetails, ProblemCodes } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
-import { markAllTouched } from '../../../shared/forms/mark-all-touched';
+import { blockedSave } from '../../../shared/forms/blocked-save';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
 import type { TableColumn } from '../../../shared/ui/data-table/data-table.types';
@@ -45,6 +45,8 @@ export abstract class CatalogueBEditorPage<TItem extends CatalogueBRow, TCreate,
   protected readonly drawerOpen = signal(false);
   protected readonly editing = signal<TItem | null>(null);
   protected readonly saveProblem = signal<ProblemDetails | null>(null);
+  /** F-03 (validation v0.5.0): a refused save says so above the form and focuses the first marked field. */
+  protected readonly blockedSave = blockedSave();
   protected readonly saving = computed(() => this.facade.create.pending() || this.facade.update.pending());
   /**
    * R-07: a row opened without `catalogue.edit` is a read-only view (fields disabled, no Save nor F10, title "View"); the
@@ -80,6 +82,7 @@ export abstract class CatalogueBEditorPage<TItem extends CatalogueBRow, TCreate,
   openCreate(): void {
     this.editing.set(null);
     this.saveProblem.set(null);
+    this.blockedSave.reset();
     this.form.reset();
     this.fill(null);
     this.form.enable();
@@ -90,6 +93,7 @@ export abstract class CatalogueBEditorPage<TItem extends CatalogueBRow, TCreate,
   openEdit(item: TItem): void {
     this.editing.set(item);
     this.saveProblem.set(null);
+    this.blockedSave.reset();
     this.form.reset();
     this.fill(item);
     this.form.enable();
@@ -108,10 +112,11 @@ export abstract class CatalogueBEditorPage<TItem extends CatalogueBRow, TCreate,
   protected onDrawerClosed(): void {
     this.editing.set(null);
     this.saveProblem.set(null);
+    this.blockedSave.reset();
   }
 
   async save(): Promise<void> {
-    if (this.saving() || this.readOnly() || !markAllTouched(this.form)) {
+    if (this.saving() || this.readOnly() || !this.blockedSave.check(this.form, 'app-drawer form')) {
       return;
     }
 

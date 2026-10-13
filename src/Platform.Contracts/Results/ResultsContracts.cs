@@ -54,6 +54,7 @@ public sealed record VisitHeaderView(
     string? DoctorNameAr,
     bool Urgent);
 
+/// <summary><paramref name="IsMasked"/>: a VIP patient shown to a user without the See-VIP right ("VIP patient", no Arabic name or date of birth; F-06).</summary>
 public sealed record PatientHeaderView(
     Guid PatientId,
     string? Number,
@@ -67,7 +68,8 @@ public sealed record PatientHeaderView(
     Guid? PatientConditionId,
     string? ConditionNameEn,
     string? ConditionNameAr,
-    bool IsVip);
+    bool IsVip,
+    bool IsMasked = false);
 
 public sealed record UnitSampleView(Guid TubeId, string? SampleNumber, string? Status, DateTimeOffset? CollectedAtUtc, DateTimeOffset? ReceivedAtUtc);
 
@@ -176,7 +178,8 @@ public sealed record ResultVisitListItem(
     int Units,
     bool HasPanic,
     bool HasDelta,
-    bool AnyPrinted);
+    bool AnyPrinted,
+    bool PatientMasked = false);
 
 public sealed record ResultLogItem(
     Guid Id,
@@ -236,7 +239,8 @@ public sealed record WorklistItem(
     string? TextValue,
     string? Flag,
     bool IsPrinted,
-    string Source);
+    string Source,
+    bool PatientMasked = false);
 
 public sealed record WorklistCounters(long Requests, long Tests, long Samples, long Delayed);
 
@@ -258,7 +262,8 @@ public sealed record ReportTemplateInfo(
     string? FooterTextEn,
     string? FooterTextAr);
 
-public sealed record ReportPatientBlock(string? Number, string? FullName, string? NameAr, string? Gender, int? AgeYears, int? AgeMonths, int? AgeDays, DateOnly? DateOfBirth);
+/// <summary><paramref name="IsMasked"/>: a VIP patient shown to a user without the See-VIP right (preview only; such a report does not print, RES-056).</summary>
+public sealed record ReportPatientBlock(string? Number, string? FullName, string? NameAr, string? Gender, int? AgeYears, int? AgeMonths, int? AgeDays, DateOnly? DateOfBirth, bool IsMasked = false);
 
 public sealed record ReportVisitBlock(string Accession, DateTimeOffset RegisteredAtUtc, string? PayerNameEn, string? PayerNameAr, string? DoctorNameEn, string? DoctorNameAr);
 

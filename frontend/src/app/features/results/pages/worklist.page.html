@@ -87,18 +87,18 @@
 </app-section-card>
 
 <div class="stats">
-  <app-stat-card [label]="i18n.t('results.worklist.requests')" [value]="counters().requests" tone="info" icon="clipboard" />
-  <app-stat-card [label]="i18n.t('results.worklist.tests')" [value]="counters().tests" tone="brand" icon="flask" />
-  <app-stat-card [label]="i18n.t('results.worklist.samples')" [value]="counters().samples" tone="ok" icon="barcode" />
-  <app-stat-card [label]="i18n.t('results.worklist.delayed')" [value]="counters().delayed" [tone]="counters().delayed > 0 ? 'bad' : 'ok'" icon="alert" />
+  <app-stat-card [label]="i18n.t('results.worklist.requests')" [value]="num(counters().requests)" tone="info" icon="clipboard" />
+  <app-stat-card [label]="i18n.t('results.worklist.tests')" [value]="num(counters().tests)" tone="brand" icon="flask" />
+  <app-stat-card [label]="i18n.t('results.worklist.samples')" [value]="num(counters().samples)" tone="ok" icon="barcode" />
+  <app-stat-card [label]="i18n.t('results.worklist.delayed')" [value]="num(counters().delayed)" [tone]="counters().delayed > 0 ? 'bad' : 'ok'" icon="alert" />
 </div>
 
 <app-section-card [padded]="false">
   <app-toolbar>
     <app-search-box toolbarFilters [value]="facade.filter().search ?? ''" [placeholder]="i18n.t('results.worklist.searchPlaceholder')" [label]="i18n.t('results.worklist.search')" (searchChange)="facade.setSearch($event)" />
     <span toolbarFilters class="legend" aria-hidden="true">
-      <span><i class="sw warn"></i>{{ i18n.tf('results.worklist.legendWarn', { percent: page()?.warnPercent ?? 80 }) }}</span>
-      <span><i class="sw late"></i>{{ i18n.tf('results.worklist.legendLate', { percent: page()?.latePercent ?? 100 }) }}</span>
+      <span><i class="sw warn"></i>{{ i18n.tf('results.worklist.legendWarn', { percent: num(page()?.warnPercent ?? 80) }) }}</span>
+      <span><i class="sw late"></i>{{ i18n.tf('results.worklist.legendLate', { percent: num(page()?.latePercent ?? 100) }) }}</span>
       <span><i class="sw done"></i>{{ i18n.t('results.worklist.legendDone') }}</span>
     </span>
     <button toolbarActions type="button" class="btn ghost" (click)="facade.list.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('results.refresh') }}</button>
@@ -155,7 +155,7 @@
     <ng-template appCell="consumed" [appCellOf]="facade.rows()" let-row>
       <span class="consumed" [class]="'consumed ' + (rowClass(row) ?? '')">
         <span class="bar"><span class="fill" [style.width.%]="row.consumedPercent > 100 ? 100 : row.consumedPercent"></span></span>
-        <span class="small muted">{{ row.consumedPercent }}%</span>
+        <span class="small muted">{{ percent(row.consumedPercent) }}</span>
       </span>
     </ng-template>
     <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>

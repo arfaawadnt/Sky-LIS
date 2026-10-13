@@ -59,6 +59,9 @@ public sealed record ReportTemplateDeactivated(Guid ReportTemplateId, DateTimeOf
 
 public sealed record ReportTemplateReactivated(Guid ReportTemplateId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
+/// <summary>A logo or signature image was attached (<paramref name="FileId"/>) or removed (null).</summary>
+public sealed record ReportTemplateImageChanged(Guid ReportTemplateId, ReportTemplateImage Image, Guid? FileId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
 public sealed record DrugTypeCreated(Guid DrugTypeId, string NameEn, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
 public sealed record DrugTypeDeactivated(Guid DrugTypeId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);

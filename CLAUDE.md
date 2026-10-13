@@ -58,7 +58,8 @@ Chosen to avoid everything already in use on this machine (checked 2026-10-08).
 | IIS sites                    | `lis-ui` (own host header on 443, plus `https://*:5443` for access by IP) / `lis-ui-test` (port `8081`) | `qams-ui` (80/443), `qams-ui-test` (8080), `8443` (QAMS ORDS firewall rule) |
 | IIS physical paths           | `C:\inetpub\wwwroot\lis-ui*`                             | `C:\inetpub\wwwroot\qams-ui*`                |
 | Prod data / backups          | `E:\lis-data`, `E:\lis-backups`                          | `E:\ntqams-data`, `E:\ntqams-backups`        |
-| Uploaded files (`Lis:Files:Root`) | dev `E:LIS.localiles` (git-ignored), production `E:lis-datailes` | none |
+| Uploaded files (`Lis:Files:Root`) | dev `E:\LIS\.local\files` (git-ignored), production `E:\lis-data\files` | none |
+| Notification pickup (`Lis:Notifications:PickupDirectory`) | dev `E:\LIS\.local\mail-pickup` (git-ignored; validation stack `…\mail-pickup\validation`), production `E:\lis-data\mail-pickup` (test service `E:\lis-data\mail-pickup-test`; ACL SYSTEM, Administrators, service account) | none |
 | Publish output               | `E:\LIS\publish` (git-ignored)                           | `E:\qms publish`                             |
 | API install root (service binaries + protected config) | `C:\lis-app\NTLIS`, `C:\lis-app\NTLIS_TEST` (`deploy/windows/install-api-service.ps1`) | none |
 | Service accounts             | virtual accounts `NT SERVICE\NTLIS`, `NT SERVICE\NTLIS_TEST` | none                                   |
@@ -227,7 +228,10 @@ QMS source is never read or copied (section 1); everything here is written from 
   user mobiles are stored in E.164 and unique in every spelling (`IUserMobileNumbers`, validation C-03);
   `RefreshCookie` (`__Secure-rt; Path=/api/v1/auth; Secure; HttpOnly; SameSite=Strict`, `rt` only under
   `Lis:Security:AllowInsecureLocalDevelopment`); `AuthOriginCheckMiddleware` guards the two cookie endpoints with
-  Sec-Fetch-Site + Origin + `X-Requested-With: Platform`; `CredentialTransportFilter` is a global action filter; rate
+  Sec-Fetch-Site + Origin + `X-Requested-With: Platform`; `CredentialTransportFilter` is a global action filter; MediatR
+  behaviors run Authorization before Validation, and an unreadable or incomplete body is reported (400) only after the
+  action's requests are authorized (`ActionRequestPolicies` from the actions' IL, called by `ProblemResponse.InvalidModelState`;
+  gates in WebApiHardeningTests; validation F-17); rate
   limits follow the 02 §5.2 matrix (policies `credential-account`, `credential-challenge`, `refresh`, global chain),
   in-process counters. Endpoints: `GET/POST /api/v1/auth/{credential-challenge,sign-in,refresh,sign-out,me}`,
   `/.well-known/jwks.json`, `/health/{live,ready}`. Every setting is read lazily from `IConfiguration` (a test host
@@ -256,7 +260,9 @@ QMS source is never read or copied (section 1); everything here is written from 
   tab's profile and never adopts another identity (state cleared, full load of `/login`); the interceptor never replays
   after a failed or foreign refresh; `signOut()` ends with a full page load of `/login` (callers must not navigate) so no
   route-provided facade survives a user change; `core/auth/session-channel.ts` (`SESSION_CHANNEL`, BroadcastChannel
-  `platform-session`, `provideSessionSync()` in `app.config.ts`) tells other tabs of a sign-in/sign-out;
+  `platform-session`, `provideSessionSync()` in `app.config.ts`) tells other tabs of a sign-in/sign-out and of a change of
+  branch (`branch-changed`; the shell's user menu offers "Change branch" through `SessionBranches` when the user has more than one,
+  validation F-05);
   `core/auth/session-navigation.ts` (`BROWSER_NAVIGATION`, `signInUrl`, `meaningfulReturnUrl`, `isLoginRoute`); specs use
   `provideSessionTesting(new FakeBrowserNavigation(), …)` from `core/auth/session-testing.ts`. **Route guard**:
   `shell/nav.guard.ts` `navRegistryGuard` (first `canActivateChild` of the shell route) refuses a URL whose longest
@@ -267,7 +273,13 @@ QMS source is never read or copied (section 1); everything here is written from 
   `shell.pageNotAvailable`; the client home forwards to the dashboard or the first menu entry (`landingEntry`). Other tabs
   of the same session follow a profile change (`profile-changed` on the session channel, `profileChangeInterceptor` for
   `PROFILE_CHANGES` endpoints, `followProfileChanges()` in the shell). A sign-in revokes the session of the refresh cookie
-  the browser presented (secret checked).
+  the browser presented (secret checked). **Idle timeout (validation F-01; FND intake §6b)**: the tenant setting
+  `sessionTimeoutMinutes` (tenant, else platform, else 30) is read in `SessionPrincipalQuery`'s one query and sent as
+  `AuthProfile.sessionTimeoutMinutes`; `RefreshSessionCommand` revokes a browser session not refreshed for longer
+  (`Expired`, `SESSION_REVOKED` info `idle_timeout`) and answers `401 AUTH-017`; an access token already issued stays valid
+  until it expires. `core/auth/idle-watcher.ts` (`provideIdleWatch()` in `app.config.ts`, `IdleWarningComponent` in the app
+  root, never in `shell/`) shares activity across tabs (`activity`/`renewed` on the session channel), renews an active
+  session at most once a minute, warns a minute before the end and signs out to `/login?reason=idle`.
   **Lists (validation v0.5.0, 2026-10-12)**: paged lists sort on the server before paging — `sort`/`direction` query
   parameters, an allow-list per list (`<Module>SortKeys.cs` over `Abstractions/Persistence/ListSorting.cs`: `ListSort`,
   `SortColumns<T>`, text keys case-insensitive via `lower()`, stable tie-breaker), VALIDATION-400 for anything else, and the
@@ -328,12 +340,22 @@ QMS source is never read or copied (section 1); everything here is written from 
   `password-recovery`, `portal-url`, `treasury-request`, `panic-value`; defaults `TryAdd`ed after the convention so a
   module adapter wins), `IOtpService` over `identity.otp_challenges` (HMAC digests, 5 min, 5 attempts;
   `Lis:Security:Session:Otp{Length,Lifetime,MaxAttempts}`; the code is logged at Debug only under
-  `AllowInsecureLocalDevelopment`); `PlatformUser.Mobile`; `POST /api/v1/auth/recovery/{start,complete}` (always 202 /
+  `AllowInsecureLocalDevelopment`); **delivery** `Lis:Notifications:*` (`Infrastructure/Notifications`, LIS-VR-002 §7):
+  `NotificationOptions` → `NotificationTransports` per channel — SMS to the HTTP gateway (`Sms:{Url,ApiKeyHeader,ApiKey,
+  Sender,BodyTemplate,Timeout}`, JSON POST), e-mail to SMTP (`Smtp:{Host,Port,EnableSsl,UserName,Password,From,Timeout}`,
+  `System.Net.Mail`), otherwise the pickup directory (`PickupDirectory`: one file `<utc-stamp>-<channel>-<recipient-hash>.txt`
+  with channel, recipient, template, language, subject, body); `DeliveringNotificationSender` renders through the template
+  source (so an inactive SA-20 template falls back to the built-in text, TPL-07) and absorbs a gateway failure (logged,
+  event 7204); with nothing configured `LoggingNotificationSender` stays the default. `ConfigGuard.InspectNotifications`
+  (transport rules everywhere; in Production the pickup folder under `E:\lis-data`). Dev API: `appsettings.Development.json`;
+  validation API: launch argument; read codes from the folder (`NotificationDeliveryFlowTests` shows how);
+  `PlatformUser.Mobile`; `POST /api/v1/auth/recovery/{start,complete}` (always 202 /
   204 or `AUTH-013`). **Tenant settings** — `app.tenant_settings` + `Platform.Domain.Settings.SettingKeys` (26 typed
   descriptors incl. `timeZone`, the laboratory zone without a client record, `SET-001`/`SET-002`), `ITenantSettings.GetAsync(SettingKeys.X)` (loaded once per scope),
   `GET/PUT /api/v1/settings` [settings.view / settings.manage]. Test host: `ApiFactory` disables the outbox loop
   (`Lis:Outbox:Enabled=false`, override per test) and replaces the sender with `RecordingNotificationSender`
-  (`factory.Notifications`). Frontend: `core/api/{auth,audit,settings}.contracts.ts`, `AuthStore.currentBranch/branchIds/
+  (`factory.Notifications`) unless the test sets `Overrides["Lis:Notifications:PickupDirectory"]` (then the real sender
+  writes pickup files). Frontend: `core/api/{auth,audit,settings}.contracts.ts`, `AuthStore.currentBranch/branchIds/
   selectBranch/startPasswordRecovery/completePasswordRecovery`. `dotnet ef` under a slot needs
   `--msbuildprojectextensionspath .local/build/<slot>/obj/Platform.Infrastructure/`.
 - Registration (wave 2, slot `reg`; intake `docs/intake/LIS-INT-REG-001_Registration.md`; migration `Registration`): aggregates
@@ -352,7 +374,7 @@ QMS source is never read or copied (section 1); everything here is written from 
   `Result` aggregate (`app.results`, states Ordered → Complete → Reviewed → Verified → Printed, cancel/undo/amend, flags,
   panic, delta, formula) with an append-only `app.result_log_entries` (per-result `sequence`), print lists, QC; policies on
   `VisitRegistered`, `VisitLineCancelled`, `SampleCollected`, `PatientsMerged`, `VisitTransferred`, `AnalyserResultReceived`;
-  read ports `IResultStatusLookup`, `IResultKpiLookup`; `ResultsController` under `/api/v1/results`. Frontend
+  read port `IResultStatusLookup`; `ResultsController` under `/api/v1/results`. Frontend
   `features/results`: `/results/worklist` (CP-18) and `/results/by-accession?accession=` (CP-19); link with
   `RESULTS_LINKS.accession(acc)`. Results by sample, work queue, QC and analyser landing are Release 2 (backend only).
 - Laboratory brand (2026-10-12, migration `LaboratoryLogo`): the top bar shows the client laboratory (logo or initials +
@@ -364,7 +386,11 @@ QMS source is never read or copied (section 1); everything here is written from 
   (`features/organization/ui/laboratory-logo-card`; the client Parameters page is Release 1: a laboratory sees the groups whose
   `ParameterGroup.release` is in scope — Registration, Printing, Samples and results, Security: R1; Subscription: R2 — and
   auto-collect / auto-receive locked On, `editableFrom: 'R2'`, until the sample pages exist) and shown read-only on the profile page. The site CSP allows `img-src blob:`; specs that render the profile page stub `LaboratoryBrandService`.
-- Not yet built: MFA/TOTP endpoints, step-up re-authentication, scheduled jobs and the retention purge, the OpenAPI
+- Wallet charge run (W2, intake PLT-001 §16 Q11): `WalletChargeJob` (Infrastructure `Jobs/`, hosted by `WalletChargeHostedService`,
+  `Lis:Jobs:WalletCharge:{Enabled,PollInterval}`, default on / 1 h; `ApiFactory` turns it off) charges each due Active client's plan fee once
+  per period (row-version guarded, no migration) through `WalletCharger`; `POST /api/v1/platform/wallets/charge-run` = SA-05 "Run charges now".
+  SMS usage metering is not built (no per-SMS price: business decision Q12).
+- Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).
 

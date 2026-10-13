@@ -73,6 +73,8 @@ public sealed record AuthResponse(
 /// <see cref="RoleNameAr"/> its Arabic name, so the shell shows the one of the current language (validation v0.5.0 B-09).
 /// <see cref="DisplayNameEn"/> and <see cref="DisplayNameAr"/> are the member's full name in each language (null without a
 /// membership); <see cref="DisplayName"/> stays the name in the preferred language (validation v0.5.0 R-12).
+/// <see cref="SessionTimeoutMinutes"/> is the idle timeout of the session's tenant (validation F-01): the SPA's idle watcher
+/// warns a minute before it and signs out at it; the server refuses a refresh after it (<c>AUTH-017</c>).
 /// </summary>
 public sealed record AuthProfile(
     Guid UserId,
@@ -87,7 +89,8 @@ public sealed record AuthProfile(
     bool MustChangePassword = false,
     string? RoleNameAr = null,
     string? DisplayNameEn = null,
-    string? DisplayNameAr = null);
+    string? DisplayNameAr = null,
+    int? SessionTimeoutMinutes = null);
 
 public sealed record TenantChoice(Guid TenantId, string DisplayName);
 
@@ -116,4 +119,13 @@ public static class AuthProblemCodes
     /// <c>403 AUTH-016</c>. The SPA routes such a user to the profile page.
     /// </summary>
     public const string PasswordChangeRequired = "AUTH-016";
+
+    /// <summary>
+    /// Validation F-01: the refresh came after the session had been idle longer than its tenant's <c>sessionTimeoutMinutes</c>
+    /// (the platform's value when the laboratory set none, else 30). The session is revoked (reason <c>Expired</c>, security
+    /// event <c>SESSION_REVOKED</c> info <c>idle_timeout</c>, no reuse alarm) and the refresh refused <c>401 AUTH-017</c>;
+    /// the SPA shows "Your session ended after inactivity" on the sign-in page. A later refresh with the same cookie is the
+    /// ordinary <c>AUTH-012</c> of an ended session.
+    /// </summary>
+    public const string SessionIdleTimeout = "AUTH-017";
 }

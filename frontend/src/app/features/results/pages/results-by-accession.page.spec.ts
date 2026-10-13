@@ -10,6 +10,7 @@ import { RESULTS_API, type ResultRowView } from '../../../core/api/results.contr
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
+import { type DocumentTexts, documentTexts } from '../../../shared/print/document-texts';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { ResultsCaseFacade } from '../state/results-case.facade';
 import { ResultsPrinter } from '../state/results-printer';
@@ -18,6 +19,10 @@ import { ResultsByAccessionPage } from './results-by-accession.page';
 
 class PrinterStub {
   readonly printed: string[] = [];
+
+  reportTexts(doc: { language: string }): Promise<DocumentTexts> {
+    return Promise.resolve(documentTexts(doc.language === 'ar' ? 'ar' : 'en', {}));
+  }
 
   report(doc: { reportUnitKey: string }): Promise<void> {
     this.printed.push(`report:${doc.reportUnitKey}`);
@@ -33,6 +38,8 @@ describe('ResultsByAccessionPage (CP-19)', () => {
   let granted: Set<string>;
   let confirmAnswer: boolean;
   let reasonAnswer: string | null;
+
+  afterEach(() => vi.restoreAllMocks());   // the dictionary fetch of one test must not reach the next
 
   async function render(): Promise<void> {
     TestBed.tick();
@@ -98,6 +105,8 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     expect(host.textContent).toContain('Mona Adel');
     expect(host.textContent).toContain('ACC-2026-00001');
     expect(host.querySelector('.visits .visit-list')).toBeNull();
+    // validation 2026-10-11: a visit opened from a link no longer sits under "Matching visits (0)"
+    expect(host.querySelector('.visits')?.textContent).toContain('results.case.matchingTitle');
     expect(buttons('results.case.review').length).toBe(0);
     expect(buttons('results.case.verify').length).toBe(0);
     const input = host.querySelector<HTMLInputElement>('app-result-grid .value-input');
@@ -277,8 +286,15 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     const search = backend.expectOne((call) => call.url === RESULTS_API.visits);
     expect(search.request.params.get('patientName')).toBe('mo%');
     expect(search.request.params.get('branchOnly')).toBe('true');
-    search.flush(page([visitItem()]));
+    search.flush(page([visitItem(), visitItem({ visitId: 'visit-vip', accession: 'ACC-2026-00027', patientNumber: 'PAT-2026-00010', patientName: 'VIP patient', patientNameAr: null, patientMasked: true })]));
     await render();
+    // A-03 on CP-19: a VIP row masked by the server reads the dictionary's "VIP patient"; the other keeps its name
+    const listed = [...host.querySelectorAll('.visit-list button.visit')].map((button) => button.textContent ?? '');
+    expect(listed[1]).toContain('results.vipMasked');
+    expect(listed[1]).toContain('PAT-2026-00010');
+    expect(listed[0]).not.toContain('results.vipMasked');
+    expect(host.querySelector('.visits')?.textContent).not.toContain('results.case.matchingTitle');
+    expect(host.querySelector('.visits')?.textContent).toContain('results.case.matching');
 
     const item = host.querySelector<HTMLButtonElement>('.visit-list button.visit');
     expect(item?.textContent).toContain('ACC-2026-00001');
@@ -333,8 +349,86 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     await i18n.load('results');
     await render();
     expect(lines()[0]).toContain('وحدة تقرير واحدة · نتيجة واحدة');
-    expect(lines()[1]).toContain('٢ وحدة تقرير · ٣ نتيجة');
+    // F-11: the Arabic dual and the 3–10 plural
+    expect(lines()[1]).toContain('وحدتا تقرير · ٣ نتائج');
     expect(host.querySelector('app-section-card.visits')?.textContent).toContain('(٢)');   // the heading count (round 3 R3-02)
+    i18n.setLanguage('en');
+  });
+
+  it('F-06: an opened VIP case reads "VIP patient" without the See-VIP right and Print is disabled with the reason', async () => {
+    granted = new Set(['results.view', 'results.export']);
+    printer = new PrinterStub();
+    await TestBed.configureTestingModule({
+      imports: [ResultsByAccessionPage],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        provideHttpClient(withInterceptors([problemDetailsInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+        { provide: ResultsPrinter, useValue: printer },
+        ResultsCaseFacade,
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ResultsByAccessionPage);
+    backend = TestBed.inject(HttpTestingController);
+    host = fixture.nativeElement as HTMLElement;
+    fixture.componentRef.setInput('accession', 'ACC-2026-00018');
+    await render();
+    const masked = caseView([reportUnit([resultRow({ status: 'Verified', numericValue: 95, textValue: '95.0' })])]);
+    backend.expectOne((call) => call.url === RESULTS_API.results).flush({
+      ...masked,
+      patient: { ...masked.patient, number: 'PAT-2026-00010', fullName: 'VIP patient', nameAr: null, dateOfBirth: null, isVip: true, isMasked: true },
+    });
+    await render();
+
+    const title = host.querySelector('.case-title')?.textContent ?? '';
+    expect(title).toContain('results.vipMasked');
+    expect(title).not.toContain('Mona Adel');
+    expect(host.querySelector('.case-sub')?.textContent).toContain('PAT-2026-00010');
+    const print = buttons('results.case.print')[0]!;
+    expect(print.disabled).toBe(true);
+    expect(print.getAttribute('title')).toBe('results.case.printVipBlocked');
+    expect(host.querySelector('.vip-print')?.textContent).toContain('results.case.printVipBlocked');
+    print.click();
+    await settle();
+    backend.expectNone((call) => call.url === RESULTS_API.print('unit-1'));
+    expect(printer.printed).toEqual([]);
+  });
+
+  it('F-09: an Arabic page shows the age, the counts and the print count in Arabic-Indic digits', async () => {
+    const dictionaries: Record<string, unknown> = { '/i18n/results.en.json': resultsEn, '/i18n/results.ar.json': resultsAr };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) => new Response(JSON.stringify(dictionaries[String(input)] ?? {}), { status: 200 }));
+    granted = new Set(['results.view']);
+    await TestBed.configureTestingModule({
+      imports: [ResultsByAccessionPage],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        provideHttpClient(withInterceptors([problemDetailsInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+        { provide: ResultsPrinter, useValue: new PrinterStub() },
+        ResultsCaseFacade,
+      ],
+    }).compileComponents();
+    const i18n = TestBed.inject(I18nService);
+    i18n.setLanguage('ar');
+    await i18n.load('results');
+    fixture = TestBed.createComponent(ResultsByAccessionPage);
+    backend = TestBed.inject(HttpTestingController);
+    host = fixture.nativeElement as HTMLElement;
+    fixture.componentRef.setInput('accession', 'ACC-2026-00001');
+    await render();
+    const unit = reportUnit([resultRow({ status: 'Printed', numericValue: 95, textValue: '95.0' })]);
+    backend.expectOne((call) => call.url === RESULTS_API.results).flush(caseView([{ ...unit, isPrinted: true, printCount: 2 }], { hiddenUnits: 3 }));
+    await render();
+
+    const sub = host.querySelector('.case-sub')?.textContent ?? '';
+    expect(sub).toContain('٣٦');
+    expect(sub).not.toMatch(/\b36\b/);
+    expect(host.querySelector('.unit-title')?.textContent).toContain('×٢');
+    expect(host.querySelector('.case-flags')?.textContent).toContain('٣ وحدات تقرير');
     i18n.setLanguage('en');
   });
 });

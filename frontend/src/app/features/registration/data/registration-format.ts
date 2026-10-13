@@ -14,11 +14,21 @@ export function count(value: number | null | undefined, lang: Language = 'en'): 
   return new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 2 }).format(number);
 }
 
+/**
+ * The dictionary key of a counted sentence: one rule for the portal (`core/i18n/count-text.ts`): `<base>None` (0),
+ * `<base>One` (1), and in Arabic `<base>Two` (2), `<base>` for 3–10 (plural noun) and `<base>Many` from 11 (singular
+ * noun); in English `<base>` from 2. Prefer `I18nService.tc`, which also falls back to the base key.
+ */
+export { countKey } from '../../../core/i18n/count-text';
+
 export function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-/** A UTC instant as local date and time (browser time zone), `—` when absent. */
+/**
+ * A UTC instant as local date and time (browser time zone) in the language's digits, `—` when absent. Medium date style
+ * ("12 Oct 2026, 04:23") like the other pages of the portal (validation 2026-10-11: the grid showed "13/10/2026, 04:27").
+ */
 export function dateTime(utc: string | null | undefined, lang: Language = 'en'): string {
   if (!utc) {
     return '—';
@@ -27,7 +37,39 @@ export function dateTime(utc: string | null | undefined, lang: Language = 'en'):
   const date = new Date(utc);
   return Number.isNaN(date.getTime())
     ? '—'
-    : new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+    : new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+/** Amounts on a printed document: two decimals with Latin digits in every language (validation v0.5.0 F-10). */
+export function printMoney(value: number | null | undefined, lang: Language = 'en'): string {
+  const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return new Intl.NumberFormat(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+}
+
+/**
+ * Date and time on a printed document (job order, quote, receipt): the medium style of the page language with Latin
+ * digits in every language, like the labels, the billing documents and the result report (validation v0.5.0 F-10: the
+ * Arabic job order printed "١٢‏/١٠‏/٢٠٢٦").
+ */
+export function printDateTime(utc: string | null | undefined, lang: Language = 'en'): string {
+  if (!utc) {
+    return '—';
+  }
+
+  const date = new Date(utc);
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+/** The compact date and time of a sample label ("12/10/2026, 04:27"): Latin digits in every language, like the printed reports. */
+export function labelDateTime(utc: string | null | undefined): string {
+  if (!utc) {
+    return '—';
+  }
+
+  const date = new Date(utc);
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('en-GB', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
 export function dateOnly(utc: string | null | undefined, lang: Language = 'en'): string {

@@ -78,17 +78,26 @@ public sealed class Payer : AggregateRoot, ITenantScoped
         return payer;
     }
 
-    /// <summary>P2 Edit (<c>pricing.edit</c>): name, search key, type and web portal; the default payer stays Cash (PRC-020).</summary>
-    public void Update(LocalizedText name, string searchKey, PayerType type, bool webPortalEnabled, string? webUsername)
+    /// <summary>
+    /// P2 Edit (<c>pricing.edit</c>): name, search key, type and web portal; the default payer stays Cash (PRC-020).
+    /// Raises <see cref="PayerUpdated"/> only when something changed, so the audit trail records the edit beside its
+    /// field changes (validation v0.5.0 O-5).
+    /// </summary>
+    public void Update(LocalizedText name, string searchKey, PayerType type, bool webPortalEnabled, string? webUsername, DateTimeOffset nowUtc)
     {
         ArgumentNullException.ThrowIfNull(name);
         Require(!IsDefault || type == PayerType.Cash, PricingCodes.DefaultPayerLocked, "The default cash payer must stay of type Cash.", DomainFault.Conflict);
 
+        var before = (Name, SearchKey, Type, WebPortalEnabled, WebUsername);
         var key = CleanSearchKey(searchKey);
         SetWebPortal(webPortalEnabled, webUsername);
         Name = name;
         SearchKey = key;
         Type = type;
+        if (before != (Name, SearchKey, Type, WebPortalEnabled, WebUsername))
+        {
+            Raise(new PayerUpdated(Id, SearchKey, nowUtc));
+        }
     }
 
     /// <summary>P3 Deactivate (<c>pricing.manage</c>). Idempotent; the default payer is locked (PRC-020).</summary>
@@ -128,13 +137,19 @@ public sealed class Payer : AggregateRoot, ITenantScoped
         return tier;
     }
 
-    /// <summary>P6 Rename tier (<c>pricing.edit</c>).</summary>
-    public void RenameTier(Guid tierId, LocalizedText name)
+    /// <summary>P6 Rename tier (<c>pricing.edit</c>). Raises <see cref="ContractTierRenamed"/> when the name changed (validation v0.5.0 O-5).</summary>
+    public void RenameTier(Guid tierId, LocalizedText name, DateTimeOffset nowUtc)
     {
         ArgumentNullException.ThrowIfNull(name);
         var tier = TierOf(tierId);
         RequireUniqueTierName(name, tierId);
+        if (tier.Name.Equals(name))
+        {
+            return;
+        }
+
         tier.Rename(name);
+        Raise(new ContractTierRenamed(Id, tier.Id, nowUtc));
     }
 
     /// <summary>P7 Deactivate tier (<c>pricing.manage</c>). Idempotent; the default tier is locked (PRC-021).</summary>

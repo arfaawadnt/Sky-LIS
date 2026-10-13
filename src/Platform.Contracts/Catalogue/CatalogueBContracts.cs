@@ -30,8 +30,14 @@ public sealed record CreateDoctorRequest(string Code, string NameEn, string Name
 
 public sealed record UpdateDoctorRequest(string NameEn, string NameAr, string? Specialty, string? Occupation, IReadOnlyList<Guid>? BranchIds, decimal SharePercent, string? Phone);
 
-/// <summary><paramref name="BranchIds"/> empty = offered in every branch.</summary>
-public sealed record DoctorListItem(Guid Id, string Code, string NameEn, string NameAr, string? Specialty, string? Occupation, IReadOnlyList<Guid> BranchIds, decimal SharePercent, string? Phone, bool IsActive);
+/// <summary>
+/// <paramref name="BranchIds"/> empty = offered in every branch. <paramref name="Branches"/>: the code and name of each of those
+/// branches, read on the server (validation v0.5.0: a user limited to some branches never sees an id for the others).
+/// </summary>
+public sealed record DoctorListItem(Guid Id, string Code, string NameEn, string NameAr, string? Specialty, string? Occupation, IReadOnlyList<Guid> BranchIds, decimal SharePercent, string? Phone, bool IsActive, IReadOnlyList<DoctorBranch> Branches);
+
+/// <summary>A branch of a doctor as the register shows it (code, bilingual name), in the order of <c>BranchIds</c>.</summary>
+public sealed record DoctorBranch(Guid Id, string Code, string NameEn, string NameAr);
 
 // CP-49 Diagnoses
 
@@ -79,13 +85,14 @@ public sealed record ReasonListItem(Guid Id, string Kind, string NameEn, string 
 
 // CP-54 Report templates
 
-/// <summary>Header and footer: both languages or none.</summary>
+/// <summary>
+/// Header and footer: both languages or none. Logo and signature are not part of the request: they are uploaded and
+/// removed on their own (<c>POST|DELETE …/report-templates/{id}/images/{logo|signature}</c>, intake A10).
+/// </summary>
 public sealed record ReportTemplateRequest(
     string NameEn,
     string NameAr,
     string Type,
-    Guid? LogoFileId,
-    Guid? SignatureFileId,
     bool ShowQr,
     string Language,
     string? HeaderTextEn,
@@ -107,6 +114,9 @@ public sealed record ReportTemplateListItem(
     string? FooterTextEn,
     string? FooterTextAr,
     bool IsActive);
+
+/// <summary>An image just attached to a report template: which one (<c>Logo</c>, <c>Signature</c>), its new file id, the detected type and the size.</summary>
+public sealed record ReportTemplateImageView(string Image, Guid FileId, string ContentType, long SizeBytes);
 
 // CP-56 / SA-14 Microbiology
 

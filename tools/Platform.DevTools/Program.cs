@@ -26,7 +26,7 @@ using Platform.SharedKernel.MultiTenancy;
 //   grant-role <username> <tenantId> <roleNameEn> <perm,perm,…>        creates or updates the role and assigns it to the membership
 //   seed-treasury <tenantId> <code> <nameEn> <nameAr>                   a treasury in a generated branch
 //   seed-demo-lab <username> <password> [tenantId]                      a complete Release-1 laboratory for browser walk-throughs: branch, catalogue with prices,
-//                                                                       treasury, a role with every permission, users <username> and <username>.manager
+//                                                                       treasury, a role with every laboratory permission, users <username> and <username>.manager
 //   seed-reasons <tenantId>                                             cancellation, refund, discount and rejection reasons (idempotent by name)
 //   seed-platform-admin <username> <password>                           a National Technology administrator of the platform tenant
 //                                                                       (user + membership in TenantIds.Platform + role "Platform Administrator" with every permission)
@@ -227,7 +227,8 @@ switch (args[0])
         await unitOfWork.SaveChangesAsync(CancellationToken.None);
         var reasonsSeeded = await SeedReasonsAsync(services, unitOfWork, now);
 
-        var role = Role.Create(new LocalizedText("Laboratory Administrator", "مدير المختبر"), PermissionCatalog.Keys, now, "Every permission of the laboratory (demo seed).", SpecialRights.All);
+        // every key a laboratory may grant, never the platform-only modules (validation F-07: ORG-033 refused every later save of the role)
+        var role = Role.Create(new LocalizedText("Laboratory Administrator", "مدير المختبر"), EffectivePrivileges.TenantGrantableKeys, now, "Every permission of the laboratory (demo seed).", SpecialRights.All);
         role.SetResultRights([new ResultRight(chemistry.Id, null, true, true, true, true, true), new ResultRight(haematology.Id, null, true, true, true, true, true)], now);
         services.GetRequiredService<IRoleRepository>().Add(role);
         await unitOfWork.SaveChangesAsync(CancellationToken.None);   // the role needs its tenant stamp before the memberships reference it

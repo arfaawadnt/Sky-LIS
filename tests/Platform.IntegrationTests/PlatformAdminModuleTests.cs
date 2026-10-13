@@ -16,6 +16,7 @@ using Platform.SharedKernel.Localization;
 using Platform.SharedKernel.MultiTenancy;
 using Platform.SharedKernel.Primitives;
 using NotificationTemplate = Platform.Domain.PlatformAdmin.NotificationTemplate;
+using Platform.TestSupport;
 
 namespace Platform.IntegrationTests;
 
@@ -28,7 +29,6 @@ namespace Platform.IntegrationTests;
 public sealed class PlatformAdminModuleTests(DatabaseFixture fixture)
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 9, 9, 0, 0, TimeSpan.Zero);
-    private static int _isoCounter = 100;
 
     [DatabaseFact]
     public async Task The_runtime_role_reads_and_writes_the_platform_tables_and_unique_keys_are_UNIQUE_409()
@@ -257,8 +257,7 @@ public sealed class PlatformAdminModuleTests(DatabaseFixture fixture)
     private async Task<(Country Country, Governorate Governorate, Plan Plan)> SeedPlaceAsync()
     {
         var suffix = Guid.CreateVersion7().ToString("N");
-        var n = Interlocked.Increment(ref _isoCounter);
-        var iso = new string([(char)('A' + (n / 26 % 26)), (char)('A' + (n % 26))]);
+        var iso = TestCountryCodes.Next();
         var country = NewCountry(iso);
         var governorate = Governorate.Create(country, "Gov " + suffix[..8], "محافظة", null, null);
         var plan = NewPlan("P" + suffix[^8..].ToUpperInvariant());

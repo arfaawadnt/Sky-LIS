@@ -65,6 +65,8 @@ export function settings(overrides: Partial<RegistrationPageSettings> = {}): Reg
     canPay: true,
     canSeeVip: false,
     currency: 'EGP',
+    branchNameEn: 'Main Branch',
+    branchNameAr: 'الفرع الرئيسي',
     ...overrides,
   };
 }

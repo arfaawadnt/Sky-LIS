@@ -53,14 +53,14 @@ public sealed class RenameContractTierValidator : AbstractValidator<RenameContra
     }
 }
 
-public sealed class RenameContractTierHandler(IPayerRepository payers, IUnitOfWork unitOfWork) : ICommandHandler<RenameContractTierCommand>
+public sealed class RenameContractTierHandler(IPayerRepository payers, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<RenameContractTierCommand>
 {
     public async Task Handle(RenameContractTierCommand command, CancellationToken cancellationToken)
     {
         var payer = await payers.GetForUpdateAsync(command.PayerId, cancellationToken)
             ?? throw new DomainException(PricingCodes.PayerNotFound, "Payer not found.", DomainFault.NotFound);
 
-        payer.RenameTier(command.TierId, new LocalizedText(command.NameEn, command.NameAr));
+        payer.RenameTier(command.TierId, new LocalizedText(command.NameEn, command.NameAr), clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

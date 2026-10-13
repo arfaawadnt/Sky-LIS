@@ -150,9 +150,17 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
             results = results.Where(result => wanted.Contains(result.Status));
         }
 
+        // F-15: "late" is TurnaroundClock.IsLate over the tenant's delayLatePercent (the row colour), stated here in SQL:
+        // every open result when the threshold is 0; else the clock has started and either the duration is zero (late when
+        // the threshold is at most 100 %) or elapsed × 100 ≥ duration × threshold.
+        var everyOpenLate = filter.LatePercent <= 0;
+        var zeroDurationLate = filter.LatePercent <= 100;
+        double latePercent = filter.LatePercent;
         if (filter.DelayedOnly)
         {
-            results = results.Where(result => result.ExpectedAtUtc < nowUtc && (result.Status == ResultStatus.Ordered || result.Status == ResultStatus.Complete || result.Status == ResultStatus.Reviewed));
+            results = results.Where(result => (result.Status == ResultStatus.Ordered || result.Status == ResultStatus.Complete || result.Status == ResultStatus.Reviewed)
+                && (everyOpenLate || (result.ClockStartUtc < nowUtc
+                    && (result.ExpectedAtUtc <= result.ClockStartUtc ? zeroDurationLate : (nowUtc - result.ClockStartUtc).TotalSeconds * 100 >= (result.ExpectedAtUtc - result.ClockStartUtc).TotalSeconds * latePercent))));
         }
 
         if (filter.BranchId is { } branchId)
@@ -186,29 +194,38 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
         {
             // CP-18 "Search": accession, sample number and patient number by prefix, the patient's Latin or Arabic name
             // anywhere in it, case-insensitive (UAT A-14: names found nothing).
+            // A-03: without the See-VIP right the name does not find a VIP file; accession, sample and patient number do.
             var term = search.ToUpperInvariant();
             var name = LikePattern(search);
+            var includeVip = filter.IncludeVip;
             joined = joined.Where(row =>
                 row.Result.Accession.StartsWith(term)
                 || (row.Sample != null && row.Sample.SampleNumber.StartsWith(term))
                 || patients.Any(patient => patient.Id == row.Result.PatientId
-                    && (patient.Number.StartsWith(term) || EF.Functions.ILike(patient.FullName, name, "\\") || (patient.NameAr != null && EF.Functions.ILike(patient.NameAr, name, "\\")))));
+                    && (patient.Number.StartsWith(term)
+                        || ((includeVip || !patient.IsVip) && (EF.Functions.ILike(patient.FullName, name, "\\") || (patient.NameAr != null && EF.Functions.ILike(patient.NameAr, name, "\\")))))));
         }
 
         var total = await joined.LongCountAsync(cancellationToken).ConfigureAwait(false);
         var requests = await joined.Select(row => row.Result.VisitId).Distinct().LongCountAsync(cancellationToken).ConfigureAwait(false);
         var tubes = await joined.Where(row => row.Result.TubeId != null).Select(row => row.Result.TubeId).Distinct().LongCountAsync(cancellationToken).ConfigureAwait(false);
-        var delayed = await joined.LongCountAsync(row => row.Result.ExpectedAtUtc < nowUtc && (row.Result.Status == ResultStatus.Ordered || row.Result.Status == ResultStatus.Complete || row.Result.Status == ResultStatus.Reviewed), cancellationToken).ConfigureAwait(false);
+        var delayed = await joined.LongCountAsync(
+            row => (row.Result.Status == ResultStatus.Ordered || row.Result.Status == ResultStatus.Complete || row.Result.Status == ResultStatus.Reviewed)
+                && (everyOpenLate || (row.Result.ClockStartUtc < nowUtc
+                    && (row.Result.ExpectedAtUtc <= row.Result.ClockStartUtc ? zeroDurationLate : (nowUtc - row.Result.ClockStartUtc).TotalSeconds * 100 >= (row.Result.ExpectedAtUtc - row.Result.ClockStartUtc).TotalSeconds * latePercent))),
+            cancellationToken).ConfigureAwait(false);
 
         var tests = Context.Set<LabTest>().AsNoTracking();
         var groups = Context.Set<ClinicalGroup>().AsNoTracking();
 
         // B-03: the order chosen in the table applies to the whole filtered list, before paging; without one, urgent
-        // first, then the expected time.
+        // first, then the expected time. A masked VIP row sorts by its masked name (A-03), so the order reveals nothing.
+        var showVip = filter.IncludeVip;
+        const string maskedName = "VIP patient";
         var sorts = SortsOf(joined)
             .Column("accession", row => row.Result.Accession)
-            .Column("patientEn", row => patients.Where(patient => patient.Id == row.Result.PatientId).Select(patient => patient.FullName).FirstOrDefault())
-            .Column("patientAr", row => patients.Where(patient => patient.Id == row.Result.PatientId).Select(patient => patient.NameAr ?? patient.FullName).FirstOrDefault())
+            .Column("patientEn", row => patients.Where(patient => patient.Id == row.Result.PatientId).Select(patient => !showVip && patient.IsVip ? maskedName : patient.FullName).FirstOrDefault())
+            .Column("patientAr", row => patients.Where(patient => patient.Id == row.Result.PatientId).Select(patient => !showVip && patient.IsVip ? maskedName : patient.NameAr ?? patient.FullName).FirstOrDefault())
             .Column("testEn", row => tests.Where(test => test.Id == row.Result.TestId).Select(test => test.Name.En).FirstOrDefault())
             .Column("testAr", row => tests.Where(test => test.Id == row.Result.TestId).Select(test => test.Name.Ar).FirstOrDefault())
             .Column("status", row => row.Result.Status == ResultStatus.Ordered ? 0 : row.Result.Status == ResultStatus.Complete ? 1 : row.Result.Status == ResultStatus.Reviewed ? 2 : row.Result.Status == ResultStatus.Verified ? 3 : row.Result.Status == ResultStatus.Printed ? 4 : 5)
@@ -263,13 +280,14 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
                 row.Result.Flag,
                 row.Result.PrintCount,
                 row.Result.Source,
+                IsVip = patient != null && patient.IsVip,
             }).ToListAsync(cancellationToken).ConfigureAwait(false);
 
         var items = rows.Select(row => new WorklistRow(
             row.Id, row.VisitId, row.Accession, row.PatientId, row.PatientNumber, row.PatientName, row.PatientNameAr, row.Gender, BirthOf(row.DateOfBirth, row.AgeYears, row.AgeMonths, row.AgeDays, row.AgeRecordedOn),
             row.TestId, row.TestCode, row.TestNameEn, row.TestNameAr, row.ClinicalGroupId, row.GroupNameEn, row.GroupNameAr, row.Status,
             row.TubeId, row.SampleNumber, row.SampleStatus?.ToString(), row.CollectedAtUtc, row.ClockStartUtc, row.ExpectedAtUtc, row.VerifiedAtUtc,
-            row.Urgent, row.TextValue, row.Flag, row.PrintCount, row.Source)).ToList();
+            row.Urgent, row.TextValue, row.Flag, row.PrintCount, row.Source, row.IsVip)).ToList();
         return new WorklistSlice(items, total, requests, tubes, delayed);
     }
 
@@ -318,8 +336,13 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
 
         if (filter.PatientName is { Length: > 0 } name)
         {
+            // A-03: without the See-VIP right a name does not find a VIP file (number and accession still do)
             var pattern = LikePattern(name);
-            var ids = patients.Where(patient => EF.Functions.ILike(patient.FullName, pattern, "\\") || (patient.NameAr != null && EF.Functions.ILike(patient.NameAr, pattern, "\\"))).Select(patient => patient.Id);
+            var includeVip = filter.IncludeVip;
+            var ids = patients
+                .Where(patient => includeVip || !patient.IsVip)
+                .Where(patient => EF.Functions.ILike(patient.FullName, pattern, "\\") || (patient.NameAr != null && EF.Functions.ILike(patient.NameAr, pattern, "\\")))
+                .Select(patient => patient.Id);
             visible = visible.Where(result => ids.Contains(result.PatientId));
         }
 
@@ -378,22 +401,6 @@ internal sealed class ResultRepository(AppDbContext context) : Repository<Result
         var rows = await grouped.OrderByDescending(row => row.RegisteredAtUtc).ThenBy(row => row.Accession).Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken).ConfigureAwait(false);
         var items = rows.Select(row => new ResultVisitRow(row.VisitId, row.Accession, row.RegisteredAtUtc, row.PatientId, row.BranchId, (ResultStatus)row.Rank, row.Results, row.Units, row.Panic == 1, row.Delta == 1, row.Printed > 0)).ToList();
         return new Paged<ResultVisitRow>(items, page.Page, page.PageSize, total);
-    }
-
-    public async Task<ResultKpis> KpisAsync(Guid? branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc, DateTimeOffset nowUtc, CancellationToken cancellationToken)
-    {
-        var live = Live;
-        if (branchId is { } branch)
-        {
-            live = live.Where(result => result.BranchId == branch);
-        }
-
-        var open = live.Where(result => result.Status == ResultStatus.Ordered || result.Status == ResultStatus.Complete || result.Status == ResultStatus.Reviewed);
-        var pending = await open.CountAsync(result => result.RegisteredAtUtc >= fromUtc && result.RegisteredAtUtc < toUtc, cancellationToken).ConfigureAwait(false);
-        var backlog = await open.CountAsync(result => result.Status != ResultStatus.Ordered, cancellationToken).ConfigureAwait(false);
-        var delayed = await open.CountAsync(result => result.ExpectedAtUtc < nowUtc, cancellationToken).ConfigureAwait(false);
-        var verified = await live.CountAsync(result => result.VerifiedAtUtc >= fromUtc && result.VerifiedAtUtc < toUtc, cancellationToken).ConfigureAwait(false);
-        return new ResultKpis(pending, backlog, delayed, verified);
     }
 
     public Task<bool> AnyVerifiedAsync(IReadOnlyCollection<Guid> lineIds, CancellationToken cancellationToken)

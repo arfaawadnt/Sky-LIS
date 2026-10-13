@@ -110,7 +110,11 @@ internal sealed class FakeCatalogue : ICatalogueLookup
         Package = Add("CHK", ServiceType.Package, null, null, members: [Urea.Id, Cbc.Id]);
         Creatinine = Add("CREA", ServiceType.Test, Chemistry, Serum, test: Test("CREA", frequencyDays: 30));
         Renal = Add("RENAL", ServiceType.Profile, Chemistry, Serum, tests: [Creatinine.Members[0].MemberId, Tests.Values.Single(test => test.Code == "UREA").Id]);
+        Wellness = Add("WELL", ServiceType.Package, null, null, members: [Renal.Id, Glucose.Id]);
     }
+
+    /// <summary>A package holding the RENAL profile and GLU (validation O-3: a test inside a profile inside a package).</summary>
+    public CatalogueServiceInfo Wellness { get; }
 
     /// <summary>A single-test service whose test is also a member of <see cref="Renal"/> (validation A-11).</summary>
     public CatalogueServiceInfo Creatinine { get; }
@@ -403,7 +407,14 @@ internal sealed class InMemoryVisits : IVisitRepository
             .Where(visit => visit.PatientId == patientId && visit.Id != excludeVisitId)
             .SelectMany(visit => visit.Lines.Where(line => line.IsLive && line.OrderedAtUtc >= sinceUtc).SelectMany(line => line.TestIds.Where(testIds.Contains).Select(test => new PriorTestOrder(test, visit.Id, visit.Accession, line.OrderedAtUtc))))]);
 
-    public Task<Paged<VisitRow>> SearchAsync(VisitSearchFilter filter, PageRequest page, CancellationToken cancellationToken) => throw new NotSupportedException();
+    /// <summary>The last register filter asked (the engine filters are tested in the integration suite); answers no rows.</summary>
+    public VisitSearchFilter? LastFilter { get; private set; }
+
+    public Task<Paged<VisitRow>> SearchAsync(VisitSearchFilter filter, PageRequest page, CancellationToken cancellationToken)
+    {
+        LastFilter = filter;
+        return Task.FromResult(new Paged<VisitRow>([], page.Page, page.PageSize, 0));
+    }
 
     public Task<IReadOnlyList<VisitRow>> SearchAllAsync(VisitSearchFilter filter, int limit, CancellationToken cancellationToken) => throw new NotSupportedException();
 

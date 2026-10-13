@@ -4,7 +4,7 @@ import type { CashClosingSheetDocument } from '../../../../core/api/billing.cont
 import { I18nService } from '../../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../../shared/forms/localized-text';
 import { DocumentFrameComponent } from '../../../../shared/print/document-frame.component';
-import { formatDateTime, formatMoney } from '../billing-format';
+import { formatPrintDateTime, formatPrintMoney } from '../billing-format';
 import { branchOf } from './receipt-document.component';
 
 /** The cash-closing sheet (A4, CP-30, BR-16): totals per method, expected and counted cash, movements and handover signatures. */
@@ -127,10 +127,10 @@ export class ClosingSheetDocumentComponent {
   protected readonly treasury = computed(() => localizedPick({ en: this.doc().treasuryNameEn, ar: this.doc().treasuryNameAr }, this.i18n.lang()));
 
   protected money(value: number | null): string {
-    return formatMoney(value, this.i18n.lang());
+    return formatPrintMoney(value, this.i18n.lang());
   }
 
   protected at(value: string): string {
-    return formatDateTime(value, this.i18n.lang());
+    return formatPrintDateTime(value, this.i18n.lang());
   }
 }

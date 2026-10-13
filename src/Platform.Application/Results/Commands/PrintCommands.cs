@@ -4,6 +4,7 @@ using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Abstractions.Settings;
 using Platform.Application.Organization;
+using Platform.Application.Patients;
 using Platform.Contracts.Common;
 using Platform.Contracts.Results;
 using Platform.Domain.Authorization;
@@ -24,8 +25,8 @@ public sealed class PrintReportUnitValidator : AbstractValidator<PrintReportUnit
     public PrintReportUnitValidator() => RuleFor(command => command.ReportUnitKey).Must(ReportUnits.IsWellFormed).WithMessage("A report unit key is required.");
 }
 
-/// <summary>Every live result of the unit is printable first (nothing is marked when one refuses), then all are marked printed.</summary>
-public sealed class PrintReportUnitHandler(IResultRepository results, ITenantSettings settings, IUserPrivileges privileges, IUserDirectory directory, IUnitOfWork unitOfWork, ICurrentUser user, IClock clock) : ICommandHandler<PrintReportUnitCommand>
+/// <summary>Every live result of the unit is printable first (nothing is marked when one refuses), then all are marked printed; a VIP patient's report needs the See-VIP right (RES-056).</summary>
+public sealed class PrintReportUnitHandler(IResultRepository results, ITenantSettings settings, IUserPrivileges privileges, IUserDirectory directory, IPatientLookup patients, IUnitOfWork unitOfWork, ICurrentUser user, IClock clock) : ICommandHandler<PrintReportUnitCommand>
 {
     public async Task Handle(PrintReportUnitCommand command, CancellationToken cancellationToken)
     {
@@ -34,6 +35,9 @@ public sealed class PrintReportUnitHandler(IResultRepository results, ITenantSet
         var name = await ResultsActor.NameOfAsync(user, directory, cancellationToken);
         var printUnverified = await settings.GetAsync(SettingKeys.PrintUnverified, cancellationToken);
         var unit = await results.ListByUnitsForUpdateAsync([command.ReportUnitKey], cancellationToken);
+        var live = Queries.ReportGuards.Visible(unit, privileges);   // RES-405 first: a unit the user cannot see says nothing of its patient
+        ResultVip.EnsureCanPrint(await patients.GetAsync(live[0].PatientId, cancellationToken), privileges);   // RES-056 (F-06)
+
         UnitPrinting.Print(unit, ResultRights.VisibilityOf(privileges), result => ResultRights.Actor(actor, name, privileges, result), printUnverified, null, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }

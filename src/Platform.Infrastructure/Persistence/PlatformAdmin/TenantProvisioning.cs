@@ -48,6 +48,8 @@ internal sealed class TenantProvisioningScope(AppDbContext context, ICurrentTena
 /// <summary>
 /// <see cref="IMasterDataCloner"/> (BR-25): catalogue A stages its copies before the handler's flush; catalogue B copies
 /// set-based after it, remapping services and clinical groups by code onto A's flushed rows (so A always runs first).
+/// A's clinical groups are staged without their report-template link (the templates are B's); B links them to its copies
+/// by name in the same transaction (validation Z-02).
 /// Each half runs elevated, inside the provisioning transaction, with the new tenant still current. A later half
 /// (pricing …) is added here in its place of the order.
 /// </summary>

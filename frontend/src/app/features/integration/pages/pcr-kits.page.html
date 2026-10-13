@@ -135,7 +135,7 @@
     @if (!run.readable) {
       <p class="problem" role="alert" data-testid="run-refused">{{ i18n.t('integration.kits.failedFile') }} {{ problemText(run.refusalCode ?? '') }} — {{ run.refusalReason }}</p>
     } @else {
-      <p class="info-strip">{{ i18n.tf('integration.kits.readFile', { count: run.samples.length, serial: run.fileSerial ?? '—' }) }}</p>
+      <p class="info-strip">{{ i18n.tc('integration.kits.readFile', run.samples.length, { serial: run.fileSerial ?? '—' }) }}</p>
       <table class="verdicts" data-testid="verdicts">
         <thead>
           <tr>

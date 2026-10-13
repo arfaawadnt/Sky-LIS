@@ -5,7 +5,7 @@
 | Module | `results` (Sky LIS Client Portal: CP-18 Worklist, CP-19 Results by accession, CP-20 Results by sample, CP-21 Work queue, CP-13 Print reports) and `quality` (CP-22 Quality control, placeholder scope); workflows WF-06, WF-07 (landing analyser results); business rules BR-03, BR-04, BR-08, BR-09, BR-10, BR-11, BR-13, BR-19, BR-20; status models "Test / result" and "Work-queue colour states" |
 | Slot / wave | `res`, wave 3 (MODULES.md §2) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001) and the LDM knowledge base (§2.3, §3.3–§3.7, §5, §6, §8, §12). **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.0 — 2026-10-10 |
+| Version | 1.1 — 2026-10-12 (validation v0.5.0: VIP on the opened case and report, RES-056, Q19; one "late" definition, Q21; report language, digits and counted wording, Q22) |
 | Implemented in | `src/Platform.Domain/{Results,Quality}`, `src/Platform.Contracts/{Results,Quality}`, `src/Platform.Application/{Results,Quality}` (+ `Results/Policies`), `src/Platform.Infrastructure/Persistence/{Results,Quality}`, `src/Platform.WebApi/Controllers/{Results,Quality}`, `frontend/src/app/features/results`, `frontend/src/app/core/api/results.contracts.ts`, `frontend/public/i18n/results.{en,ar}.json` |
 
 ## 1. Purpose and policy basis
@@ -40,8 +40,9 @@ In scope:
 - Worklist (CP-18), results by accession (CP-19), results by sample (CP-20), work queue (CP-21), print reports with
   print lists (CP-13), quality control (CP-22); documents: laboratory report per report unit, abbreviated worksheet,
   worklist (bench list); CSV export of the lists.
-- Read ports for other modules: `IResultStatusLookup` (declared by Registration; real adapter here),
-  `IResultKpiLookup` (dashboard: pending results, unverified backlog, delayed tests).
+- Read ports for other modules: `IResultStatusLookup` (declared by Registration; real adapter here). The dashboard
+  (CP-05) reads its result figures with its own SQL over `app.results` (Reporting); the unused `IResultKpiLookup` was
+  removed on 2026-10-12 (validation v0.5.0 F-15, Q21).
 
 Out of scope (later intakes or other modules): auto-verification (Automation, CP-63/64; consumes this module's
 events), result attachments and voice notes (LDM §3.7, CP-19 "attachments": needs the Files capability per result),
@@ -156,7 +157,7 @@ Verified × Printed / Not printed (+ "Reserved & Not printed", never produced: R
 | T5 | Verified → Reviewed (if reviewed) or Complete; Reviewed → Complete | Undo verify / undo review | `results.cancel` + verify right (undo verify) or review right (undo review) | state Reviewed or Verified (RES-017); Printed is amended, not undone (RES-018) | — | — | **required** (RES-019) | `ResultUndone` | no |
 | T6 | Verified / Printed → Complete | Amend (modify verified result) | `results.edit` + edit right + special right *modify verified result* (RES-055) | state (RES-023); value rules of T2; sample Received (RES-010) | — | — | **required** (RES-019) | `ResultAmended` (+ panic) | no |
 | T7 | (Complete / Reviewed / Verified) | Acknowledge delta | `results.approve` + review or verify right (RES-051) | a delta flag not yet acknowledged (RES-020) | — | — | optional comment | `ResultDeltaAcknowledged` | no |
-| T8 | Verified → Printed; Printed → Printed; (Complete / Reviewed: printed flag only, `printUnverified` on) | Print report unit (one unit, or a print list) | `results.export` + print right (RES-053) | every non-cancelled result of the unit Verified or Printed (RES-021, BR-09) unless `printUnverified`; no missing value | — | — | — | `ResultPrinted` | no |
+| T8 | Verified → Printed; Printed → Printed; (Complete / Reviewed: printed flag only, `printUnverified` on) | Print report unit (one unit, or a print list) | `results.export` + print right (RES-053); a VIP patient's unit also needs the See-VIP special right (RES-056, F-06) | every non-cancelled result of the unit Verified or Printed (RES-021, BR-09) unless `printUnverified`; no missing value | — | — | — | `ResultPrinted` | no |
 | T9 | any but Cancelled → Cancelled | Cancel | policy P2 (`VisitLineCancelled`) | idempotent | — | — | the line's reason | `ResultCancelled` | yes |
 | T10 | (any but Cancelled) | Report comment | `results.create` + edit right | not Verified / Printed (RES-024: undo or amend first); ≤ 2 000 (RES-025) | — | — | — | — (log row) | no |
 | T11 | (any but Cancelled) | Internal note | `results.create` | ≤ 2 000 (RES-025); never printed | — | — | — | — (log row) | no |
@@ -312,8 +313,8 @@ API: `/api/v1/results` — `GET ?accession|visitId|sampleNumber` (case with repo
 ## 15. Notifications and escalations
 
 A panic value raises `ResultPanicDetected` (the foundation's `panic-value` template is the hook for an SMS/e-mail
-policy of the Notifications capability; not sent by this module). Late tests are visible on the worklist (colour) and
-counted by `IResultKpiLookup` for the dashboard (CP-05). Rejected QC runs raise `QcRunRejected`.
+policy of the Notifications capability; not sent by this module). Late tests are visible on the worklist (colour, Delayed counter and filter) and
+counted by the dashboard (CP-05), all with the predicate of Q21. Rejected QC runs raise `QcRunRejected`.
 
 ## 16. Acceptance scenarios, open questions and assumptions
 
@@ -378,6 +379,10 @@ Open questions (the assumed answers let the build proceed; confirm or change):
 | Q16 | Culture flag | Growth (any isolate) reads Abnormal, No growth reads Normal; no panic. |
 | Q17 | QC scope (CP-22 "scope to be confirmed") | Materials with up to three levels and targets, manual runs, Levey-Jennings, Westgard 1-2s (warning), 1-3s, 2-2s, R-4s (rejection) on consecutive runs of the same material and level; no blocking of patient results. |
 | Q18 | Visit header data (doctor, payer, registration time) | Raw SQL on `app.visits` (MODULES.md §5) and optional columns when present; replaced by Registration's `IVisitLookup` when it exists. |
+| Q19 | VIP patients on the worklist (CP-18) and in the matching visits of Results by accession (CP-19) | **Same rule as PAT Q8 / REG Q12 — assumption, awaiting the business owner (validation 2026-10-11; CP-19 added 2026-10-12).** Without the See-VIP special right the worklist, its bench list and its export, and the CP-19 matching-visits list show "VIP patient" with no Arabic name (`WorklistItem.PatientMasked`, `ResultVisitListItem.PatientMasked`), and a name search does not find the file; the accession, the sample number (worklist) and the patient number still do. **Opened case and report (validation v0.5.0 F-06, 2026-10-12; assumption, awaiting the business owner):** without the right, the CP-19 case view and the on-screen report preview mask the identity too: "VIP patient", no Arabic name, no date of birth (the case carries no mobile or national id); the patient number, sex and age stay, because the bench needs them (ranges, formulas). The masking is done by the server (`PatientHeaderView.IsMasked`, `ReportPatientBlock.IsMasked`, `ResultVip`). Printing a VIP patient's report (`POST …/print` and the official copy `GET …/documents/report?preview=false`) needs the See-VIP right: **RES-056** (403) otherwise, checked after the unit's visibility (RES-405 first). The page keeps Print visible but disabled, with the reason. Registration and the patient file are unchanged: the desk needs the identity (PAT Q8, REG Q12). |
+| Q20 | Digits of dates and times | **Decision 2026-10-12 (validation R3-02).** On screen, dates and times use the digits of the language (Arabic-Indic in Arabic) like the rest of the portal (`result-format.ts` `formatDateTime`); printed reports, the bench list and exported files keep Latin digits (`formatPrintDateTime`). |
+| Q21 | One definition of "late" for the worklist (validation v0.5.0 F-15, 2026-10-12) | **Decision.** A test is late when its consumed share of the turnaround reaches the tenant's `delayLatePercent`: consumed ≥ late ⇔ now ≥ start + (expected − start) × late / 100 (`TurnaroundClock.IsLate`). The row colour, the *Delayed* counter and *Delayed only* (server SQL), and the dashboard's delayed tests read the same predicate; the shown share is rounded down so "2 %" and a red row always agree. Before, the counter and the filter used the expected time (100 %) whatever the threshold. |
+| Q22 | Report language, digits and counted wording (validation v0.5.0 F-09…F-12, 2026-10-12) | **Decision.** The laboratory report follows its own language as a whole (`resultLanguage`, or the template's language): captions, frame language and direction come from that language's dictionary (`DocumentTextsLoader`), whatever the screen's language. On screen an Arabic page writes every number (ages, counts, percentages, amounts, dates) in Arabic-Indic digits; printed documents and CSV exports keep Latin digits. Counted sentences take their grammatical form (`I18nService.tc`: Arabic dual, 3–10 plural, 11+ singular; English one / other). |
 
 Assumptions about other modules (same-wave raw-SQL reads, MODULES.md §5): `app.visits(id, tenant_id, accession,
 patient_id, branch_id, payer_id, registered_at_utc, urgent[, doctor_id])`, `app.visit_lines(id, tenant_id, visit_id,

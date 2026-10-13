@@ -2,6 +2,9 @@
   @if (generalProblem(); as message) {
     <p class="problem" role="alert">{{ message }}</p>
   }
+  @if (blocked()) {
+    <p class="problem blocked" role="alert">{{ i18n.t('shared.masterData.invalid') }}</p>
+  }
 
   @if (similar().length > 0 && !isEdit()) {
     <section class="similar warn-strip" role="status" aria-live="polite">
@@ -121,15 +124,15 @@
         @if (mobileCountries().length > 0) {
           <label class="ff-plain country">
             <span class="label">{{ i18n.t('patients.field.mobileCountry') }}</span>
-            <select class="inp" [value]="''" (change)="onMobileCountryChange($event)">
-              <option value="">{{ i18n.t('patients.field.mobileAnyCountry') }}</option>
+            <select class="inp" (change)="onMobileCountryChange($event)">
+              <option value="" [selected]="mobileCountry() === ''">{{ i18n.t('patients.field.mobileAnyCountry') }}</option>
               @for (country of mobileCountries(); track country.code) {
-                <option [value]="country.code">{{ optionName(country) }} ({{ country.mobileLength }})</option>
+                <option [value]="country.code" [selected]="mobileCountry() === country.code">{{ optionName(country) }} ({{ num(country.mobileLength ?? 0) }})</option>
               }
             </select>
           </label>
         }
-        <app-form-field class="number" [label]="i18n.t('patients.field.mobile')" [hint]="mobileLength() !== null ? i18n.tf('patients.hint.mobileLength', { length: mobileLength() ?? 0 }) : i18n.t('patients.hint.mobile')">
+        <app-form-field class="number" [label]="i18n.t('patients.field.mobile')" [hint]="mobileLength() !== null ? i18n.tf('patients.hint.mobileLength', { length: num(mobileLength() ?? 0) }) : i18n.t('patients.hint.mobile')">
           <input type="tel" formControlName="mobile" maxlength="32" autocomplete="off" dir="ltr" inputmode="tel" (input)="onIdentityInput()" />
         </app-form-field>
       </div>

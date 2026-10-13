@@ -35,7 +35,7 @@ public sealed class RegistrationFlowTests(ApiFactory factory) : IClassFixture<Ap
     public async Task A_clerk_registers_a_walk_in_finds_it_prints_its_documents_and_cancels_a_service()
     {
         var tenant = Guid.CreateVersion7();
-        var branch = Guid.CreateVersion7();
+        var branch = await SeedBranchAsync(tenant);
         var (clerk, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ClerkPermissions, displayName: "Reception Clerk", branchIds: [branch]);
         await GrantRightsAsync(tenant, clerk, SpecialRights.All);
         var world = await SeedAsync(tenant);
@@ -44,6 +44,7 @@ public sealed class RegistrationFlowTests(ApiFactory factory) : IClassFixture<Ap
         var settings = (await client.GetFromJsonAsync<RegistrationPageSettings>($"{Registration}/settings"))!;
         Assert.True(settings.AutoPrintLabels);
         Assert.True(settings.CanCancel);
+        Assert.Equal("Main branch", settings.BranchNameEn);   // the session's branch for the page header (validation 2026-10-11)
 
         var entry = (await client.GetFromJsonAsync<ServiceEntryResult>($"{Registration}/service-entry?text=12"))!;
         Assert.Equal(("Service", world.Glucose), (entry.Kind, Assert.Single(entry.Services).Id));
@@ -55,7 +56,7 @@ public sealed class RegistrationFlowTests(ApiFactory factory) : IClassFixture<Ap
         Assert.Equal((2, 1, 150m), (dryRun.Lines.Count, dryRun.Tubes.Count, dryRun.Totals.PatientShareTotal));
         Assert.Contains(dryRun.Warnings, warning => warning.Code == "REG-203");
 
-        var created = await client.PostAsJsonAsync(Visits, Register(world, lines));
+        var created = await client.PostAsJsonAsync(Visits, Register(world, lines) with { Biohazard = true });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var registered = (await created.Content.ReadFromJsonAsync<VisitRegisteredResponse>())!;
         Assert.StartsWith("ACC-", registered.Accession, StringComparison.Ordinal);
@@ -70,6 +71,7 @@ public sealed class RegistrationFlowTests(ApiFactory factory) : IClassFixture<Ap
 
         var labels = (await client.GetFromJsonAsync<VisitLabelsDocument>($"{Visits}/{registered.Id}/documents/labels"))!;
         Assert.Equal(("C", "GLU"), (Assert.Single(labels.Labels).UnitCode, labels.Labels[0].ServiceCodes.Single()));
+        Assert.Equal((true, false), (labels.Labels[0].Biohazard, labels.Labels[0].Urgent));   // the label marks a biohazard visit (validation 2026-10-11)
         var jobOrder = (await client.GetFromJsonAsync<JobOrderDocument>($"{Visits}/{registered.Id}/documents/job-order"))!;
         Assert.Equal((registered.Accession, 2, 1), (jobOrder.Accession, jobOrder.Lines.Count, jobOrder.VisitOrdinal));
 
@@ -144,6 +146,17 @@ public sealed class RegistrationFlowTests(ApiFactory factory) : IClassFixture<Ap
         new(world.Patient, null, null, world.Payer, world.Tier, null, null, null, false, false, false, lines, null, null, false, 120);
 
     private sealed record World(Guid Patient, Guid Payer, Guid Tier, Guid Glucose, Guid Urea, Guid Cbc, Guid Inactive);
+
+    /// <summary>The session's branch as an Organization row, so the page settings can name it.</summary>
+    private async Task<Guid> SeedBranchAsync(Guid tenant)
+    {
+        using var scope = factory.Services.CreateScope();
+        using var tenantScope = scope.ServiceProvider.GetRequiredService<ICurrentTenantSetter>().ForTenant(tenant);
+        var branch = Branch.Create("MAIN", new LocalizedText("Main branch", "الفرع الرئيسي"), null, null, null, null, "EGP", factory.Clock.UtcNow);
+        scope.ServiceProvider.GetRequiredService<AppDbContext>().Set<Branch>().Add(branch);
+        await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        return branch.Id;
+    }
 
     /// <summary>Chemistry (serum) GLU (shortcut 12, precaution) + UREA, haematology (whole blood) CBC, an inactive OLD; the cash payer with the default list; a patient.</summary>
     private async Task<World> SeedAsync(Guid tenant)

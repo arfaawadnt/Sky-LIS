@@ -29,7 +29,7 @@ internal sealed partial class LocalFileStore(ICurrentTenant tenant, IConfigurati
         }
 
         var tenantId = tenant.TenantId ?? throw new InvalidOperationException("Files are stored for a resolved tenant only.");
-        var key = $"{tenantId:N}/{area}/{ownerId:N}/{Guid.CreateVersion7():N}";
+        var key = FileKeys.Compose(tenantId, area!, ownerId, Guid.CreateVersion7());
         var path = PathOf(key);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
@@ -87,6 +87,28 @@ internal sealed partial class LocalFileStore(ICurrentTenant tenant, IConfigurati
         }
 
         return Task.CompletedTask;
+    }
+
+    public async Task<StoredFile?> CopyAsync(string sourceKey, string area, Guid ownerId, long maxBytes, CancellationToken cancellationToken)
+    {
+        if (!tenant.IsElevated)
+        {
+            throw new InvalidOperationException("A file of another tenant is copied only inside an elevated scope (provisioning).");
+        }
+
+        if (sourceKey is null || !KeyPattern().IsMatch(sourceKey))
+        {
+            return null;
+        }
+
+        var source = PathOf(sourceKey);
+        if (!File.Exists(source))
+        {
+            return null;
+        }
+
+        await using var content = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        return await SaveAsync(area, ownerId, content, maxBytes, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>The configured root, absolute.</summary>

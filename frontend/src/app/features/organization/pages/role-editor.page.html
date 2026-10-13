@@ -32,7 +32,10 @@
   @switch (activeTab()) {
     @case ('general') {
       <app-section-card role="tabpanel" [title]="i18n.t('organization.roles.tab.general')">
-        <form class="form-grid" [formGroup]="form" (ngSubmit)="saveGeneral()" novalidate>
+        <form id="role-general" class="form-grid" [formGroup]="form" (ngSubmit)="saveGeneral()" novalidate>
+          @if (blockedSave.blocked()) {
+            <p class="problem full" role="alert">{{ i18n.t('shared.masterData.invalid') }}</p>
+          }
           <app-localized-text-input class="full" [group]="form.controls.name" [label]="i18n.t('organization.roles.field.name')" [maxLength]="200" />
           <app-form-field class="full" [label]="i18n.t('organization.roles.field.description')">
             <textarea formControlName="description" rows="3" maxlength="500"></textarea>
@@ -63,10 +66,13 @@
         <app-privilege-matrix
           [modules]="catalogue().modules"
           [actions]="catalogue().actions"
-          [selected]="keys()"
+          [selected]="shownKeys()"
           [disabled]="!canEdit()"
           [caption]="i18n.t('organization.roles.tab.permissions')"
           (selectedChange)="setKeys($event)" />
+        @if (keptKeyCount() > 0) {
+          <p class="muted small kept-keys">{{ i18n.tc('organization.roles.keptLaterRelease', keptKeyCount()) }}</p>
+        }
         @if (canEdit() && !isNew()) {
           <div class="actions">
             <button type="button" class="btn ghost" [disabled]="!permissionsDirty()" (click)="discard('permissions')">{{ i18n.t('organization.discard') }}</button>

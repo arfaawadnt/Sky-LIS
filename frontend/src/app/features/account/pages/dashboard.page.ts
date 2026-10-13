@@ -152,9 +152,8 @@ export class DashboardPage {
     (this.data()?.registrationsByDay ?? []).map((bar) => {
       const lang = this.i18n.lang();
       const count = formatNumber(bar.count, lang);
-      // R-10: one registration reads in the singular ('1 registration'), in both languages
-      const key = bar.count === 1 ? 'account.dashboard.chartBarOne' : 'account.dashboard.chartBar';
-      return { label: weekday(bar.date, lang), value: bar.count, display: count, description: this.i18n.tf(key, { date: formatDay(bar.date, lang), count }) };
+      // R-10 / F-11: the counted form of the language (one, two, 3–10, 11+), the number in its digits
+      return { label: weekday(bar.date, lang), value: bar.count, display: count, description: this.i18n.tc('account.dashboard.chartBar', bar.count, { date: formatDay(bar.date, lang), count }) };
     }),
   );
 

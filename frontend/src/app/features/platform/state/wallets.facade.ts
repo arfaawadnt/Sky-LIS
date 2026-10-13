@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, resource, signal } from '@angular/core';
 
 import type { PageRequest } from '../../../core/api/paging';
-import type { PlanListItem, PlanRequest, TopUpWalletRequest, WalletTransactionItem, WalletTransactionKind } from '../../../core/api/platform.contracts';
+import type { PlanListItem, PlanRequest, TopUpWalletRequest, WalletChargeRunSummary, WalletTransactionItem, WalletTransactionKind } from '../../../core/api/platform.contracts';
 import { mutation } from '../../../core/state/mutation';
 import { PlatformApi } from '../data/platform.api';
 
@@ -51,6 +51,9 @@ export class WalletsFacade {
   readonly topUp = mutation((request: TopUpWalletRequest) => this.api.topUpWallet(this.requireClient(), request), { then: () => this.reloadWallet() });
 
   readonly decline = mutation((requestId: string) => this.api.declineTopUpRequest(this.requireClient(), requestId), { then: () => this.reloadWallet() });
+
+  /** SA-05 "Run charges now" (W2): every due wallet, then the selected wallet and the client list are re-read. */
+  readonly runCharges = mutation<void, WalletChargeRunSummary>(() => this.api.runWalletCharges(), { then: () => this.reloadWallet() });
 
   selectClient(clientId: string | null): void {
     this.clientId.set(clientId === '' ? null : clientId);

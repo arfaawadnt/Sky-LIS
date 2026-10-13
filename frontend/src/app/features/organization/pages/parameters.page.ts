@@ -90,7 +90,7 @@ export class ParametersPage {
     const descriptors = new Map(PARAMETER_GROUPS.flatMap((group) => group.parameters).map((parameter) => [parameter.key as string, parameter]));
     return new Set([...this.facade.edits()].filter(([key, value]) => {
       const descriptor = descriptors.get(key);
-      return descriptor !== undefined && !isValidParameter(descriptor, value);
+      return value !== null && descriptor !== undefined && !isValidParameter(descriptor, value);   // null = back to the default (F-13)
     }).map(([key]) => key));
   });
 

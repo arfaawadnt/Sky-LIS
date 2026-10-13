@@ -5,7 +5,7 @@ import type { PageRequest } from '../../../core/api/paging';
 import { type PcrKitListItem, PLATFORM_PERMISSIONS } from '../../../core/api/platform.contracts';
 import type { ProblemDetails } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
-import { markAllTouched } from '../../../shared/forms/mark-all-touched';
+import { blockedSave } from '../../../shared/forms/blocked-save';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
@@ -85,6 +85,8 @@ export class PcrKitsPage {
   protected readonly editing = signal<PcrKitListItem | null>(null);
   protected readonly form = signal<KitForm | null>(null);
   protected readonly saveProblem = signal<ProblemDetails | null>(null);
+  /** F-03 (validation v0.5.0): a refused save says so above the form and focuses the first marked field. */
+  protected readonly blockedSave = blockedSave();
   protected readonly modelOptions = computed(() => this.facade.models.value()?.items ?? []);
 
   constructor() {
@@ -104,6 +106,7 @@ export class PcrKitsPage {
   protected openEdit(kit: PcrKitListItem | null): void {
     this.editing.set(kit);
     this.saveProblem.set(null);
+    this.blockedSave.reset();
     this.form.set(this.buildForm(kit));
     this.drawerOpen.set(true);
   }
@@ -116,7 +119,7 @@ export class PcrKitsPage {
 
   protected async save(): Promise<void> {
     const form = this.form();
-    if (form === null || this.facade.save.pending() || !markAllTouched(form)) {
+    if (form === null || this.facade.save.pending() || !this.blockedSave.check(form, '#platform-pcr-kit-form')) {
       return;
     }
 

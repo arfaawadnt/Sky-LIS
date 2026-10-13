@@ -5,7 +5,7 @@ import { I18nService } from '../../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../../shared/forms/localized-text';
 import { Code128Component } from '../../../../shared/print/code128.component';
 import { DocumentFrameComponent } from '../../../../shared/print/document-frame.component';
-import { formatDateTime, formatMoney } from '../billing-format';
+import { formatPrintDateTime, formatPrintMoney } from '../billing-format';
 import { branchOf } from './receipt-document.component';
 
 /** The refund receipt (A5, CP-24; LDM §10.8 "for patient signature"): amount, method, reason and the signature boxes. */
@@ -72,10 +72,10 @@ export class RefundReceiptDocumentComponent {
   });
 
   protected money(value: number): string {
-    return formatMoney(value, this.i18n.lang());
+    return formatPrintMoney(value, this.i18n.lang());
   }
 
   protected at(value: string): string {
-    return formatDateTime(value, this.i18n.lang());
+    return formatPrintDateTime(value, this.i18n.lang());
   }
 }

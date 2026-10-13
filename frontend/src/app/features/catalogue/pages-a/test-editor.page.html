@@ -29,6 +29,9 @@
   </div>
 
   <div class="editor" appSaveShortcut (appSaveShortcut)="save()">
+    @if (blocked() && stillInvalid()) {
+      <p class="problem" role="alert">{{ i18n.t('shared.masterData.invalid') }}</p>
+    }
     <!-- general -->
     <form role="tabpanel" [hidden]="activeTab() !== 'general'" [formGroup]="general" (ngSubmit)="save()" novalidate>
       @if (problemOf('general'); as problem) {
@@ -222,7 +225,12 @@
                 <td class="num mono">{{ i + 1 }}</td>
                 <td><input class="inp sm wide" type="text" formControlName="value" maxlength="200" [attr.aria-label]="i18n.t('catalogue-a.tests.values.value')" [class.invalid]="value.controls.value.invalid && value.controls.value.touched" /></td>
                 <td class="center"><input type="checkbox" formControlName="isNormal" [attr.aria-label]="i18n.t('catalogue-a.tests.values.isNormal')" /></td>
-                <td class="center"><input type="checkbox" formControlName="isCritical" [attr.aria-label]="i18n.t('catalogue-a.tests.values.isCritical')" /></td>
+                <td class="center">
+                  <input type="checkbox" formControlName="isCritical" [attr.aria-label]="i18n.t('catalogue-a.tests.values.isCritical')" [attr.aria-invalid]="flagsError(value) !== null ? 'true' : null" [attr.aria-describedby]="flagsError(value) !== null ? 'value-flags-' + i : null" />
+                  @if (flagsError(value); as error) {
+                    <p class="cell-error" role="alert" [id]="'value-flags-' + i">{{ error }}</p>
+                  }
+                </td>
                 <td class="center"><input type="checkbox" formControlName="isDefault" (change)="onDefault(i)" [attr.aria-label]="i18n.t('catalogue-a.tests.values.isDefault')" /></td>
                 <td class="center"><input type="checkbox" formControlName="isPlaceholder" [attr.aria-label]="i18n.t('catalogue-a.tests.values.isPlaceholder')" /></td>
                 <td>

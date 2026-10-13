@@ -100,7 +100,7 @@ public sealed class CatalogueBApplicationTests
         var preparation = new CreatePreparationValidator().Validate(new CreatePreparationCommand("FAST", "Q", "س", "Essay", null, "Any", null));
         Assert.Contains(preparation.Errors, error => error.PropertyName == nameof(CreatePreparationCommand.AnswerType));
 
-        var template = new CreateReportTemplateValidator().Validate(new CreateReportTemplateCommand("A4", "أ4", "Results", null, null, false, "Both", "Header only", null, null, null));
+        var template = new CreateReportTemplateValidator().Validate(new CreateReportTemplateCommand("A4", "أ4", "Results", false, "Both", "Header only", null, null, null));
         Assert.Contains(template.Errors, error => error.PropertyName == nameof(CreateReportTemplateCommand.HeaderTextAr));
 
         Assert.False(new ListReasonsValidator().Validate(new ListReasonsQuery(null, null, "flying", null, null)).IsValid);

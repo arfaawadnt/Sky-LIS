@@ -2,15 +2,46 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
 import { CATALOGUE_A_PERMISSIONS, type ClinicalGroupListItem, type ClinicalGroupRequest } from '../../../core/api/catalogue-a.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
-import { localizedPick } from '../../../shared/forms/localized-text';
+import type { Portal } from '../../../core/portal/portal';
+import { PortalService } from '../../../core/portal/portal.service';
+import { type Release, inReleaseScope } from '../../../core/release';
+import { type LocalizedText, localizedPick, localizedToDto } from '../../../shared/forms/localized-text';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { sortParams } from '../../../shared/forms/paging';
 import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 import { MasterDataPageComponent } from '../../../shared/ui/master-data-page/master-data-page.component';
-import type { MasterDataConfig, MasterDataFilter, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
+import type { FieldSchema, FormValue, MasterDataConfig, MasterDataFilter, SelectOption } from '../../../shared/ui/master-data-page/master-data.types';
 import { CatalogueAApi } from '../data-a/catalogue-a.api';
 import { csvFileName, downloadCsv, toCsv, yesNo } from '../data-a/csv-export';
 import { CatalogueExportButtonComponent } from '../ui-a/export-button.component';
+
+/**
+ * The release of each portal's report-template register (the navigation entries): the client's (CP-50) is Release 2, the
+ * Super Admin's global templates (SA-12) are Release 1. Validation v0.5.0 O-8: the group's template field follows it.
+ */
+export const REPORT_TEMPLATES_RELEASE: Readonly<Record<Portal, Release>> = { client: 'R2', admin: 'R1' };
+
+/** True when the clinical group editor of this portal offers the report template (O-8). */
+export function offersReportTemplate(portal: Portal, scope?: Release): boolean {
+  return inReleaseScope(REPORT_TEMPLATES_RELEASE[portal], scope);
+}
+
+/**
+ * The request of a save. Without the template field (O-8) an edit keeps the template the group already holds, so hiding
+ * the field never clears it; a new group has none.
+ */
+export function clinicalGroupRequest(value: FormValue, item: ClinicalGroupListItem | null, withTemplate: boolean): ClinicalGroupRequest {
+  const text = (name: string): string => (typeof value[name] === 'string' ? (value[name] as string) : '');
+  const template = value['reportTemplateId'];
+  return {
+    code: text('code'),
+    unitCode: text('unitCode'),
+    ...(localizedToDto('name', (value['name'] as LocalizedText | undefined) ?? { en: '', ar: '' }) as { nameEn: string; nameAr: string }),
+    reportName: text('reportName') === '' ? null : text('reportName'),
+    reportTemplateId: withTemplate ? (typeof template === 'string' && template !== '' ? template : null) : (item?.reportTemplateId ?? null),
+    displayOrder: typeof value['displayOrder'] === 'number' ? value['displayOrder'] : 0,
+  };
+}
 
 /**
  * Clinical groups (SRS CP-39): code (immutable), unit code (the tube label letter), bilingual name, report name,
@@ -33,6 +64,9 @@ export class ClinicalGroupsPage {
 
   protected readonly permissions = CATALOGUE_A_PERMISSIONS;
 
+  /** O-8: the template field only where the portal's report templates are in the delivered release. */
+  private readonly withTemplate = offersReportTemplate(inject(PortalService).portal());
+
   /** The filter of the list on screen: the export writes exactly these rows (UAT C-04 / B-09). */
   private filter: MasterDataFilter = { search: '', active: true };
 
@@ -51,9 +85,10 @@ export class ClinicalGroupsPage {
       { name: 'unitCode', kind: 'code', required: true, maxLength: 4, immutable: false, hint: 'catalogue-a.groups.hint.unitCode' },
       { name: 'name', kind: 'localizedText', required: true, maxLength: 200 },
       { name: 'reportName', kind: 'text', maxLength: 200 },
-      { name: 'reportTemplateId', kind: 'select', options: () => this.reportTemplateOptions() },
+      ...(this.withTemplate ? [{ name: 'reportTemplateId', kind: 'select', options: () => this.reportTemplateOptions() } satisfies FieldSchema] : []),
       { name: 'displayOrder', kind: 'number', required: true, min: 0, max: 9999, defaultValue: 0 },
     ],
+    toDto: (value, item) => clinicalGroupRequest(value, item, this.withTemplate),
     adapter: {
       list: (filter, page, signal) => {
         this.filter = filter;

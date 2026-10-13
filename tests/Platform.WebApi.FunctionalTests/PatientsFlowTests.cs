@@ -15,6 +15,7 @@ using Platform.Domain.PlatformAdmin;
 using Platform.Infrastructure.Persistence;
 using Platform.SharedKernel.Localization;
 using Platform.WebApi.FunctionalTests.Support;
+using Platform.TestSupport;
 
 namespace Platform.WebApi.FunctionalTests;
 
@@ -248,9 +249,9 @@ public sealed class PatientsFlowTests : IClassFixture<ApiFactory>
         var cairoAdmin = await ClientAsync(cairoLab, AdministratorPermissions);
         var byAge = Register("Mrs", "Huda Zaki", null, "Female", withBirthDate: false) with { Age = new PatientAgeView(30, 0, 0) };
 
-        // A zone this host does not know is refused with its code (SET-002); a known IANA zone is stored.
+        // A zone this host does not know is refused with its own code (SET-003, LIS-VR-002 round 4); a known IANA zone is stored.
         var unknown = await demoAdmin.PutAsJsonAsync("/api/v1/settings", new UpdateTenantSettingsRequest([new SettingValueItem("timeZone", "Mars/Olympus")]));
-        Assert.Equal((HttpStatusCode.UnprocessableEntity, "SET-002"), (unknown.StatusCode, await AuthClient.CodeOf(unknown)));
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "SET-003"), (unknown.StatusCode, await AuthClient.CodeOf(unknown)));
         foreach (var admin in new[] { demoAdmin, cairoAdmin })
         {
             var saved = await admin.PutAsJsonAsync("/api/v1/settings", new UpdateTenantSettingsRequest([new SettingValueItem("timeZone", "America/New_York")]));
@@ -426,12 +427,12 @@ public sealed class PatientsFlowTests : IClassFixture<ApiFactory>
         return client.PostAsync($"{Patients}/{patientId}/documents", form);
     }
 
-    /// <summary>A laboratory with a client record in a country of <paramref name="timeZone"/> (Z? country codes are used by no other test).</summary>
+    /// <summary>A laboratory with a client record in a country of <paramref name="timeZone"/> (country codes from TestCountryCodes).</summary>
     private async Task<Guid> ProvisionLaboratoryAsync(string timeZone)
     {
-        var n = Interlocked.Increment(ref _isoCounter);
+        var iso = TestCountryCodes.Next();
         var suffix = Guid.CreateVersion7().ToString("N");
-        var country = Country.Create(new CountryData("Zoneland " + n, "أرض المنطقة", $"Z{(char)('A' + (n % 26))}", "+20", "Pound", "EGP", "ar", timeZone, 10, null, null));
+        var country = Country.Create(new CountryData("Zoneland " + iso, "أرض المنطقة", iso, "+20", "Pound", "EGP", "ar", timeZone, 10, null, null));
         var governorate = Governorate.Create(country, "Gov " + suffix[..8], "محافظة", null, null);
         var plan = Plan.Create("P" + suffix[^8..].ToUpperInvariant(), new PlanTerms(new LocalizedText("Plan " + suffix[..6], "باقة"), 100m, "EGP", 1, 5, 100, 1));
         using (var scope = _factory.Services.CreateScope())
@@ -455,7 +456,6 @@ public sealed class PatientsFlowTests : IClassFixture<ApiFactory>
         return tenant.Id;
     }
 
-    private static int _isoCounter;
 
     private static readonly SpecialRights SeeVip = new(null, false, false, false, false, false, false, false, canSeeVip: true);
 

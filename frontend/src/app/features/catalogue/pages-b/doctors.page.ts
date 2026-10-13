@@ -95,11 +95,28 @@ export class DoctorsPage extends CatalogueBEditorPage<DoctorListItem, CreateDoct
     void this.loadBranches();
   }
 
+  /**
+   * The branches the picker can label: the selectable ones, plus the open doctor's branches the server named that the
+   * user cannot pick (another branch of a reception limited to some), so the drawer never shows an id either.
+   */
+  protected readonly knownBranches = computed<readonly CatalogueBOption[]>(() => {
+    const listed = this.branches();
+    const ids = new Set(listed.map((branch) => branch.id));
+    const held = (this.editing()?.branches ?? []).filter((branch) => !ids.has(branch.id)).map((branch) => ({ ...branch, inactive: true }));
+    return [...listed, ...held];
+  });
+
+  /** The doctor's branches by code (name as the tooltip), from the server's join; an id is never shown (validation v0.5.0). */
   protected chips(row: DoctorListItem): readonly CatalogueBChip[] {
-    return row.branchIds.map((id) => {
-      const branch = this.branchById().get(id);
-      const name = branch ? localizedPick({ en: branch.nameEn, ar: branch.nameAr }, this.i18n.lang()) : id.slice(0, 8);
-      return { key: id, text: branch?.code || name, title: name };
+    const named = new Map(row.branches.map((branch) => [branch.id, branch]));
+    return row.branchIds.flatMap((id) => {
+      const branch = named.get(id) ?? this.branchById().get(id);
+      if (branch === undefined) {
+        return [];
+      }
+
+      const name = localizedPick({ en: branch.nameEn, ar: branch.nameAr }, this.i18n.lang());
+      return [{ key: id, text: branch.code || name, title: name }];
     });
   }
 

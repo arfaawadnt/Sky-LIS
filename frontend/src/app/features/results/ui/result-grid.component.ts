@@ -4,7 +4,7 @@ import type { ReportUnitView, ResultRowView, ServiceBannerView } from '../../../
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
-import { flagClass, flagSymbol, flagTone, initialDraft, isSigned } from './result-format';
+import { flagClass, flagSymbol, flagTone, initialDraft, isSigned, screenNumber } from './result-format';
 
 /** One line of the grid: a profile banner or a result row. */
 type GridLine = { readonly kind: 'banner'; readonly banner: ServiceBannerView } | { readonly kind: 'row'; readonly row: ResultRowView };
@@ -122,7 +122,7 @@ export interface DraftChange {
                 <td>
                   @if (row.delta; as delta) {
                     @if (delta.flag) {
-                      <app-badge tone="warn" [attr.title]="deltaTitle(row)">Δ {{ delta.percent ?? '' }}%</app-badge>
+                      <app-badge tone="warn" [attr.title]="deltaTitle(row)">Δ {{ percent(delta.percent) }}</app-badge>
                       @if (!delta.acknowledged && canAcknowledge()) {
                         <button type="button" class="btn sm ghost" (click)="acknowledge.emit(row)">{{ i18n.t('results.grid.acknowledge') }}</button>
                       } @else if (delta.acknowledged) {
@@ -303,7 +303,13 @@ export class ResultGridComponent {
   }
 
   protected deltaTitle(row: ResultRowView): string {
-    return this.i18n.tf('results.grid.deltaTitle', { previous: row.delta?.previousValue ?? '—', percent: row.delta?.percent ?? '—' });
+    const percent = row.delta?.percent;
+    return this.i18n.tf('results.grid.deltaTitle', { previous: row.delta?.previousValue ?? '—', percent: percent === null || percent === undefined ? '—' : screenNumber(percent, this.i18n.lang()) });
+  }
+
+  /** "Δ 25%" / "Δ ٢٥٪" in the page language's digits (validation v0.5.0 F-09). */
+  protected percent(value: number | null): string {
+    return value === null ? '' : this.i18n.tf('results.worklist.percent', { value: screenNumber(value, this.i18n.lang()) });
   }
 
   protected statusLabel(status: string): string {

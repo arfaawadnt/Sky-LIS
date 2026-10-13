@@ -1,6 +1,8 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, computed, inject, signal } from '@angular/core';
 
+import { countKeys } from './count-text';
+
 export type Language = 'en' | 'ar';
 export type Direction = 'ltr' | 'rtl';
 
@@ -79,5 +81,17 @@ export class I18nService {
       const value = params[name];
       return value === undefined ? match : String(value);
     });
+  }
+
+  /**
+   * A counted sentence in the right grammatical form: `tc('platform.parameters.saved', 1)` reads
+   * `platform.parameters.savedOne` ("1 parameter saved.") when the dictionary has it, else the plural base key
+   * (`count-text.ts`: None / One / Two / base / Many). `{count}` is the number; `params` fill the other placeholders
+   * and may override `count` (for example with the language's digits).
+   */
+  tc(key: string, count: number, params: Readonly<Record<string, string | number>> = {}): string {
+    const candidates = countKeys(key, count, this.lang());
+    const chosen = candidates.find((candidate) => this.has(candidate)) ?? key;
+    return this.tf(chosen, { count, ...params });
   }
 }

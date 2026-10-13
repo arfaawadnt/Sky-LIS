@@ -95,6 +95,15 @@ internal sealed class TenantSettingsStore(AppDbContext context, ITenantContextAc
             existing.Set(value, actorUserId, nowUtc);
         }
     }
+
+    public async Task RemoveAsync(string key, CancellationToken cancellationToken)
+    {
+        var existing = await context.Set<TenantSetting>().FirstOrDefaultAsync(setting => setting.Key == key, cancellationToken).ConfigureAwait(false);
+        if (existing is not null)
+        {
+            context.Set<TenantSetting>().Remove(existing);   // the field-change log records the deletion with the value it held
+        }
+    }
 }
 
 /// <summary>

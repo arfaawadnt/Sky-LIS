@@ -51,6 +51,8 @@
               <div class="row-gap">
                 @if (isModified(form, item)) {
                   <app-badge tone="info">{{ i18n.t('platform.parameters.modified') }}</app-badge>
+                }
+                @if (canUseDefault(form, item)) {
                   <button type="button" class="btn sm ghost" *appCan="permissions.settingsManage" (click)="resetToDefault(form, item)">{{ i18n.t('platform.parameters.useDefault') }}</button>
                 }
                 @if (item.updatedAtUtc) {

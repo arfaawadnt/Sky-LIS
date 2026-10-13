@@ -4,7 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import type { PaymentReceiptDocument } from '../../../core/api/billing.contracts';
 import { PrintService } from '../../../shared/print/print.service';
 import { fileNameOf } from '../data/billing.api';
-import { formatMoney, hasTwoDecimals, localInputToIso, roundMoney, toLocalInputValue } from './billing-format';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { formatCount, formatDateTime, formatMoney, formatPrintDateTime, formatPrintMoney, hasTwoDecimals, localInputToIso, roundMoney, toLocalInputValue } from './billing-format';
 import { dayEndIso, dayStartIso, paymentTone } from './billing-view';
 import { ReceiptDocumentComponent } from './documents/receipt-document.component';
 
@@ -37,9 +38,16 @@ const receipt: PaymentReceiptDocument = {
 };
 
 describe('Billing UI helpers and documents', () => {
-  it('formats money with two decimals and Latin digits in both languages', () => {
+  it('formats money with two decimals: Arabic-Indic digits on an Arabic screen, Latin on paper (validation v0.5.0 F-09)', () => {
     expect(formatMoney(1234.5, 'en')).toBe('1,234.50');
-    expect(formatMoney(1234.5, 'ar')).toMatch(/1.234.50/);
+    expect(formatMoney(230, 'ar')).toBe('٢٣٠٫٠٠');
+    expect(formatPrintMoney(1234.5, 'ar')).toMatch(/^1.234.50$/);
+    expect(formatPrintMoney(1234.5, 'en')).toBe('1,234.50');
+    expect(formatDateTime('2026-10-12T12:58:00Z', 'ar')).toMatch(/[٠-٩]/);
+    expect(formatDateTime('2026-10-12T12:58:00Z', 'ar')).not.toMatch(/[0-9]/);
+    expect(formatPrintDateTime('2026-10-12T12:58:00Z', 'ar')).not.toMatch(/[٠-٩]/);
+    expect(formatCount(12, 'ar')).toBe('١٢');
+    expect(formatCount(12, 'en')).toBe('12');
     expect(formatMoney(null, 'en')).toBe('—');
     expect(roundMoney(10.005 + 0.001)).toBe(10.01);
     expect(hasTwoDecimals(10.25)).toBe(true);
@@ -74,6 +82,13 @@ describe('Billing UI helpers and documents', () => {
     expect(posted).toContain('1,234.50');
     expect(posted).toContain('SLIP-77');
     expect(posted).not.toContain('void-banner');
+
+    // F-09: the receipt printed from an Arabic screen keeps Latin digits
+    TestBed.inject(I18nService).setLanguage('ar');
+    const arabic = print.render({ type: ReceiptDocumentComponent, inputs: { doc: receipt } });
+    TestBed.inject(I18nService).setLanguage('en');
+    expect(arabic).toContain('1,234.50');
+    expect(arabic).not.toMatch(/[٠-٩]/);
 
     const voided = print.render({ type: ReceiptDocumentComponent, inputs: { doc: { ...receipt, status: 'Voided', voidReason: 'wrong visit' } } });
     expect(voided).toContain('void-banner');

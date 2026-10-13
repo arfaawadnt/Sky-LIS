@@ -56,14 +56,14 @@ public sealed class UpdateBasePriceListValidator : AbstractValidator<UpdateBaseP
     }
 }
 
-public sealed class UpdateBasePriceListHandler(IBasePriceListRepository lists, IUnitOfWork unitOfWork) : ICommandHandler<UpdateBasePriceListCommand>
+public sealed class UpdateBasePriceListHandler(IBasePriceListRepository lists, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<UpdateBasePriceListCommand>
 {
     public async Task Handle(UpdateBasePriceListCommand command, CancellationToken cancellationToken)
     {
         var list = await lists.GetForUpdateAsync(command.ListId, cancellationToken)
             ?? throw new DomainException(PricingCodes.BaseListNotFound, "Base price list not found.", DomainFault.NotFound);
 
-        list.Update(new LocalizedText(command.NameEn, command.NameAr), command.Year);
+        list.Update(new LocalizedText(command.NameEn, command.NameAr), command.Year, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

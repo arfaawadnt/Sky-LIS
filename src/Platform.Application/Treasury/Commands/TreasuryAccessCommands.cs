@@ -25,12 +25,17 @@ public sealed class RequestTreasuryAccessValidator : AbstractValidator<RequestTr
     }
 }
 
+/// <summary>
+/// T1. The treasury must belong to a branch the requester may work in (intake Q3, validation v0.5.0 O-4: TRS-015); the
+/// assignment comes from the session principal resolved for this request (02 §4.4), never from the request body.
+/// </summary>
 public sealed class RequestTreasuryAccessHandler(
     ITreasuryRepository treasuries,
     ITreasuryAccessRequestRepository requests,
     IReferenceNumbers numbers,
     IUnitOfWork unitOfWork,
     ICurrentUser user,
+    ISessionPrincipalQuery principals,
     IClock clock) : ICommandHandler<RequestTreasuryAccessCommand, CreatedResource>
 {
     public async Task<CreatedResource> Handle(RequestTreasuryAccessCommand command, CancellationToken cancellationToken)
@@ -38,6 +43,8 @@ public sealed class RequestTreasuryAccessHandler(
         var actor = Actor.Of(user);
         var treasury = await treasuries.GetForUpdateAsync(command.TreasuryId, cancellationToken)
             ?? throw new DomainException(TreasuryCodes.TreasuryNotFound, "Treasury not found.", DomainFault.NotFound);
+
+        TreasuryAccessRequest.EnsureRequesterWorksIn(treasury, await AssignedBranchesAsync(actor, cancellationToken));
 
         // INV-TRS-002 decided here with its code; the partial unique index is the backstop.
         if (await requests.LiveRequestExistsAsync(actor, treasury.Id, command.DeviceId.Trim(), cancellationToken))
@@ -52,6 +59,19 @@ public sealed class RequestTreasuryAccessHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new CreatedResource(request.Id);
+    }
+
+    /// <summary>The membership's branches as stored (empty = every branch of the laboratory).</summary>
+    private async Task<IReadOnlyList<Guid>> AssignedBranchesAsync(Guid actor, CancellationToken cancellationToken)
+    {
+        if (user.SessionId is not { } sessionId)
+        {
+            throw new DomainException(ProblemCodes.AuthenticatedActorRequired, "A session-bound actor is required.", DomainFault.Unauthenticated);
+        }
+
+        var principal = await principals.ResolveAsync(sessionId, actor, cancellationToken)
+            ?? throw new DomainException(ProblemCodes.TokenSessionMismatch, "The session could not be resolved.", DomainFault.Unauthenticated);
+        return principal.BranchIds;
     }
 }
 
