@@ -2,6 +2,7 @@ using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Abstractions.Settings;
 using Platform.Application.Billing;
+using Platform.Application.Patients;
 using Platform.Application.Registration;
 using Platform.Contracts.Billing;
 using Platform.Contracts.Common;
@@ -52,6 +53,10 @@ internal sealed class BillingWorld
     public FixedBillingClock Clock { get; } = new(Now);
 
     public FakeBillingSettings Settings { get; } = new();
+
+    public FakeCollections Collections { get; } = new();
+
+    public FakeLaboratoryZone Zone { get; } = new();
 
     public BillingWorld()
     {
@@ -244,6 +249,33 @@ internal sealed class FakeDirectory : IBillingDirectory
 
     public Task<IReadOnlyDictionary<Guid, NamedReference>> PayersAsync(IReadOnlyCollection<Guid> payerIds, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyDictionary<Guid, NamedReference>>(new Dictionary<Guid, NamedReference>());
+
+    public Task<IReadOnlyDictionary<Guid, NamedReference>> BranchesAsync(IReadOnlyCollection<Guid> branchIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, NamedReference>>(branchIds.ToDictionary(id => id, id => new NamedReference(id, "MAIN", "Main branch", "الفرع الرئيسي")));
+}
+
+/// <summary>The cells of the collections report, whatever the scope asked for (the scope itself is recorded for the handler tests).</summary>
+internal sealed class FakeCollections : ICollectionsReportQueries
+{
+    public List<CollectionsCell> Cells { get; } = [];
+
+    public CollectionsScope? LastScope { get; private set; }
+
+    public Task<IReadOnlyList<CollectionsCell>> CellsAsync(CollectionsScope scope, CancellationToken cancellationToken)
+    {
+        LastScope = scope;
+        return Task.FromResult<IReadOnlyList<CollectionsCell>>([.. Cells]);
+    }
+}
+
+/// <summary>A fixed laboratory zone (+03, no daylight saving) so the handler's local days are predictable.</summary>
+internal sealed class FakeLaboratoryZone : ILaboratoryTimeZone
+{
+    public static readonly TimeZoneInfo PlusThree = TimeZoneInfo.CreateCustomTimeZone("Test+03", TimeSpan.FromHours(3), "Test +03", "Test +03");
+
+    public TimeZoneInfo? Zone { get; set; } = PlusThree;
+
+    public Task<TimeZoneInfo?> FindAsync(CancellationToken cancellationToken) => Task.FromResult(Zone);
 }
 
 internal sealed class FakeBalances(InMemoryAccounts accounts, FakeVisits visits) : IVisitBalanceLookup
@@ -318,7 +350,7 @@ internal sealed class FakeUser : ICurrentUser
 
 internal sealed class FixedBillingClock(DateTimeOffset utcNow) : IClock
 {
-    public DateTimeOffset UtcNow { get; } = utcNow;
+    public DateTimeOffset UtcNow { get; set; } = utcNow;
 }
 
 internal sealed class FakeBillingSettings : ITenantSettings

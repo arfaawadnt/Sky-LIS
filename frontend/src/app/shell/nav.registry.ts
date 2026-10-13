@@ -133,6 +133,7 @@ export const NAV_REGISTRY: readonly NavEntry[] = [
   { portal: 'client', group: 'shell.group.finance', path: '/billing/payments', permission: 'billing.view', i18nKey: 'shell.nav.payments', release: 'R1', icon: 'coins' },
   { portal: 'client', group: 'shell.group.finance', path: '/billing/refunds', permission: 'billing.view', i18nKey: 'shell.nav.refunds', release: 'R1', menu: 'R2', icon: 'arrow-down' },
   { portal: 'client', group: 'shell.group.finance', path: '/billing/batch-payment', permission: 'billing.view', i18nKey: 'shell.nav.batchPayment', release: 'R2', icon: 'layers' },
+  { portal: 'client', group: 'shell.group.finance', path: '/reports/work-amount', permission: 'reporting.view', i18nKey: 'shell.nav.workAmountReport', release: 'R1', icon: 'trending-up' },
   { portal: 'client', group: 'shell.group.finance', path: '/billing/cash-closing', permission: 'billing.view', i18nKey: 'shell.nav.cashClosing', release: 'R2', icon: 'clipboard' },
   { portal: 'client', group: 'shell.group.account', path: '/account/profile', permission: null, i18nKey: 'shell.nav.profile', release: 'R1', icon: 'user-circle' },
   { portal: 'client', group: 'shell.group.account', path: '/account/wallet', permission: 'wallet.view', i18nKey: 'shell.nav.wallet', release: 'R2', icon: 'vault' },

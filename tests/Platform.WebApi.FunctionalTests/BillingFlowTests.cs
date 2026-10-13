@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -28,6 +29,7 @@ public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
     private const string Payments = "/api/v1/billing/payments";
     private const string Refunds = "/api/v1/billing/refunds";
     private const string Closings = "/api/v1/billing/cash-closings";
+    private const string CollectionsReport = "/api/v1/billing/collections-report";
     private const string Device = "device-cash-desk-1";
 
     private static readonly string[] CashierPermissions = ["billing.view", "billing.create", "treasury.view", "treasury.create", "treasury.manage"];
@@ -160,6 +162,41 @@ public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         var off = await desk.Cashier.GetFromJsonAsync<BillingPrintSettings>("/api/v1/billing/print-settings");
         Assert.False(off!.AutoPrintReceipt);
         await ExpectAsync(desk.Outsider.GetAsync("/api/v1/billing/print-settings"), HttpStatusCode.Forbidden, ProblemCodes.Forbidden);
+    }
+
+    [DatabaseFact]
+    public async Task The_collections_report_covers_own_movements_by_default_and_the_branch_only_with_the_right()
+    {
+        // Change request 2026-10-13, item 2: the cashier prints today's own collections per method; the whole branch needs the
+        // CP-37 right (BIL-044); a role limited to today (SpecialRights.None: report days limit 0) cannot look back (BIL-045).
+        var desk = await DeskAsync();
+        var (visitId, _) = await InsertVisitAsync(desk.Tenant, 300m);
+        Assert.Equal(HttpStatusCode.Created, (await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 100m, "Cash", null, desk.TreasuryId, Device))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 200m, "Card", "SLIP-1", desk.TreasuryId, Device))).StatusCode);
+
+        var own = await desk.Cashier.GetFromJsonAsync<CollectionsReportDocument>(CollectionsReport);
+        Assert.Equal(("User", "Method", "Cashier One"), (own!.Scope, own.GroupBy, own.CashierName));
+        Assert.Equal(own.FromDay, own.ToDay);
+        Assert.True(own.ToUtc - own.FromUtc == TimeSpan.FromDays(1) && own.FromUtc <= factory.Clock.UtcNow && factory.Clock.UtcNow < own.ToUtc);
+        Assert.Equal(["Cash", "Card"], own.Rows.Select(row => row.Key).ToArray());
+        Assert.Equal((100m, 200m, 300m, 2, 0), (own.Rows[0].Cash.Net, own.Rows[1].Card.Net, own.Totals.Net, own.Totals.PaymentCount, own.Totals.RefundCount));
+        Assert.False(string.IsNullOrWhiteSpace(own.Letterhead.LabNameEn));
+
+        await ExpectAsync(desk.Cashier.GetAsync($"{CollectionsReport}?scope=Branch"), HttpStatusCode.Forbidden, "BIL-044");
+        await ExpectAsync(desk.Outsider.GetAsync(CollectionsReport), HttpStatusCode.Forbidden, ProblemCodes.Forbidden);
+        await ExpectAsync(desk.Cashier.GetAsync($"{CollectionsReport}?scope=Everyone"), HttpStatusCode.BadRequest, ProblemCodes.ValidationFailed);
+        await ExpectAsync(desk.Cashier.GetAsync($"{CollectionsReport}?from=2026-10-02&to=2026-10-01"), HttpStatusCode.BadRequest, ProblemCodes.ValidationFailed);
+
+        var branch = await desk.Supervisor.GetFromJsonAsync<CollectionsReportDocument>($"{CollectionsReport}?scope=branch&groupBy=user");
+        Assert.Equal(("Branch", "User", null), (branch!.Scope, branch.GroupBy, branch.CashierName));
+        var row = Assert.Single(branch.Rows);
+        Assert.Equal((desk.CashierId.ToString("D"), "Cashier One", 300m, 2), (row.Key, row.LabelEn, row.Net, row.PaymentCount));
+
+        var twoDaysAgo = DateOnly.FromDateTime(factory.Clock.UtcNow.UtcDateTime).AddDays(-2).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        await ExpectAsync(desk.NoRight.GetAsync($"{CollectionsReport}?from={twoDaysAgo}"), HttpStatusCode.Forbidden, "BIL-045");
+        var empty = await desk.NoRight.GetFromJsonAsync<CollectionsReportDocument>(CollectionsReport);
+        Assert.Empty(empty!.Rows);
+        Assert.Equal(0m, empty.Totals.Net);
     }
 
     // ---- desk -------------------------------------------------------------------------------------------------

@@ -4,7 +4,7 @@
 | --- | --- |
 | Module | `billing` (Sky LIS Client Portal, pages CP-23 Payments, CP-24 Refunds, CP-27 Batch payment, CP-30 Cash closing; business rules BR-14, BR-16, BR-26, BR-27; workflow WF-09 and the payment steps of WF-02 / WF-04) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), MODULES.md (LIS-BM-001 §1, §3, §5) and the LDM synthesis. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.1 — 2026-10-10 (CP-37 special rights enforced) |
+| Version | 1.2 — 2026-10-13 (collections report of the Payments register: change request item 2; 1.1 — 2026-10-10 CP-37 special rights enforced) |
 | Slot / wave | `bill`, wave 2 (built in parallel with Registration, Samples and Account) |
 | Implemented in | `src/Platform.Domain/Billing`, `src/Platform.Contracts/Billing`, `src/Platform.Application/Billing` (+ `Platform.Application/Registration/IVisitBalanceLookup.cs`), `src/Platform.Infrastructure/Persistence/Billing`, `src/Platform.WebApi/Controllers/Billing`, `frontend/src/app/features/billing`, `frontend/src/app/core/api/billing.contracts.ts` |
 
@@ -71,7 +71,9 @@ an ERP interface (LDM is "not an accounting system", synthesis §7), multi-curre
 
 The special rights of CP-37 (Organization, `IUserPrivileges.SpecialRights`, from the role of the membership, BR-17) narrow
 the permissions inside the handlers, checked first and refused with 403: `CanPay` (payments and pay-all, BIL-040),
-`CanRefund` (refunds, BIL-041), `CanCancel` (voids, BIL-042), `CanPrintInvoice` (the invoice document, BIL-043). Cashier = any user holding `billing.create` with an approved
+`CanRefund` (refunds, BIL-041), `CanCancel` (voids, BIL-042), `CanPrintInvoice` (the invoice document, BIL-043),
+`CanViewBranchCollections` (the collections report over the whole branch, BIL-044) and `ReportDaysLimit` (how far back the
+collections report may start, BIL-045; `0` = today only, empty = no limit). Cashier = any user holding `billing.create` with an approved
 treasury on the device; manager = holder of `billing.manage`. Deny by default: every command and query carries one
 `[RequirePermissionPolicy]` (RequestPolicyTests).
 
@@ -209,6 +211,7 @@ No new parameter keys.
 | Invoice (A4) | per visit (special right `CanPrintInvoice`) | letterhead, visit, patient, payer; billed lines with list price, discount, patient share, payer share; totals; payments; refunds; balance | `billing.view` |
 | Refund receipt (A5) | per refund | letterhead, number, date, visit, patient, amount, method, reason, note; **signature boxes** (patient, cashier) | `billing.view` |
 | Cash-closing sheet (A4) | per closing | letterhead, number, treasury, cashier scope, period, totals, expected / counted / difference, note, movements; **handover signatures** (cashier, receiver) | `billing.view` |
+| Collections (treasury) report (A4; change request 2026-10-13 item 2, LDM "Total Daily Income" §10.11) | `GET /api/v1/billing/collections-report?from&to&scope&groupBy` — whole laboratory-calendar days (`timeZone` resolution of `ILaboratoryTimeZone`; default today), `scope` User (own posted payments and refunds, every branch) or Branch (every cashier of the session branch; TENANT-004 without a branch, **BIL-044** without `CanViewBranchCollections`), `groupBy` Branch / User / Method (default Method); a start before `EarliestReportDay(today)` → **BIL-045**; `to` < `from` → BIL-030 | `CollectionsReportDocument`: letterhead, scope, grouping, period (days and UTC bounds, half-open), cashier (user scope), one row per key with payment / refund counts (voided payments excluded), payments, refunds and net per method (Cash, Card, Pos, Transfer), totals and net; a grand-total row; printed by/at. Printed from the "Print collections" button of the Payments register (dialog: period, scope, grouping, preview table) | `billing.view` |
 
 ## 15. Notifications and escalations
 
@@ -270,6 +273,15 @@ Scenario S-T5-diff: counted 440 without a note → BIL-034 (422); with a note �
 Scenario S-T5-overlap: a second closing overlapping the same treasury for the same cashier (or for all cashiers) → BIL-120 (409)
 Scenario S-T5-period: from ≥ to → BIL-030; to in the future → BIL-031; longer than 31 days → BIL-033
 
+Scenario S-CR-own: Collections report, default
+  Given a cashier who took 100 cash and 200 by card today
+  When the cashier prints the collections report without parameters
+  Then the report covers today (laboratory day, 00:00–23:59:59.999 local) for the cashier's own movements grouped by method: Cash 100, Card 200, total 300, 2 payments, 0 refunds
+Scenario S-CR-branch: scope Branch without CanViewBranchCollections → 403 BIL-044; with it → one row per cashier of the session branch (grouping User) or per branch / method
+Scenario S-CR-limit: a role with ReportDaysLimit 0 asks for a period starting yesterday → 403 BIL-045; today → 200 (empty rows when nothing was taken)
+Scenario S-CR-shape: scope or groupBy outside the enum names, or to before from → VALIDATION-400
+Scenario S-CR-cells: the grouping query counts posted payments only, refunds by their method, per (branch, cashier, method); another tenant sees nothing
+
 Scenario S-AUTHZ: any command without the permission → 403 AUTHZ-001 before the handler runs
 Scenario S-RIGHTS: a user holding the permission but not the CP-37 special right → 403 BIL-040 (pay), BIL-041 (refund), BIL-042 (void), BIL-043 (invoice); nothing is recorded and no number is drawn
 Scenario S-TENANT: accounts, payments, refunds and closings of tenant X are invisible to tenant Y (query filter + FORCE RLS)
@@ -299,6 +311,9 @@ Open questions (assumed answers let the build proceed; confirm or change):
 | Q17 | Retention | With the tenant's financial records (10 years). |
 | Q18 | Cashiers without `settings.view` cannot read `autoPrintReceipt` through `/api/v1/settings` | The SPA falls back to the code default (`true`); integrator to decide whether an authenticated read of print parameters is exposed. |
 | Q19 | Digits of amounts and dates (validation v0.5.0 F-09, 2026-10-12) | **Decision.** On screen an Arabic page writes amounts, counts and dates in Arabic-Indic digits like the rest of the portal (`formatMoney`, `formatDateTime`, `formatCount`); the receipt, refund receipt, invoice and closing sheet keep Latin digits in both languages (`formatPrintMoney`, `formatPrintDateTime`), and the CSV exports are written by the server in Latin digits. Counted texts take their Arabic forms ("زيارتان", "٧ إيصالات", "١٢ إيصالًا"; F-11). |
+| Q20 | Collections report (change request 2026-10-13 item 2): does the member's `ReportDaysLimit` apply to this report only or to every report? | Assumed: it is the member's limit for **every** report; the collections report is its first consumer (BIL-045 when the period starts before `EarliestReportDay(today)`), and the Reporting module should apply the same check. Today is the laboratory's calendar day (`ILaboratoryTimeZone`: client country zone → `timeZone` parameter → Africa/Cairo), not the browser's; the SPA bounds the date inputs with the browser's today and the server decides. |
+| Q21 | Which branch does the "own payments" scope cover? | Assumed: every branch the user took money in (the movements carry their branch, so grouping by Branch shows the split); the "whole branch" scope is the session branch only. The letterhead names the session branch when one is selected. |
+| Q22 | What does "amount per collection method" mean when refunds exist? | Assumed: the report shows, per method, the posted payments, the refunds and the net (payments − refunds), plus the counts; voided payments are excluded from amounts and counts (they are not collections). Method rows are ordered Cash, Card, Pos, Transfer; cashier and branch rows by name. |
 
 Integration dependencies (wave 1/2 modules built in parallel; placeholders marked `[FallbackAdapter]`):
 

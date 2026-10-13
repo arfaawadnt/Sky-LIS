@@ -76,6 +76,19 @@ public interface ICashDrawerQueries
     Task<IReadOnlyDictionary<Guid, string>> UserNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// The scope of the collections report: one cashier (<paramref name="CashierUserId"/>) or every cashier of a branch
+/// (<paramref name="BranchId"/>), over a half-open UTC period of whole laboratory days.
+/// </summary>
+public sealed record CollectionsScope(Guid? CashierUserId, Guid? BranchId, DateTimeOffset FromUtc, DateTimeOffset ToUtc);
+
+/// <summary>The collections report (change request 2026-10-13, item 2) over <c>app.payments</c> (Posted only) and <c>app.refunds</c>.</summary>
+public interface ICollectionsReportQueries
+{
+    /// <summary>One cell per (branch, cashier, method) with the sums and counts; one grouping query, nothing else.</summary>
+    Task<IReadOnlyList<CollectionsCell>> CellsAsync(CollectionsScope scope, CancellationToken cancellationToken);
+}
+
 /// <summary>A visit as Billing reads it from <c>app.visits</c> (+ its batch from <c>app.batches</c>), MODULES.md §5.</summary>
 public sealed record BillableVisit(
     Guid VisitId,
@@ -185,4 +198,7 @@ public interface IBillingDirectory
     Task<IReadOnlyDictionary<Guid, NamedReference>> ServicesAsync(IReadOnlyCollection<Guid> serviceIds, CancellationToken cancellationToken);
 
     Task<IReadOnlyDictionary<Guid, NamedReference>> PayersAsync(IReadOnlyCollection<Guid> payerIds, CancellationToken cancellationToken);
+
+    /// <summary>Bilingual names of the branches (<c>app.branches</c>) the collections report groups by, keyed by id.</summary>
+    Task<IReadOnlyDictionary<Guid, NamedReference>> BranchesAsync(IReadOnlyCollection<Guid> branchIds, CancellationToken cancellationToken);
 }

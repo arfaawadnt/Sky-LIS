@@ -23,6 +23,9 @@ public static class PatientCodes
     public const string VipRequiresConfidential = "PAT-030";
     public const string VipFilterRequiresConfidential = "PAT-031";
 
+    /// <summary>An identity field (title, names, gender, date of birth or age, condition, national id, nationality) may no longer change: a result of the visit (or of the patient) has passed the status the member's <c>DemographicsEditUpTo</c> right allows (change request 2026-10-13, item 1).</summary>
+    public const string DemographicsLockedByResults = "PAT-032";
+
     public const string DocumentEmpty = "PAT-040";
     public const string DocumentTooLarge = "PAT-041";
     public const string DocumentTypeNotAllowed = "PAT-042";

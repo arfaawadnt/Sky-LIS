@@ -209,6 +209,50 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
     }
 
     [DatabaseFact]
+    public async Task The_collections_cells_sum_posted_payments_and_refunds_per_branch_cashier_and_method()
+    {
+        var world = await WorldAsync();
+        var second = await RegisterUserAsync("Billing Cashier Two");
+        var secondStation = world.Station with { CashierUserId = second };
+        var visitA = await InsertVisitAsync(world.Tenant, "ACC-COL-1", 500m);
+        var visitB = await InsertVisitAsync(world.Tenant, "ACC-COL-2", 400m);
+        await PayAsync(world, visitA, 300m);
+        await PayAsync(world, visitA, 100m, PaymentMethod.Card, "SLIP-1");
+        var voided = await PayAsync(world, visitB, 50m);
+        await VoidAsync(world, voided);
+        await PayAsync(world, visitB, 400m, station: secondStation);
+        await LowerShareAsync(world.Tenant, visitB, 380m);
+        await RefundAsync(world, visitB, 20m, station: secondStation);
+
+        using (var scope = fixture.AppScope(world.Tenant, world.Cashier, branchId: world.Branch))
+        {
+            var queries = scope.ServiceProvider.GetRequiredService<ICollectionsReportQueries>();
+            var branchCells = await queries.CellsAsync(new CollectionsScope(null, world.Branch, Now.AddHours(-1), Now.AddHours(1)), CancellationToken.None);
+            Assert.Equal(3, branchCells.Count);   // (cashier 1, cash), (cashier 1, card), (cashier 2, cash); the voided payment is not counted
+
+            var (byMethod, totals) = CollectionsReport.Group(branchCells, CollectionsReportGrouping.Method);
+            var cash = Assert.Single(byMethod, group => group.Key == "Cash").Figures;
+            Assert.Equal((700m, 20m, 680m, 2, 1), (cash.Cash.Payments, cash.Cash.Refunds, cash.Cash.Net, cash.PaymentCount, cash.RefundCount));
+            Assert.Equal(100m, Assert.Single(byMethod, group => group.Key == "Card").Figures.Card.Payments);
+            Assert.Equal((800m, 20m, 780m, 3, 1), (totals.TotalPayments, totals.TotalRefunds, totals.Net, totals.PaymentCount, totals.RefundCount));
+
+            var (byUser, _) = CollectionsReport.Group(branchCells, CollectionsReportGrouping.User);
+            Assert.Equal(400m, Assert.Single(byUser, group => group.Key == world.Cashier.ToString("D")).Figures.Net);
+            Assert.Equal(380m, Assert.Single(byUser, group => group.Key == second.ToString("D")).Figures.Net);
+
+            var own = await queries.CellsAsync(new CollectionsScope(world.Cashier, null, Now.AddHours(-1), Now.AddHours(1)), CancellationToken.None);
+            Assert.All(own, cell => Assert.Equal(world.Cashier, cell.CashierUserId));
+            Assert.Equal(400m, CollectionsReport.Group(own, CollectionsReportGrouping.Method).Totals.Net);
+
+            Assert.Empty(await queries.CellsAsync(new CollectionsScope(null, Guid.CreateVersion7(), Now.AddHours(-1), Now.AddHours(1)), CancellationToken.None));
+            Assert.Empty(await queries.CellsAsync(new CollectionsScope(null, world.Branch, Now.AddHours(1), Now.AddHours(2)), CancellationToken.None));
+        }
+
+        using var other = fixture.AppScope(Guid.CreateVersion7(), world.Cashier, branchId: world.Branch);
+        Assert.Empty(await other.ServiceProvider.GetRequiredService<ICollectionsReportQueries>().CellsAsync(new CollectionsScope(null, world.Branch, Now.AddHours(-1), Now.AddHours(1)), CancellationToken.None));
+    }
+
+    [DatabaseFact]
     public async Task Money_rows_are_immutable_in_the_database()
     {
         var world = await WorldAsync();
@@ -275,15 +319,16 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
         return user.Id;
     }
 
-    private async Task<Guid> PayAsync(World world, Guid visit, decimal amount, PaymentMethod method = PaymentMethod.Cash, string? reference = null, string? number = null)
+    private async Task<Guid> PayAsync(World world, Guid visit, decimal amount, PaymentMethod method = PaymentMethod.Cash, string? reference = null, string? number = null, CashierStation? station = null)
     {
-        using var scope = fixture.AppScope(world.Tenant, world.Cashier, branchId: world.Branch);
+        var at = station ?? world.Station;
+        using var scope = fixture.AppScope(world.Tenant, at.CashierUserId, branchId: world.Branch);
         var accounts = scope.ServiceProvider.GetRequiredService<IVisitAccountRepository>();
         var share = (await scope.ServiceProvider.GetRequiredService<IBillableVisitLookup>().GetAsync(visit, CancellationToken.None))!.Charge;
         var existing = await accounts.GetForUpdateAsync(visit, CancellationToken.None);
         var account = existing ?? VisitAccount.Open(visit);
         number ??= await scope.ServiceProvider.GetRequiredService<IReferenceNumbers>().NextAsync(Payment.NumberKind, Payment.NumberPrefix, Now, CancellationToken.None);
-        var payment = account.RecordPayment(number, amount, method, reference, world.Station, share, Now);
+        var payment = account.RecordPayment(number, amount, method, reference, at, share, Now);
         if (existing is null)
         {
             accounts.Add(account);
@@ -301,13 +346,14 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
     }
 
-    private async Task RefundAsync(World world, Guid visit, decimal amount)
+    private async Task RefundAsync(World world, Guid visit, decimal amount, CashierStation? station = null)
     {
-        using var scope = fixture.AppScope(world.Tenant, world.Cashier, branchId: world.Branch);
+        var at = station ?? world.Station;
+        using var scope = fixture.AppScope(world.Tenant, at.CashierUserId, branchId: world.Branch);
         var share = (await scope.ServiceProvider.GetRequiredService<IBillableVisitLookup>().GetAsync(visit, CancellationToken.None))!.Charge;
         var account = (await scope.ServiceProvider.GetRequiredService<IVisitAccountRepository>().GetForUpdateAsync(visit, CancellationToken.None))!;
         var number = await scope.ServiceProvider.GetRequiredService<IReferenceNumbers>().NextAsync(Refund.NumberKind, Refund.NumberPrefix, Now, CancellationToken.None);
-        account.RecordRefund(number, amount, PaymentMethod.Cash, null, Guid.CreateVersion7(), "integration", world.Station, share, Now);
+        account.RecordRefund(number, amount, PaymentMethod.Cash, null, Guid.CreateVersion7(), "integration", at, share, Now);
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
     }
 

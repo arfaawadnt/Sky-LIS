@@ -4,7 +4,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
-import { PATIENTS_API, type PatientDetail, type PatientDocumentItem } from '../../../core/api/patients.contracts';
+import { PATIENTS_API, type PatientDemographicsLock, type PatientDetail, type PatientDocumentItem } from '../../../core/api/patients.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { PatientFileFacade } from '../state/patient-file.facade';
@@ -45,6 +45,9 @@ const detail: PatientDetail = {
   modifiedByName: null,
   rowVersion: 7,
 };
+
+const unlocked: PatientDemographicsLock = { highestStatus: 'Ordered', canEditIdentity: true, editableUpTo: 'Complete' };
+const locked: PatientDemographicsLock = { highestStatus: 'Verified', canEditIdentity: false, editableUpTo: 'Complete' };
 
 const document: PatientDocumentItem = {
   id: 'd-1',
@@ -88,11 +91,12 @@ describe('PatientFilePage (CP-11 file, documents, visits, merge)', () => {
     await settle();
   }
 
-  async function render(patient: PatientDetail = detail): Promise<HTMLElement> {
+  async function render(patient: PatientDetail = detail, lock: PatientDemographicsLock = unlocked): Promise<HTMLElement> {
     const fixture = TestBed.createComponent(PatientFilePage);
     fixture.componentRef.setInput('id', patient.id);
     await flush();
     backend.expectOne(`${PATIENTS_API.patients}/${patient.id}`).flush(patient);
+    backend.expectOne((r) => r.url === `${PATIENTS_API.patients}/${patient.id}/demographics-lock`).flush(lock);   // the file-wide lock (no visitId), read with the file
     if (granted.has('files.view')) {
       backend.expectOne((r) => r.url === `${PATIENTS_API.patients}/${patient.id}/documents`).flush([document]);
     } else {
@@ -122,6 +126,23 @@ describe('PatientFilePage (CP-11 file, documents, visits, merge)', () => {
     expect(host.textContent).toContain('PAT-2026-00000');
     expect(host.textContent).toContain('patients.edit');
     expect(host.textContent).not.toContain('patients.merge.open');
+  });
+
+  it('re-reads the file-wide demographics lock when the edit drawer opens and freezes the identity fields (PAT-032)', async () => {
+    granted = new Set(['patients.view', 'patients.edit']);
+    const host = await render(detail, unlocked);
+
+    host.querySelector<HTMLButtonElement>('app-page-header .btn.primary')!.click();
+    await flush();
+    const reread = backend.expectOne((r) => r.url === `${PATIENTS_API.patients}/p-1/demographics-lock`);
+    expect(reread.request.params.has('visitId')).toBe(false);
+    reread.flush(locked);
+    await flush();
+
+    expect(host.querySelector('.lock-hint')?.textContent).toContain('patients.lock.identity');
+    expect(host.querySelector<HTMLInputElement>('[formcontrolname="fullName"]')?.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('[formcontrolname="nationalId"]')?.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('[formcontrolname="mobile"]')?.disabled).toBe(false);
   });
 
   it('offers no Documents tab without files.view (UAT A-03)', async () => {

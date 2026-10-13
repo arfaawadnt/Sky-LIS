@@ -62,6 +62,25 @@ public sealed class ListPatientsHandler(IPatientRepository patients, IPatientVis
 [RequirePermissionPolicy(PermissionCatalog.Patients, PermissionAction.View)]
 public sealed record GetPatientQuery(Guid PatientId) : IQuery<PatientDetail>;
 
+/// <summary>The lock affordance of the patient form (PAT-032): what the server will decide on an identity change from <paramref name="VisitId"/> (or from the file when null).</summary>
+[RequirePermissionPolicy(PermissionCatalog.Patients, PermissionAction.View)]
+public sealed record GetPatientDemographicsLockQuery(Guid PatientId, Guid? VisitId) : IQuery<PatientDemographicsLock>;
+
+public sealed class GetPatientDemographicsLockHandler(IPatientRepository patients, IPatientResultStatusLookup results, IUserPrivileges privileges) : IQueryHandler<GetPatientDemographicsLockQuery, PatientDemographicsLock>
+{
+    public async Task<PatientDemographicsLock> Handle(GetPatientDemographicsLockQuery query, CancellationToken cancellationToken)
+    {
+        if (!await patients.ExistsAsync(query.PatientId, cancellationToken))
+        {
+            throw new DomainException(PatientCodes.PatientNotFound, "Patient file not found.", DomainFault.NotFound);
+        }
+
+        var highest = await results.HighestStatusAsync(query.PatientId, query.VisitId, cancellationToken);
+        var rights = privileges.SpecialRights;
+        return new PatientDemographicsLock(highest.ToString(), rights.AllowsDemographicsEditAt(highest), rights.DemographicsEditUpTo.ToString());
+    }
+}
+
 public sealed class GetPatientHandler(IPatientRepository patients, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, IClock clock) : IQueryHandler<GetPatientQuery, PatientDetail>
 {
     public async Task<PatientDetail> Handle(GetPatientQuery query, CancellationToken cancellationToken)

@@ -429,3 +429,16 @@ Open questions (assumed answers let the build proceed; confirm or change):
 | Q21 | Can a Completed visit be transferred or have services cancelled? | Yes (money stays correctable for claims and refunds); new services need an Open visit. |
 | Q22 | Shortcut numbers and sets at the service entry | Resolved on the server in this order: exact shortcut number, exact service code, exact short name or alias, shortcut set code; otherwise the picker opens with the typed text. |
 | Q23 | Does "refuses duplicates" (SRS actor table) cover tests ordered through different services? | **Assumption, awaiting the business owner (validation O-3, 2026-10-11).** Yes at test level: a service whose every test is already on the visit through another service (a profile, a member of a package, a profile inside a package) is refused with REG-109, which names each repeated test and the service that orders it ("CREA (PKG › RFT)"). A service that adds at least one new test is allowed, with warning REG-206 naming the repeated tests; its price is not reduced. Services without tests (additional services) are never refused by this rule. |
+
+## 17. Change request 2026-10-13 item 1 — patient demographics from Search registrations
+
+CP-10 gains the row action **Patient** (`patients.edit`, icon `user`): the patient file opens in a drawer with the shared
+patient form prefilled from `GET /api/v1/patients/{id}`. Before the form shows, the drawer reads
+`GET /api/v1/patients/{id}/demographics-lock?visitId=<row>`; when `canEditIdentity` is false the identity fields (title,
+names, gender, date of birth or age, condition, national id, nationality) are read-only with a hint naming the status a
+result of this visit has reached and the user's limit (`DemographicsEditUpTo`, CP-37), while the contact fields stay
+editable. Save (button or F10) calls `PUT /api/v1/patients/{id}` with the row's `visitId` and the file's row version; the
+server decides (PAT-032 → 403, shown in the drawer); on success the drawer closes, a toast confirms and the register
+reloads so the name and mobile columns follow. The rule, the code and the read port are specified in LIS-INT-PAT-001 §17;
+Registration adds no table and no endpoint. The lock is judged on the row's visit (a visit without live results is judged
+patient-wide); editing from the patient file (CP-11) judges every visit of the patient.

@@ -137,6 +137,10 @@ public sealed class SetRoleSpecialRightsValidator : AbstractValidator<SetRoleSpe
         RuleFor(command => command.SpecialRights.DiscountCapPercent)
             .InclusiveBetween(0, Domain.Organization.SpecialRights.MaxDiscountCapPercent)
             .When(command => command.SpecialRights?.DiscountCapPercent is not null);
+        RuleFor(command => command.SpecialRights.DemographicsEditUpTo).NotEmpty().IsEnumName(typeof(DemographicsEditLimit), caseSensitive: false).When(command => command.SpecialRights is not null);
+        RuleFor(command => command.SpecialRights.ReportDaysLimit)
+            .InclusiveBetween(0, Domain.Organization.SpecialRights.MaxReportDaysLimit)
+            .When(command => command.SpecialRights?.ReportDaysLimit is not null);
     }
 }
 

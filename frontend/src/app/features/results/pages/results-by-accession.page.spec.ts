@@ -431,4 +431,68 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     expect(host.querySelector('.case-flags')?.textContent).toContain('٣ وحدات تقرير');
     i18n.setLanguage('en');
   });
+  it('folds the criteria into a summary bar once the query answers, hands the keyboard to the list and unfolds on "Change criteria" (change request 2026-10-13 item 4)', async () => {
+    granted = new Set(['results.view']);
+    printer = new PrinterStub();
+    await TestBed.configureTestingModule({
+      imports: [ResultsByAccessionPage],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        provideHttpClient(withInterceptors([problemDetailsInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+        { provide: ResultsPrinter, useValue: printer },
+        ResultsCaseFacade,
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ResultsByAccessionPage);
+    backend = TestBed.inject(HttpTestingController);
+    host = fixture.nativeElement as HTMLElement;
+    await render();
+    expect(host.querySelector('form.query-form')).not.toBeNull();
+    expect(host.querySelector('.criteria-bar')).toBeNull();
+
+    const name = host.querySelector<HTMLInputElement>('input[formcontrolname="patientName"]')!;
+    name.value = 'mo%';
+    name.dispatchEvent(new Event('input'));
+    host.querySelector<HTMLInputElement>('input[formcontrolname="notVerified"]')!.click();
+    host.querySelector<HTMLFormElement>('form.query-form')!.dispatchEvent(new Event('submit'));
+    await render();
+    expect(host.querySelector('form.query-form')).not.toBeNull();   // still open while the answer is pending
+    backend.expectOne((call) => call.url === RESULTS_API.visits).flush(page([visitItem(), visitItem({ visitId: 'visit-2', accession: 'ACC-2026-00002' })]));
+    await render();
+
+    expect(host.querySelector('form.query-form')).toBeNull();
+    const chips = (): string[] => [...host.querySelectorAll('.criteria-bar .tag')].map((chip) => chip.textContent?.replace(/\s+/g, ' ').trim() ?? '');
+    expect(chips()).toEqual(['results.case.patientName: mo%', 'results.case.notVerified', 'results.case.branchOnly']);
+    expect(document.activeElement).toBe(host.querySelector('.visit-list .visit'));
+
+    // opening a visit keeps the summary (the case gets the height)
+    host.querySelector<HTMLButtonElement>('.visit-list .visit')!.click();
+    await render();
+    backend.expectOne((call) => call.url === RESULTS_API.results).flush(caseView());
+    await render();
+    expect(host.querySelector('.criteria-bar')).not.toBeNull();
+    expect(host.textContent).toContain('Mona Adel');
+
+    // "Change criteria" unfolds the form with its values and the cursor on the accession field
+    host.querySelector<HTMLButtonElement>('.change-criteria')!.click();
+    await render();
+    expect(host.querySelector('.criteria-bar')).toBeNull();
+    expect(host.querySelector<HTMLInputElement>('input[formcontrolname="patientName"]')?.value).toBe('mo%');
+    expect(document.activeElement).toBe(host.querySelector('input[formcontrolname="accession"]'));
+
+    // a query without criteria folds to a single chip; "New query" unfolds again
+    buttons('results.case.newQuery')[0]!.click();
+    await render();
+    expect(host.querySelector('form.query-form')).not.toBeNull();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F8', bubbles: true }));
+    await render();
+    backend.expectOne((call) => call.url === RESULTS_API.visits).flush(page([]));
+    await render();
+    expect(chips()).toEqual(['results.case.branchOnly']);
+    expect(document.activeElement).toBe(host.querySelector('.visit-list'));
+    backend.verify();
+  });
 });

@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
-import { BILLING_API, type PaymentListItem, type VisitAccountView } from '../../../core/api/billing.contracts';
+import { BILLING_API, type CollectionsReportDocument, type CollectionsReportRequest, type PaymentListItem, type VisitAccountView } from '../../../core/api/billing.contracts';
 import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
@@ -13,7 +13,7 @@ import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { BillingPrinter } from '../state/billing-printer';
 import { CashDeskFacade } from '../state/cash-desk.facade';
 import { PaymentsFacade } from '../state/payments.facade';
-import { account, flushCashDesk } from '../testing/billing.fixtures';
+import { account, collectionsReport, flushCashDesk, flushReportPrivileges } from '../testing/billing.fixtures';
 import type { MovementInput } from '../ui/movement-form.component';
 import { PaymentsPage } from './payments.page';
 
@@ -22,6 +22,10 @@ interface PaymentsPageInternals {
   pay(account: VisitAccountView, input: MovementInput): Promise<void>;
   voidPayment(row: PaymentListItem): Promise<void>;
   canVoid(row: PaymentListItem): boolean;
+  onTab(id: string | null): void;
+  openCollections(): void;
+  loadCollections(request: CollectionsReportRequest): Promise<unknown>;
+  printCollections(request: CollectionsReportRequest): Promise<void>;
 }
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -61,6 +65,11 @@ class PrinterStub {
 
   invoice(id: string): Promise<void> {
     this.printed.push(`invoice:${id}`);
+    return Promise.resolve();
+  }
+
+  collectionsReport(doc: CollectionsReportDocument): Promise<void> {
+    this.printed.push(`collections:${doc.scope}:${doc.groupBy}:${doc.fromDay}`);
     return Promise.resolve();
   }
 }
@@ -172,6 +181,92 @@ describe('PaymentsPage (CP-23)', () => {
     expect((facade.account.error() as { code?: string } | undefined)?.code).toBe('BIL-404');
     harness.detectChanges();
     expect(harness.routeNativeElement?.querySelector('[role="alert"]')).not.toBeNull();
+    backend.verify();
+  });
+
+  // ---- collections (treasury) report, change request 2026-10-13 item 2 ---------------------------------------------
+
+  /** Opens the register tab (its list and treasuries load) and the collections dialog; answers the register's own reads. */
+  async function openCollectionsDialog(page: PaymentsPageInternals): Promise<void> {
+    page.onTab('register');
+    TestBed.tick();
+    await settle();
+    backend.expectOne((request) => request.url === BILLING_API.payments).flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 0 });
+    backend.expectOne(BILLING_API.treasuries).flush([]);
+    page.openCollections();
+    TestBed.tick();
+    await settle();
+  }
+
+  it('opens the collections dialog on the register tab, reads the member\'s rights and offers the whole branch only with the right', async () => {
+    const page = await open('/billing/payments');
+    await openCollectionsDialog(page);
+
+    flushReportPrivileges(backend, false, 0);   // today only, own payments only
+    TestBed.tick();
+    await settle();
+    harness.detectChanges();
+    const dialog = harness.routeNativeElement!.querySelector('app-billing-collections-report-dialog')!;
+    expect(dialog.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(dialog.querySelector('input[type="radio"][value="User"]')).not.toBeNull();
+    expect(dialog.querySelector('input[type="radio"][value="Branch"]')).toBeNull();
+    const from = dialog.querySelector<HTMLInputElement>('input[type="date"]')!;
+    expect(from.value).toBe(from.getAttribute('min'));   // the earliest allowed day is today, which is also the default
+    expect(dialog.querySelector('select')?.querySelectorAll('option').length).toBe(3);
+    expect((dialog.querySelector('select') as HTMLSelectElement).value).toBe('Method');
+
+    const facade = harness.routeDebugElement!.injector.get(PaymentsFacade);
+    facade.closeCollections();
+    facade.openCollections();
+    TestBed.tick();
+    await settle();
+    flushReportPrivileges(backend, true, null);
+    TestBed.tick();
+    await settle();
+    harness.detectChanges();
+    expect(dialog.querySelector('input[type="radio"][value="Branch"]')).not.toBeNull();
+    expect(dialog.querySelector('input[type="date"]')?.getAttribute('min')).toBeNull();
+    backend.verify();
+  });
+
+  it('loads the report with the chosen period, scope and grouping, shows its rows, and prints the grouping asked for', async () => {
+    const page = await open('/billing/payments');
+    await openCollectionsDialog(page);
+    flushReportPrivileges(backend, true, null);
+    TestBed.tick();
+    await settle();
+
+    const request: CollectionsReportRequest = { fromDay: '2026-10-12', toDay: '2026-10-13', scope: 'Branch', groupBy: 'User' };
+    const loading = page.loadCollections(request);
+    await settle();
+    const get = backend.expectOne((candidate) => candidate.url === BILLING_API.collectionsReport);
+    expect([get.request.params.get('from'), get.request.params.get('to'), get.request.params.get('scope'), get.request.params.get('groupBy')]).toEqual(['2026-10-12', '2026-10-13', 'Branch', 'User']);
+    get.flush(collectionsReport({ scope: 'Branch', groupBy: 'User', fromDay: '2026-10-12', cashierName: null, rows: [collectionsReport().rows[0]!, { ...collectionsReport().rows[1]!, key: 'u-2', labelEn: 'Cashier Two', labelAr: 'الصراف الثاني' }] }));
+    await loading;
+    TestBed.tick();
+    await settle();
+    harness.detectChanges();
+    const table = harness.routeNativeElement!.querySelector('app-billing-collections-report-dialog table.report')!;
+    expect(table.querySelectorAll('tbody tr').length).toBe(2);
+    expect(table.textContent).toContain('Cashier Two');
+    expect(table.querySelector('tfoot')?.textContent).toContain('350.00');
+    expect(printer.printed).toEqual([]);
+
+    const printing = page.printCollections({ ...request, groupBy: 'Method' });
+    await settle();
+    const again = backend.expectOne((candidate) => candidate.url === BILLING_API.collectionsReport);
+    expect(again.request.params.get('groupBy')).toBe('Method');
+    again.flush(collectionsReport({ scope: 'Branch', groupBy: 'Method', fromDay: '2026-10-12' }));
+    await printing;
+    expect(printer.printed).toEqual(['collections:Branch:Method:2026-10-12']);
+
+    const refused = page.printCollections({ ...request, fromDay: '2026-01-01' });
+    await settle();
+    backend.expectOne((candidate) => candidate.url === BILLING_API.collectionsReport).flush({ type: 'about:blank', title: 'Refused', status: 403, code: 'BIL-045' }, { status: 403, statusText: 'Forbidden' });
+    await refused;
+    expect(printer.printed.length).toBe(1);
+    const facade = harness.routeDebugElement!.injector.get(PaymentsFacade);
+    expect(facade.collectionsReport.problem()?.code).toBe('BIL-045');
     backend.verify();
   });
 });

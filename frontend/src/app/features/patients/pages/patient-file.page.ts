@@ -85,6 +85,16 @@ export class PatientFilePage {
 
   protected readonly patient = computed(() => (this.facade.detail.hasValue() ? this.facade.detail.value() : null));
   protected readonly isActive = computed(() => this.patient()?.status === 'Active');
+  /** The identity fields of the edit drawer follow the file-wide demographics lock (PAT-032); an unreadable lock locks them (the server decides anyway). */
+  protected readonly identityLocked = computed(() => (this.facade.lock.hasValue() ? !this.facade.lock.value().canEditIdentity : true));
+  protected readonly lockHint = computed(() => {
+    if (!this.facade.lock.hasValue()) {
+      return this.i18n.t('patients.lock.unknown');
+    }
+
+    const lock = this.facade.lock.value();
+    return lock.canEditIdentity ? null : this.i18n.tf('patients.lock.identity', { status: this.i18n.t(`shared.status.${lock.highestStatus}`), limit: this.i18n.t(`shared.status.${lock.editableUpTo}`) });
+  });
   protected readonly documents = computed<readonly PatientDocumentItem[]>(() => (this.facade.documents.hasValue() ? this.facade.documents.value() : []));
   protected readonly visits = computed<readonly PatientVisitItem[]>(() => (this.facade.visits.hasValue() ? this.facade.visits.value() : []));
 
@@ -138,6 +148,7 @@ export class PatientFilePage {
 
   protected openEdit(): void {
     this.facade.update.reset();
+    this.facade.lock.reload();   // results may have moved on since the file was opened
     this.editOpen.set(true);
   }
 

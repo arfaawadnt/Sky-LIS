@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import type { CountryOption, GovernorateOption, PatientFormSettings, RegisterPatientRequest } from '../../core/api/patients.contracts';
+import type { CountryOption, GovernorateOption, PatientDetail, PatientFormSettings, RegisterPatientRequest } from '../../core/api/patients.contracts';
 import { PermissionsService } from '../../core/permissions/permissions.service';
 import { PatientFormComponent } from './patient-form.component';
 import { ageBetween, todayIso } from './patient-demographics';
@@ -9,12 +9,15 @@ import { ageBetween, todayIso } from './patient-demographics';
 @Component({
   imports: [PatientFormComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<app-patient-form [settings]="settings()" [countries]="countries()" [governorates]="governorates()" (save)="saved.push($event)" />`,
+  template: `<app-patient-form [patient]="patient()" [settings]="settings()" [countries]="countries()" [governorates]="governorates()" [identityLocked]="locked()" [lockHint]="hint()" (save)="saved.push($event)" />`,
 })
 class HostComponent {
+  readonly patient = signal<PatientDetail | null>(null);
   readonly settings = signal<PatientFormSettings | null>(null);
   readonly countries = signal<readonly CountryOption[]>([]);
   readonly governorates = signal<readonly GovernorateOption[]>([]);
+  readonly locked = signal(false);
+  readonly hint = signal<string | null>(null);
   readonly saved: RegisterPatientRequest[] = [];
   readonly form = viewChild.required(PatientFormComponent);
 }
@@ -73,6 +76,41 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
     await fixture.whenStable();
     expect(host.querySelector('.problem.blocked')).toBeNull();
     host.remove();
+  });
+
+  it('freezes the identity fields under a demographics lock and still saves them unchanged with the edited contact (PAT-032)', async () => {
+    const { fixture, host } = await render();
+    fixture.componentInstance.patient.set({
+      id: 'p-1', number: 'PAT-2026-00001', title: 'Mrs', fullName: 'Mona Hassan', nameAr: 'منى حسن', gender: 'Female', dateOfBirth: '1990-05-01', dateOfBirthIsEstimated: false,
+      age: ageBetween('1990-05-01', todayIso()), statedAge: null, ageRecordedOn: null, registeredOn: '2026-10-01', patientConditionId: null, mobile: '01001234567', nationalId: '29005010101234',
+      nationality: 'EG', email: null, governorateId: null, city: 'Cairo', address: null, comments: null, isVip: null, status: 'Active', merge: null, mergedFiles: [],
+      createdAtUtc: '2026-10-01T08:00:00Z', createdByName: null, modifiedAtUtc: null, modifiedByName: null, rowVersion: 3,
+    });
+    fixture.componentInstance.locked.set(true);
+    fixture.componentInstance.hint.set('locked at Verified');
+    await fixture.whenStable();
+
+    expect(host.querySelector('.lock-hint')?.textContent).toContain('locked at Verified');
+    for (const field of ['title', 'fullName', 'nameAr', 'dateOfBirth', 'ageYears', 'ageMonths', 'ageDays', 'nationalId', 'nationality']) {
+      expect(host.querySelector<HTMLInputElement>(`[formcontrolname="${field}"]`)?.disabled).toBe(true);
+    }
+
+    expect(host.querySelectorAll<HTMLInputElement>('input[type="radio"][formcontrolname="gender"]').length).toBeGreaterThan(0);
+    host.querySelectorAll<HTMLInputElement>('input[type="radio"][formcontrolname="gender"]').forEach((radio) => expect(radio.disabled).toBe(true));
+    for (const field of ['mobile', 'email', 'city', 'address', 'comments']) {
+      expect(host.querySelector<HTMLInputElement>(`[formcontrolname="${field}"]`)?.disabled).toBe(false);
+    }
+
+    type(host, 'mobile', '01112223333');
+    await fixture.whenStable();
+    expect(fixture.componentInstance.form().submit()).toBe(true);
+    const saved = fixture.componentInstance.saved[0]!;
+    expect(saved).toEqual(expect.objectContaining({ title: 'Mrs', fullName: 'Mona Hassan', nameAr: 'منى حسن', gender: 'Female', dateOfBirth: '1990-05-01', nationalId: '29005010101234', nationality: 'EG', mobile: '01112223333' }));
+
+    fixture.componentInstance.locked.set(false);
+    await fixture.whenStable();
+    expect(host.querySelector('.lock-hint')).toBeNull();
+    expect(host.querySelector<HTMLInputElement>('[formcontrolname="fullName"]')?.disabled).toBe(false);
   });
 
   it('lets the title propose the gender', async () => {

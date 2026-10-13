@@ -40,6 +40,13 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
             rights.Property(value => value.CanPreviewWithoutVerify).HasColumnName("special_can_preview_without_verify").IsRequired();
             rights.Property(value => value.CanPrintInvoice).HasColumnName("special_can_print_invoice").IsRequired();
             rights.Property(value => value.CanSeeVip).HasColumnName("special_can_see_vip").IsRequired();
+            // Three later rights (change request 2026-10-13). The convention adds no CHECK to owned enums: the migration declares
+            // ck_roles_special_demographics_edit_up_to_domain. No EF default value here: with one, the CLR default of the enum (Ordered)
+            // would be EF's "unset" sentinel and the column default (Complete) would silently replace a deliberate Ordered. The
+            // migration alone carries the defaults that fill the rows existing at upgrade time.
+            rights.Property(value => value.DemographicsEditUpTo).HasColumnName("special_demographics_edit_up_to").HasConversion<string>().HasMaxLength(16).IsRequired();
+            rights.Property(value => value.CanViewBranchCollections).HasColumnName("special_can_view_branch_collections").IsRequired();
+            rights.Property(value => value.ReportDaysLimit).HasColumnName("special_report_days_limit");
         });
         builder.Navigation(role => role.SpecialRights).IsRequired();
 

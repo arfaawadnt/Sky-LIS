@@ -3,7 +3,16 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import { BILLING_PERMISSIONS, PAYMENT_METHODS, PAYMENT_STATUSES, type PaymentListItem, type PaymentMethod, type PaymentStatus, type VisitAccountView } from '../../../core/api/billing.contracts';
+import {
+  BILLING_PERMISSIONS,
+  type CollectionsReportRequest,
+  PAYMENT_METHODS,
+  PAYMENT_STATUSES,
+  type PaymentListItem,
+  type PaymentMethod,
+  type PaymentStatus,
+  type VisitAccountView,
+} from '../../../core/api/billing.contracts';
 import type { PageRequest } from '../../../core/api/paging';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
@@ -29,6 +38,7 @@ import { PaymentsFacade } from '../state/payments.facade';
 import { AccountSummaryComponent } from '../ui/account-summary.component';
 import { formatDateTime, formatMoney } from '../ui/billing-format';
 import { dayEndIso, dayStartIso, paymentTone, problemOf } from '../ui/billing-view';
+import { CollectionsReportDialogComponent } from '../ui/collections-report-dialog.component';
 import { MovementFormComponent, type MovementInput } from '../ui/movement-form.component';
 import { saveFile } from '../ui/save-file';
 
@@ -60,6 +70,7 @@ type PaymentsTab = 'collect' | 'register';
     IconComponent,
     AccountSummaryComponent,
     MovementFormComponent,
+    CollectionsReportDialogComponent,
   ],
   templateUrl: './payments.page.html',
   styleUrl: './billing-pages.css',
@@ -120,6 +131,9 @@ export class PaymentsPage {
   protected readonly branchTreasuries = computed(() => (this.facade.branchTreasuries.hasValue() ? this.facade.branchTreasuries.value() : []));
 
   protected readonly lookupProblem = computed(() => problemOf(this.facade.account.error()));
+
+  /** The member's report rights once the collections dialog has read them (null while loading: the branch option stays hidden). */
+  protected readonly reportPrivileges = computed(() => (this.facade.reportPrivileges.hasValue() ? this.facade.reportPrivileges.value() : null));
 
   constructor() {
     void this.i18n.load('billing');
@@ -224,6 +238,30 @@ export class PaymentsPage {
 
   protected onTab(id: string | null): void {
     this.tab.set(id === 'register' ? 'register' : 'collect');
+  }
+
+  // ---- collections (treasury) report, change request 2026-10-13 item 2 ---------------------------------------------
+
+  protected openCollections(): void {
+    this.facade.openCollections();
+  }
+
+  protected onCollectionsOpen(open: boolean): void {
+    if (!open) {
+      this.facade.closeCollections();
+    }
+  }
+
+  protected loadCollections(request: CollectionsReportRequest): Promise<unknown> {
+    return this.facade.collectionsReport.execute(request);
+  }
+
+  /** Loads the report for the chosen period, scope and grouping (so the paper matches the form), then prints it. */
+  protected async printCollections(request: CollectionsReportRequest): Promise<void> {
+    const doc = await this.facade.collectionsReport.execute(request);
+    if (doc !== null) {
+      await this.run(() => this.printer.collectionsReport(doc));
+    }
   }
 
   protected onAccessionFilter(value: string): void {

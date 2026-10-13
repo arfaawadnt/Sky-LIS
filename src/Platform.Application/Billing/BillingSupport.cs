@@ -33,6 +33,9 @@ internal static class BillingRights
     public static void RequirePrintInvoice(IUserPrivileges privileges) =>
         Require(privileges.SpecialRights.CanPrintInvoice, BillingCodes.PrintInvoiceRightRequired, "Your role does not hold the right to print invoices.");
 
+    public static void RequireBranchCollections(IUserPrivileges privileges) =>
+        Require(privileges.SpecialRights.CanViewBranchCollections, BillingCodes.BranchCollectionsRightRequired, "Your role does not hold the right to view the collections of the whole branch.");
+
     private static void Require(bool granted, string code, string message)
     {
         if (!granted)

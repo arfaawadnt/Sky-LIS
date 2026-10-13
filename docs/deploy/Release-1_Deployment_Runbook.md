@@ -104,6 +104,7 @@ As the PostgreSQL superuser, connected to `postgres`:
 and the database `lis` owned by `lis_owner`, and limits `lis_app` to CONNECT and TEMPORARY. Then, as `lis_owner` on `lis`:
 
 ```powershell
+$env:PGCLIENTENCODING = 'UTF8'   # the scripts are UTF-8 with a byte-order mark; psql skips it only in UTF-8 mode
 & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -h <db-host> -p 5432 -U lis_owner -d lis -v ON_ERROR_STOP=1 -f .\schema.sql
 & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -h <db-host> -p 5432 -U lis_owner -d lis -v ON_ERROR_STOP=1 -f .\migrations.sql
 & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -h <db-host> -p 5432 -U lis_owner -d lis -Atc "select count(*) from ops.__ef_migrations_history"
@@ -112,6 +113,9 @@ and the database `lis` owned by `lis_owner`, and limits `lis_app` to CONNECT and
 `schema.sql` creates the schemas `identity, app, audit, saas, read, ops` and the default privileges of `lis_app`;
 `migrations.sql` is idempotent and applies every migration not yet in `ops.__ef_migrations_history`. The runtime role
 owns no table (the start-up guard refuses otherwise), so the migrations must run as `lis_owner`, never as `lis_app`.
+The generated scripts begin with a UTF-8 byte-order mark: in a console whose code page is not 65001, psql reads it as
+text and stops at line 6 with `syntax error at or near "ï»¿DO"` before touching anything — set `PGCLIENTENCODING=UTF8`
+(or `chcp 65001`) first. The password of `lis_owner` is `LIS_OWNER_PASSWORD` in the env file; `$env:PGPASSWORD` avoids the prompt.
 
 ### 5.2 Database credentials file for the backup scripts
 
@@ -227,7 +231,7 @@ the scripts at hand; the scripts contain no secret. Replicate `E:\lis-backups` o
 2. **Dry run** both install scripts with `-WhatIf`.
 3. **Backup**: `backup-database.ps1 -EnvFile E:\lis-data\postgres.env` → note the dump name.
 4. **Stop the API** so no request runs across the schema change: `Stop-Service NTLIS`.
-5. **Migrations**: `psql -U lis_owner -d lis -v ON_ERROR_STOP=1 -f migrations.sql` (idempotent; applies only what is missing).
+5. **Migrations**: `psql -U lis_owner -d lis -v ON_ERROR_STOP=1 -f migrations.sql` with `PGCLIENTENCODING=UTF8` (idempotent; applies only what is missing).
 6. **Service**: `install-api-service.ps1 -PackagePath …\api` (no `-ConfigSource` unless the configuration changed; the
    script keeps the current build as `app.previous`, installs, starts and waits for `/health/ready`).
 7. **Site**: `install-ui-site.ps1 -PackagePath …\ui -HostHeader … -CertificateThumbprint …` (previous content kept).

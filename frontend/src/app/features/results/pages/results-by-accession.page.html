@@ -3,60 +3,72 @@
 </app-page-header>
 
 <app-section-card class="query" [padded]="true">
-  <form class="query-form" [formGroup]="form" (ngSubmit)="runQuery()" novalidate>
-    <label class="field">
-      <span>{{ i18n.t('results.case.accession') }}</span>
-      <input class="inp" type="text" formControlName="accession" autocomplete="off" spellcheck="false" />
-    </label>
-    <label class="field">
-      <span>{{ i18n.t('results.case.patientNumber') }}</span>
-      <input class="inp" type="text" formControlName="patientNumber" autocomplete="off" />
-    </label>
-    <label class="field">
-      <span>{{ i18n.t('results.case.patientName') }}</span>
-      <input class="inp" type="text" formControlName="patientName" autocomplete="off" [placeholder]="i18n.t('results.case.wildcardHint')" />
-    </label>
-    <label class="field">
-      <span>{{ i18n.t('results.case.testStatus') }}</span>
-      <select class="inp" formControlName="status">
-        <option value="">{{ i18n.t('results.all') }}</option>
-        @for (status of statuses; track status) {
-          <option [value]="status">{{ statusLabel(status) }}</option>
+  @if (criteriaCollapsed()) {
+    <div class="criteria-bar" role="group" [attr.aria-label]="i18n.t('results.case.criteria')">
+      <span class="small muted">{{ i18n.t('results.case.criteria') }}:</span>
+      <ul class="chips">
+        @for (chip of criteriaChips(); track chip.key) {
+          <li class="tag">@if (chip.label) {<span class="chip-key">{{ chip.label }}: </span>}{{ chip.value }}</li>
         }
-      </select>
-    </label>
-    <label class="field">
-      <span>{{ i18n.t('results.case.sampleStatus') }}</span>
-      <select class="inp" formControlName="sampleStatus">
-        <option value="">{{ i18n.t('results.all') }}</option>
-        @for (status of sampleStatuses; track status) {
-          <option [value]="status">{{ sampleStatusLabel(status) }}</option>
-        }
-      </select>
-    </label>
-    <label class="field">
-      <span>{{ i18n.t('results.case.registeredFrom') }}</span>
-      <input class="inp" type="date" formControlName="fromDay" />
-    </label>
-    <label class="field">
-      <span>{{ i18n.t('results.case.registeredTo') }}</span>
-      <input class="inp" type="date" formControlName="toDay" />
-    </label>
-    <div class="field boxes" role="group" [attr.aria-label]="i18n.t('results.case.filters')">
-      <span>{{ i18n.t('results.case.filters') }}</span>
-      <div class="box-row">
-        <label class="check"><input type="checkbox" formControlName="notPrinted" />{{ i18n.t('results.case.notPrinted') }}</label>
-        <label class="check"><input type="checkbox" formControlName="notVerified" />{{ i18n.t('results.case.notVerified') }}</label>
-        <label class="check"><input type="checkbox" formControlName="delta" />{{ i18n.t('results.case.deltaOnly') }}</label>
-        <label class="check"><input type="checkbox" formControlName="branchOnly" />{{ i18n.t('results.case.branchOnly') }}</label>
+      </ul>
+      <button type="button" class="btn sm ghost change-criteria" (click)="expandCriteria()"><app-icon name="search" [size]="14" />{{ i18n.t('results.case.changeCriteria') }}</button>
+    </div>
+  } @else {
+    <form class="query-form" [formGroup]="form" (ngSubmit)="runQuery()" novalidate>
+      <label class="field">
+        <span>{{ i18n.t('results.case.accession') }}</span>
+        <input class="inp" type="text" formControlName="accession" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>{{ i18n.t('results.case.patientNumber') }}</span>
+        <input class="inp" type="text" formControlName="patientNumber" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span>{{ i18n.t('results.case.patientName') }}</span>
+        <input class="inp" type="text" formControlName="patientName" autocomplete="off" [placeholder]="i18n.t('results.case.wildcardHint')" />
+      </label>
+      <label class="field">
+        <span>{{ i18n.t('results.case.testStatus') }}</span>
+        <select class="inp" formControlName="status">
+          <option value="">{{ i18n.t('results.all') }}</option>
+          @for (status of statuses; track status) {
+            <option [value]="status">{{ statusLabel(status) }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span>{{ i18n.t('results.case.sampleStatus') }}</span>
+        <select class="inp" formControlName="sampleStatus">
+          <option value="">{{ i18n.t('results.all') }}</option>
+          @for (status of sampleStatuses; track status) {
+            <option [value]="status">{{ sampleStatusLabel(status) }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span>{{ i18n.t('results.case.registeredFrom') }}</span>
+        <input class="inp" type="date" formControlName="fromDay" />
+      </label>
+      <label class="field">
+        <span>{{ i18n.t('results.case.registeredTo') }}</span>
+        <input class="inp" type="date" formControlName="toDay" />
+      </label>
+      <div class="field boxes" role="group" [attr.aria-label]="i18n.t('results.case.filters')">
+        <span>{{ i18n.t('results.case.filters') }}</span>
+        <div class="box-row">
+          <label class="check"><input type="checkbox" formControlName="notPrinted" />{{ i18n.t('results.case.notPrinted') }}</label>
+          <label class="check"><input type="checkbox" formControlName="notVerified" />{{ i18n.t('results.case.notVerified') }}</label>
+          <label class="check"><input type="checkbox" formControlName="delta" />{{ i18n.t('results.case.deltaOnly') }}</label>
+          <label class="check"><input type="checkbox" formControlName="branchOnly" />{{ i18n.t('results.case.branchOnly') }}</label>
+        </div>
       </div>
-    </div>
-    <div class="field actions">
-      <span aria-hidden="true">&nbsp;</span>
-      <button type="submit" class="btn primary"><app-icon name="search" [size]="15" />{{ i18n.t('results.case.run') }}</button>
-    </div>
-  </form>
-  <p class="help small muted">{{ i18n.t('results.case.queryHelp') }}</p>
+      <div class="field actions">
+        <span aria-hidden="true">&nbsp;</span>
+        <button type="submit" class="btn primary"><app-icon name="search" [size]="15" />{{ i18n.t('results.case.run') }}</button>
+      </div>
+    </form>
+    <p class="help small muted">{{ i18n.t('results.case.queryHelp') }}</p>
+  }
 </app-section-card>
 
 <div class="split" [class.collapsed]="listCollapsed()">
@@ -70,7 +82,7 @@
       @if (facade.visits.error()) {
         <p class="problem list-problem" role="alert">{{ i18n.t('results.case.searchError') }}</p>
       }
-      <ul class="visit-list">
+      <ul class="visit-list" tabindex="-1">
         @for (item of visits(); track item.visitId) {
           <li>
             <button type="button" class="visit" [class.active]="current()?.visit?.visitId === item.visitId" (click)="select(item)">

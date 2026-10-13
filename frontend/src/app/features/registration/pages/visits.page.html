@@ -97,6 +97,7 @@
     </ng-template>
     <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
       <button type="button" class="btn sm ghost" *appCan="permissions.edit" (click)="edit(row)" [attr.aria-label]="i18n.t('registration.visits.edit') + ' ' + row.accession"><app-icon name="edit" [size]="14" />{{ i18n.t('registration.visits.edit') }}</button>
+      <button type="button" class="btn sm ghost" *appCan="patientPermissions.edit" (click)="openPatient(row)" [attr.aria-label]="i18n.t('registration.visits.patient') + ' ' + row.accession"><app-icon name="user" [size]="14" />{{ i18n.t('registration.visits.patient') }}</button>
       <button type="button" class="btn sm ghost" *appCan="'samples.view'" (click)="openSamples(row)" [attr.aria-label]="i18n.t('registration.visits.samples') + ' ' + row.accession"><app-icon name="barcode" [size]="14" />{{ i18n.t('registration.visits.samples') }}</button>
       <button type="button" class="btn sm ghost" *appCan="'billing.view'" (click)="payments(row)" [attr.aria-label]="i18n.t('registration.visits.payments') + ' ' + row.accession"><app-icon name="coins" [size]="14" />{{ i18n.t('registration.visits.payments') }}</button>
       <button type="button" class="btn sm ghost" (click)="openDocuments(row)" [attr.aria-label]="i18n.t('registration.visits.documents') + ' ' + row.accession"><app-icon name="printer" [size]="14" />{{ i18n.t('registration.visits.documents') }}</button>
@@ -109,6 +110,33 @@
 </app-section-card>
 
 <app-reg-visit-samples-dialog [(open)]="samplesOpen" [visitId]="current()?.id ?? null" [accession]="current()?.accession ?? ''" />
+
+<app-drawer [open]="patientOpen()" (openChange)="onPatientOpenChange($event)" [title]="i18n.tf('registration.patient.title', { number: patient()?.number ?? '' })" size="lg">
+  @if (patientOpen()) {
+    @if (facade.patientDetail.error()) {
+      <p class="problem" role="alert">{{ i18n.t('registration.patient.loadError') }}</p>
+    } @else if (patientReady()) {
+      <app-patient-form
+        [patient]="patient()"
+        [settings]="facade.patientSettings.value() ?? null"
+        [countries]="facade.countries.value() ?? []"
+        [governorates]="facade.governorates.value() ?? []"
+        [conditions]="facade.conditions.value() ?? []"
+        [identityLocked]="identityLocked()"
+        [lockHint]="lockHint()"
+        [problem]="facade.updatePatient.problem()"
+        [pending]="facade.updatePatient.pending()"
+        (save)="onPatientSave($event)"
+      />
+    } @else {
+      <p class="muted" role="status">{{ i18n.t('registration.patient.loading') }}</p>
+    }
+  }
+  <ng-container drawerFooter>
+    <button type="button" class="btn ghost" (click)="closePatient()">{{ i18n.t('registration.close') }}</button>
+    <button type="button" class="btn primary" [disabled]="!patientReady() || facade.updatePatient.pending()" (click)="submitPatient()">{{ facade.updatePatient.pending() ? i18n.t('registration.patient.saving') : i18n.t('registration.patient.save') }}</button>
+  </ng-container>
+</app-drawer>
 
 <app-reg-cancel-services-dialog
   [(open)]="cancelOpen"

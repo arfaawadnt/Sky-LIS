@@ -2,7 +2,8 @@
 
 import type { HttpTestingController } from '@angular/common/http/testing';
 
-import { BILLING_API, type CashClosingPreview, type VisitAccountView } from '../../../core/api/billing.contracts';
+import { BILLING_API, type CashClosingPreview, type CollectionsReportDocument, type CollectionsReportRow, type VisitAccountView } from '../../../core/api/billing.contracts';
+import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
 
 export function account(overrides: Partial<VisitAccountView> = {}): VisitAccountView {
   return {
@@ -71,6 +72,79 @@ export function preview(overrides: Partial<CashClosingPreview> = {}): CashClosin
     currency: 'EGP',
     ...overrides,
   };
+}
+
+/** A row of the collections report: cash 300 in / 50 back and card 100 in, four posted payments and one refund. */
+export function collectionsRow(overrides: Partial<CollectionsReportRow> = {}): CollectionsReportRow {
+  return {
+    key: 'Cash',
+    labelEn: null,
+    labelAr: null,
+    paymentCount: 4,
+    refundCount: 1,
+    cash: { payments: 300, refunds: 50, net: 250 },
+    card: { payments: 100, refunds: 0, net: 100 },
+    pos: { payments: 0, refunds: 0, net: 0 },
+    transfer: { payments: 0, refunds: 0, net: 0 },
+    totalPayments: 400,
+    totalRefunds: 50,
+    net: 350,
+    ...overrides,
+  };
+}
+
+/** Today's own collections by method (change request 2026-10-13, item 2). */
+export function collectionsReport(overrides: Partial<CollectionsReportDocument> = {}): CollectionsReportDocument {
+  return {
+    letterhead: { labNameEn: 'Sky Lab', labNameAr: 'مختبر سكاي', branchNameEn: 'Main branch', branchNameAr: 'الفرع الرئيسي' },
+    scope: 'User',
+    groupBy: 'Method',
+    fromDay: '2026-10-13',
+    toDay: '2026-10-13',
+    fromUtc: '2026-10-12T21:00:00Z',
+    toUtc: '2026-10-13T21:00:00Z',
+    timeZone: 'Africa/Cairo',
+    cashierName: 'Cashier One',
+    rows: [
+      collectionsRow({ key: 'Cash', card: { payments: 0, refunds: 0, net: 0 }, paymentCount: 3, totalPayments: 300, net: 250 }),
+      collectionsRow({ key: 'Card', cash: { payments: 0, refunds: 0, net: 0 }, paymentCount: 1, refundCount: 0, totalPayments: 100, totalRefunds: 0, net: 100 }),
+    ],
+    totals: collectionsRow({ key: 'Total' }),
+    currency: 'EGP',
+    printedBy: 'Cashier One',
+    printedAtUtc: '2026-10-13T12:00:00Z',
+    ...overrides,
+  };
+}
+
+/** Answers the dialog's read of the member's privileges (Organization's endpoint) with the two report rights. */
+export function flushReportPrivileges(backend: HttpTestingController, canViewBranchCollections: boolean, reportDaysLimit: number | null): void {
+  backend.expectOne(ORGANIZATION_API.myPrivileges).flush({
+    userId: 'u-1',
+    tenantId: 't-1',
+    branchId: 'b-1',
+    isPrimaryAdministrator: false,
+    mustChangePassword: false,
+    passwordExpiresAtUtc: null,
+    privileges: {
+      permissionKeys: ['billing.view'],
+      specialRights: {
+        discountCapPercent: null,
+        canPay: true,
+        canRefund: false,
+        canTransfer: false,
+        canCancel: false,
+        canModifyVerifiedResult: false,
+        canPreviewWithoutVerify: false,
+        canPrintInvoice: true,
+        canSeeVip: false,
+        demographicsEditUpTo: 'Complete',
+        canViewBranchCollections,
+        reportDaysLimit,
+      },
+      resultRights: [],
+    },
+  });
 }
 
 /** Answers the two loads of the cash desk (approved treasuries of this device, the billing print parameters) when they are pending. */

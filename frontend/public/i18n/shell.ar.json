@@ -105,5 +105,6 @@
   "nav.analyserTests": "تحاليل الأجهزة",
   "nav.analyserSamples": "عينات الأجهزة",
   "nav.siteAgents": "وكلاء المواقع",
-  "nav.tenantPcrKits": "كواشف PCR"
+  "nav.tenantPcrKits": "كواشف PCR",
+  "nav.workAmountReport": "تقرير حجم العمل"
 }

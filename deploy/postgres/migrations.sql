@@ -6113,5 +6113,69 @@ BEGIN
     VALUES ('20261012135907_RemovePlatformKeysFromLaboratoryRoles', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261013141855_SpecialRightsExtended') THEN
+    ALTER TABLE app.tenant_memberships ADD override_can_view_branch_collections boolean;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261013141855_SpecialRightsExtended') THEN
+    ALTER TABLE app.tenant_memberships ADD override_demographics_edit_up_to character varying(16);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261013141855_SpecialRightsExtended') THEN
+    ALTER TABLE app.tenant_memberships ADD override_report_days_limit integer;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261013141855_SpecialRightsExtended') THEN
+    ALTER TABLE app.roles ADD special_can_view_branch_collections boolean NOT NULL DEFAULT FALSE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261013141855_SpecialRightsExtended') THEN
+    ALTER TABLE app.roles ADD special_demographics_edit_up_to character varying(16) NOT NULL DEFAULT 'Complete';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261013141855_SpecialRightsExtended') THEN
+    ALTER TABLE app.roles ADD special_report_days_limit integer;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261013141855_SpecialRightsExtended') THEN
+    ALTER TABLE app.roles ADD CONSTRAINT ck_roles_special_demographics_edit_up_to_domain
+        CHECK (special_demographics_edit_up_to IN ('Ordered', 'Complete', 'Reviewed', 'Verified', 'Printed'));
+    ALTER TABLE app.tenant_memberships ADD CONSTRAINT ck_tenant_memberships_override_demographics_edit_up_to_domain
+        CHECK (override_demographics_edit_up_to IS NULL OR override_demographics_edit_up_to IN ('Ordered', 'Complete', 'Reviewed', 'Verified', 'Printed'));
+    ALTER TABLE app.roles ADD CONSTRAINT ck_roles_special_report_days_limit_range
+        CHECK (special_report_days_limit IS NULL OR special_report_days_limit BETWEEN 0 AND 3650);
+    ALTER TABLE app.tenant_memberships ADD CONSTRAINT ck_tenant_memberships_override_report_days_limit_range
+        CHECK (override_report_days_limit IS NULL OR override_report_days_limit BETWEEN 0 AND 3650);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261013141855_SpecialRightsExtended') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261013141855_SpecialRightsExtended', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

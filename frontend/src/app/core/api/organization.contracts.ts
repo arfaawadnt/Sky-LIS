@@ -71,9 +71,21 @@ export interface SpecialRights {
   readonly canPreviewWithoutVerify: boolean;
   readonly canPrintInvoice: boolean;
   readonly canSeeVip: boolean;
+  /** The highest result status of a visit up to which the member may still change a patient's identity demographics. */
+  readonly demographicsEditUpTo: DemographicsEditLimit;
+  /** The collections report may cover the whole branch, not only the member's own payments. */
+  readonly canViewBranchCollections: boolean;
+  /** Days back the member may report: 0 = today only, null = no limit. */
+  readonly reportDaysLimit: number | null;
 }
 
-export type SpecialRightFlag = Exclude<keyof SpecialRights, 'discountCapPercent'>;
+export type DemographicsEditLimit = 'Ordered' | 'Complete' | 'Reviewed' | 'Verified' | 'Printed';
+
+export const DEMOGRAPHICS_EDIT_LIMITS: readonly DemographicsEditLimit[] = ['Ordered', 'Complete', 'Reviewed', 'Verified', 'Printed'];
+
+export const MAX_REPORT_DAYS_LIMIT = 3650;
+
+export type SpecialRightFlag = Exclude<keyof SpecialRights, 'discountCapPercent' | 'demographicsEditUpTo' | 'reportDaysLimit'>;
 
 export const SPECIAL_RIGHT_FLAGS: readonly SpecialRightFlag[] = [
   'canPay',
@@ -84,6 +96,7 @@ export const SPECIAL_RIGHT_FLAGS: readonly SpecialRightFlag[] = [
   'canPreviewWithoutVerify',
   'canPrintInvoice',
   'canSeeVip',
+  'canViewBranchCollections',
 ];
 
 export const NO_SPECIAL_RIGHTS: SpecialRights = {
@@ -96,6 +109,9 @@ export const NO_SPECIAL_RIGHTS: SpecialRights = {
   canPreviewWithoutVerify: false,
   canPrintInvoice: false,
   canSeeVip: false,
+  demographicsEditUpTo: 'Ordered',
+  canViewBranchCollections: false,
+  reportDaysLimit: 0,
 };
 
 /** Result rights on one clinical group in one branch (`branchId` null = every branch). */

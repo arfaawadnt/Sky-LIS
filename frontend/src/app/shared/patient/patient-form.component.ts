@@ -63,6 +63,9 @@ type IdField = 'dob' | 'gender' | 'governorate';
 /** The optional fields folded under "More details". */
 const DETAIL_FIELDS = ['nationality', 'email', 'governorateId', 'city', 'address', 'comments'] as const;
 
+/** The identity fields a result-status lock freezes (PAT-032; the server's list): everything else is contact data and stays editable. */
+const IDENTITY_FIELDS = ['title', 'fullName', 'nameAr', 'gender', 'dateOfBirth', 'ageYears', 'ageMonths', 'ageDays', 'patientConditionId', 'nationalId', 'nationality'] as const;
+
 /**
  * The patient create/edit form (CP-06 patient data, CP-11), in four groups — identity (title, both names, national id),
  * sex and age (gender switch, date of birth or age on one line, condition), contact (mobile with its country) and the
@@ -100,6 +103,14 @@ export class PatientFormComponent {
   readonly pending = input(false);
   /** Prefills the name of a new file (the picker passes what the clerk searched). */
   readonly initialName = input('');
+  /**
+   * The identity fields are read-only (change request 2026-10-13 item 1): a result of the visit has passed the status the user's
+   * `DemographicsEditUpTo` right allows (`PatientDemographicsLock.canEditIdentity` false). Contact fields stay editable; the
+   * saved request still carries the unchanged identity, so the server sees no identity change.
+   */
+  readonly identityLocked = input(false);
+  /** The sentence that says why (the status reached and the user's limit), shown above the identity group. */
+  readonly lockHint = input<string | null>(null);
 
   readonly save = output<RegisterPatientRequest>();
   readonly typed = output<TypedIdentity>();
@@ -235,6 +246,23 @@ export class PatientFormComponent {
       untracked(() => {
         setRequired(this.form.controls.mobile, settings?.mandatoryMobile ?? false, (control) => this.validateMobile(control));
         setRequired(this.form.controls.nationalId, settings?.mandatoryNationalId ?? false, Validators.maxLength(32), Validators.pattern(/^[\sA-Za-z0-9\u0660-\u0669-]*$/));
+      });
+    });
+
+    // The lock freezes the identity controls; `getRawValue()` keeps their values in the saved request.
+    effect(() => {
+      const locked = this.identityLocked();
+      untracked(() => {
+        for (const field of IDENTITY_FIELDS) {
+          const control = this.form.controls[field];
+          if (locked && control.enabled) {
+            control.disable({ emitEvent: false });
+          } else if (!locked && control.disabled) {
+            control.enable({ emitEvent: false });
+          }
+        }
+
+        this.form.updateValueAndValidity({ emitEvent: false });
       });
     });
 

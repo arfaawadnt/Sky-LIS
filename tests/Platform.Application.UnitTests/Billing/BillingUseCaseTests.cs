@@ -278,4 +278,102 @@ public sealed class BillingUseCaseTests
         Assert.Equal(("RCT-2026-00001", "Posted", "ACC-2026-00050", 120m, 120m, 180m), (receipt.ReceiptNumber, receipt.Status, receipt.Accession, receipt.Amount, receipt.Paid, receipt.Remaining));
         Assert.Equal(("Sky Lab", "مختبر سكاي", "Cashier One", BillingWorld.Now), (receipt.Letterhead.LabNameEn, receipt.Letterhead.LabNameAr, receipt.PrintedBy, receipt.PrintedAtUtc));
     }
+
+    // ---- collections report (change request 2026-10-13, item 2) ----------------------------------------------------
+
+    private static CollectionsReportHandler CollectionsHandler(BillingWorld world) =>
+        new(world.Collections, world.Drawer, world.Directory, world.Zone, world.Settings, world.User, world.Privileges, world.Clock);
+
+    private static void SeedCollections(BillingWorld world, Guid? otherCashier = null)
+    {
+        world.Collections.Cells.Add(new CollectionsCell(world.Branch, world.Cashier, PaymentMethod.Cash, 300m, 2, 50m, 1));
+        world.Collections.Cells.Add(new CollectionsCell(world.Branch, world.Cashier, PaymentMethod.Card, 100m, 1, 0m, 0));
+        if (otherCashier is { } other)
+        {
+            world.Collections.Cells.Add(new CollectionsCell(world.Branch, other, PaymentMethod.Cash, 400m, 1, 0m, 0));
+        }
+    }
+
+    [Fact]
+    public async Task S_CR_The_default_report_is_today_in_the_laboratory_zone_for_the_users_own_movements_by_method()
+    {
+        var world = new BillingWorld();
+        world.Clock.UtcNow = new DateTimeOffset(2026, 10, 9, 22, 30, 0, TimeSpan.Zero);   // 01:30 on 10 Oct at +03: the laboratory's day is the 10th
+        SeedCollections(world);
+
+        var report = await CollectionsHandler(world).Handle(new CollectionsReportQuery(null, null, null, null), CancellationToken.None);
+
+        var scope = world.Collections.LastScope!;
+        Assert.Equal((world.Cashier, (Guid?)null), (scope.CashierUserId, scope.BranchId));
+        Assert.Equal((new DateTimeOffset(2026, 10, 9, 21, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 10, 10, 21, 0, 0, TimeSpan.Zero)), (scope.FromUtc, scope.ToUtc));
+        Assert.Equal(("User", "Method", new DateOnly(2026, 10, 10), new DateOnly(2026, 10, 10), "Test+03", "Cashier One"), (report.Scope, report.GroupBy, report.FromDay, report.ToDay, report.TimeZone, report.CashierName));
+        Assert.Equal(["Cash", "Card"], report.Rows.Select(row => row.Key).ToArray());   // method order, labels left to the SPA
+        Assert.All(report.Rows, row => Assert.Null(row.LabelEn));
+        var cash = report.Rows[0];
+        Assert.Equal((300m, 50m, 250m, 2, 1), (cash.Cash.Payments, cash.Cash.Refunds, cash.Cash.Net, cash.PaymentCount, cash.RefundCount));
+        Assert.Equal((400m, 50m, 350m, 3, 1, 100m), (report.Totals.TotalPayments, report.Totals.TotalRefunds, report.Totals.Net, report.Totals.PaymentCount, report.Totals.RefundCount, report.Totals.Card.Net));
+        Assert.Equal(("Sky Lab", "Main", "EGP", "Cashier One", world.Clock.UtcNow), (report.Letterhead.LabNameEn, report.Letterhead.BranchNameEn, report.Currency, report.PrintedBy, report.PrintedAtUtc));
+    }
+
+    [Fact]
+    public async Task S_CR_The_branch_scope_needs_a_session_branch_and_the_CP_37_right_BIL_044()
+    {
+        var world = new BillingWorld();
+        var other = Guid.CreateVersion7();
+        SeedCollections(world, other);
+        world.Privileges.SpecialRights = new SpecialRights(null, true, true, true, true, true, true, true, true, DemographicsEditLimit.Printed, canViewBranchCollections: false, reportDaysLimit: null);
+
+        var refusal = await Assert.ThrowsAsync<DomainException>(() => CollectionsHandler(world).Handle(new CollectionsReportQuery(null, null, "branch", "user"), CancellationToken.None));
+        Assert.Equal((BillingCodes.BranchCollectionsRightRequired, DomainFault.Refused), (refusal.Code, refusal.Fault));
+        Assert.Null(world.Collections.LastScope);
+
+        world.User.BranchId = null;
+        world.Privileges.SpecialRights = SpecialRights.All;
+        var noBranch = await Assert.ThrowsAsync<DomainException>(() => CollectionsHandler(world).Handle(new CollectionsReportQuery(null, null, "Branch", "User"), CancellationToken.None));
+        Assert.Equal(ProblemCodes.BranchRequired, noBranch.Code);
+
+        world.User.BranchId = world.Branch;
+        var report = await CollectionsHandler(world).Handle(new CollectionsReportQuery(null, null, "Branch", "User"), CancellationToken.None);
+        Assert.Equal(((Guid?)null, world.Branch), (world.Collections.LastScope!.CashierUserId, world.Collections.LastScope.BranchId));
+        Assert.Equal(("Branch", "User", null), (report.Scope, report.GroupBy, report.CashierName));
+        Assert.Equal(2, report.Rows.Count);   // one row per cashier, named through the drawer's user names
+        Assert.All(report.Rows, row => Assert.Equal("Cashier One", row.LabelEn));
+        Assert.Equal(400m, Assert.Single(report.Rows, row => row.Key == other.ToString("D")).Net);
+        Assert.Equal(750m, report.Totals.Net);
+    }
+
+    [Fact]
+    public async Task S_CR_The_report_days_limit_refuses_an_earlier_period_BIL_045_and_grouping_by_branch_names_the_branch()
+    {
+        var world = new BillingWorld();
+        SeedCollections(world);
+        var today = new DateOnly(2026, 10, 9);   // 14:00Z at +03 is still the 9th
+        world.Privileges.SpecialRights = new SpecialRights(null, true, true, true, true, true, true, true, true, DemographicsEditLimit.Printed, canViewBranchCollections: true, reportDaysLimit: 0);
+
+        var refusal = await Assert.ThrowsAsync<DomainException>(() => CollectionsHandler(world).Handle(new CollectionsReportQuery(today.AddDays(-1), today, "User", "Branch"), CancellationToken.None));
+        Assert.Equal((BillingCodes.ReportPeriodBeyondLimit, DomainFault.Refused), (refusal.Code, refusal.Fault));
+        Assert.Null(world.Collections.LastScope);
+
+        world.Privileges.SpecialRights = new SpecialRights(null, true, true, true, true, true, true, true, true, DemographicsEditLimit.Printed, canViewBranchCollections: true, reportDaysLimit: 1);
+        var report = await CollectionsHandler(world).Handle(new CollectionsReportQuery(today.AddDays(-1), today.AddDays(3), "User", "Branch"), CancellationToken.None);
+        Assert.Equal((today.AddDays(-1), today.AddDays(3)), (report.FromDay, report.ToDay));
+        Assert.Equal((new DateTimeOffset(2026, 10, 7, 21, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 10, 12, 21, 0, 0, TimeSpan.Zero)), (report.FromUtc, report.ToUtc));
+        var row = Assert.Single(report.Rows);
+        Assert.Equal((world.Branch.ToString("D"), "Main branch", "الفرع الرئيسي", 350m), (row.Key, row.LabelEn, row.LabelAr, row.Net));
+
+        var backwards = await Assert.ThrowsAsync<DomainException>(() => CollectionsHandler(world).Handle(new CollectionsReportQuery(today, today.AddDays(-1), null, null), CancellationToken.None));
+        Assert.Equal(BillingCodes.PeriodInvalid, backwards.Code);
+    }
+
+    [Fact]
+    public void S_CR_The_validator_accepts_the_enum_names_in_any_case_and_refuses_the_rest()
+    {
+        var validator = new CollectionsReportValidator();
+
+        Assert.True(validator.Validate(new CollectionsReportQuery(null, null, "branch", "METHOD")).IsValid);
+        Assert.True(validator.Validate(new CollectionsReportQuery(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 1), null, null)).IsValid);
+        Assert.False(validator.Validate(new CollectionsReportQuery(null, null, "Everyone", null)).IsValid);
+        Assert.False(validator.Validate(new CollectionsReportQuery(null, null, null, "Treasury")).IsValid);
+        Assert.False(validator.Validate(new CollectionsReportQuery(new DateOnly(2026, 10, 2), new DateOnly(2026, 10, 1), null, null)).IsValid);
+    }
 }

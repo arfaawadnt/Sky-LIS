@@ -5,7 +5,7 @@
 | Slot / modules | `org` — permission modules `organization` (branches, roles), `identity` (users and credentials), `settings` (parameters) |
 | SRS pages | CP-36 Branches, CP-37 Roles & privileges, CP-38 Users, CP-57 Parameters; the same Roles/Users pages serve SA-06 Roles and SA-07 Admin users under the platform tenant; business rule BR-17; workflows WF-01 (onboarding, steps 2–3) and WF-11 (privileges administration) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), the LDM knowledge base (manual ch. 12) and the architecture pack (02 §4, §6.1). **For review by the business owner**; assumptions in §16. |
-| Version | 1.0 — 2026-10-09 |
+| Version | 1.1 — 2026-10-13 (three special rights of the change request of 2026-10-13: demographics edit limit, branch collections view, report days limit) |
 | Implemented in | `src/Platform.Domain/{Organization,Tenancy}`, `src/Platform.Domain/Identity/PlatformUser.cs` (administration methods), `src/Platform.Contracts/Organization`, `src/Platform.Application/{Organization,Tenancy}`, `src/Platform.Application/Identity/Commands/SelectBranchCommand.cs`, `src/Platform.Infrastructure/Persistence/{Organization,Tenancy}`, `src/Platform.Infrastructure/Security/SessionPrincipalQuery.cs`, `src/Platform.WebApi/Controllers/Organization`, `frontend/src/app/features/organization`, `frontend/src/app/core/api/organization.contracts.ts` |
 
 ## 1. Purpose and policy basis
@@ -15,7 +15,9 @@ chose at sign-in (CP-04). Staff get access through **privilege groups** first an
 §12.1): a role carries the screen rights (here: catalogued permission keys `module.action`, the LDM `Q I U D` per
 screen of §12.3), the **special rights** (particular actions: discount with a cap, payment, refund, transfer,
 cancellation, modifying a verified result, previewing without verification, printing invoices, seeing VIP cases —
-§12.3 "Special Rights") and the **result rights** per clinical group and branch (`S R V E P`: see, review, verify,
+§12.3 "Special Rights"; since 1.1 also three **limits**: the result status up to which a member may still change a
+patient's identity demographics, whether the collections report may cover the whole branch, and how many days back a
+member may report) and the **result rights** per clinical group and branch (`S R V E P`: see, review, verify,
 edit, print — §12.4). A user joined to a role inherits everything (§12.6 step 3). BR-17 (§12.8): changing a role
 changes every member at once; changing one user (an **override**) touches that user only, is marked *modified*, and
 **Restore** returns the user to the role. The main administrator of a tenant is protected (CP-38, SA-07).
@@ -47,6 +49,9 @@ deactivation instead); SA-06 platform special rights "impersonate client admin" 
 | Privilege group, role (Groups And Privileges) | `Role` aggregate (`app.roles`) |
 | Screen right `Q/I/U/D` per screen | permission key `module.action` from `PermissionCatalog` (`view`, `create`, `edit`, `approve`, `cancel`, `export`, `manage`, `viewConfidential`) |
 | Special right (Discount, Payment, Refund …) | `SpecialRights` value object on the role (and optionally overridden per user) |
+| Demographics editable up to (status) | `SpecialRights.DemographicsEditUpTo` (`DemographicsEditLimit`: Ordered < Complete < Reviewed < Verified < Printed), consumed by Patients (`AllowsDemographicsEditAt`) |
+| Treasury report of the whole branch | `SpecialRights.CanViewBranchCollections`, consumed by Billing (collections report, scope Branch) |
+| Report time limit (days) | `SpecialRights.ReportDaysLimit` (null = no limit, 0 = today only, ≤ 3650), consumed by Reporting and Billing through `EarliestReportDay(today)` |
 | Result rights `S R V E P` per medical group and branch | `RoleResultRight` rows (`app.role_result_rights`): clinical group × branch (or all branches) × five flags |
 | System user | `PlatformUser` (global credentials, `identity.platform_users`) + `TenantMembership` (tenant profile, `app.tenant_memberships`) |
 | Modified / Restore | membership overrides (`AddedPermissionKeys`, `RemovedPermissionKeys`, `SpecialRightsOverride`), `IsModified`, `RestoreToRole` |
@@ -120,7 +125,7 @@ Platform-only modules (`platform`, `tenancy`) cannot be granted in a client tena
 | R1 | — → Role active | Create role | `organization.create` | name unique (ORG-101); ≥ 1 permission (ORG-005); keys catalogued (ORG-001); no platform key outside the platform tenant (ORG-033); no key the actor lacks (ORG-030) | — | — | — | `RoleCreated` | no |
 | R2 | Role | Rename / describe | `organization.edit` | name unique (ORG-101); description ≤ 500 (ORG-004) | — | — | — | — | no |
 | R3 | Role | Set permissions | `organization.edit` | as R1; an active role keeps ≥ 1 (ORG-005); the role of the primary administrator loses none (ORG-014) | — | — | — | `RoleChanged(permissions)` | no |
-| R4 | Role | Set special rights | `organization.edit` | cap null or 0–100 (ORG-006) | — | — | — | `RoleChanged(special-rights)` | no |
+| R4 | Role | Set special rights | `organization.edit` | cap null or 0–100 (ORG-006); demographics edit limit a result status name (ORG-020); report days limit null or 0–3650 (ORG-019) | — | — | — | `RoleChanged(special-rights)` | no |
 | R5 | Role | Set result rights | `organization.edit` | group present, no duplicate (group, branch) (ORG-007), ≤ 2 000 rows | — | — | — | `RoleChanged(result-rights)` | no |
 | R6 | active → inactive | Deactivate | `organization.manage` | no member (ORG-011) | — | — | — | `RoleChanged(deactivated)` | no |
 | R7 | inactive → active | Activate | `organization.manage` | ≥ 1 permission (ORG-005) | — | — | — | `RoleChanged(activated)` | no |
@@ -158,6 +163,8 @@ Platform-only modules (`platform`, `tenancy`) cannot be granted in a client tena
 | INV-ORG-014 | Passwords: length between the tenant's `passwordMinLength` (default 8) and 128, no composition rules, must not contain the username (decision of the user, 2026-10-09) | `PasswordRules` (application) | ORG-020 / ORG-021 | — |
 | INV-ORG-015 | Credentials and contact data of a user who is an active member of another tenant are changed only there or by the user (prevents a cross-tenant takeover) | handler (`IMembershipDirectory`) | ORG-031 | "This user belongs to other organisations; their credentials cannot be changed here." |
 | INV-ORG-016 | No per-user override in the platform tenant (SA-07 "privileges inherited from the role only") | handler | ORG-032 | — |
+| INV-ORG-018 | The demographics edit limit is one of the result statuses Ordered, Complete, Reviewed, Verified, Printed; a role created before 1.1 holds Complete (migration default), the provisioned administrator role Printed, a member without a role Ordered (`SpecialRights.None`) | value object + CHECK `ck_roles_special_demographics_edit_up_to_domain` / `ck_tenant_memberships_override_demographics_edit_up_to_domain` | ORG-020 | "The demographics edit limit must be one of the result statuses." |
+| INV-ORG-019 | The report days limit is empty (no limit) or 0–3650 days; a role created before 1.1 holds no limit, a member without a role 0 | value object + CHECK `ck_roles_special_report_days_limit_range` / `ck_tenant_memberships_override_report_days_limit_range` | ORG-019 | "The report days limit must be between 0 and 3650 days." |
 | INV-ORG-017 | Branch assignment references existing active branches of the tenant; an empty assignment means all active branches. The create and assign requests say which they mean with `allBranches` (validation v0.5.0 B-02): `false` with no branch, or `true` with branches, is refused ORG-018 (field `branchIds`); `null` keeps the older contract | handler (`IBranchLookup`, `OrganizationGuards.EnsureBranchChoice`) | ORG-012, ORG-018 | — |
 
 ## 9. Segregation-of-duties rules
@@ -250,7 +257,7 @@ Acceptance scenarios (domain unit tests are named after them; functional tests c
 | AS-B2 | Deactivate a branch; deactivating the last active branch is ORG-110; reactivation is idempotent. |
 | AS-B3 | A governorate without a country, a malformed e-mail or currency is refused (ORG-008/009). |
 | AS-R1 | Create a role with permissions; zero permissions is ORG-005; an unknown key is ORG-001. |
-| AS-R2 | Set special rights; a cap of 101 is ORG-006. |
+| AS-R2 | Set special rights; a cap of 101 is ORG-006; an unknown demographics edit limit is ORG-020; a report days limit of 3651 is ORG-019; the short constructor and a client that omits the three limits keep the migration defaults (Complete, false, no limit). |
 | AS-R3 | Set result rights; duplicates are ORG-007; "verify" implies "see". |
 | AS-R4 | Deactivate a role with members is ORG-011; without members succeeds; activating a role without permissions is ORG-005. |
 | AS-R5 | Changing a role's permissions changes the next request of every member (BR-17). |
@@ -281,3 +288,6 @@ contain the username. The composition rules of CP-02 are superseded.
 | A11 | No per-user overrides in the platform tenant (SA-07). | — |
 | A12 | The provisioned role "Laboratory Administrator" holds every permission except the platform-only modules, every special right with a cap of 100, and no result rights (clinical groups are copied later). | Should the administrator role get result rights on every group after the catalogue copy? |
 | A13 | The forced change at next sign-in is enforced by the sign-in flow (foundation) and the change-password page (`acc`); this module sets and exposes the flag (`SessionPrincipal.MustChangePassword`). | — |
+| A14 | Change request 2026-10-13 item 1: the right "edit demographics according to test status" is a per-role (overridable per user) **status limit**: identity demographics of a patient may be changed from a visit while the highest status of that visit's results is at most the limit; every role that existed before 1.1 received `Complete` from the migration so that nothing changes for a reviewed or verified visit (an administrator raises it in the role editor); the administrator role of a laboratory provisioned after 1.1 holds `Printed` (`SpecialRights.All`). | Is `Complete` the right default for existing roles, and should the limit also apply from the patient file (there: the highest status over every visit of the patient)? |
+| A15 | Item 2: "treasury report for the current user or the branch as per the rights" is the boolean right `CanViewBranchCollections` (off for every role that existed before 1.1, on for the administrator role of a laboratory provisioned after 1.1); without it the collections report covers the user's own collections only. | Confirm. |
+| A16 | Item 3: "user right for time limits in days" is `ReportDaysLimit` per role / user: the earliest day a report may start is today minus the limit (0 = today only; empty = no limit, which existing roles received). The same limit bounds the collections report of item 2. | Should existing roles start with a limit (e.g. 30 days) instead of none? |

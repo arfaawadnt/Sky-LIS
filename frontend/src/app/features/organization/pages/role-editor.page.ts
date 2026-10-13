@@ -25,7 +25,7 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { RoleEditorFacade } from '../state/roles.facade';
 import { PrivilegeMatrixComponent, sortKeys } from '../ui/privilege-matrix.component';
 import { type BranchOption, ResultRightsGridComponent } from '../ui/result-rights-grid.component';
-import { isDiscountCapValid, SpecialRightsFormComponent } from '../ui/special-rights-form.component';
+import { isDiscountCapValid, isReportDaysLimitValid, SpecialRightsFormComponent } from '../ui/special-rights-form.component';
 import { catalogueInScope, splitByScope } from './role-permission-scope';
 
 export type RoleTab = 'general' | 'permissions' | 'special' | 'results';
@@ -272,6 +272,11 @@ export class RoleEditorPage {
 
     if (!isDiscountCapValid(this.special().discountCapPercent)) {
       this.toast.error(this.i18n.t('organization.error.ORG-006'));
+      return;
+    }
+
+    if (!isReportDaysLimitValid(this.special().reportDaysLimit)) {
+      this.toast.error(this.i18n.t('organization.error.ORG-019'));
       return;
     }
 

@@ -31,7 +31,12 @@ public sealed record SelectableBranchesResponse(Guid? CurrentBranchId, IReadOnly
 
 // ---- Roles and privileges (CP-37, SA-06) ------------------------------------------------------------------------
 
-/// <summary><see cref="DiscountCapPercent"/>: null = the tenant parameter <c>discountCapPercent</c>, 0 = no discount, 1–100 = the cap.</summary>
+/// <summary>
+/// <see cref="DiscountCapPercent"/>: null = the tenant parameter <c>discountCapPercent</c>, 0 = no discount, 1–100 = the cap.
+/// <see cref="DemographicsEditUpTo"/>: a result status name (Ordered, Complete, Reviewed, Verified, Printed) up to which
+/// the member may still change a patient's identity demographics. <see cref="CanViewBranchCollections"/>: the collections
+/// report may cover the whole branch. <see cref="ReportDaysLimit"/>: days back the member may report (0 = today, null = no limit).
+/// </summary>
 public sealed record SpecialRightsDto(
     int? DiscountCapPercent,
     bool CanPay,
@@ -41,7 +46,10 @@ public sealed record SpecialRightsDto(
     bool CanModifyVerifiedResult,
     bool CanPreviewWithoutVerify,
     bool CanPrintInvoice,
-    bool CanSeeVip);
+    bool CanSeeVip,
+    string DemographicsEditUpTo = "Complete",
+    bool CanViewBranchCollections = false,
+    int? ReportDaysLimit = null);
 
 /// <summary>Result rights on one clinical group in one branch (<see cref="BranchId"/> null = every branch).</summary>
 public sealed record ResultRightDto(Guid ClinicalGroupId, Guid? BranchId, bool CanSee, bool CanReview, bool CanVerify, bool CanEdit, bool CanPrint);

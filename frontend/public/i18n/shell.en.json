@@ -105,5 +105,6 @@
   "nav.analyserTests": "Analyser tests",
   "nav.analyserSamples": "Analyser samples",
   "nav.siteAgents": "Site agents",
-  "nav.tenantPcrKits": "PCR kits"
+  "nav.tenantPcrKits": "PCR kits",
+  "nav.workAmountReport": "Work amount report"
 }

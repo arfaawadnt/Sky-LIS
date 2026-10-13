@@ -136,10 +136,24 @@
           }
         </select>
       </label>
+      <button toolbarActions type="button" class="btn ghost" *appCan="permissions.view" (click)="openCollections()">
+        <app-icon name="printer" [size]="15" />{{ i18n.t('billing.payments.printCollections') }}
+      </button>
       <button toolbarActions type="button" class="btn ghost" *appCan="permissions.export" (click)="exportCsv()" [disabled]="facade.exportCsv.pending()">
         <app-icon name="arrow-down" [size]="15" />{{ i18n.t('billing.exportCsv') }}
       </button>
     </app-toolbar>
+
+    <app-billing-collections-report-dialog
+      [open]="facade.collectionsOpen()"
+      (openChange)="onCollectionsOpen($event)"
+      [privileges]="reportPrivileges()"
+      [report]="facade.collectionsDocument()"
+      [pending]="facade.collectionsReport.pending()"
+      [problem]="facade.collectionsReport.problem()"
+      (loadRequested)="loadCollections($event)"
+      (printRequested)="printCollections($event)"
+    />
 
     @if (facade.register.error()) {
       <p class="problem list-problem" role="alert">{{ i18n.t('billing.loadError') }}</p>

@@ -37,7 +37,7 @@ import { DEFAULT_PASSWORD_MIN_LENGTH, UserEditorFacade } from '../state/users.fa
 import { PrivilegeMatrixComponent, sortKeys } from '../ui/privilege-matrix.component';
 import { catalogueInScope, permissionInScope, splitByScope } from './role-permission-scope';
 import { type ResetPasswordInput, ResetPasswordDialogComponent } from '../ui/reset-password-dialog.component';
-import { isDiscountCapValid, SpecialRightsFormComponent } from '../ui/special-rights-form.component';
+import { isDiscountCapValid, isReportDaysLimitValid, SpecialRightsFormComponent } from '../ui/special-rights-form.component';
 import { USER_STATUS_TONES } from '../ui/user-status';
 
 export type UserTab = 'profile' | 'access' | 'privileges' | 'security';
@@ -446,6 +446,11 @@ export class UserEditorPage {
 
     if (!this.useRoleSpecialRights() && !isDiscountCapValid(this.specialOverride().discountCapPercent)) {
       this.toast.error(this.i18n.t('organization.error.ORG-006'));
+      return;
+    }
+
+    if (!this.useRoleSpecialRights() && !isReportDaysLimitValid(this.specialOverride().reportDaysLimit)) {
+      this.toast.error(this.i18n.t('organization.error.ORG-019'));
       return;
     }
 

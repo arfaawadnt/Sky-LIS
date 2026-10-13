@@ -52,6 +52,12 @@ export class PatientFileFacade {
     loader: ({ params, abortSignal }) => this.api.visits(params, abortSignal),
   });
 
+  /** The demographics lock of the whole file (no visit): read with the file, re-read when the edit drawer opens (PAT-032). */
+  readonly lock = resource({
+    params: () => this.patientId() ?? undefined,
+    loader: ({ params, abortSignal }) => this.lookup.demographicsLock(params, null, abortSignal),
+  });
+
   readonly settings = resource({ loader: ({ abortSignal }) => this.lookup.formSettings(abortSignal) });
   readonly countries = resource({ loader: () => this.lookup.countries() });
   readonly governorates = resource({ loader: () => this.lookup.governorates() });
@@ -107,6 +113,7 @@ export class PatientFileFacade {
     }
 
     this.detail.reload();
+    this.lock.reload();
     this.documents.reload();
     this.visits.reload();
     this.settings.reload();

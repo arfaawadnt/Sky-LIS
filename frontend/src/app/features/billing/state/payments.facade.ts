@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, resource, signal } from '@angular/core';
 
-import type { PaymentCreated, PaymentRegisterFilter, VisitAccountView } from '../../../core/api/billing.contracts';
+import type { CollectionsReportDocument, CollectionsReportRequest, PaymentCreated, PaymentRegisterFilter, VisitAccountView } from '../../../core/api/billing.contracts';
 import type { PageRequest } from '../../../core/api/paging';
 import { mutation } from '../../../core/state/mutation';
 import { BillingApi, type DownloadedFile } from '../data/billing.api';
@@ -54,6 +54,33 @@ export class PaymentsFacade {
   });
 
   readonly exportCsv = mutation<void, DownloadedFile>(() => this.api.exportPayments(this.filter()));
+
+  // ---- collections (treasury) report, change request 2026-10-13 item 2 ------------------------------------------
+
+  /** The report dialog is open: its rights are read when it opens (a role change since the last visit shows at once). */
+  readonly collectionsOpen = signal(false);
+
+  readonly reportPrivileges = resource({
+    params: () => (this.collectionsOpen() ? true : undefined),
+    loader: ({ abortSignal }) => this.api.collectionsReportPrivileges(abortSignal),
+  });
+
+  /** The report last loaded in the dialog (shown in its table, printed on demand); cleared when the dialog closes. */
+  readonly collectionsDocument = signal<CollectionsReportDocument | null>(null);
+
+  readonly collectionsReport = mutation((request: CollectionsReportRequest) => this.api.collectionsReport(request), { then: (doc) => this.collectionsDocument.set(doc) });
+
+  openCollections(): void {
+    this.collectionsReport.reset();
+    this.collectionsDocument.set(null);
+    this.collectionsOpen.set(true);
+  }
+
+  closeCollections(): void {
+    this.collectionsOpen.set(false);
+    this.collectionsDocument.set(null);
+    this.collectionsReport.reset();
+  }
 
   find(accession: string): void {
     const value = accession.trim();

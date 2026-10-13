@@ -10007,9 +10007,25 @@ namespace Platform.Infrastructure.Persistence.Migrations
                                 .HasColumnType("boolean")
                                 .HasColumnName("special_can_transfer");
 
+                            b1.Property<bool>("CanViewBranchCollections")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("boolean")
+                                .HasColumnName("special_can_view_branch_collections");
+
+                            b1.Property<string>("DemographicsEditUpTo")
+                                .IsRequired()
+                                .ValueGeneratedOnAdd()
+                                .HasMaxLength(16)
+                                .HasColumnType("character varying(16)")
+                                .HasColumnName("special_demographics_edit_up_to");
+
                             b1.Property<int?>("DiscountCapPercent")
                                 .HasColumnType("integer")
                                 .HasColumnName("special_discount_cap_percent");
+
+                            b1.Property<int?>("ReportDaysLimit")
+                                .HasColumnType("integer")
+                                .HasColumnName("special_report_days_limit");
 
                             b1.HasKey("RoleTenantId", "RoleId")
                                 .HasName("pk_roles");
@@ -10785,9 +10801,23 @@ namespace Platform.Infrastructure.Persistence.Migrations
                                 .HasColumnType("boolean")
                                 .HasColumnName("override_can_transfer");
 
+                            b1.Property<bool>("CanViewBranchCollections")
+                                .HasColumnType("boolean")
+                                .HasColumnName("override_can_view_branch_collections");
+
+                            b1.Property<string>("DemographicsEditUpTo")
+                                .IsRequired()
+                                .HasMaxLength(16)
+                                .HasColumnType("character varying(16)")
+                                .HasColumnName("override_demographics_edit_up_to");
+
                             b1.Property<int?>("DiscountCapPercent")
                                 .HasColumnType("integer")
                                 .HasColumnName("override_discount_cap_percent");
+
+                            b1.Property<int?>("ReportDaysLimit")
+                                .HasColumnType("integer")
+                                .HasColumnName("override_report_days_limit");
 
                             b1.HasKey("TenantMembershipTenantId", "TenantMembershipId")
                                 .HasName("pk_tenant_memberships");

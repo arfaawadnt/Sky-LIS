@@ -9,11 +9,13 @@ import {
   type CreatedPatient,
   type GovernorateOption,
   PATIENTS_API,
+  type PatientDemographicsLock,
   type PatientDetail,
   type PatientFormSettings,
   type PatientListItem,
   type RegisterPatientRequest,
   type SimilarPatientsResponse,
+  type UpdatePatientRequest,
 } from '../../core/api/patients.contracts';
 
 const DEFAULT_SETTINGS: PatientFormSettings = { mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true };
@@ -68,6 +70,17 @@ export class PatientLookupApi {
 
   register(request: RegisterPatientRequest): Promise<CreatedPatient> {
     return firstValueFrom(this.http.post<CreatedPatient>(PATIENTS_API.patients, request));
+  }
+
+  /** T2 from any page that edits a file (the patient file, Search registrations with its `visitId`); a 204 resolves to `undefined`. */
+  update(id: string, request: UpdatePatientRequest): Promise<void> {
+    return firstValueFrom(this.http.put<void>(`${PATIENTS_API.patients}/${encodeURIComponent(id)}`, request), { defaultValue: undefined }).then(() => undefined);
+  }
+
+  /** The demographics lock the form shows before the user types (PAT-032): judged on `visitId` when given, on the whole file otherwise. */
+  demographicsLock(id: string, visitId: string | null, signal?: AbortSignal): Promise<PatientDemographicsLock> {
+    const params = visitId === null ? new HttpParams() : new HttpParams({ fromObject: { visitId } });
+    return firstValueFrom(this.http.get<PatientDemographicsLock>(`${PATIENTS_API.patients}/${encodeURIComponent(id)}/demographics-lock`, { params })).then(abortable(signal));
   }
 
   countries(): Promise<readonly CountryOption[]> {

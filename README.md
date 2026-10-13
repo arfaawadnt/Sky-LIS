@@ -234,7 +234,36 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Three new special rights (Roles & privileges, per-user overrides).** *Demographics editable up to* (a result status:
+  Ordered, Complete, Reviewed, Verified, Printed), *Treasury report of the whole branch* and *Report time limit (days)*
+  (empty = no limit, 0 = today only). Roles that already exist receive Complete / off / no limit from the migration
+  `SpecialRightsExtended`; an administrator raises them in the role editor. Newly provisioned administrator roles hold
+  everything. Codes ORG-019 / ORG-020.
+- **Patient demographics from Search registrations.** The visits register gets a *Patient* row action (right
+  `patients.edit`) that opens the patient file in a drawer: contact fields are always editable; identity fields (title,
+  names, gender, date of birth or age, condition, national id, nationality) stay editable only while the highest result
+  status of that visit is within the user's *Demographics editable up to* right — beyond it they are shown read-only with
+  the reason, and the server refuses a change with `PAT-032`. The same lock applies on the patient file (highest status
+  over every visit of the patient). The change reflects on the patient record at once (names and mobile in the register).
+- **Treasury (collections) report on Payments.** *Print collections* on the Search payments tab: period of whole
+  laboratory days (default today), scope *Own payments* or *Whole branch* (the latter needs the new branch right,
+  `BIL-044`), grouped by payment method (default), cashier or branch, with posted payments, refunds and net per method
+  (Cash, Card, POS, Transfer) and totals; printed as an A4 document. A period starting before the user's report time
+  limit is refused (`BIL-045`). `GET /api/v1/billing/collections-report`.
+- **Work amount report** (new page Finance › *Work amount report*, right `reporting.view`): the booked income of the
+  visits registered in a period of laboratory days (default today) — visits, services, gross, discount, cash income
+  (patient share), credit income (payer share) and net — without cancelled services, grouped by day, payer, contract
+  tier, registering user, referring doctor, clinical group, service or branch, with a totals row, A4 print and CSV
+  export (`reporting.export`). A period starting before the user's *Report time limit* is refused (`REP-001`); a
+  reversed or longer-than-366-day period `REP-002`; a branch the user may not report on `REP-003`.
+  `GET /api/v1/reports/work-amount` (+ `/export`).
+- **Results by accession: criteria fold away.** Once a query has answered, the criteria card collapses into a one-line
+  bar of chips (accession, patient, statuses, dates, flags) with *Change criteria*, so the matching visits and the case
+  get the height; focus moves to the first matching visit; *Change criteria* or *New query* opens the form again with
+  the typed values; F8 still reruns the query while folded.
+- **Runbook: applying `migrations.sql` from a Windows console.** The generated script starts with a UTF-8 byte-order mark that
+  psql skips only in UTF-8 mode; the runbook now sets `PGCLIENTENCODING=UTF8` before `psql -f` (a console on a legacy code page
+  otherwise stops at line 6 with `syntax error at or near "ï»¿DO"`, before touching anything).
 
 ### v0.8.1 — 2026-10-13
 

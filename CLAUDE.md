@@ -386,6 +386,32 @@ QMS source is never read or copied (section 1); everything here is written from 
   (`features/organization/ui/laboratory-logo-card`; the client Parameters page is Release 1: a laboratory sees the groups whose
   `ParameterGroup.release` is in scope — Registration, Printing, Samples and results, Security: R1; Subscription: R2 — and
   auto-collect / auto-receive locked On, `editableFrom: 'R2'`, until the sample pages exist) and shown read-only on the profile page. The site CSP allows `img-src blob:`; specs that render the profile page stub `LaboratoryBrandService`.
+- Special-right limits (change request 2026-10-13, migration `SpecialRightsExtended`, intake ORG-001 v1.1 A14–A16): `SpecialRights`
+  carries `DemographicsEditUpTo` (`DemographicsEditLimit` Ordered < Complete < Reviewed < Verified < Printed; `AllowsDemographicsEditAt`),
+  `CanViewBranchCollections` and `ReportDaysLimit` (null = no limit, 0 = today; `EarliestReportDay(today)`); codes ORG-019/ORG-020; owned
+  columns `special_*` on `app.roles`, `override_*` on `app.tenant_memberships` with CHECKs declared in the migration (the enum convention
+  skips owned types; the EF model declares no default for the two required role columns — with one, the enum's CLR default Ordered is EF's
+  "unset" sentinel and the column default Complete would replace a deliberate Ordered; only the migration carries the defaults). Roles that existed before the migration hold Complete / false / no limit (set them in the role editor); provisioned
+  administrator roles hold `SpecialRights.All`. Consumers: Patients (identity demographics edit from a visit), Billing (collections
+  report), Reporting (work amount report).
+- Demographics lock (Patients intake §17, Registration intake §17): `UpdatePatientCommand.VisitId?`; `Patient.IdentityChangesWith` tells an
+  identity change (title, names, gender, DOB/age, condition, national id, nationality) from a contact change; `IPatientResultStatusLookup.
+  HighestStatusAsync(patientId, visitId?)` (adapter over `Result`, cancelled ignored, a visit without live results falls back to the
+  patient-wide answer) → `PAT-032` (403) when beyond `DemographicsEditUpTo`; `GET /api/v1/patients/{id}/demographics-lock?visitId=`
+  feeds the shared `app-patient-form` inputs `identityLocked`/`lockHint`; the visits register (CP-10) opens the patient in a drawer
+  (row action "Patient", `patients.edit`, `shared/patient/patient-lookup.api.ts`).
+- Collections report (Billing intake v1.2 §14, Q20–Q22): `CollectionsReportQuery(FromDay?, ToDay?, Scope User|Branch, GroupBy
+  Branch|User|Method)` [billing.view] → `GET /api/v1/billing/collections-report`; `BIL-044` branch scope without
+  `CanViewBranchCollections`, `BIL-045` period before `EarliestReportDay`; domain arithmetic in `Domain/Billing/CollectionsReport.cs`,
+  port `ICollectionsReportQueries` (one grouped UNION ALL of posted payments and refunds); SPA dialog
+  `features/billing/ui/collections-report-dialog.component.ts`, document `ui/documents/collections-report-document.component.ts`.
+- Reporting module (slot `rep`; intake `docs/intake/LIS-INT-REP-001_Reporting.md` v1.1 §14b): `WorkAmountReportQuery(FromDay?, ToDay?,
+  GroupBy Day|Payer|ContractTier|User|Doctor|ClinicalGroup|Service|Branch, BranchId?)` [reporting.view] and `ExportWorkAmountReportQuery`
+  [reporting.export] over `IWorkAmountReader` (live top-level visit lines, `Visit`/`VisitLine` entity types; aggregation in memory,
+  span ≤ 366 days) with `IWorkAmountNames`; codes `REP-001` (period before the days limit), `REP-002` (invalid period), `REP-003`
+  (branch not allowed: neither the session branch, nor assigned, nor `organization.view`); `ReportsController` under `/api/v1/reports`.
+  Frontend `features/reporting` (`/reports/work-amount`, nav group Finance), `core/api/reporting.contracts.ts`, dictionaries
+  `reporting.{en,ar}.json`. Results CP-19 folds its criteria card into a chip bar once a query answers (`criteriaCollapsed`).
 - Wallet charge run (W2, intake PLT-001 §16 Q11): `WalletChargeJob` (Infrastructure `Jobs/`, hosted by `WalletChargeHostedService`,
   `Lis:Jobs:WalletCharge:{Enabled,PollInterval}`, default on / 1 h; `ApiFactory` turns it off) charges each due Active client's plan fee once
   per period (row-version guarded, no migration) through `WalletCharger`; `POST /api/v1/platform/wallets/charge-run` = SA-05 "Run charges now".

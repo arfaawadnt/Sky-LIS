@@ -200,11 +200,7 @@ public sealed class Patient : AggregateRoot, ITenantScoped
 
         var today = LocalDate(nowUtc, zone);
         var before = Current();
-        var cleaned = Clean(demographics, rules, today);
-        if (cleaned.DateOfBirth is null && DateOfBirth is null && cleaned.StatedAge is { } stated && stated == AgeOn(today))
-        {
-            cleaned = cleaned with { StatedAge = before.StatedAge, AgeRecordedOn = before.AgeRecordedOn };
-        }
+        var cleaned = Reconcile(Clean(demographics, rules, today), today);
 
         Apply(cleaned);
         var vipChanged = isVip is { } vip && vip != IsVip;
@@ -217,6 +213,21 @@ public sealed class Patient : AggregateRoot, ITenantScoped
         {
             Raise(new PatientUpdated(Id, Number, nowUtc));
         }
+    }
+
+    /// <summary>
+    /// True when applying <paramref name=demographics/> through <see cref=Update/> would change an <b>identity</b> field:
+    /// title, name, Arabic name, gender, date of birth or stated age, patient condition, national id or nationality. These are
+    /// the fields a result-status lock protects (PAT-032, change request 2026-10-13 item 1); mobile, e-mail, governorate, city,
+    /// address, comments and the VIP flag are contact fields and stay free. Same cleaning as the update (a restated age equal
+    /// to today's age is no change), so an untouched form never counts as a change.
+    /// </summary>
+    public bool IdentityChangesWith(PatientDemographics demographics, PatientFieldRules rules, DateTimeOffset nowUtc, TimeZoneInfo? zone = null)
+    {
+        ArgumentNullException.ThrowIfNull(demographics);
+        ArgumentNullException.ThrowIfNull(rules);
+        var today = LocalDate(nowUtc, zone);
+        return IdentityOf(Reconcile(Clean(demographics, rules, today), today)) != IdentityOf(Current());
     }
 
     /// <summary>
@@ -384,6 +395,16 @@ public sealed class Patient : AggregateRoot, ITenantScoped
         Address = value.Address;
         Comments = value.Comments;
     }
+
+    /// <summary>A stated age equal to the age computed today keeps the original statement (no artificial change) when neither side has a date of birth.</summary>
+    private Cleaned Reconcile(Cleaned cleaned, DateOnly today) =>
+        cleaned.DateOfBirth is null && DateOfBirth is null && cleaned.StatedAge is { } stated && stated == AgeOn(today)
+            ? cleaned with { StatedAge = StatedAge, AgeRecordedOn = AgeRecordedOn }
+            : cleaned;
+
+    /// <summary>The identity fields of a cleaned value (see <see cref=IdentityChangesWith/>).</summary>
+    private static (PatientTitle, string, string?, PatientGender, DateOnly?, PatientAge?, DateOnly?, Guid?, string?, string?) IdentityOf(Cleaned value) =>
+        (value.Title, value.FullName, value.NameAr, value.Gender, value.DateOfBirth, value.StatedAge, value.AgeRecordedOn, value.PatientConditionId, value.NationalId, value.Nationality);
 
     private Cleaned Current() => new(
         Title, FullName, NameAr, Gender, DateOfBirth, StatedAge, AgeRecordedOn, PatientConditionId, Mobile, NationalId, Nationality, Email, GovernorateId, City, Address, Comments);

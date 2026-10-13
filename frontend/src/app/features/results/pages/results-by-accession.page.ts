@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -50,6 +50,14 @@ import { type TextReportRequest, TextReportDialogComponent } from '../ui/text-re
 /** The server's refusal of a verification whose delta flag is not acknowledged (BR-11; `ResultsCodes.DeltaNotAcknowledged`). */
 const DELTA_NOT_ACKNOWLEDGED = 'RES-015';
 
+/** One active criterion of the last query, shown as a chip while the criteria card is collapsed (change request 2026-10-13 item 4). */
+export interface CriteriaChip {
+  readonly key: string;
+  /** The criterion's caption (already translated); null for a flag whose value is its own caption. */
+  readonly label: string | null;
+  readonly value: string;
+}
+
 /**
  * CP-19 Results by accession (WF-06 steps 2–5; LDM §5.2–§5.7): the query panel (accession, patient number, name with
  * `%`, test and sample status, analyser, not printed / not verified / delta boxes, registration window; F8 runs it),
@@ -97,6 +105,8 @@ export class ResultsByAccessionPage {
   private readonly templateImages = inject(ReportTemplateImageLoader);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   /** The `?accession=` query parameter (component input binding): other pages open a visit's results with it. */
   readonly accession = input<string>();
@@ -121,6 +131,51 @@ export class ResultsByAccessionPage {
 
   /** The matching-visits panel folds away once a case is open (prototype "hide filters"). */
   protected readonly listCollapsed = signal(false);
+
+  /**
+   * The criteria card folds into a one-line summary once a query has answered (change request 2026-10-13 item 4), so the
+   * results get the height; "Change criteria" or a new query unfolds it. Opening a visit leaves it as it is.
+   */
+  protected readonly criteriaCollapsed = signal(false);
+  /** The form values of the last run, from which the summary chips are built (null before the first run). */
+  private readonly runCriteria = signal<ReturnType<ResultsByAccessionPage['form']['getRawValue']> | null>(null);
+  /** Set by a run: once its answer is in, the card collapses and the focus moves to the matching visits. */
+  private readonly collapseWhenAnswered = signal(false);
+
+  protected readonly criteriaChips = computed<readonly CriteriaChip[]>(() => {
+    const value = this.runCriteria();
+    if (value === null) {
+      return [];
+    }
+
+    const chips: CriteriaChip[] = [];
+    const text = (key: string, label: string, raw: string): void => {
+      if (raw.trim().length > 0) {
+        chips.push({ key, label: this.i18n.t(label), value: raw.trim() });
+      }
+    };
+    text('accession', 'results.case.accession', value.accession.toUpperCase());
+    text('patientNumber', 'results.case.patientNumber', value.patientNumber);
+    text('patientName', 'results.case.patientName', value.patientName);
+    if (value.status.length > 0) {
+      chips.push({ key: 'status', label: this.i18n.t('results.case.testStatus'), value: this.statusLabel(value.status) });
+    }
+
+    if (value.sampleStatus.length > 0) {
+      chips.push({ key: 'sampleStatus', label: this.i18n.t('results.case.sampleStatus'), value: this.sampleStatusLabel(value.sampleStatus) });
+    }
+
+    text('analyserId', 'results.worklist.analyser', value.analyserId);
+    text('fromDay', 'results.case.registeredFrom', value.fromDay);
+    text('toDay', 'results.case.registeredTo', value.toDay);
+    for (const [key, flag] of [['notPrinted', value.notPrinted], ['notVerified', value.notVerified], ['delta', value.delta], ['branchOnly', value.branchOnly]] as const) {
+      if (flag) {
+        chips.push({ key, label: null, value: this.i18n.t(`results.case.${key === 'delta' ? 'deltaOnly' : key}`) });
+      }
+    }
+
+    return chips.length === 0 ? [{ key: 'all', label: null, value: this.i18n.t('results.case.allVisits') }] : chips;
+  });
 
   protected readonly amendRow = signal<ResultRowView | null>(null);
   protected readonly amendOpen = signal(false);
@@ -190,10 +245,26 @@ export class ResultsByAccessionPage {
         this.form.patchValue({ accession });
         this.facade.open({ accession });
         this.listCollapsed.set(true);
+        // a visit opened from a link is "retrieved" too: the card folds to its accession chip (item 4), focus untouched
+        this.runCriteria.set(this.form.getRawValue());
+        this.criteriaCollapsed.set(true);
       });
     });
     effect(() => {
       this.historyOpen.set(this.facade.historyRow() !== null);
+    });
+    effect(() => {
+      // item 4: once the query's answer is in (rows or none), fold the criteria and hand the keyboard to the list
+      const answered = this.facade.query() !== null && !this.facade.visits.isLoading() && this.facade.visits.hasValue();
+      untracked(() => {
+        if (!answered || !this.collapseWhenAnswered()) {
+          return;
+        }
+
+        this.collapseWhenAnswered.set(false);
+        this.criteriaCollapsed.set(true);
+        afterNextRender({ read: () => this.focusResults() }, { injector: this.injector });
+      });
     });
   }
 
@@ -218,6 +289,8 @@ export class ResultsByAccessionPage {
       page: page.page,
       pageSize: page.pageSize,
     };
+    this.runCriteria.set(value);
+    this.collapseWhenAnswered.set(true);
     this.facade.run(query);
     this.listCollapsed.set(false);
   }
@@ -232,7 +305,21 @@ export class ResultsByAccessionPage {
     this.facade.query.set(null);
     this.facade.close();
     this.listCollapsed.set(false);
+    this.collapseWhenAnswered.set(false);
+    this.expandCriteria();
     void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+  }
+
+  /** Unfolds the criteria card ("Change criteria") and puts the cursor back on the accession field. */
+  protected expandCriteria(): void {
+    this.criteriaCollapsed.set(false);
+    afterNextRender({ read: () => this.host.nativeElement.querySelector<HTMLElement>('input[formcontrolname="accession"]')?.focus() }, { injector: this.injector });
+  }
+
+  /** The keyboard flow after a search: the first matching visit (Enter opens it), else the list itself. */
+  private focusResults(): void {
+    const element = this.host.nativeElement;
+    (element.querySelector<HTMLElement>('.visit-list .visit') ?? element.querySelector<HTMLElement>('.visit-list'))?.focus();
   }
 
   protected select(item: ResultVisitListItem): void {

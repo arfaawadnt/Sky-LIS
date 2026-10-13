@@ -29,7 +29,11 @@ public sealed record RegisterPatientRequest(
     string? Comments,
     bool? IsVip);
 
-/// <summary>T2: the same fields; <paramref name="IsVip"/> <see langword="null"/> keeps the flag; <paramref name="RowVersion"/> (from the detail) refuses a stale edit with CONCURRENCY-409.</summary>
+/// <summary>
+/// T2: the same fields; <paramref name="IsVip"/> <see langword="null"/> keeps the flag; <paramref name="RowVersion"/> (from the detail) refuses a stale edit with CONCURRENCY-409.
+/// <paramref name="VisitId"/>: the visit the user edits from (Search registrations); the result-status lock on the identity fields is judged on it,
+/// on every visit of the patient when <see langword="null"/> (PAT-032; see <see cref="PatientDemographicsLock"/>).
+/// </summary>
 public sealed record UpdatePatientRequest(
     string Title,
     string FullName,
@@ -47,7 +51,17 @@ public sealed record UpdatePatientRequest(
     string? Address,
     string? Comments,
     bool? IsVip,
-    uint? RowVersion);
+    uint? RowVersion,
+    Guid? VisitId = null);
+
+/// <summary>
+/// The demographics lock of a file for the current user (<c>GET /patients/{id}/demographics-lock?visitId=</c>, change request
+/// 2026-10-13 item 1): <paramref name="HighestStatus"/> is the highest live result status of the visit (of the patient when no visit
+/// is given) on the scale Ordered | Complete | Reviewed | Verified | Printed; <paramref name="EditableUpTo"/> is the user's
+/// <c>DemographicsEditUpTo</c> special right; <paramref name="CanEditIdentity"/> tells whether title, names, gender, date of
+/// birth or age, condition, national id and nationality may still change (contact fields always may, with <c>patients.edit</c>).
+/// </summary>
+public sealed record PatientDemographicsLock(string HighestStatus, bool CanEditIdentity, string EditableUpTo);
 
 /// <summary>The response of T1: the id and the number the file received.</summary>
 public sealed record CreatedPatient(Guid Id, string Number);

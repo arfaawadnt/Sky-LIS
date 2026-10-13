@@ -417,3 +417,68 @@ internal sealed class CashDrawerQueries(AppDbContext context) : ICashDrawerQueri
         public int VisitCount { get; set; }
     }
 }
+
+/// <summary>
+/// The collections report (change request 2026-10-13, item 2): one grouping query over the union of the posted payments
+/// and the refunds of the scope, summed per (branch, cashier, method); the domain regroups the cells by the chosen key.
+/// </summary>
+internal sealed class CollectionsReportQueries(AppDbContext context) : ICollectionsReportQueries
+{
+    public async Task<IReadOnlyList<CollectionsCell>> CellsAsync(CollectionsScope scope, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        var payments = context.Set<Payment>().AsNoTracking()
+            .Where(payment => payment.Status == PaymentStatus.Posted && payment.PaidAtUtc >= scope.FromUtc && payment.PaidAtUtc < scope.ToUtc);
+        var refunds = context.Set<Refund>().AsNoTracking()
+            .Where(refund => refund.RefundedAtUtc >= scope.FromUtc && refund.RefundedAtUtc < scope.ToUtc);
+        if (scope.CashierUserId is { } cashier)
+        {
+            payments = payments.Where(payment => payment.CashierUserId == cashier);
+            refunds = refunds.Where(refund => refund.CashierUserId == cashier);
+        }
+
+        if (scope.BranchId is { } branch)
+        {
+            payments = payments.Where(payment => payment.BranchId == branch);
+            refunds = refunds.Where(refund => refund.BranchId == branch);
+        }
+
+        var movements = payments
+            .Select(payment => new Movement { BranchId = payment.BranchId, CashierUserId = payment.CashierUserId, Method = payment.Method, Payment = payment.Amount, Refund = 0m, PaymentCount = 1, RefundCount = 0 })
+            .Concat(refunds.Select(refund => new Movement { BranchId = refund.BranchId, CashierUserId = refund.CashierUserId, Method = refund.Method, Payment = 0m, Refund = refund.Amount, PaymentCount = 0, RefundCount = 1 }));
+
+        var cells = await movements
+            .GroupBy(movement => new { movement.BranchId, movement.CashierUserId, movement.Method })
+            .Select(group => new
+            {
+                group.Key.BranchId,
+                group.Key.CashierUserId,
+                group.Key.Method,
+                Payments = group.Sum(movement => movement.Payment),
+                PaymentCount = group.Sum(movement => movement.PaymentCount),
+                Refunds = group.Sum(movement => movement.Refund),
+                RefundCount = group.Sum(movement => movement.RefundCount),
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return cells.Select(cell => new CollectionsCell(cell.BranchId, cell.CashierUserId, cell.Method, cell.Payments, cell.PaymentCount, cell.Refunds, cell.RefundCount)).ToList();
+    }
+
+    private sealed class Movement
+    {
+        public Guid BranchId { get; set; }
+
+        public Guid CashierUserId { get; set; }
+
+        public PaymentMethod Method { get; set; }
+
+        public decimal Payment { get; set; }
+
+        public decimal Refund { get; set; }
+
+        public int PaymentCount { get; set; }
+
+        public int RefundCount { get; set; }
+    }
+}

@@ -5,8 +5,11 @@ import type { PaymentReceiptDocument } from '../../../core/api/billing.contracts
 import { PrintService } from '../../../shared/print/print.service';
 import { fileNameOf } from '../data/billing.api';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { collectionsReport, collectionsRow } from '../testing/billing.fixtures';
 import { formatCount, formatDateTime, formatMoney, formatPrintDateTime, formatPrintMoney, hasTwoDecimals, localInputToIso, roundMoney, toLocalInputValue } from './billing-format';
 import { dayEndIso, dayStartIso, paymentTone } from './billing-view';
+import { dayInputValue, earliestReportDay } from './collections-report-view';
+import { CollectionsReportDocumentComponent } from './documents/collections-report-document.component';
 import { ReceiptDocumentComponent } from './documents/receipt-document.component';
 
 const receipt: PaymentReceiptDocument = {
@@ -93,5 +96,43 @@ describe('Billing UI helpers and documents', () => {
     const voided = print.render({ type: ReceiptDocumentComponent, inputs: { doc: { ...receipt, status: 'Voided', voidReason: 'wrong visit' } } });
     expect(voided).toContain('void-banner');
     expect(voided).toContain('wrong visit');
+  });
+
+  it('renders the collections report with one row per key, translated methods, named cashiers and the totals (change request 2026-10-13, item 2)', () => {
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection()] });
+    const print = TestBed.inject(PrintService);
+    const i18n = TestBed.inject(I18nService);
+
+    const byMethod = print.render({ type: CollectionsReportDocumentComponent, inputs: { doc: collectionsReport() } });
+    expect(byMethod).toContain('Sky Lab');
+    expect(byMethod).toContain('Cashier One');
+    expect(byMethod).toContain('2026-10-13');
+    expect(byMethod).toContain('Africa/Cairo');
+    expect(byMethod).toContain('350.00');   // the net of the totals
+    expect(byMethod).toContain('250.00');   // cash net
+    const reportTable = /<table[^>]*class="report"[\s\S]*?<\/table>/.exec(byMethod)?.[0] ?? '';
+    expect((reportTable.match(/scope="row"/g) ?? []).length).toBe(3);   // Cash, Card and the total row
+
+    const byUser = print.render({ type: CollectionsReportDocumentComponent, inputs: { doc: collectionsReport({ scope: 'Branch', groupBy: 'User', cashierName: null, rows: [collectionsRow({ key: 'u-2', labelEn: 'Cashier Two', labelAr: 'الصراف الثاني' })] }) } });
+    expect(byUser).toContain('Cashier Two');
+    expect(byUser).not.toContain('u-2');
+    i18n.setLanguage('ar');
+    const arabic = print.render({ type: CollectionsReportDocumentComponent, inputs: { doc: collectionsReport({ scope: 'Branch', groupBy: 'User', cashierName: null, rows: [collectionsRow({ key: 'u-2', labelEn: 'Cashier Two', labelAr: 'الصراف الثاني' })] }) } });
+    i18n.setLanguage('en');
+    expect(arabic).toContain('الصراف الثاني');
+    expect(arabic).toContain('350.00');   // F-09: Latin digits on paper
+    expect(arabic).not.toMatch(/[٠-٩]/);
+
+    const empty = print.render({ type: CollectionsReportDocumentComponent, inputs: { doc: collectionsReport({ rows: [], totals: collectionsRow({ paymentCount: 0, refundCount: 0, cash: { payments: 0, refunds: 0, net: 0 }, card: { payments: 0, refunds: 0, net: 0 }, totalPayments: 0, totalRefunds: 0, net: 0 }) }) } });
+    expect(empty).toContain('colspan="8"');
+  });
+
+  it('bounds the report period by the member\'s report days limit (0 = today only, null = no limit)', () => {
+    const today = new Date(2026, 9, 13);
+    expect(dayInputValue(today)).toBe('2026-10-13');
+    expect(earliestReportDay(0, today)).toBe('2026-10-13');
+    expect(earliestReportDay(7, today)).toBe('2026-10-06');
+    expect(earliestReportDay(31, today)).toBe('2026-09-12');
+    expect(earliestReportDay(null, today)).toBeNull();
   });
 });

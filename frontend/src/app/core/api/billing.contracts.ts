@@ -421,6 +421,69 @@ export interface CashClosingSheetDocument {
   readonly printedAtUtc: string;
 }
 
+// ---- collections (treasury) report (change request 2026-10-13, item 2) ------------------------------------------------------
+
+/** Own posted payments and refunds, or every cashier of the session branch (needs the special right `canViewBranchCollections`). */
+export type CollectionsReportScope = 'User' | 'Branch';
+
+export type CollectionsReportGrouping = 'Branch' | 'User' | 'Method';
+
+export const COLLECTIONS_REPORT_GROUPINGS: readonly CollectionsReportGrouping[] = ['Branch', 'User', 'Method'];
+
+/** `fromDay`/`toDay` are laboratory-calendar days (`yyyy-MM-dd`, inclusive); null = today. */
+export interface CollectionsReportRequest {
+  readonly fromDay: string | null;
+  readonly toDay: string | null;
+  readonly scope: CollectionsReportScope;
+  readonly groupBy: CollectionsReportGrouping;
+}
+
+export interface CollectionsMethodView {
+  readonly payments: number;
+  readonly refunds: number;
+  readonly net: number;
+}
+
+/** `key` is the branch id, the cashier's user id or the method name by the grouping; labels are null for a method (translated here). */
+export interface CollectionsReportRow {
+  readonly key: string;
+  readonly labelEn: string | null;
+  readonly labelAr: string | null;
+  readonly paymentCount: number;
+  readonly refundCount: number;
+  readonly cash: CollectionsMethodView;
+  readonly card: CollectionsMethodView;
+  readonly pos: CollectionsMethodView;
+  readonly transfer: CollectionsMethodView;
+  readonly totalPayments: number;
+  readonly totalRefunds: number;
+  readonly net: number;
+}
+
+export interface CollectionsReportDocument {
+  readonly letterhead: DocumentLetterhead;
+  readonly scope: CollectionsReportScope;
+  readonly groupBy: CollectionsReportGrouping;
+  readonly fromDay: string;
+  readonly toDay: string;
+  readonly fromUtc: string;
+  readonly toUtc: string;
+  readonly timeZone: string;
+  readonly cashierName: string | null;
+  readonly rows: readonly CollectionsReportRow[];
+  readonly totals: CollectionsReportRow;
+  readonly currency: string;
+  readonly printedBy: string;
+  readonly printedAtUtc: string;
+}
+
+/** The two CP-37 special rights the report dialog reads from `GET /api/v1/organization/me/privileges`. */
+export interface CollectionsReportPrivileges {
+  readonly canViewBranchCollections: boolean;
+  /** Days back the member may report: 0 = today only, null = no limit. */
+  readonly reportDaysLimit: number | null;
+}
+
 // ---- filters ---------------------------------------------------------------------------------------------------------------
 
 export interface PaymentRegisterFilter {
@@ -485,6 +548,7 @@ export const BILLING_API = {
   myTreasuries: '/api/v1/billing/my-treasuries',
   treasuries: '/api/v1/billing/treasuries',
   printSettings: '/api/v1/billing/print-settings',
+  collectionsReport: '/api/v1/billing/collections-report',
   refundReasons: '/api/v1/catalogue/reasons',
 } as const;
 

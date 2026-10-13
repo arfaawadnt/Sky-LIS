@@ -36,6 +36,12 @@ public static class BillingCodes
     public const string CancelRightRequired = "BIL-042";
     public const string PrintInvoiceRightRequired = "BIL-043";
 
+    /// <summary>The collections report over the whole branch needs the CP-37 right "view branch collections" (change request 2026-10-13, item 2).</summary>
+    public const string BranchCollectionsRightRequired = "BIL-044";
+
+    /// <summary>A report period starting before the member's earliest allowed day (<c>SpecialRights.ReportDaysLimit</c>).</summary>
+    public const string ReportPeriodBeyondLimit = "BIL-045";
+
     public const string ExportTooLarge = "BIL-050";
 
     public const string ClosingOverlaps = "BIL-120";

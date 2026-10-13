@@ -300,3 +300,38 @@ Open questions (assumed answers let the build proceed; confirm or change):
 | Q12 | Are deactivated documents still downloadable? | Listed for everyone with `files.view`; content only for `files.manage` (a wrong-file upload is a privacy incident). |
 | Q13 | Which "today" computes the age? | The UTC date of the server clock (a lab working at UTC+2/+3 may see the age change up to 3 hours late around midnight). |
 | Q14 | An Egyptian mobile typed with the trunk 0 (`01011140001`, 11 digits) or without it (`1011140001`, 10)? | **Both accepted, stored one way (remaining point A-09, 2026-10-12).** With a mobile country chosen on the form (its national length from the platform list), the national form (not starting with 0) and the same number with the trunk 0 are valid, and the form sends the trunk form (`01011140001`), so one number has one stored spelling and the mobile search finds it typed either way. "Any country" keeps 8–15 digits as typed; an international number (`+20…`) is stored as typed. The server rule stays 8–15 digits (INV-PAT-003): it does not know the chosen country. **Default country (validation v0.5.0 F-08, 2026-10-12):** the form opens on the laboratory's country, the country of its client record (`ILaboratoryCountry`; without a client record, the only active country whose time zone is the laboratory's `timeZone` parameter), returned by `GET /patients/form-settings` (`countryCode`, `countryMobileLength`); "Any" is still offered and, chosen on purpose, keeps the number as typed. **Search:** with the laboratory's national length, a number typed with the trunk 0 is searched without it (`Patient.MobileSearchDigits`), so the register (CP-11), its export and the visit register (CP-10) find a file stored either way (`1019199912` or `01019199912`). |
+
+## 17. Change request 2026-10-13 item 1 — demographics edit by result status
+
+**Rule.** A patient's **identity** (title, name, Arabic name, gender, date of birth or stated age, patient condition,
+national id, nationality) may change (T2) only while the highest status of the **live** results (Cancelled ignored) of the
+visit the user edits from — or of every visit of the patient when the edit comes from the patient file — is within the
+member's special right **`DemographicsEditUpTo`** (CP-37; values `Ordered < Complete < Reviewed < Verified < Printed`;
+existing roles hold `Complete`, the administrator role `Printed`, a member without a role `Ordered`). **Contact** fields
+(mobile, e-mail, governorate, city, address, comments) and the VIP flag stay editable with `patients.edit` alone (the VIP
+flag keeps INV-PAT-007). An unchanged identity (the same values, however spelled; an age restated as today's age) is not
+a change, so the results are read only when an identity field really changes.
+
+| Item | Value |
+| --- | --- |
+| Code | **PAT-032** `DemographicsLockedByResults` (403, `DomainFault.Refused`): "The patient's identity can no longer change: a result is {status} and your right allows identity changes up to {limit}. Contact details can still be edited." (PAT-030/031 were already the VIP codes, so the request's "PAT-030" became PAT-032.) |
+| Right | `SpecialRights.DemographicsEditUpTo` (`DemographicsEditLimit`), judged with `SpecialRights.AllowsDemographicsEditAt(highest)`; edited on the role (SA/CP-37) and as a user override. |
+| Read port | `IPatientResultStatusLookup.HighestStatusAsync(patientId, visitId?)` over `app.results` (adapter `PatientResultStatusLookup`): the visit's highest live status, the patient's when no visit is given; a visit id that names no live result of the patient (unknown, foreign, not yet ordered) falls back to the patient-wide answer so a client-supplied id never weakens the lock. |
+| Request | `PUT /api/v1/patients/{id}` gains `visitId` (null from the patient file). |
+| Affordance | `GET /api/v1/patients/{id}/demographics-lock?visitId=` [`patients.view`] → `{ highestStatus, canEditIdentity, editableUpTo }`; the form reads it before it shows and renders the identity fields read-only with a hint naming both statuses (patient file: file-wide; Search registrations: the row's visit). |
+| Audit | the change is an ordinary patient update: `PatientUpdated` and the field history in `audit.field_changes`. |
+| Domain | `Patient.IdentityChangesWith(demographics, rules, now, zone)` decides what counts as identity (one test per field, `PatientIdentityChangeTests`). |
+
+Scenarios (tests `PatientIdentityChangeTests`, `UpdatePatientHandlerTests`, `PatientsDemographicsLockTests`,
+`PatientsDemographicsLockFlowTests`, specs of the patient form, the patient file page and Search registrations):
+
+```gherkin
+Scenario S-LOCK-refused: a member whose right stops at Complete renames the patient from a visit with a Verified result → PAT-032 (403), nothing saved
+Scenario S-LOCK-contact: the same member changes the mobile only → saved (the results are not read)
+Scenario S-LOCK-within: a member whose right reaches Verified renames the patient → saved; the register shows the new name
+Scenario S-LOCK-file: from the patient file the lock is judged on every visit of the patient
+Scenario S-LOCK-affordance: the lock query reports the status, the right and the decision; 404 for an unknown file
+```
+
+Assumptions (for the business owner): a visit whose results are all cancelled or not yet ordered is judged patient-wide;
+the lock does not apply to T1 (a new file has no results) nor to the merge (T3, its own right).

@@ -140,13 +140,18 @@ public static class OrganizationGuards
     public static SpecialRights ToDomain(SpecialRightsDto dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
-        return new SpecialRights(dto.DiscountCapPercent, dto.CanPay, dto.CanRefund, dto.CanTransfer, dto.CanCancel, dto.CanModifyVerifiedResult, dto.CanPreviewWithoutVerify, dto.CanPrintInvoice, dto.CanSeeVip);
+        if (!Enum.TryParse<DemographicsEditLimit>(dto.DemographicsEditUpTo, ignoreCase: true, out var editLimit))
+        {
+            throw new DomainException(OrganizationCodes.DemographicsEditLimitInvalid, "The demographics edit limit must be one of the result statuses.", DomainFault.Validation);
+        }
+
+        return new SpecialRights(dto.DiscountCapPercent, dto.CanPay, dto.CanRefund, dto.CanTransfer, dto.CanCancel, dto.CanModifyVerifiedResult, dto.CanPreviewWithoutVerify, dto.CanPrintInvoice, dto.CanSeeVip, editLimit, dto.CanViewBranchCollections, dto.ReportDaysLimit);
     }
 
     public static SpecialRightsDto ToDto(SpecialRights rights)
     {
         ArgumentNullException.ThrowIfNull(rights);
-        return new SpecialRightsDto(rights.DiscountCapPercent, rights.CanPay, rights.CanRefund, rights.CanTransfer, rights.CanCancel, rights.CanModifyVerifiedResult, rights.CanPreviewWithoutVerify, rights.CanPrintInvoice, rights.CanSeeVip);
+        return new SpecialRightsDto(rights.DiscountCapPercent, rights.CanPay, rights.CanRefund, rights.CanTransfer, rights.CanCancel, rights.CanModifyVerifiedResult, rights.CanPreviewWithoutVerify, rights.CanPrintInvoice, rights.CanSeeVip, rights.DemographicsEditUpTo.ToString(), rights.CanViewBranchCollections, rights.ReportDaysLimit);
     }
 
     public static ResultRight ToDomain(ResultRightDto dto)

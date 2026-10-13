@@ -33,6 +33,12 @@ public static class OrganizationCodes
     /// branch, so a restricted choice with no branch must never reach it.
     /// </summary>
     public const string BranchChoiceRequired = "ORG-018";
+
+    /// <summary>Special right "report days limit": empty (no limit) or 0 to 3650 days (change request 2026-10-13).</summary>
+    public const string ReportDaysLimitInvalid = "ORG-019";
+
+    /// <summary>Special right "demographics editable up to": one of the result statuses Ordered … Printed.</summary>
+    public const string DemographicsEditLimitInvalid = "ORG-020";
     public const string PasswordLength = "ORG-020";
     public const string PasswordContainsUsername = "ORG-021";
     public const string PasswordExpiryInvalid = "ORG-022";

@@ -210,6 +210,8 @@
         [countries]="facade.countries.value() ?? []"
         [governorates]="facade.governorates.value() ?? []"
         [conditions]="facade.conditions.value() ?? []"
+        [identityLocked]="identityLocked()"
+        [lockHint]="lockHint()"
         [problem]="facade.update.problem()"
         [pending]="facade.update.pending()"
         (save)="onSave($event)"

@@ -75,10 +75,15 @@ public sealed class PatientsController(ISender sender) : ControllerBase
         await sender.Send(
             new UpdatePatientCommand(
                 id, request.Title, request.FullName, request.NameAr, request.Gender, request.DateOfBirth, request.Age, request.PatientConditionId, request.Mobile,
-                request.NationalId, request.Nationality, request.Email, request.GovernorateId, request.City, request.Address, request.Comments, request.IsVip, request.RowVersion),
+                request.NationalId, request.Nationality, request.Email, request.GovernorateId, request.City, request.Address, request.Comments, request.IsVip, request.RowVersion, request.VisitId),
             cancellationToken);
         return NoContent();
     }
+
+    /// <summary>The demographics lock of the file for the caller (PAT-032 affordance): judged on <paramref name="visitId"/> when given, on every visit of the patient otherwise.</summary>
+    [HttpGet("{id:guid}/demographics-lock")]
+    public async Task<ActionResult<PatientDemographicsLock>> DemographicsLock(Guid id, [FromQuery] Guid? visitId, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new GetPatientDemographicsLockQuery(id, visitId), cancellationToken));
 
     /// <summary>T3: the route's file survives; <see cref="MergePatientsRequest.MergedPatientId"/> becomes Merged.</summary>
     [HttpPost("{id:guid}/merge")]

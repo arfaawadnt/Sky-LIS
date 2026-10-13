@@ -90,6 +90,10 @@ export const routes: Routes = [
         loadChildren: () => import('./features/results/results.routes').then((m) => m.RESULTS_ROUTES),
       },
       {
+        path: 'reports',
+        loadChildren: () => import('./features/reporting/reporting.routes').then((m) => m.REPORTING_ROUTES),
+      },
+      {
         path: 'admin',
         canActivate: [platformGuard],
         children: [

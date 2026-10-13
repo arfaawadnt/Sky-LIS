@@ -225,4 +225,18 @@ public sealed class BillingTreasuriesController(ISender sender) : ControllerBase
     [HttpGet("print-settings")]
     public async Task<ActionResult<BillingPrintSettings>> PrintSettings(CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetBillingPrintSettingsQuery(), cancellationToken));
+
+    /// <summary>
+    /// The treasury (collections) report printed from the Payments register (change request 2026-10-13, item 2): whole
+    /// laboratory days <c>from</c>…<c>to</c> (default today), <c>scope</c> User | Branch (BIL-044 without the right),
+    /// <c>groupBy</c> Branch | User | Method; a period before the member's report days limit is refused with BIL-045.
+    /// </summary>
+    [HttpGet("collections-report")]
+    public async Task<ActionResult<CollectionsReportDocument>> CollectionsReport(
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        [FromQuery] string? scope,
+        [FromQuery] string? groupBy,
+        CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new CollectionsReportQuery(from, to, scope, groupBy), cancellationToken));
 }

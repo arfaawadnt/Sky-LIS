@@ -6,6 +6,7 @@ using Platform.Application.Abstractions.Settings;
 using Platform.Contracts.Common;
 using Platform.Contracts.Patients;
 using Platform.Domain.Authorization;
+using Platform.Domain.Organization;
 using Platform.Domain.Patients;
 using Platform.Domain.Settings;
 using Platform.SharedKernel.Abstractions;
@@ -84,6 +85,10 @@ public sealed class RegisterPatientHandler(
     }
 }
 
+/// <summary>
+/// T2. <paramref name="VisitId"/>: the visit the user edits from (Search registrations, CP-10) — the result-status lock is
+/// judged on that visit; <see langword="null"/> from the patient file judges every visit of the patient (PAT-032).
+/// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Patients, PermissionAction.Edit)]
 public sealed record UpdatePatientCommand(
     Guid PatientId,
@@ -103,7 +108,8 @@ public sealed record UpdatePatientCommand(
     string? Address,
     string? Comments,
     bool? IsVip,
-    uint? RowVersion) : ICommand;
+    uint? RowVersion,
+    Guid? VisitId = null) : ICommand;
 
 public sealed class UpdatePatientValidator : AbstractValidator<UpdatePatientCommand>
 {
@@ -125,10 +131,18 @@ public sealed class UpdatePatientValidator : AbstractValidator<UpdatePatientComm
     }
 }
 
+/// <summary>
+/// T2 with the demographics lock (change request 2026-10-13 item 1): an <b>identity</b> field (title, names, gender, date of
+/// birth or age, condition, national id, nationality) changes only while the highest live result status of the visit (or of
+/// the patient, from the file) is within the member's <c>DemographicsEditUpTo</c> special right; otherwise PAT-032 (403).
+/// Contact fields (mobile, e-mail, governorate, city, address, comments) and the VIP flag need <c>patients.edit</c> alone.
+/// The field history is the ordinary patient update in <c>audit.field_changes</c>.
+/// </summary>
 public sealed class UpdatePatientHandler(
     IPatientRepository patients,
     ITenantSettings settings,
     IUserPrivileges privileges,
+    IPatientResultStatusLookup results,
     ILaboratoryTimeZone laboratoryZone,
     IUnitOfWork unitOfWork,
     IClock clock) : ICommandHandler<UpdatePatientCommand>
@@ -151,10 +165,30 @@ public sealed class UpdatePatientHandler(
 
         var rules = await PatientShape.ReadRulesAsync(settings, cancellationToken);
         var demographics = PatientShape.Demographics(command.Title, command.FullName, command.NameAr, command.Gender, command.DateOfBirth, command.Age, command.PatientConditionId, command.Mobile, command.NationalId, command.Nationality, command.Email, command.GovernorateId, command.City, command.Address, command.Comments);
-        patient.Update(demographics, rules, command.IsVip, clock.UtcNow, await laboratoryZone.FindAsync(cancellationToken));
+        var now = clock.UtcNow;
+        var zone = await laboratoryZone.FindAsync(cancellationToken);
+
+        // The lock is judged only when an identity field actually changes: a contact-only edit never reads the results.
+        if (patient.IdentityChangesWith(demographics, rules, now, zone))
+        {
+            var highest = await results.HighestStatusAsync(patient.Id, command.VisitId, cancellationToken);
+            if (!privileges.SpecialRights.AllowsDemographicsEditAt(highest))
+            {
+                throw new DomainException(PatientCodes.DemographicsLockedByResults, DemographicsLock.Message(highest, privileges.SpecialRights.DemographicsEditUpTo), DomainFault.Refused);
+            }
+        }
+
+        patient.Update(demographics, rules, command.IsVip, now, zone);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
+}
+
+/// <summary>The wording of the demographics lock (PAT-032); the UI translates the statuses itself from the lock query.</summary>
+internal static class DemographicsLock
+{
+    public static string Message(DemographicsEditLimit highest, DemographicsEditLimit limit) =>
+        $"The patient's identity can no longer change: a result is {highest} and your right allows identity changes up to {limit}. Contact details can still be edited.";
 }
 
 public sealed class PatientAgeValidator : AbstractValidator<PatientAgeView>

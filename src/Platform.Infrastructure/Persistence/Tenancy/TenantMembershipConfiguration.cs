@@ -64,6 +64,9 @@ internal sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<T
             rights.Property(value => value.CanPreviewWithoutVerify).HasColumnName("override_can_preview_without_verify");
             rights.Property(value => value.CanPrintInvoice).HasColumnName("override_can_print_invoice");
             rights.Property(value => value.CanSeeVip).HasColumnName("override_can_see_vip");
+            rights.Property(value => value.DemographicsEditUpTo).HasColumnName("override_demographics_edit_up_to").HasConversion<string>().HasMaxLength(16);
+            rights.Property(value => value.CanViewBranchCollections).HasColumnName("override_can_view_branch_collections");
+            rights.Property(value => value.ReportDaysLimit).HasColumnName("override_report_days_limit");
         });
         builder.Ignore(membership => membership.IsModified);
     }

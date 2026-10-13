@@ -1,0 +1,64 @@
+app-section-card {
+  display: block;
+  margin-block-end: var(--sp-4);
+}
+
+.criteria-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 220px));
+  gap: var(--sp-3);
+  align-items: start;
+}
+
+.run {
+  align-self: end;
+  padding-block-end: 0.9rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.amounts {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.amounts th,
+.amounts td {
+  padding: 8px 12px;
+  border-block-end: 1px solid var(--line-soft);
+  text-align: start;
+  white-space: nowrap;
+}
+
+.amounts thead th {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface-2);
+}
+
+.amounts .num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.amounts tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.totals th,
+.totals td {
+  font-weight: 700;
+  color: var(--navy);
+  background: var(--info-soft);
+  border-block-end: 0;
+}
+
+.footnote,
+.loading {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4) var(--sp-3);
+}

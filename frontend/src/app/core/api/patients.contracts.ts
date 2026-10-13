@@ -45,9 +45,28 @@ export interface RegisterPatientRequest {
   readonly isVip: boolean | null;
 }
 
-/** T2: the same fields plus the row version of the detail the user edited (stale → CONCURRENCY-409). */
+/**
+ * T2: the same fields plus the row version of the detail the user edited (stale → CONCURRENCY-409). `visitId`: the visit the
+ * user edits from (Search registrations, CP-10): the result-status lock on the identity fields is judged on it, on every visit
+ * of the patient when absent (PAT-032; see `PatientDemographicsLock`).
+ */
 export interface UpdatePatientRequest extends RegisterPatientRequest {
   readonly rowVersion: number | null;
+  readonly visitId?: string | null;
+}
+
+/** The result statuses a demographics edit limit is expressed on, lowest first (the `DemographicsEditUpTo` special right, CP-37). */
+export type ResultStatusLimit = 'Ordered' | 'Complete' | 'Reviewed' | 'Verified' | 'Printed';
+
+/**
+ * `GET /patients/{id}/demographics-lock?visitId=` (change request 2026-10-13 item 1): the highest live result status of the
+ * visit (of the patient without a visit), the user's own limit, and whether the identity fields (title, names, gender, date of
+ * birth or age, condition, national id, nationality) may still change; contact fields always may with `patients.edit`.
+ */
+export interface PatientDemographicsLock {
+  readonly highestStatus: ResultStatusLimit;
+  readonly canEditIdentity: boolean;
+  readonly editableUpTo: ResultStatusLimit;
 }
 
 export interface CreatedPatient {

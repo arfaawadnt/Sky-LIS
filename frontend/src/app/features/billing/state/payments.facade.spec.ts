@@ -6,7 +6,8 @@ import { TestBed } from '@angular/core/testing';
 import { BILLING_API, type Paged, type PaymentListItem } from '../../../core/api/billing.contracts';
 import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
-import { account, flushCashDesk } from '../testing/billing.fixtures';
+import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
+import { account, collectionsReport, flushCashDesk, flushReportPrivileges } from '../testing/billing.fixtures';
 import { CashDeskFacade } from './cash-desk.facade';
 import { PaymentsFacade } from './payments.facade';
 
@@ -120,6 +121,30 @@ describe('PaymentsFacade (CP-23)', () => {
     list.flush(page<PaymentListItem>([]));
     backend.expectOne(BILLING_API.treasuries).flush([]);
     await runEffects();
+    backend.verify();
+  });
+
+  it('reads the report rights when the collections dialog opens and forgets the loaded report when it closes', async () => {
+    await runEffects();
+    backend.expectNone(ORGANIZATION_API.myPrivileges);
+
+    facade.openCollections();
+    await runEffects();
+    flushReportPrivileges(backend, true, 7);
+    await runEffects();
+    expect(facade.reportPrivileges.value()).toEqual({ canViewBranchCollections: true, reportDaysLimit: 7 });
+
+    const loading = facade.collectionsReport.execute({ fromDay: null, toDay: null, scope: 'User', groupBy: 'Method' });
+    await settle();
+    const get = backend.expectOne((request) => request.url === BILLING_API.collectionsReport);
+    expect([get.request.params.has('from'), get.request.params.get('scope'), get.request.params.get('groupBy')]).toEqual([false, 'User', 'Method']);
+    get.flush(collectionsReport());
+    expect((await loading)?.totals.net).toBe(350);
+    expect(facade.collectionsDocument()?.rows.length).toBe(2);
+
+    facade.closeCollections();
+    expect(facade.collectionsDocument()).toBeNull();
+    expect(facade.collectionsOpen()).toBe(false);
     backend.verify();
   });
 

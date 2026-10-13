@@ -34,6 +34,9 @@
   <!-- 1. who: title + both names -->
   <section class="group">
     <h3 class="group-title">{{ i18n.t('patients.section.identity') }}</h3>
+    @if (identityLocked()) {
+      <p class="lock-hint" role="status"><app-icon name="info" [size]="14" />{{ lockHint() ?? i18n.t('patients.lock.identity') }}</p>
+    }
     <div class="row name-row">
       <app-form-field class="title" [label]="i18n.t('patients.field.title')">
         <select formControlName="title" (change)="onTitleChange()">

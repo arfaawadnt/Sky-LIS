@@ -1,16 +1,19 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import type { PageRequest } from '../../../core/api/paging';
+import { PATIENTS_PERMISSIONS, type RegisterPatientRequest } from '../../../core/api/patients.contracts';
 import { type CancelLinesRequest, REGISTRATION_PERMISSIONS, VISIT_STATUSES, type VisitListItem } from '../../../core/api/registration.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { problemMessage } from '../../../shared/forms/problem-text';
+import { PatientFormComponent } from '../../../shared/patient/patient-form.component';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { CellTemplateDirective, RowActionsTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
 import { DataTableComponent } from '../../../shared/ui/data-table/data-table.component';
 import type { TableColumn } from '../../../shared/ui/data-table/data-table.types';
 import { DialogComponent } from '../../../shared/ui/dialog/dialog.component';
+import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
 import { PaginatorComponent } from '../../../shared/ui/paginator/paginator.component';
@@ -27,8 +30,10 @@ import { CancelServicesDialogComponent, VisitSamplesDialogComponent } from '../u
 /**
  * Search registrations (SRS CP-10, Release 1): one search box (accession, patient number, mobile or name), the day
  * range, payer, status and "this branch only"; rows with the services styled by status (Reserved, Cancelled), the
- * patient share and the remaining balance (BR-14, Billing's definition). Row actions: edit, samples (dialog), payments,
- * documents (labels, job order), results, cancel services with a reason (BR-15). CSV export with `registration.export`.
+ * patient share and the remaining balance (BR-14, Billing's definition). Row actions: edit, patient (the file in a drawer,
+ * change request 2026-10-13 item 1: identity fields locked by the visit's result status and the user's right, PAT-032),
+ * samples (dialog), payments, documents (labels, job order), results, cancel services with a reason (BR-15). CSV export
+ * with `registration.export`.
  */
 @Component({
   selector: 'app-registration-visits-page',
@@ -46,6 +51,8 @@ import { CancelServicesDialogComponent, VisitSamplesDialogComponent } from '../u
     BadgeComponent,
     IconComponent,
     DialogComponent,
+    DrawerComponent,
+    PatientFormComponent,
     CancelServicesDialogComponent,
     VisitSamplesDialogComponent,
   ],
@@ -60,7 +67,10 @@ export class VisitsPage {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
+  private readonly patientForm = viewChild(PatientFormComponent);
+
   protected readonly permissions = REGISTRATION_PERMISSIONS;
+  protected readonly patientPermissions = PATIENTS_PERMISSIONS;
   protected readonly statuses = VISIT_STATUSES;
   protected readonly exporting = signal(false);
 
@@ -83,6 +93,24 @@ export class VisitsPage {
 
   protected readonly rows = computed<readonly VisitListItem[]>(() => (this.facade.visits.hasValue() ? this.facade.visits.value().items : []));
   protected readonly total = computed(() => (this.facade.visits.hasValue() ? this.facade.visits.value().totalCount : 0));
+
+  /** The patient drawer: open while a row's file is targeted. */
+  protected readonly patientOpen = computed(() => this.facade.patientEdit() !== null);
+  protected readonly patient = computed(() => (this.facade.patientDetail.hasValue() ? this.facade.patientDetail.value() : null));
+  /** The form shows only once the file and its lock are both known, so the identity fields never flash editable. */
+  protected readonly patientReady = computed(() => this.patient() !== null && (this.facade.patientLock.hasValue() || this.facade.patientLock.error() !== undefined));
+  /** A lock that could not be read locks the identity (the server decides anyway). */
+  protected readonly identityLocked = computed(() => (this.facade.patientLock.hasValue() ? !this.facade.patientLock.value().canEditIdentity : true));
+  protected readonly lockHint = computed(() => {
+    if (!this.facade.patientLock.hasValue()) {
+      return this.i18n.t('registration.patient.lockUnknown');
+    }
+
+    const lock = this.facade.patientLock.value();
+    return lock.canEditIdentity
+      ? null
+      : this.i18n.tf('registration.patient.locked', { status: this.i18n.t(`shared.status.${lock.highestStatus}`), limit: this.i18n.t(`shared.status.${lock.editableUpTo}`) });
+  });
 
   constructor() {
     void this.i18n.load('registration');
@@ -133,6 +161,41 @@ export class VisitsPage {
 
   protected edit(row: VisitListItem): void {
     void this.router.navigate(['/registration/visits', row.id]);
+  }
+
+  /** CP-10 "patient": the file in a drawer; the edit is judged on this visit's results (PAT-032). */
+  protected openPatient(row: VisitListItem): void {
+    this.facade.openPatient({ patientId: row.patientId, visitId: row.id });
+  }
+
+  protected closePatient(): void {
+    this.facade.closePatient();
+  }
+
+  /** The drawer closed itself (Esc, scrim, the x): drop the target so its reads stop. */
+  protected onPatientOpenChange(open: boolean): void {
+    if (!open) {
+      this.facade.closePatient();
+    }
+  }
+
+  /** The drawer's Save button; F10 inside the form reaches `onPatientSave` through the form's own shortcut host. */
+  protected submitPatient(): void {
+    this.patientForm()?.submit();
+  }
+
+  protected async onPatientSave(request: RegisterPatientRequest): Promise<void> {
+    const target = this.facade.patientEdit();
+    const patient = this.patient();
+    if (target === null || patient === null) {
+      return;
+    }
+
+    const saved = await this.facade.updatePatient.execute({ patientId: target.patientId, request: { ...request, rowVersion: patient.rowVersion, visitId: target.visitId } });
+    if (saved !== null) {
+      this.facade.closePatient();
+      this.toast.success(this.i18n.tf('registration.patient.saved', { number: patient.number }));
+    }
   }
 
   /** CP-10 "payments": the Billing cash desk opened on this visit (BR-26). */

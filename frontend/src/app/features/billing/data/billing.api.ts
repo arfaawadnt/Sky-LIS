@@ -15,6 +15,9 @@ import {
   type CashClosingRegisterFilter,
   type CashClosingSheetDocument,
   type CloseCashDrawerRequest,
+  type CollectionsReportDocument,
+  type CollectionsReportPrivileges,
+  type CollectionsReportRequest,
   type DrawerCashier,
   type DrawerScopeFilter,
   type InvoiceDocument,
@@ -32,6 +35,7 @@ import {
   type RefundRegisterFilter,
   type VisitAccountView,
 } from '../../../core/api/billing.contracts';
+import { type MyPrivileges, ORGANIZATION_API } from '../../../core/api/organization.contracts';
 import { emptyPage } from '../../../core/api/paging';
 import { toHttpParams } from '../../../shared/forms/paging';
 
@@ -167,6 +171,23 @@ export class BillingApi {
 
   closingSheet(id: string): Promise<CashClosingSheetDocument> {
     return this.require<CashClosingSheetDocument>(`${BILLING_API.cashClosings}/${encodeURIComponent(id)}/documents/sheet`);
+  }
+
+  // ---- collections report (change request 2026-10-13, item 2) --------------------------------------------------
+
+  /** The treasury (collections) report: whole laboratory days, own or branch scope, one row per branch / cashier / method. */
+  collectionsReport(request: CollectionsReportRequest, signal?: AbortSignal): Promise<CollectionsReportDocument> {
+    const params = toHttpParams({ from: request.fromDay, to: request.toDay, scope: request.scope, groupBy: request.groupBy });
+    return firstValueFrom(this.http.get<CollectionsReportDocument>(BILLING_API.collectionsReport, { params })).then(abortable(signal));
+  }
+
+  /**
+   * The CP-37 rights that shape the report dialog, read from the member's own privileges (Organization's endpoint, called
+   * here so the feature does not import another feature; the server enforces them again with BIL-044 / BIL-045).
+   */
+  async collectionsReportPrivileges(signal?: AbortSignal): Promise<CollectionsReportPrivileges> {
+    const mine = await this.require<MyPrivileges>(ORGANIZATION_API.myPrivileges, signal);
+    return { canViewBranchCollections: mine.privileges.specialRights.canViewBranchCollections, reportDaysLimit: mine.privileges.specialRights.reportDaysLimit };
   }
 
   // ---- plumbing ---------------------------------------------------------------------------------------------------

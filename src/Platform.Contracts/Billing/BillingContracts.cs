@@ -316,5 +316,50 @@ public sealed record CashClosingSheetDocument(
     string PrintedBy,
     DateTimeOffset PrintedAtUtc);
 
+// ---- collections (treasury) report ---------------------------------------------------------------------------------
+
+/// <summary>Payments in, refunds out and the net of one method on a report row.</summary>
+public sealed record CollectionsMethodView(decimal Payments, decimal Refunds, decimal Net);
+
+/// <summary>
+/// One row of the collections report: <paramref name="Key"/> is the branch id, the cashier's user id or the method name
+/// (<c>Cash | Card | Pos | Transfer</c>) by the grouping; labels are the branch's bilingual names, the cashier's display
+/// name in both, or <see langword="null"/> for a method (the SPA translates the method). Counts exclude voided payments.
+/// </summary>
+public sealed record CollectionsReportRow(
+    string Key,
+    string? LabelEn,
+    string? LabelAr,
+    int PaymentCount,
+    int RefundCount,
+    CollectionsMethodView Cash,
+    CollectionsMethodView Card,
+    CollectionsMethodView Pos,
+    CollectionsMethodView Transfer,
+    decimal TotalPayments,
+    decimal TotalRefunds,
+    decimal Net);
+
+/// <summary>
+/// The treasury (collections) report of the Payments register (A4): <paramref name="Scope"/> User | Branch, <paramref name="GroupBy"/>
+/// Branch | User | Method, the period as whole laboratory days (<paramref name="TimeZone"/>) and its UTC bounds (half-open),
+/// the cashier in user scope, the rows and the grand total.
+/// </summary>
+public sealed record CollectionsReportDocument(
+    DocumentLetterhead Letterhead,
+    string Scope,
+    string GroupBy,
+    DateOnly FromDay,
+    DateOnly ToDay,
+    DateTimeOffset FromUtc,
+    DateTimeOffset ToUtc,
+    string TimeZone,
+    string? CashierName,
+    IReadOnlyList<CollectionsReportRow> Rows,
+    CollectionsReportRow Totals,
+    string Currency,
+    string PrintedBy,
+    DateTimeOffset PrintedAtUtc);
+
 /// <summary>A generated file (CSV) the controller streams with its name and type.</summary>
 public sealed record BillingExportFile(string FileName, string ContentType, byte[] Content);
