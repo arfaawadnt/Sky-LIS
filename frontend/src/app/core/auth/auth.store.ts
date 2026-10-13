@@ -11,7 +11,7 @@ import {
   type SignInRequest,
   type StartPasswordRecoveryRequest,
 } from '../api/auth.contracts';
-import { ACCOUNT_API } from '../api/account.contracts';
+import { ACCOUNT_API, type ResultsDensity } from '../api/account.contracts';
 import { ProblemCodes, ProblemError, toProblemDetails } from '../api/problem-details';
 import { I18nService } from '../i18n/i18n.service';
 import { REFRESH_LOCK } from './refresh-lock';
@@ -142,6 +142,18 @@ export class AuthStore {
     const current = this.profileState();
     if (current) {
       this.profileState.set({ ...current, language });
+    }
+  }
+
+  /**
+   * CP-19 (results page, 2026-10-14): saves the row density of the results grid on the membership of the session, so
+   * every device of the user opens the grid the same way; the profile follows a successful save.
+   */
+  async updateResultsDensity(resultsDensity: ResultsDensity): Promise<void> {
+    await firstValueFrom(this.http.put<void>(ACCOUNT_API.preferences, { resultsDensity }), { defaultValue: undefined });
+    const current = this.profileState();
+    if (current) {
+      this.profileState.set({ ...current, resultsDensity });
     }
   }
 

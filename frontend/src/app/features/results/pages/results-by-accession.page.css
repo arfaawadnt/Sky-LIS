@@ -1,7 +1,4 @@
-app-section-card {
-  display: block;
-  margin-block-end: var(--sp-4);
-}
+app-section-card { display: block; margin-block-end: var(--sp-4); }
 
 .query-form {
   display: grid;
@@ -18,14 +15,9 @@ app-section-card {
   min-width: 0;
 }
 
-.field > span {
-  font-size: 12px;
-  font-weight: 600;
-}
+.field > span { font-size: 12px; font-weight: 600; }
 
-.boxes {
-  grid-column: span 2;
-}
+.boxes { grid-column: span 2; }
 
 .box-row {
   display: flex;
@@ -42,9 +34,7 @@ app-section-card {
   font-size: var(--fs-sm);
 }
 
-.help {
-  margin: var(--sp-2) 0 0;
-}
+.help { margin: var(--sp-2) 0 0; }
 
 .criteria-bar {
   display: flex;
@@ -63,12 +53,8 @@ app-section-card {
   padding: 0;
 }
 
-.chip-key {
-  opacity: 0.75;
-}
+.chip-key { opacity: 0.75; }
 
-/* The open case: one sticky strip (accession, patient, rights flags, criteria / visits / new query) replaces the page
-   header, the criteria card and the matching list, so the results start right under the unit tabs. */
 .context-strip {
   position: sticky;
   top: var(--topbar-h, 56px);
@@ -98,9 +84,14 @@ app-section-card {
 
 .strip-actions {
   display: flex;
+  align-items: center;
   gap: var(--sp-2);
   flex-wrap: wrap;
 }
+
+.nav-pair { display: inline-flex; gap: 2px; }
+
+.icon-only { padding-inline: 6px; }
 
 .case-title {
   margin: 0;
@@ -112,9 +103,7 @@ app-section-card {
   flex-wrap: wrap;
 }
 
-.strip-name {
-  font-weight: 700;
-}
+.strip-name { font-weight: 700; }
 
 .case-flags {
   display: inline-flex;
@@ -122,9 +111,7 @@ app-section-card {
   flex-wrap: wrap;
 }
 
-.strip-details {
-  margin: var(--sp-2) 0 0;
-}
+.strip-details { margin: var(--sp-2) 0 0; }
 
 .visit-list {
   list-style: none;
@@ -134,13 +121,9 @@ app-section-card {
   overflow: auto;
 }
 
-.drawer-list .visit-list {
-  max-height: none;
-}
+.drawer-list .visit-list { max-height: none; }
 
-.visit-list li + li {
-  border-block-start: 1px solid var(--line-soft);
-}
+.visit-list li + li { border-block-start: 1px solid var(--line-soft); }
 
 .visit {
   display: grid;
@@ -155,14 +138,9 @@ app-section-card {
   cursor: pointer;
 }
 
-.visit:hover {
-  background: var(--surface-2);
-}
+.visit:hover { background: var(--surface-2); }
 
-.visit.active {
-  background: var(--info-soft);
-  box-shadow: inset 3px 0 0 var(--blue);
-}
+.visit.active { background: var(--info-soft); box-shadow: inset 3px 0 0 var(--blue); }
 
 .line {
   display: flex;
@@ -171,13 +149,9 @@ app-section-card {
   flex-wrap: wrap;
 }
 
-.empty-item {
-  padding: var(--sp-2);
-}
+.empty-item { padding: var(--sp-2); }
 
-.list-problem {
-  margin: var(--sp-3) var(--sp-4) 0;
-}
+.list-problem { margin: var(--sp-3) var(--sp-4) 0; }
 
 .tag {
   display: inline-block;
@@ -189,7 +163,6 @@ app-section-card {
   font-weight: 500;
 }
 
-/* Unit tabs, sample chips and the action buttons share one row above the grid. */
 .unit-bar {
   display: flex;
   align-items: center;
@@ -199,10 +172,7 @@ app-section-card {
   border-block-end: 1px solid var(--line-soft);
 }
 
-.unit-bar app-tabs {
-  flex: 0 0 auto;
-  max-width: 100%;
-}
+.unit-bar app-tabs { flex: 0 0 auto; max-width: 100%; }
 
 .unit-meta {
   margin: 0 0 var(--sp-1);
@@ -227,10 +197,7 @@ app-section-card {
   margin-inline-start: auto;
 }
 
-.unit-foot {
-  margin: 0;
-  padding: var(--sp-2) var(--sp-4) var(--sp-3);
-}
+.unit-foot { margin: 0; padding: var(--sp-2) var(--sp-4) var(--sp-3); }
 
 .preview-paper {
   background: #fff;
@@ -247,6 +214,9 @@ app-section-card {
   }
 
   .context-strip {
-    position: static;
+    margin-inline: calc(-1 * var(--sp-2));
+    border-radius: 0;
   }
-}
+
+  .case-flags,
+  .case-sub { display: none; } }

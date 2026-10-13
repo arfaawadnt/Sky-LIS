@@ -25,7 +25,8 @@ public static class Profiles
             principal.RoleNameAr,
             principal.DisplayNameEn,
             principal.DisplayNameAr,
-            principal.SessionTimeoutMinutes);
+            principal.SessionTimeoutMinutes,
+            principal.ResultsDensity);
     }
 
     public static SessionResponse ToSession(SessionPrincipal principal)

@@ -67,6 +67,7 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                     MembershipActive = (bool?)membership.IsActive,
                     MembershipName = membership.FullName,
                     membership.PreferredLanguage,
+                    membership.PreferredResultsDensity,
                     membership.BranchIds,
                     membership.DepartmentIds,
                     IsPrimaryAdministrator = (bool?)membership.IsPrimaryAdministrator,
@@ -113,6 +114,7 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                     row.BranchId)
                 {
                     SpecialRights = EffectivePrivileges.SpecialRightsOf(role?.SpecialRights, row.SpecialRightsOverride),
+                    ResultsDensity = row.PreferredResultsDensity,
                     ResultRights = role?.ResultRightValues() ?? [],
                     MembershipId = row.MembershipId,
                     RoleId = role?.Id,

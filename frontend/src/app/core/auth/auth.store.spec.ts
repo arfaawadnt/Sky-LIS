@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideZonelessChangeDetection, resource } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
+import { ACCOUNT_API } from '../api/account.contracts';
 import { AUTH_API, type AuthResponse } from '../api/auth.contracts';
 import { AuthStore } from './auth.store';
 import { broadcastSessionChannel, readSessionMessage } from './session-channel';
@@ -245,6 +246,21 @@ describe('AuthStore (D-01, P-61)', () => {
       expect(await pending).toBe('token-2');
       expect(store.currentBranch()).toBe('b1');
       expect(navigation.loads).toEqual([]);
+    });
+
+    it('saves the results grid density as a preference of the membership and the profile follows (results page, 2026-10-14)', async () => {
+      await signInAsMona();
+      expect(store.profile()?.resultsDensity).toBeUndefined();
+
+      const pending = store.updateResultsDensity('compact');
+      const put = http.expectOne(ACCOUNT_API.preferences);
+      expect(put.request.method).toBe('PUT');
+      expect(put.request.body).toEqual({ resultsDensity: 'compact' });
+      put.flush(null, { status: 204, statusText: 'No Content' });
+      await pending;
+
+      expect(store.profile()?.resultsDensity).toBe('compact');
+      expect(store.profile()?.language).toBe('ar');   // the language of the signed-in fixture is untouched
     });
 
     it('a lost session reloads the sign-in page with the page the user was on', async () => {

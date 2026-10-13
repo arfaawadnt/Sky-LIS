@@ -17,5 +17,8 @@ public static class TenancyCodes
 
     /// <summary>INV-ORG-012: a key cannot be both added and removed by a user's overrides.</summary>
     public const string OverrideConflict = "TEN-013";
+
+    /// <summary>The results grid density preference is <c>comfortable</c> or <c>compact</c> (results page, 2026-10-14).</summary>
+    public const string ResultsDensityInvalid = "TEN-014";
     public const string MembershipNotFound = "TEN-404";
 }

@@ -132,6 +132,13 @@ public sealed class AccountFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.Equal(HttpStatusCode.OK, refreshed.StatusCode);
         Assert.Equal("ar", (await refreshed.Content.ReadFromJsonAsync<AuthResponse>())!.Profile!.Language);
         Assert.Equal("ar", (await client.GetFromJsonAsync<MyAccountProfile>(Profile))!.Language);
+
+        // results page (2026-10-14): the grid density is a preference of the same endpoint; the language stays as it was
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync(Preferences, new UpdatePreferencesRequest(null, "dense"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync(Preferences, new UpdatePreferencesRequest())).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(Preferences, new UpdatePreferencesRequest(null, "compact"))).StatusCode);
+        var withDensity = (await (await auth.RefreshAsync(cookie)).Content.ReadFromJsonAsync<AuthResponse>())!.Profile!;
+        Assert.Equal(("ar", "compact"), (withDensity.Language, withDensity.ResultsDensity));
     }
 
     [DatabaseFact]

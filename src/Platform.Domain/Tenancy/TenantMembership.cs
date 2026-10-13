@@ -21,6 +21,8 @@ public sealed class TenantMembership : AggregateRoot, ITenantScoped
     public const int MaxShiftLength = 40;
     public const int MaxBranches = 200;
     private static readonly string[] SupportedLanguages = ["en", "ar"];
+    /// <summary>The row densities of the results grid a member may prefer (null = the default, comfortable).</summary>
+    public static readonly IReadOnlyList<string> SupportedResultsDensities = ["comfortable", "compact"];
 
     private TenantMembership()
     {
@@ -71,6 +73,9 @@ public sealed class TenantMembership : AggregateRoot, ITenantScoped
     public Guid[] DepartmentIds { get; private set; }
 
     public string PreferredLanguage { get; private set; }
+
+    /// <summary>CP-19: the member's row density of the results grid, <c>comfortable</c> or <c>compact</c>; null = the default.</summary>
+    public string? PreferredResultsDensity { get; private set; }
 
     /// <summary>Job title shown on the user list and on signed reports (CP-38).</summary>
     public string? Designation { get; private set; }
@@ -152,6 +157,20 @@ public sealed class TenantMembership : AggregateRoot, ITenantScoped
     }
 
     public void SetPreferredLanguage(string language) => PreferredLanguage = RequireLanguage(language);
+
+    /// <summary>The results grid density the member works with (null returns to the default); a self-service preference like the language.</summary>
+    public void SetPreferredResultsDensity(string? density)
+    {
+        var value = density?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(value))
+        {
+            PreferredResultsDensity = null;
+            return;
+        }
+
+        Require(SupportedResultsDensities.Contains(value), TenancyCodes.ResultsDensityInvalid, "The results density must be 'comfortable' or 'compact'.", DomainFault.Validation);
+        PreferredResultsDensity = value;
+    }
 
     /// <summary>
     /// U4 Assign the role whose privileges the member inherits: same tenant (TEN-011), active (ORG-010); the primary

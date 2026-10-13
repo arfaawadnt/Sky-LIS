@@ -416,6 +416,11 @@ QMS source is never read or copied (section 1); everything here is written from 
   flags, *Details* disclosure, *Criteria* → the form in an `app-dialog`, *Visits (n)* → the list in an `app-drawer`, *New query*)
   replaces them and the unit tabs (`<app-tabs compact />`), sample chips and action buttons share `.unit-bar`; a query with exactly
   one match opens it (`focusGridWhenLoaded` → first editable cell), several matches go to the list (card or side panel).
+  Follow-ups 2026-10-14: previous / next visit from the strip (`neighbours`, `moveTo`: the loaded page of the list, the
+  neighbouring page via `openOnAnswer`, else `accessionNeighbour()` ± 1 looked up with `facade.findByAccession`; Ctrl+Alt+←/→;
+  `leaveCase()` confirms unsaved drafts away), grid hints behind the *i* button (`hintsOpen`), row density as a user
+  preference (`TenantMembership.PreferredResultsDensity`, migration `MembershipResultsDensity`, TEN-014, `AuthProfile.resultsDensity`,
+  `AuthStore.updateResultsDensity`, `app-result-grid [density]`), the strip stays sticky on narrow screens.
 - Wallet charge run (W2, intake PLT-001 §16 Q11): `WalletChargeJob` (Infrastructure `Jobs/`, hosted by `WalletChargeHostedService`,
   `Lis:Jobs:WalletCharge:{Enabled,PollInterval}`, default on / 1 h; `ApiFactory` turns it off) charges each due Active client's plan fee once
   per period (row-version guarded, no migration) through `WalletCharger`; `POST /api/v1/platform/wallets/charge-run` = SA-05 "Run charges now".

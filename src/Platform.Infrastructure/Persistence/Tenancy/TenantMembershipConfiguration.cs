@@ -40,6 +40,8 @@ internal sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<T
         builder.Property(membership => membership.BranchIds).IsRequired();      // uuid[]; empty = unrestricted
         builder.Property(membership => membership.DepartmentIds).IsRequired();
         builder.Property(membership => membership.PreferredLanguage).HasMaxLength(5).IsRequired();
+        // results grid density (results page, 2026-10-14); the domain CHECK ck_tenant_memberships_preferred_results_density_domain is declared in the migration
+        builder.Property(membership => membership.PreferredResultsDensity).HasMaxLength(16);
 
         // Staff profile and BR-17 overrides (CP-38, intake LIS-INT-ORG-001 §5).
         builder.Property(membership => membership.Designation).HasMaxLength(TenantMembership.MaxDesignationLength);

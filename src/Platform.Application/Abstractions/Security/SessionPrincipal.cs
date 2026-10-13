@@ -53,6 +53,8 @@ public sealed record SessionPrincipal(
     public string? DisplayNameEn { get; init; }
 
     public string? DisplayNameAr { get; init; }
+    /// <summary>CP-19: the member's row density of the results grid (<c>comfortable</c> | <c>compact</c>), null = default; read with the membership.</summary>
+    public string? ResultsDensity { get; init; }
 
     public bool IsPrimaryAdministrator { get; init; }
 

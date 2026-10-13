@@ -19,6 +19,7 @@ import {
   type SampleStatusName,
 } from '../../../core/api/results.contracts';
 import { ProblemError } from '../../../core/api/problem-details';
+import { AuthStore } from '../../../core/auth/auth.store';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { problemMessage } from '../../../shared/forms/problem-text';
@@ -50,6 +51,24 @@ import { type TextReportRequest, TextReportDialogComponent } from '../ui/text-re
 
 /** The server's refusal of a verification whose delta flag is not acknowledged (BR-11; `ResultsCodes.DeltaNotAcknowledged`). */
 const DELTA_NOT_ACKNOWLEDGED = 'RES-015';
+
+/**
+ * The accession one lower (-1) or higher (+1) than `accession` by its trailing number, keeping its width
+ * (`ACC-2026-00042` → `ACC-2026-00041` / `…00043`); null when the accession ends in no number or the count would reach zero.
+ */
+export function accessionNeighbour(accession: string, direction: -1 | 1): string | null {
+  const match = /^(.*?)(\d+)$/.exec(accession.trim());
+  if (match === null || match[1] === undefined || match[2] === undefined) {
+    return null;
+  }
+
+  const next = Number.parseInt(match[2], 10) + direction;
+  if (!Number.isSafeInteger(next) || next < 1) {
+    return null;
+  }
+
+  return `${match[1]}${String(next).padStart(match[2].length, '0')}`;
+}
 
 /** One active criterion of the last query, shown as a chip while the criteria card is collapsed (change request 2026-10-13 item 4). */
 export interface CriteriaChip {
@@ -95,11 +114,16 @@ export interface CriteriaChip {
   templateUrl: './results-by-accession.page.html',
   styleUrl: './results-by-accession.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '(document:keydown.f8)': 'onRunKey($event)' },
+  host: {
+    '(document:keydown.f8)': 'onRunKey($event)',
+    '(document:keydown.control.alt.arrowleft)': 'onNeighbourKey($event, -1)',
+    '(document:keydown.control.alt.arrowright)': 'onNeighbourKey($event, 1)',
+  },
 })
 export class ResultsByAccessionPage {
   protected readonly i18n = inject(I18nService);
   protected readonly facade = inject(ResultsCaseFacade);
+  private readonly auth = inject(AuthStore);
   private readonly permissions = inject(PermissionsService);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
@@ -148,6 +172,35 @@ export class ResultsByAccessionPage {
   private readonly collapseWhenAnswered = signal(false);
   /** Set when a run opens its only match: once the case is in, the keyboard goes to the first editable result. */
   private readonly focusGridWhenLoaded = signal(false);
+  /** Set by previous / next at a page edge: once the neighbouring page is in, its last / first visit opens. */
+  private readonly openOnAnswer = signal<'first' | 'last' | null>(null);
+  /** The keyboard and colour hints under the grid, folded by default (suggestion 5): the "?" of the unit bar unfolds them. */
+  protected readonly hintsOpen = signal(false);
+  /** The row density of the grid: the user's preference (suggestion 6), saved on the membership through the preferences endpoint. */
+  protected readonly density = computed<'comfortable' | 'compact'>(() => (this.auth.profile()?.resultsDensity === 'compact' ? 'compact' : 'comfortable'));
+
+  /**
+   * Previous / next visit from the strip: the neighbours of the open case in the matching list (across its pages), else,
+   * when the case is not in the list (opened from a link, or the list answered another query), the accession number ± 1.
+   */
+  protected readonly neighbours = computed(() => {
+    const view = this.current();
+    if (view === null) {
+      return { previous: false, next: false };
+    }
+
+    const items = this.visits();
+    const index = items.findIndex((item) => item.visitId === view.visit.visitId);
+    if (index < 0) {
+      return { previous: accessionNeighbour(view.visit.accession, -1) !== null, next: accessionNeighbour(view.visit.accession, 1) !== null };
+    }
+
+    // the server's paging of the answer (it normalises the page size asked for)
+    const paged = this.facade.visits.hasValue() ? this.facade.visits.value() : null;
+    const page = paged?.page ?? 1;
+    const pageSize = paged?.pageSize ?? 40;
+    return { previous: index > 0 || page > 1, next: index < items.length - 1 || page * pageSize < this.visitsTotal() };
+  });
 
   protected readonly criteriaChips = computed<readonly CriteriaChip[]>(() => {
     const value = this.runCriteria();
@@ -264,7 +317,24 @@ export class ResultsByAccessionPage {
       // keyboard lands on its first editable result; several matches go to the list (card or side panel)
       const answered = this.facade.query() !== null && !this.facade.visits.isLoading() && this.facade.visits.hasValue();
       untracked(() => {
-        if (!answered || !this.collapseWhenAnswered()) {
+        if (!answered) {
+          return;
+        }
+
+        const edge = this.openOnAnswer();
+        if (edge !== null) {
+          // previous / next crossed a page of the matching list: open the neighbour on the page that just arrived
+          this.openOnAnswer.set(null);
+          const items = this.visits();
+          const target = edge === 'first' ? items[0] : items[items.length - 1];
+          if (target) {
+            this.select(target);
+          }
+
+          return;
+        }
+
+        if (!this.collapseWhenAnswered()) {
           return;
         }
 
@@ -376,10 +446,111 @@ export class ResultsByAccessionPage {
     (element.querySelector<HTMLElement>('app-result-grid .value-input:not(:disabled)') ?? element.querySelector<HTMLElement>('.unit-bar [role="tab"][tabindex="0"]'))?.focus();
   }
 
+  /** Opens a visit of the list at once; entered values not yet saved are confirmed away first (`leaveCase`). */
   protected select(item: ResultVisitListItem): void {
-    this.facade.open({ accession: item.accession });
-    this.visitsOpen.set(false);
-    void this.router.navigate([], { relativeTo: this.route, queryParams: { accession: item.accession }, replaceUrl: true });
+    if (this.facade.dirtyCount() === 0) {
+      this.openAccession(item.accession);
+      this.visitsOpen.set(false);
+      return;
+    }
+
+    void this.leaveCase().then((leave) => {
+      if (leave) {
+        this.openAccession(item.accession);
+        this.visitsOpen.set(false);
+      }
+    });
+  }
+
+  private openAccession(accession: string): void {
+    this.facade.open({ accession });
+    void this.router.navigate([], { relativeTo: this.route, queryParams: { accession }, replaceUrl: true });
+  }
+
+  /** True when the open case may be left: nothing entered, or the user discards what was entered (the drafts belong to the case). */
+  private async leaveCase(): Promise<boolean> {
+    const dirty = this.facade.dirtyCount();
+    if (dirty === 0) {
+      return true;
+    }
+
+    return this.confirm.confirm({
+      title: this.i18n.t('results.case.discardTitle'),
+      message: this.countText('results.case.discardMessage', dirty),
+      confirmLabel: this.i18n.t('results.case.discard'),
+      cancelLabel: this.i18n.t('results.cancel'),
+      danger: true,
+    });
+  }
+
+  protected onNeighbourKey(event: Event, direction: -1 | 1): void {
+    if (this.current() === null) {
+      return;
+    }
+
+    event.preventDefault();
+    void this.moveTo(direction);
+  }
+
+  /**
+   * Previous (-1) / next (+1) visit without opening the list: the neighbour in the loaded page of the matching list, the
+   * last / first visit of the neighbouring page (loaded first), or — when the case is not in the list — the visit whose
+   * accession number is one lower / higher, looked up before it is opened so a missing one only says so.
+   */
+  protected async moveTo(direction: -1 | 1): Promise<void> {
+    const view = this.current();
+    if (view === null || !(direction < 0 ? this.neighbours().previous : this.neighbours().next)) {
+      return;
+    }
+
+    const items = this.visits();
+    const index = items.findIndex((item) => item.visitId === view.visit.visitId);
+    if (index >= 0) {
+      const target = items[index + direction];
+      if (target) {
+        this.select(target);
+        return;
+      }
+
+      const query = this.facade.query();
+      const paged = this.facade.visits.hasValue() ? this.facade.visits.value() : null;
+      if (query === null || paged === null || !(await this.leaveCase())) {
+        return;
+      }
+
+      this.openOnAnswer.set(direction > 0 ? 'first' : 'last');
+      this.facade.run({ ...query, page: paged.page + direction, pageSize: paged.pageSize });
+      return;
+    }
+
+    const accession = accessionNeighbour(view.visit.accession, direction);
+    if (accession === null) {
+      return;
+    }
+
+    const found = await this.facade.findByAccession(accession);
+    if (found === null) {
+      this.toast.info(this.i18n.tf('results.case.visitNotFound', { accession }));
+      return;
+    }
+
+    if (await this.leaveCase()) {
+      this.openAccession(found.accession);
+    }
+  }
+
+  protected toggleHints(): void {
+    this.hintsOpen.set(!this.hintsOpen());
+  }
+
+  /** Saves the opposite density as the user's preference; the grid follows the profile, so every tab switches with it. */
+  protected async toggleDensity(): Promise<void> {
+    const next = this.density() === 'compact' ? 'comfortable' : 'compact';
+    try {
+      await this.auth.updateResultsDensity(next);
+    } catch {
+      this.toast.warn(this.i18n.t('results.case.densitySaveFailed'));
+    }
   }
 
   protected onVisitsPage(page: PageRequest): void {

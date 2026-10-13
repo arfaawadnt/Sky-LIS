@@ -5,8 +5,12 @@ namespace Platform.Contracts.Account;
 // Request and response shapes of the Account & onboarding module (intake LIS-INT-ACC-001). Validation here is shape
 // only; the rules live in the aggregates and handlers.
 
-/// <summary>A1 (CP-65 / SA-21): the language the user works in, <c>en</c> or <c>ar</c>, stored on the membership of the session's tenant.</summary>
-public sealed record UpdatePreferencesRequest(string Language);
+/// <summary>
+/// A1 (CP-65 / SA-21): the language the user works in, <c>en</c> or <c>ar</c>, stored on the membership of the session's tenant;
+/// <see cref="ResultsDensity"/> (results page, 2026-10-14): the row density of the results grid, <c>comfortable</c> or <c>compact</c>.
+/// Each value is saved when present; at least one is required.
+/// </summary>
+public sealed record UpdatePreferencesRequest(string? Language = null, string? ResultsDensity = null);
 
 /// <summary>A2 (CP-65 / SA-21): both passwords travel in the credential envelope (D-03).</summary>
 public sealed record ChangePasswordRequest

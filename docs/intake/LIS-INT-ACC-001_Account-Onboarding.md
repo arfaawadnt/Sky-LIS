@@ -8,6 +8,11 @@
 | Version | 1.0 — 2026-10-09 |
 | Implemented in | `src/Platform.Domain/Account`, `src/Platform.Contracts/Account`, `src/Platform.Application/Account`, `src/Platform.Infrastructure/Persistence/Account` (+ `Account.migration.sql`), `src/Platform.WebApi/Controllers/Account`, `frontend/src/app/features/{public,account}`, `frontend/src/app/features/auth` (recovery, links), `frontend/src/app/features/home` (dashboard redirect), `frontend/src/app/core/api/account.contracts.ts`, `frontend/public/i18n/{public,account}.{en,ar}.json` |
 
+> **Preferences (2026-10-14).** Beside the language (A1), the member's row density of the results grid — `resultsDensity`
+> `comfortable` | `compact`, null = default — is stored on the membership of the session's tenant
+> (`TenantMembership.PreferredResultsDensity`, migration `MembershipResultsDensity`, CHECK domain, code TEN-014) through the same
+> `PUT /api/v1/account/preferences` (each value given is saved; at least one is required) and returned in `AuthProfile.resultsDensity`.
+
 ## 1. Purpose and policy basis
 
 A laboratory finds Sky LIS on the public site, subscribes on its own (WF-01 step 1), signs in, binds the session to a

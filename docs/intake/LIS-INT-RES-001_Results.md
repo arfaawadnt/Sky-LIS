@@ -8,6 +8,11 @@
 | Version | 1.1 — 2026-10-12 (validation v0.5.0: VIP on the opened case and report, RES-056, Q19; one "late" definition, Q21; report language, digits and counted wording, Q22) |
 | Implemented in | `src/Platform.Domain/{Results,Quality}`, `src/Platform.Contracts/{Results,Quality}`, `src/Platform.Application/{Results,Quality}` (+ `Results/Policies`), `src/Platform.Infrastructure/Persistence/{Results,Quality}`, `src/Platform.WebApi/Controllers/{Results,Quality}`, `frontend/src/app/features/results`, `frontend/src/app/core/api/results.contracts.ts`, `frontend/public/i18n/results.{en,ar}.json` |
 
+> **Results page follow-ups (2026-10-14).** CP-19 with a visit open: previous / next visit from the context strip (the neighbour in
+> the matching list across its pages, else the accession number ± 1 looked up first), unsaved values confirmed away before leaving a
+> visit, the keyboard and colour hints behind the *i* button of the unit bar, a compact row density saved as the member's preference
+> (`PUT /api/v1/account/preferences` with `resultsDensity`, intake ACC-001), and the strip pinned on narrow screens.
+
 ## 1. Purpose and policy basis
 
 A **result** is the medical track of one test of one visit (LDM §2.3 "test track": Ordered → Complete → Review →

@@ -2,11 +2,14 @@ import resultsAr from '../../../../../public/i18n/results.ar.json';
 import resultsEn from '../../../../../public/i18n/results.en.json';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import type { ResultsDensity } from '../../../core/api/account.contracts';
+import type { AuthProfile } from '../../../core/api/auth.contracts';
 import { RESULTS_API, type ResultRowView } from '../../../core/api/results.contracts';
+import { AuthStore } from '../../../core/auth/auth.store';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
@@ -15,7 +18,7 @@ import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { ResultsCaseFacade } from '../state/results-case.facade';
 import { ResultsPrinter } from '../state/results-printer';
 import { caseView, page, reportDocument, reportUnit, resultRow, settle, visitItem } from '../testing/results.fixtures';
-import { ResultsByAccessionPage } from './results-by-accession.page';
+import { ResultsByAccessionPage, accessionNeighbour } from './results-by-accession.page';
 
 class PrinterStub {
   readonly printed: string[] = [];
@@ -567,5 +570,182 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     expect(document.activeElement).toBe(host.querySelector('app-drawer .visit-list .visit'));
     expect(host.textContent).toContain('Mona Adel');
     backend.verify();
+  });
+
+  it('folds the grid hints behind the "?" of the unit bar and saves the row density as a preference (suggestions 5 and 6)', async () => {
+    granted = new Set(['results.view', 'results.create']);
+    printer = new PrinterStub();
+    const profile = signal<AuthProfile | null>({ userId: 'u1', displayName: 'Mona', tenantId: 't1', roleName: null, permissions: [], language: 'en', scope: 'client', branchId: 'b1', branchIds: ['b1'] });
+    const savedDensities: string[] = [];
+    const authStub = {
+      profile: profile.asReadonly(),
+      updateResultsDensity: (density: ResultsDensity): Promise<void> => {
+        savedDensities.push(density);
+        profile.set({ ...profile()!, resultsDensity: density });
+        return Promise.resolve();
+      },
+    } satisfies Pick<AuthStore, 'profile' | 'updateResultsDensity'>;
+    await TestBed.configureTestingModule({
+      imports: [ResultsByAccessionPage],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        provideHttpClient(withInterceptors([problemDetailsInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+        { provide: ResultsPrinter, useValue: printer },
+        { provide: AuthStore, useValue: authStub },
+        ResultsCaseFacade,
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ResultsByAccessionPage);
+    backend = TestBed.inject(HttpTestingController);
+    host = fixture.nativeElement as HTMLElement;
+    fixture.componentRef.setInput('accession', 'ACC-2026-00001');
+    await render();
+    backend.expectOne((call) => call.url === RESULTS_API.results).flush(caseView([reportUnit([resultRow()])]));
+    await render();
+
+    // the hints take no height until asked for; the toggle announces its state
+    expect(host.querySelector('#grid-hints')).toBeNull();
+    const hints = host.querySelector<HTMLButtonElement>('.hints-toggle')!;
+    expect(hints.getAttribute('aria-expanded')).toBe('false');
+    hints.click();
+    await render();
+    expect(host.querySelector('#grid-hints')?.textContent).toContain('results.case.gridHelp');
+    expect(hints.getAttribute('aria-expanded')).toBe('true');
+
+    // the grid follows the profile's density; the toggle saves the opposite one as the user's preference
+    const grid = host.querySelector('app-result-grid')!;
+    expect(grid.classList.contains('compact')).toBe(false);
+    expect(host.querySelector('.density-toggle')?.getAttribute('aria-pressed')).toBe('false');
+    host.querySelector<HTMLButtonElement>('.density-toggle')!.click();
+    await render();
+    expect(savedDensities).toEqual(['compact']);
+    expect(grid.classList.contains('compact')).toBe(true);
+    expect(host.querySelector('.density-toggle')?.getAttribute('aria-pressed')).toBe('true');
+    host.querySelector<HTMLButtonElement>('.density-toggle')!.click();
+    await render();
+    expect(savedDensities).toEqual(['compact', 'comfortable']);
+    expect(grid.classList.contains('compact')).toBe(false);
+    backend.verify();
+  });
+
+  it('moves to the previous and next visit of the matching list from the strip, across its pages, and asks before discarding entered values', async () => {
+    granted = new Set(['results.view', 'results.create']);
+    printer = new PrinterStub();
+    confirmAnswer = false;
+    await TestBed.configureTestingModule({
+      imports: [ResultsByAccessionPage],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        provideHttpClient(withInterceptors([problemDetailsInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+        { provide: ConfirmService, useValue: { confirm: () => Promise.resolve(confirmAnswer), promptReason: () => Promise.resolve(reasonAnswer) } satisfies Pick<ConfirmService, 'confirm' | 'promptReason'> },
+        { provide: ResultsPrinter, useValue: printer },
+        ResultsCaseFacade,
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ResultsByAccessionPage);
+    backend = TestBed.inject(HttpTestingController);
+    host = fixture.nativeElement as HTMLElement;
+    await render();
+
+    // a query of two pages: the first page holds two visits, the second one more
+    const name = host.querySelector<HTMLInputElement>('input[formcontrolname="patientName"]')!;
+    name.value = 'mo%';
+    name.dispatchEvent(new Event('input'));
+    host.querySelector<HTMLFormElement>('form.query-form')!.dispatchEvent(new Event('submit'));
+    await render();
+    const first = backend.expectOne((call) => call.url === RESULTS_API.visits);
+    first.flush({ ...page([visitItem(), visitItem({ visitId: 'visit-2', accession: 'ACC-2026-00002' })]), totalCount: 3, pageSize: 2 });
+    await render();
+    host.querySelector<HTMLButtonElement>('.visit-list .visit')!.click();
+    await render();
+    backend.expectOne((call) => call.url === RESULTS_API.results).flush(caseView([reportUnit([resultRow()])]));
+    await render();
+
+    const previous = (): HTMLButtonElement => host.querySelector<HTMLButtonElement>('.nav-previous')!;
+    const next = (): HTMLButtonElement => host.querySelector<HTMLButtonElement>('.nav-next')!;
+    expect(previous().disabled).toBe(true);
+    expect(next().disabled).toBe(false);
+
+    // next: the second visit of the page, without the side panel
+    next().click();
+    await render();
+    const second = backend.expectOne((call) => call.url === RESULTS_API.results);
+    expect(second.request.params.get('accession')).toBe('ACC-2026-00002');
+    second.flush(caseView([reportUnit([resultRow()])], { visit: { ...caseView().visit, visitId: 'visit-2', accession: 'ACC-2026-00002' } }));
+    await render();
+    expect(host.querySelector('app-drawer .visit-list')).toBeNull();
+    expect(previous().disabled).toBe(false);
+    expect(next().disabled).toBe(false);   // the list has a further page
+
+    // next at the page edge: the second page is loaded and its first visit opened
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', ctrlKey: true, altKey: true, bubbles: true }));
+    await render();
+    const secondPage = backend.expectOne((call) => call.url === RESULTS_API.visits);
+    expect(secondPage.request.params.get('page')).toBe('2');
+    expect(secondPage.request.params.get('patientName')).toBe('mo%');
+    secondPage.flush({ ...page([visitItem({ visitId: 'visit-3', accession: 'ACC-2026-00003' })]), totalCount: 3, pageSize: 2, page: 2 });
+    await render();
+    const third = backend.expectOne((call) => call.url === RESULTS_API.results);
+    expect(third.request.params.get('accession')).toBe('ACC-2026-00003');
+    third.flush(caseView([reportUnit([resultRow()])], { visit: { ...caseView().visit, visitId: 'visit-3', accession: 'ACC-2026-00003' } }));
+    await render();
+    expect(next().disabled).toBe(true);
+    expect(previous().disabled).toBe(false);
+
+    // an entered value guards the move: a refused confirmation keeps the visit, nothing is requested
+    const input = host.querySelector<HTMLInputElement>('app-result-grid .value-input')!;
+    input.value = '95.2';
+    input.dispatchEvent(new Event('input'));
+    await render();
+    previous().click();
+    await render();
+    backend.expectNone((call) => call.url === RESULTS_API.visits);
+    backend.expectNone((call) => call.url === RESULTS_API.results);
+    expect(host.textContent).toContain('ACC-2026-00003');
+    backend.verify();
+  });
+
+  it('walks by accession number when the open visit is not in a list, and only says so when the neighbour does not exist', async () => {
+    await open(['results.view'], [resultRow()]);
+    const next = (): HTMLButtonElement => host.querySelector<HTMLButtonElement>('.nav-next')!;
+    const previous = (): HTMLButtonElement => host.querySelector<HTMLButtonElement>('.nav-previous')!;
+    expect(next().disabled).toBe(false);
+    expect(previous().disabled).toBe(true);   // ACC-2026-00001 has no lower neighbour
+
+    next().click();
+    await settle();
+    const lookup = backend.expectOne((call) => call.url === RESULTS_API.visits);
+    expect(lookup.request.params.get('accession')).toBe('ACC-2026-00002');
+    expect(lookup.request.params.get('branchOnly')).toBeNull();   // across branches: the flag is sent only when on
+    expect(lookup.request.params.get('pageSize')).toBe('1');
+    lookup.flush(page([]));
+    await render();
+    backend.expectNone((call) => call.url === RESULTS_API.results);
+    expect(host.textContent).toContain('ACC-2026-00001');
+
+    next().click();
+    await settle();
+    backend.expectOne((call) => call.url === RESULTS_API.visits).flush(page([visitItem({ visitId: 'visit-2', accession: 'ACC-2026-00002' })]));
+    await render();
+    const opened = backend.expectOne((call) => call.url === RESULTS_API.results);
+    expect(opened.request.params.get('accession')).toBe('ACC-2026-00002');
+    opened.flush(caseView([reportUnit([resultRow()])], { visit: { ...caseView().visit, visitId: 'visit-2', accession: 'ACC-2026-00002' } }));
+    await render();
+    expect(host.querySelector('.context-strip .case-title')?.textContent).toContain('ACC-2026-00002');
+    backend.verify();
+  });
+
+  it('computes the neighbouring accession by its trailing number', () => {
+    expect(accessionNeighbour('ACC-2026-00042', 1)).toBe('ACC-2026-00043');
+    expect(accessionNeighbour('ACC-2026-00042', -1)).toBe('ACC-2026-00041');
+    expect(accessionNeighbour('ACC-2026-00001', -1)).toBeNull();
+    expect(accessionNeighbour('ACC-2026-99999', 1)).toBe('ACC-2026-100000');
+    expect(accessionNeighbour('NO-NUMBER', 1)).toBeNull();
   });
 });

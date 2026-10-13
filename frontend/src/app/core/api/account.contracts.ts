@@ -7,8 +7,13 @@
 
 export type AccountLanguage = 'en' | 'ar';
 
+/** The row density of the results grid (CP-19), a self-service preference beside the language (results page, 2026-10-14). */
+export type ResultsDensity = 'comfortable' | 'compact';
+
+/** Each value given is saved; at least one is required. */
 export interface UpdatePreferencesRequest {
-  readonly language: AccountLanguage;
+  readonly language?: AccountLanguage;
+  readonly resultsDensity?: ResultsDensity;
 }
 
 /** Both values are `[CredentialField]`: the envelope interceptor seals them (D-03) once `credential-fields.ts` lists the endpoint. */

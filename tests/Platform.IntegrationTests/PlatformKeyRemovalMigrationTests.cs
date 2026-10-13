@@ -45,14 +45,16 @@ public sealed class PlatformKeyRemovalMigrationTests(DatabaseFixture fixture)
         try
         {
             await DatabaseFixture.TruncateAsync(context);
+            // The memberships go in through the production services on the current schema (the EF model writes every column,
+            // including those later migrations added); the roles go in by SQL on the schema just before the removal.
+            var overridden = await InsertMembershipAsync(Laboratory, added: ["platform.view", "results.view", "tenancy.manage"], removed: ["registration.view", "tenancy.view"]);
+            var plain = await InsertMembershipAsync(Laboratory, added: ["results.view"], removed: []);
+            var platformMember = await InsertMembershipAsync(TenantIds.Platform, added: ["tenancy.view"], removed: ["platform.manage"]);
             await migrator.MigrateAsync(BeforeRemoval);
 
             var demoAdministrator = await InsertRoleAsync(Laboratory, "Laboratory Administrator", everyKey);   // what seed-demo-lab stored
             var reception = await InsertRoleAsync(Laboratory, "Reception", ["registration.create", "registration.view"]);
             var platformAdministrator = await InsertRoleAsync(TenantIds.Platform, "Platform Administrator", everyKey);
-            var overridden = await InsertMembershipAsync(Laboratory, added: ["platform.view", "results.view", "tenancy.manage"], removed: ["registration.view", "tenancy.view"]);
-            var plain = await InsertMembershipAsync(Laboratory, added: ["results.view"], removed: []);
-            var platformMember = await InsertMembershipAsync(TenantIds.Platform, added: ["tenancy.view"], removed: ["platform.manage"]);
 
             await migrator.MigrateAsync();
             Assert.Empty(await context.Database.GetPendingMigrationsAsync());

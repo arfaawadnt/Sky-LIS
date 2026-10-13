@@ -11,6 +11,7 @@ import type {
   ResultRefusal,
   ResultRowView,
   ResultValueItem,
+  ResultVisitListItem,
   ResultVisitQuery,
 } from '../../../core/api/results.contracts';
 import { mutation } from '../../../core/state/mutation';
@@ -40,6 +41,30 @@ export class ResultsCaseFacade {
     params: () => this.query() ?? undefined,
     loader: ({ params, abortSignal }) => this.api.searchVisits(params, abortSignal),
   });
+
+  /**
+   * One visit by its exact accession, across branches, without touching the query or the list (the strip's previous /
+   * next visit when the open case is not in the matching list): null when no visit carries it.
+   */
+  async findByAccession(accession: string): Promise<ResultVisitListItem | null> {
+    const found = await this.api.searchVisits({
+      accession,
+      patientNumber: null,
+      patientName: null,
+      status: null,
+      sampleStatus: null,
+      analyserId: null,
+      notPrinted: false,
+      notVerified: false,
+      delta: false,
+      from: null,
+      to: null,
+      branchOnly: false,
+      page: 1,
+      pageSize: 1,
+    });
+    return found.items.find((item) => item.accession === accession) ?? null;
+  }
 
   readonly key = signal<CaseKey | null>(null);
 

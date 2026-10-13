@@ -55,7 +55,7 @@ public sealed class AccountController(ISender sender) : ControllerBase
     public async Task<IActionResult> UpdatePreferences([FromBody] UpdatePreferencesRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        await sender.Send(new UpdateMyPreferencesCommand(request.Language), cancellationToken);
+        await sender.Send(new UpdateMyPreferencesCommand(request.Language, request.ResultsDensity), cancellationToken);
         return NoContent();
     }
 

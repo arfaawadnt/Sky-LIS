@@ -234,7 +234,16 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Results by accession: previous / next visit from the strip.** Two arrow buttons (and Ctrl+Alt+← / →) move to the
+  neighbouring visit of the matching list without opening it — across its pages — or, when the open visit is not in a
+  list (opened from a link), to the accession one lower or higher, looked up first so a missing one only says so.
+  Entered values not yet saved are confirmed away before leaving a visit (also when a row of the list is chosen).
+- **Results by accession: smaller details.** The keyboard and colour hints under the grid fold behind the *i* button of
+  the unit bar; a *Compact rows* toggle (saved as a preference of the user, so every device follows) fits a long
+  profile on one screen; on narrow screens the strip stays pinned and its sub line and flags give way.
+- **Preferences endpoint.** `PUT /api/v1/account/preferences` accepts `language` and / or `resultsDensity`
+  (`comfortable` | `compact`); the profile carries `resultsDensity`. Migration `MembershipResultsDensity` (one nullable
+  column on `app.tenant_memberships`, code `TEN-014`).
 
 ### v0.10.1 — 2026-10-13
 

@@ -6177,5 +6177,28 @@ BEGIN
     VALUES ('20261013141855_SpecialRightsExtended', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261013211359_MembershipResultsDensity') THEN
+    ALTER TABLE app.tenant_memberships ADD preferred_results_density character varying(16);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261013211359_MembershipResultsDensity') THEN
+    ALTER TABLE app.tenant_memberships ADD CONSTRAINT ck_tenant_memberships_preferred_results_density_domain
+        CHECK (preferred_results_density IS NULL OR preferred_results_density IN ('comfortable', 'compact'));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261013211359_MembershipResultsDensity') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261013211359_MembershipResultsDensity', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

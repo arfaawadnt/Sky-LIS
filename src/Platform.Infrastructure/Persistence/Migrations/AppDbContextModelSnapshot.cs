@@ -7350,6 +7350,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(5)")
                         .HasColumnName("preferred_language");
 
+                    b.Property<string>("PreferredResultsDensity")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("preferred_results_density");
+
                     b.PrimitiveCollection<string[]>("RemovedPermissionKeys")
                         .IsRequired()
                         .HasColumnType("text[]")
@@ -10008,13 +10013,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                                 .HasColumnName("special_can_transfer");
 
                             b1.Property<bool>("CanViewBranchCollections")
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("boolean")
                                 .HasColumnName("special_can_view_branch_collections");
 
                             b1.Property<string>("DemographicsEditUpTo")
                                 .IsRequired()
-                                .ValueGeneratedOnAdd()
                                 .HasMaxLength(16)
                                 .HasColumnType("character varying(16)")
                                 .HasColumnName("special_demographics_edit_up_to");

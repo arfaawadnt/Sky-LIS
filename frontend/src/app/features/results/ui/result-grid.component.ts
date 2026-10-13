@@ -186,14 +186,20 @@ export interface DraftChange {
     tr.flag-abnormal td.value-col { background: var(--warn-soft); }
     tr.dirty .value-input { outline: 2px solid var(--blue); outline-offset: -2px; }
     tr.hidden-helper .name { color: var(--muted); font-style: italic; }
+    :host(.compact) .grid th, :host(.compact) .grid td { padding: 1px 8px; }
+    :host(.compact) .value-input { min-height: 26px; padding-block: 1px; }
+    :host(.compact) .icon-btn { padding: 2px; }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.compact]': "density() === 'compact'" },
 })
 export class ResultGridComponent {
   protected readonly i18n = inject(I18nService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
   readonly unit = input.required<ReportUnitView>();
+  /** The row density (results page, 2026-10-14): `compact` fits a long profile on one screen; a preference of the user. */
+  readonly density = input<'comfortable' | 'compact'>('comfortable');
   readonly drafts = input<Readonly<Record<string, string>>>({});
   readonly refusals = input<Readonly<Record<string, string>>>({});
   /** The user may enter values (results.create and the unit's edit right). */

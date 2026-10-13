@@ -3,6 +3,7 @@
  * Bootstrap only: 01 §6.2 generates `core/api` from the OpenAPI document once the API publishes one, and CI
  * then fails on any drift (pitfall P-62). Nothing here is decoded from a token (D-02).
  */
+import type { ResultsDensity } from './account.contracts';
 
 export interface AuthProfile {
   readonly userId: string;
@@ -29,6 +30,8 @@ export interface AuthProfile {
    * refresh after it with `AUTH-017`. Optional only until the generator lands; absent means 30.
    */
   readonly sessionTimeoutMinutes?: number | null;
+  /** CP-19 (results page, 2026-10-14): the member's row density of the results grid; absent or null = comfortable. */
+  readonly resultsDensity?: ResultsDensity | null;
 }
 
 /** CP-04: binds the current session to one of `AuthProfile.branchIds`. */

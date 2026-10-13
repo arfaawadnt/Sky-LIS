@@ -90,7 +90,8 @@ public sealed record AuthProfile(
     string? RoleNameAr = null,
     string? DisplayNameEn = null,
     string? DisplayNameAr = null,
-    int? SessionTimeoutMinutes = null);
+    int? SessionTimeoutMinutes = null,
+    string? ResultsDensity = null);
 
 public sealed record TenantChoice(Guid TenantId, string DisplayName);
 
