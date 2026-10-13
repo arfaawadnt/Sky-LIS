@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.7.2** · released 2026-10-12 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.8.0** · released 2026-10-13 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.8.0 — 2026-10-13
 
 - **Session timeout enforced (validation F-01).** The parameter *Session timeout (minutes)* now ends idle sessions: the
   server refuses a refresh after the session of a laboratory (or of the platform) went unrenewed longer than its timeout
