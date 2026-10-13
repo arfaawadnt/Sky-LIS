@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.9.1** · released 2026-10-13 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.10.0** · released 2026-10-13 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.10.0 — 2026-10-13
 
 - **Results by accession: the results start at the top.** With a visit open, one sticky strip (accession, patient, sex and age,
   VIP / urgent, rights flags, *Details*) replaces the page header, the criteria card and the matching list; *Criteria* opens the
