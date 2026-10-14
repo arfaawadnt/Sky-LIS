@@ -899,6 +899,12 @@ export class ResultsByAccessionPage {
     return this.i18n.tc(key, count, { count: this.num(count) });
   }
 
+  /** The note of a unit whose results are partly outside the user's result rights: the count and the clinical groups to ask for. */
+  protected hiddenResultsText(unit: ReportUnitView): string {
+    const groups = unit.hiddenGroups.map((group) => pickName(group.nameEn, group.nameAr, this.i18n.lang()) || group.code || '—').join(this.i18n.lang() === 'ar' ? '، ' : ', ');
+    return this.i18n.tc('results.case.unitHiddenResults', unit.hiddenResults, { count: this.num(unit.hiddenResults), groups });
+  }
+
   /**
    * The list heading: the count of the last query in the language's digits (round 3 R3-02); no count before a query has
    * run, so a visit opened from a link does not sit under "Matching visits (0)" (validation 2026-10-11).

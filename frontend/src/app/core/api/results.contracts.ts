@@ -258,6 +258,9 @@ export interface ReportUnitView {
   readonly rights: ReportUnitRightsView;
   readonly services: readonly ServiceBannerView[];
   readonly results: readonly ResultRowView[];
+  /** Results of this unit outside the user's result rights (a print-alone service spanning clinical groups), and their groups. */
+  readonly hiddenResults: number;
+  readonly hiddenGroups: readonly LookupOption[];
 }
 
 export interface ResultSettingsView {
@@ -270,7 +273,10 @@ export interface ResultCaseView {
   readonly visit: VisitHeaderView;
   readonly patient: PatientHeaderView;
   readonly units: readonly ReportUnitView[];
+  /** Report units with no visible result. */
   readonly hiddenUnits: number;
+  /** Results hidden inside the visible units (sum of the units' `hiddenResults`). */
+  readonly hiddenResults: number;
   readonly scannedSampleNumber: string | null;
   readonly settings: ResultSettingsView;
 }

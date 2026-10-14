@@ -2,8 +2,13 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Platform.Application.Abstractions.Messaging;
+using Platform.Application.Abstractions.Security;
 using Platform.Application.Identity;
+using Platform.Application.Organization;
+using Platform.Application.Organization.Policies;
 using Platform.Contracts.Common;
+using Platform.Domain.Catalogue;
 using Platform.Contracts.Identity;
 using Platform.Contracts.Organization;
 using Platform.Contracts.PlatformAdmin;
@@ -244,6 +249,50 @@ public sealed class OrganizationFlowTests(ApiFactory factory) : IClassFixture<Ap
         Assert.Equal(("ORG-016", HttpStatusCode.UnprocessableEntity), (await AuthClient.CodeOf(email), email.StatusCode));
         var phone = await admin.PutAsJsonAsync($"{Branches}/{north}", new UpdateBranchRequest("North", "الشمال", egypt, alexandria, "phone!", null, "EGP"));
         Assert.Equal("ORG-015", await AuthClient.CodeOf(phone));
+    }
+
+    [DatabaseFact]
+    public async Task A_new_clinical_group_is_granted_to_the_roles_that_manage_roles_and_to_nobody_else()
+    {
+        var tenant = Guid.CreateVersion7();
+        var (adminName, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: AdministratorPermissions, displayName: "Lab Administrator");
+        var admin = await SignedInClientAsync(adminName);   // the principal is cached now; the policy must evict it (BR-17)
+        var adminRole = await RoleIdAsync(tenant, $"role-{adminName}");
+        var technician = await CreateRoleAsync(admin, "Technician", ["results.view"]);   // a key the administrator holds (nobody grants beyond their own rights)
+        var group = Guid.CreateVersion7();
+        var created = new ClinicalGroupCreated(group, "MICRO", factory.Clock.UtcNow);
+
+        await RunGroupPolicyAsync(tenant, created);
+        await RunGroupPolicyAsync(tenant, created);   // the outbox retries a policy: nothing doubles
+
+        var detail = await admin.GetFromJsonAsync<RoleDetail>($"{Roles}/{adminRole}");
+        Assert.Equal(new ResultRightDto(group, null, true, true, true, true, true), Assert.Single(detail!.ResultRights));
+        Assert.Empty((await admin.GetFromJsonAsync<RoleDetail>($"{Roles}/{technician}"))!.ResultRights);
+        var privileges = await admin.GetFromJsonAsync<MyPrivilegesResponse>(MyPrivileges);
+        Assert.Equal(group, Assert.Single(privileges!.Privileges.ResultRights).ClinicalGroupId);
+
+        // The platform catalogue is a template (BR-25): its administrators take no result right.
+        var (supervisor, _, _) = await factory.SeedUserAsync(tenantId: TenantIds.Platform, permissions: ["organization.view", "organization.manage"], displayName: "Platform Supervisor");
+        var supervisorRole = await RoleIdAsync(TenantIds.Platform, $"role-{supervisor}");
+        await RunGroupPolicyAsync(TenantIds.Platform, new ClinicalGroupCreated(Guid.CreateVersion7(), "TPL", factory.Clock.UtcNow));
+        var platformClient = await SignedInClientAsync(supervisor);
+        Assert.Empty((await platformClient.GetFromJsonAsync<RoleDetail>($"{Roles}/{supervisorRole}"))!.ResultRights);
+    }
+
+    /// <summary>Runs the Organization policy for a created clinical group the way the outbox processor would, inside the tenant's scope.</summary>
+    private async Task RunGroupPolicyAsync(Guid tenant, ClinicalGroupCreated created)
+    {
+        using var scope = factory.Services.CreateScope();
+        using var tenantScope = scope.ServiceProvider.GetRequiredService<ICurrentTenantSetter>().ForTenant(tenant);
+        var policy = scope.ServiceProvider.GetServices<IDomainEventHandler<ClinicalGroupCreated>>().OfType<GrantNewClinicalGroupToAdministratorsPolicy>().Single();
+        await policy.HandleAsync(created, CancellationToken.None);
+    }
+
+    private async Task<Guid> RoleIdAsync(Guid tenant, string nameEn)
+    {
+        using var scope = factory.Services.CreateScope();
+        using var tenantScope = scope.ServiceProvider.GetRequiredService<ICurrentTenantSetter>().ForTenant(tenant);
+        return (await scope.ServiceProvider.GetRequiredService<IRoleRepository>().FindByNameAsync(nameEn, CancellationToken.None))!.Id;
     }
 
     [DatabaseFact]

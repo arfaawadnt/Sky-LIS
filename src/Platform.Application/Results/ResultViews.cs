@@ -55,20 +55,35 @@ internal static class ResultViews
             .ThenBy(result => result.MemberOrder)
             .ThenBy(result => context.Tests.GetValueOrDefault(result.TestId)?.Code, StringComparer.Ordinal);
 
-    public static IReadOnlyList<ReportUnitView> Units(IEnumerable<Result> results, ResultReadContext context, IUserPrivileges privileges)
+    /// <summary>
+    /// One unit per report-unit key of <paramref name="results"/> (the results the user may see). <paramref name="hidden"/>
+    /// are the visit's other results, outside the user's result rights: those sharing a key with a visible unit are
+    /// counted on it and their clinical groups named, so the page can say what is missing (change request 2026-10-14);
+    /// the ones of a key with nothing visible make a hidden unit (counted by the case, never built).
+    /// </summary>
+    public static IReadOnlyList<ReportUnitView> Units(IEnumerable<Result> results, IEnumerable<Result> hidden, ResultReadContext context, IUserPrivileges privileges)
     {
+        var hiddenByUnit = (hidden ?? []).GroupBy(result => result.ReportUnitKey).ToDictionary(group => group.Key, group => (IReadOnlyList<Result>)[.. group], StringComparer.Ordinal);
         return results
             .GroupBy(result => result.ReportUnitKey)
-            .Select(group => Unit(group.Key, [.. group], context, privileges))
+            .Select(group => Unit(group.Key, [.. group], hiddenByUnit.GetValueOrDefault(group.Key) ?? [], context, privileges))
             .OrderBy(unit => context.Groups.GetValueOrDefault(unit.ClinicalGroupId)?.DisplayOrder ?? int.MaxValue)
             .ThenBy(unit => unit.PrintAloneServiceId is null ? 0 : 1)
             .ThenBy(unit => unit.Key, StringComparer.Ordinal)
             .ToList();
     }
 
-    public static ReportUnitView Unit(string key, IReadOnlyList<Result> results, ResultReadContext context, IUserPrivileges privileges)
+    public static ReportUnitView Unit(string key, IReadOnlyList<Result> results, IReadOnlyList<Result> hidden, ResultReadContext context, IUserPrivileges privileges)
     {
         var live = results.Where(result => result.IsLive).ToList();
+        var hiddenGroups = hidden
+            .Select(result => result.ClinicalGroupId)
+            .Distinct()
+            .Select(groupId => context.Groups.TryGetValue(groupId, out var hiddenGroup)
+                ? new LookupOption(groupId, hiddenGroup.Code, hiddenGroup.NameEn, hiddenGroup.NameAr)
+                : new LookupOption(groupId, null, string.Empty, string.Empty))
+            .OrderBy(option => option.Code, StringComparer.Ordinal)
+            .ToList();
         var first = results[0];
         var group = context.Groups.GetValueOrDefault(first.ClinicalGroupId);
         var printAlone = ReportUnits.ServiceOf(key);
@@ -111,7 +126,9 @@ internal static class ResultViews
             samples,
             ResultRights.View(rights),
             banners,
-            [.. ordered.Select(result => Row(result, context))]);
+            [.. ordered.Select(result => Row(result, context))],
+            hidden.Count,
+            hiddenGroups);
     }
 
     public static ResultRowView Row(Result result, ResultReadContext context)

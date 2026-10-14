@@ -1,3 +1,4 @@
+using Platform.Domain.Authorization;
 using Platform.SharedKernel.Localization;
 using Platform.SharedKernel.MultiTenancy;
 using Platform.SharedKernel.Primitives;
@@ -161,6 +162,33 @@ public sealed class Role : AggregateRoot, ITenantScoped
             Raise(new RoleChanged(Id, nowUtc, RoleChangeAspects.ResultRights));
         }
     }
+
+    /// <summary>
+    /// R5b Grant one result right the role does not hold yet: a new clinical group is handed to the roles that manage roles
+    /// (change request 2026-10-14). A row for the same group and branch, whatever it grants, is left as the laboratory set
+    /// it. Returns false (and raises nothing) when the row exists, so a retried policy run changes nothing.
+    /// </summary>
+    public bool GrantResultRight(ResultRight right, DateTimeOffset nowUtc)
+    {
+        ArgumentNullException.ThrowIfNull(right);
+        var wanted = right.Normalised();
+        Require(wanted.ClinicalGroupId != Guid.Empty && wanted.BranchId != Guid.Empty && wanted.GrantsAnything, OrganizationCodes.ResultRightInvalid, "A granted result right names a clinical group and grants something.", DomainFault.Validation);
+        if (_resultRights.Any(row => row.ClinicalGroupId == wanted.ClinicalGroupId && row.BranchId == wanted.BranchId))
+        {
+            return false;
+        }
+
+        Require(_resultRights.Count < MaxResultRights, OrganizationCodes.ResultRightInvalid, $"At most {MaxResultRights} result rights.", DomainFault.Validation);
+        _resultRights.Add(RoleResultRight.From(wanted));
+        Raise(new RoleChanged(Id, nowUtc, RoleChangeAspects.ResultRights));
+        return true;
+    }
+
+    /// <summary>
+    /// True when the role may edit every role of the laboratory (<c>organization.manage</c>): its holders could grant
+    /// themselves any result right, so handing them a new clinical group's rights automatically widens nothing.
+    /// </summary>
+    public bool ManagesRoles => PermissionKeys.Contains(PermissionCatalog.Key(PermissionCatalog.Organization, PermissionAction.Manage), StringComparer.Ordinal);
 
     /// <summary>The result rights as values (ordered by group then branch), for projections and the principal.</summary>
     public IReadOnlyList<ResultRight> ResultRightValues() =>

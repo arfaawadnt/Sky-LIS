@@ -19,6 +19,9 @@ public interface IRoleRepository : IRepository<Role>
     Task<Paged<RoleListItem>> ListAsync(RoleFilter filter, PageRequest page, CancellationToken cancellationToken);
 
     Task<RoleDetail?> GetDetailAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Every active role of the current tenant, tracked, with its result rights (the clinical-group policy).</summary>
+    Task<IReadOnlyList<Role>> ListActiveForUpdateAsync(CancellationToken cancellationToken);
 }
 
 /// <summary><see cref="Sort"/>: server-side order before paging (validation v0.5.0 B-03; keys in <see cref="OrganizationSortKeys.Branches"/>).</summary>

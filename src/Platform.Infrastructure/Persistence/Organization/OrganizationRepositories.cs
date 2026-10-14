@@ -79,6 +79,9 @@ internal sealed class RoleRepository(AppDbContext context) : Repository<Role>(co
         return new Paged<RoleListItem>(items, page.Page, page.PageSize, total);
     }
 
+    public async Task<IReadOnlyList<Role>> ListActiveForUpdateAsync(CancellationToken cancellationToken) =>
+        await Set.Where(role => role.IsActive).OrderBy(role => role.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
+
     public async Task<RoleDetail?> GetDetailAsync(Guid id, CancellationToken cancellationToken)
     {
         var role = await Set.AsNoTracking().FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken).ConfigureAwait(false);

@@ -38,6 +38,9 @@ public sealed record ResultRight(Guid ClinicalGroupId, Guid? BranchId, bool CanS
     /// <summary>Review, verify, edit and print presuppose seeing the result (INV-ORG-008).</summary>
     public ResultRight Normalised() => this with { CanSee = CanSee || CanReview || CanVerify || CanEdit || CanPrint };
 
+    /// <summary>All five rights on <paramref name="clinicalGroupId"/> in <paramref name="branchId"/> (<see langword="null"/> = every branch).</summary>
+    public static ResultRight Full(Guid clinicalGroupId, Guid? branchId = null) => new(clinicalGroupId, branchId, true, true, true, true, true);
+
     /// <summary>The decision the Results module needs: does any of <paramref name="rights"/> grant <paramref name="action"/> on this group and branch?</summary>
     public static bool Allows(IEnumerable<ResultRight> rights, ResultAction action, Guid clinicalGroupId, Guid branchId)
     {

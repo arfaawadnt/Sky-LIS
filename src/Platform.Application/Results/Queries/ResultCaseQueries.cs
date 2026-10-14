@@ -81,16 +81,21 @@ public sealed class GetResultCaseHandler(
 
         var visibility = ResultRights.VisibilityOf(privileges);
         var visible = scoped.Where(result => visibility.CanSee(result.ClinicalGroupId, result.BranchId)).ToList();
-        var hiddenUnits = scoped.Select(result => result.ReportUnitKey).Distinct().Count() - visible.Select(result => result.ReportUnitKey).Distinct().Count();
-        var context = await new ResultReadContextLoader(catalogue, samples, users).LoadAsync(visible, cancellationToken);
+        var hidden = scoped.Except(visible).ToList();
+        var visibleUnits = visible.Select(result => result.ReportUnitKey).ToHashSet(StringComparer.Ordinal);
+        var hiddenUnits = hidden.Select(result => result.ReportUnitKey).Distinct().Count(key => !visibleUnits.Contains(key));
+        var hiddenResults = hidden.Count(result => visibleUnits.Contains(result.ReportUnitKey));
+        // The context covers the hidden results too: only their clinical groups' names reach the view (ReportUnitView.HiddenGroups).
+        var context = await new ResultReadContextLoader(catalogue, samples, users).LoadAsync(scoped, cancellationToken);
         var header = await new ResultHeaderLoader(patients, visits, references, doctors).LoadAsync(scoped[0], cancellationToken);
         // F-06: an opened VIP case reads "VIP patient" without the See-VIP right, like the lists (A-03, RES Q19).
         var patientView = ResultVip.IsMasked(header.Patient, privileges) ? ResultVip.Mask(header.PatientView) : header.PatientView;
         return new ResultCaseView(
             header.VisitView,
             patientView,
-            ResultViews.Units(visible, context, privileges),
+            ResultViews.Units(visible, hidden, context, privileges),
             hiddenUnits,
+            hiddenResults,
             scanned,
             await ResultSettings.ReadAsync(settings, cancellationToken));
     }

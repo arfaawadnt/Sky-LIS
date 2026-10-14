@@ -156,12 +156,19 @@ public sealed record ReportUnitView(
     IReadOnlyList<UnitSampleView> Samples,
     ReportUnitRightsView Rights,
     IReadOnlyList<ServiceBannerView> Services,
-    IReadOnlyList<ResultRowView> Results);
+    IReadOnlyList<ResultRowView> Results,
+    int HiddenResults,
+    IReadOnlyList<LookupOption> HiddenGroups);
 
 public sealed record ResultSettingsView(bool ReviewBeforeVerify, bool PrintUnverified, string ResultLanguage);
 
-/// <summary>The case of CP-19 / CP-20: header, then one tab per report unit the user may see (<paramref name="HiddenUnits"/> counts the others).</summary>
-public sealed record ResultCaseView(VisitHeaderView Visit, PatientHeaderView Patient, IReadOnlyList<ReportUnitView> Units, int HiddenUnits, string? ScannedSampleNumber, ResultSettingsView Settings);
+/// <summary>
+/// The case of CP-19 / CP-20: header, then one tab per report unit the user may see. <paramref name="HiddenUnits"/> counts
+/// the units with no visible result; <paramref name="HiddenResults"/> the results of the visible units that belong to a
+/// clinical group outside the user's result rights (a print-alone service spanning groups), each unit naming its own
+/// (<see cref="ReportUnitView.HiddenResults"/>, <see cref="ReportUnitView.HiddenGroups"/>).
+/// </summary>
+public sealed record ResultCaseView(VisitHeaderView Visit, PatientHeaderView Patient, IReadOnlyList<ReportUnitView> Units, int HiddenUnits, int HiddenResults, string? ScannedSampleNumber, ResultSettingsView Settings);
 
 /// <summary>A visit found by the query panel of CP-19.</summary>
 public sealed record ResultVisitListItem(

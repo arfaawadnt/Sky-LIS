@@ -51,7 +51,7 @@ Chosen to avoid everything already in use on this machine (checked 2026-10-08).
 | Dev API (HTTP / HTTPS)       | `5100` / `5101`                                          | `5000`, `5080` (QMS APIs)                    |
 | Dev SPA server               | `4300`                                                   | `4200` (keep free for other dev work)        |
 | Dev PostgreSQL               | private instance `E:\LIS\.local\pg17` (in use) or Docker container `lis-postgres`; host port `5433` | `5432` (shared PostgreSQL 17, holds `ntqams`) |
-| Other dev services           | ports `5102`–`5199` (`5102` = validation API beside the installed service; `5110` = second dev SPA `ux-spa` proxying the validation API) | `80`, `443`, `8080`, `5985`, `3389`          |
+| Other dev services           | ports `5102`–`5199` (`5102` = validation API beside the installed service; `5103` = review API `review-api` from the default build, SPA `review-spa` on 4300 via `frontend/proxy.review.json`; `5110` = second dev SPA `ux-spa` proxying the validation API) | `80`, `443`, `8080`, `5985`, `3389`          |
 | Database and roles           | db `lis`, owner role `lis_owner`, app role `lis_app`     | db `ntqams`, role `postgres`                 |
 | Docker Compose project       | `name: lis` → containers `lis-*`, volumes `lis_*`, network `lis_default` | none yet (daemon was off)    |
 | Windows services (prod/test) | `NTLIS` (port `5100`) / `NTLIS_TEST` (port `5180`); `LIS_POSTGRES` = the private PostgreSQL 17 instance of this host as a service (5433, NetworkService) | `NTQAMS`, `NTQAMS_TEST`, `postgresql-x64-17` (5432) |
@@ -400,6 +400,11 @@ QMS source is never read or copied (section 1); everything here is written from 
   patient-wide answer) → `PAT-032` (403) when beyond `DemographicsEditUpTo`; `GET /api/v1/patients/{id}/demographics-lock?visitId=`
   feeds the shared `app-patient-form` inputs `identityLocked`/`lockHint`; the visits register (CP-10) opens the patient in a drawer
   (row action "Patient", `patients.edit`, `shared/patient/patient-lookup.api.ts`).
+- Parent services on the test page (change request 2026-10-14, Catalogue-A intake v1.1 T21/Q17): a test stores no link to its services;
+  `LabTestDetail.ParentServices` is read from `app.service_members` (sequence order) and `PUT /api/v1/catalogue/tests/{id}/parent-services`
+  (`SetLabTestParentServicesCommand`, `catalogue.edit`) makes the test join / leave services by rewriting each affected service's
+  members through `Service.ReplaceMembers`, so the type's member rules decide (CAT-021/022/036/027); one refusal changes nothing. The
+  SPA (`test-editor.page`, general tab) offers only profiles and cultures (`serviceTakesTestsFreely`) and shows the other parents locked.
 - Collections report (Billing intake v1.2 §14, Q20–Q22): `CollectionsReportQuery(FromDay?, ToDay?, Scope User|Branch, GroupBy
   Branch|User|Method)` [billing.view] → `GET /api/v1/billing/collections-report`; `BIL-044` branch scope without
   `CanViewBranchCollections`, `BIL-045` period before `EarliestReportDay`; domain arithmetic in `Domain/Billing/CollectionsReport.cs`,
@@ -416,6 +421,15 @@ QMS source is never read or copied (section 1); everything here is written from 
   flags, *Details* disclosure, *Criteria* → the form in an `app-dialog`, *Visits (n)* → the list in an `app-drawer`, *New query*)
   replaces them and the unit tabs (`<app-tabs compact />`), sample chips and action buttons share `.unit-bar`; a query with exactly
   one match opens it (`focusGridWhenLoaded` → first editable cell), several matches go to the list (card or side panel).
+  **Hidden by rights (change request 2026-10-14)**: `GetResultCaseHandler` keeps the results the user may see (`ResultRights.VisibilityOf`);
+  units with nothing visible are counted in `ResultCaseView.HiddenUnits`, results hidden inside a visible unit (a print-alone
+  service spanning groups) in `HiddenResults` and per unit in `ReportUnitView.HiddenResults` + `HiddenGroups` (clinical groups to ask
+  for); the page shows a strip tag and a `.unit-hidden` note (`hiddenResultsText`). Gate: `ResultsFlowTests.A_unit_names_the_results_outside_the_users_rights…`.
+- Organization policy (`Application/Organization/Policies/RolePolicies.cs`): `GrantNewClinicalGroupToAdministratorsPolicy` on
+  `ClinicalGroupCreated` gives every active role with `Role.ManagesRoles` (`organization.manage`) the full result right on the new
+  group in every branch (`Role.GrantResultRight`, idempotent, never touches an existing row), saves once, evicts the members'
+  principals and writes `PRIVILEGE_MATRIX_CHANGED`; skipped in the platform tenant. Rationale: such roles could grant themselves any
+  right, so nothing widens. Gate: `OrganizationFlowTests.A_new_clinical_group_is_granted_to_the_roles_that_manage_roles…`.
   Follow-ups 2026-10-14: previous / next visit from the strip (`neighbours`, `moveTo`: the loaded page of the list, the
   neighbouring page via `openOnAnswer`, else `accessionNeighbour()` ± 1 looked up with `facade.findByAccession`; Ctrl+Alt+←/→;
   `leaveCase()` confirms unsaved drafts away), grid hints behind the *i* button (`hintsOpen`), row density as a user

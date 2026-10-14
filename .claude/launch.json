@@ -127,6 +127,54 @@
       ],
       "port": 4300,
       "url": "http://127.0.0.1:4300"
+    },
+    {
+      "name": "review-api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Platform.WebApi/Platform.WebApi.csproj",
+        "-c",
+        "Release",
+        "--no-build",
+        "--",
+        "--Kestrel:Endpoints:Http:Url=http://127.0.0.1:5103",
+        "--Lis:Notifications:PickupDirectory=E:\\LIS\\.local\\mail-pickup\\review"
+      ],
+      "port": 5103
+    },
+    {
+      "name": "review-spa",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "start",
+        "--",
+        "--proxy-config",
+        "proxy.review.json"
+      ],
+      "port": 4300,
+      "url": "http://127.0.0.1:4300"
+    },
+    {
+      "name": "cat-api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Platform.WebApi/Platform.WebApi.csproj",
+        "-c",
+        "Release",
+        "--no-build",
+        "-p:LisBuildSlot=cat",
+        "--",
+        "--Kestrel:Endpoints:Http:Url=http://127.0.0.1:5102",
+        "--Lis:Notifications:PickupDirectory=E:\\LIS\\.local\\mail-pickup\\validation"
+      ],
+      "port": 5102
     }
   ]
 }

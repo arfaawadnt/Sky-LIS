@@ -234,7 +234,27 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Tests: parent services on the test page (CP-41, change request 2026-10-14).** The test editor's general tab lists
+  the services that carry the test (code, name, type, "from the service" when the service carries exactly this one
+  test) and lets the laboratory add the test to a profile or a culture, or take it out, saved with the test
+  (`PUT /api/v1/catalogue/tests/{id}/parent-services`, `catalogue.edit`). Each change rewrites the members of the
+  affected service under its own rules, so a test service keeps its single test (`CAT-021`), a package takes no test
+  (`CAT-022`) and an inactive test joins nothing (`CAT-027`); one refusal changes nothing. `LabTestDetail` gains
+  `parentServices`. Same page on both portals (Setup › Tests and Master data › Tests). Intake CAT-001 v1.1 (T21,
+  Q17), SRS 1.1, UAT-ADM-08 step 13.
+- **Results by accession: what the result rights hide (change request 2026-10-14).** A report unit whose results
+  belong partly to a clinical group outside the user's rights (a print-alone service such as Urine C/S with a chemistry
+  member) shows a note with the count and the groups to ask for, and the case header counts those results beside the
+  hidden units (`ReportUnitView.hiddenResults` / `hiddenGroups`, `ResultCaseView.hiddenResults`). Found on
+  ACC-2026-00052: the culture row was invisible with no explanation.
+- **New clinical groups reach the administrators' result rights by themselves.** When a clinical group is created, every
+  active role that manages roles (`organization.manage`, held by the provisioned Laboratory Administrator) receives see,
+  review, verify, edit and print on it in every branch through the outbox policy `GrantNewClinicalGroupToAdministratorsPolicy`;
+  other roles keep their deliberate rights and the platform catalogue takes none. Groups created before this release
+  still need the Result rights tab once.
+- **Review stack for the built-in browser.** Launch configurations `review-api` (API on 127.0.0.1:5103 from the default
+  Release build, pickup folder `.local/mail-pickup/review`) and `review-spa` (4300, `frontend/proxy.review.json`) let a
+  change be checked beside the installed service and the other dev stacks.
 
 ### v0.11.1 — 2026-10-13
 
@@ -553,7 +573,10 @@ _Nothing yet._
   through the API, asserting the database after every request, plus negative and isolation checks; reruns against any
   base URL (`--deployed --insecure-tls` for the installed site).
 - **Validation stack**: launch configurations `validation-api` (127.0.0.1:5102) and `validation-spa` (4300, proxy
-  `frontend/proxy.validation.json`) run beside the installed service on the same database.
+  `frontend/proxy.validation.json`) run beside the installed service on the same database. `cat-api` (added
+  2026-10-14) serves the `cat` build slot's output (`.local/build/cat/…/Platform.WebApi.dll`, Development
+  environment) on the same 5102, for checking a slot build in the browser through `ux-spa` (5110) while another
+  session holds 5100 / 4300.
 
 ### v0.3.8 — 2026-10-10
 

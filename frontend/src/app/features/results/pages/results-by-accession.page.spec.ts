@@ -403,6 +403,43 @@ describe('ResultsByAccessionPage (CP-19)', () => {
     expect(printer.printed).toEqual([]);
   });
 
+  it('names the results of a unit that are outside the result rights and the clinical groups to ask for (change request 2026-10-14)', async () => {
+    const dictionaries: Record<string, unknown> = { '/i18n/results.en.json': resultsEn, '/i18n/results.ar.json': resultsAr };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) => new Response(JSON.stringify(dictionaries[String(input)] ?? {}), { status: 200 }));
+    granted = new Set(['results.view']);
+    await TestBed.configureTestingModule({
+      imports: [ResultsByAccessionPage],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        provideHttpClient(withInterceptors([problemDetailsInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+        { provide: ResultsPrinter, useValue: new PrinterStub() },
+        ResultsCaseFacade,
+      ],
+    }).compileComponents();
+    const i18n = TestBed.inject(I18nService);
+    await i18n.load('results');
+    fixture = TestBed.createComponent(ResultsByAccessionPage);
+    backend = TestBed.inject(HttpTestingController);
+    host = fixture.nativeElement as HTMLElement;
+    fixture.componentRef.setInput('accession', 'ACC-2026-00052');
+    await render();
+    const unit = reportUnit([resultRow()], {
+      printAloneServiceId: 'svc-ucs',
+      serviceNameEn: 'Urine C/S',
+      hiddenResults: 1,
+      hiddenGroups: [{ id: 'grp-2', code: 'MICRO', nameEn: 'Microbiology', nameAr: 'الميكروبيولوجي' }],
+    });
+    backend.expectOne((call) => call.url === RESULTS_API.results).flush(caseView([unit], { hiddenResults: 1 }));
+    await render();
+
+    expect(host.querySelector('.case-flags')?.textContent).toContain('1 result is outside your result rights');
+    expect(host.querySelector('.unit-hidden')?.textContent).toContain('1 result of this report unit is outside your result rights (Microbiology)');
+    expect(host.querySelectorAll('app-result-grid tbody tr').length).toBe(1);
+  });
+
   it('F-09: an Arabic page shows the age, the counts and the print count in Arabic-Indic digits', async () => {
     const dictionaries: Record<string, unknown> = { '/i18n/results.en.json': resultsEn, '/i18n/results.ar.json': resultsAr };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) => new Response(JSON.stringify(dictionaries[String(input)] ?? {}), { status: 200 }));

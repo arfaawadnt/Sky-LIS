@@ -77,6 +77,8 @@ export function reportUnit(rows: readonly ResultRowView[] = [resultRow()], overr
     rights: { canEdit: true, canReview: true, canVerify: true, canPrint: true, canModifyVerified: false, canPreviewWithoutVerify: false },
     services: [{ serviceId: 'svc-1', code: 'GLU', nameEn: 'Glucose', nameAr: 'جلوكوز', reportName: null, status: rows[0]?.status ?? 'Ordered', resultCount: rows.length }],
     results: rows,
+    hiddenResults: 0,
+    hiddenGroups: [],
     ...overrides,
   };
 }
@@ -115,6 +117,7 @@ export function caseView(units: readonly ReportUnitView[] = [reportUnit()], over
     },
     units,
     hiddenUnits: 0,
+    hiddenResults: 0,
     scannedSampleNumber: null,
     settings: { reviewBeforeVerify: false, printUnverified: false, resultLanguage: 'en' },
     ...overrides,

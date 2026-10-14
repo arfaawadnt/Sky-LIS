@@ -36,7 +36,7 @@ public sealed class ResultsFlowTests(ApiFactory factory) : IClassFixture<ApiFact
     {
         var lab = await SeedLabAsync();
         var (bench, _, _) = await factory.SeedUserAsync(tenantId: lab.Tenant, permissions: BenchPermissions, displayName: "Dr. Bench", branchIds: [lab.Branch]);
-        await GrantResultRightsAsync(lab.Tenant, bench, lab.Group, SpecialRights.All);
+        await GrantResultRightsAsync(lab.Tenant, bench, SpecialRights.All, lab.Group);
         var client = await SignedInClientAsync(bench);
         var visit = await RegisterVisitAsync(lab);
 
@@ -115,10 +115,10 @@ public sealed class ResultsFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         var lab = await SeedLabAsync();
         var visit = await RegisterVisitAsync(lab);
         var (viewer, _, _) = await factory.SeedUserAsync(tenantId: lab.Tenant, permissions: ViewerPermissions, branchIds: [lab.Branch]);
-        await GrantResultRightsAsync(lab.Tenant, viewer, lab.Group, SpecialRights.None);
+        await GrantResultRightsAsync(lab.Tenant, viewer, SpecialRights.None, lab.Group);
         var (noRights, _, _) = await factory.SeedUserAsync(tenantId: lab.Tenant, permissions: BenchPermissions, branchIds: [lab.Branch]);
         var (branchless, _, _) = await factory.SeedUserAsync(tenantId: lab.Tenant, permissions: BenchPermissions);
-        await GrantResultRightsAsync(lab.Tenant, branchless, lab.Group, SpecialRights.All);
+        await GrantResultRightsAsync(lab.Tenant, branchless, SpecialRights.All, lab.Group);
         var (stranger, _, _) = await factory.SeedUserAsync(permissions: BenchPermissions, branchIds: [Guid.CreateVersion7()]);
 
         var viewerClient = await SignedInClientAsync(viewer);
@@ -148,7 +148,69 @@ public sealed class ResultsFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.Equal(HttpStatusCode.BadRequest, noQuery.StatusCode);
     }
 
+    [DatabaseFact]
+    public async Task A_unit_names_the_results_outside_the_users_rights_and_their_clinical_groups()
+    {
+        // Change request 2026-10-14: a print-alone service spanning two clinical groups (Urine C/S with a chemistry member)
+        // shows a user with rights on one group the unit, the visible rows and a note of what is hidden and why.
+        var (lab, micro, cultureTest) = await SeedPrintAloneLabAsync();
+        var visit = await RegisterVisitAsync(lab, cultureTest);
+        var (chemist, _, _) = await factory.SeedUserAsync(tenantId: lab.Tenant, permissions: ViewerPermissions, branchIds: [lab.Branch]);
+        await GrantResultRightsAsync(lab.Tenant, chemist, SpecialRights.None, lab.Group);
+        var (both, _, _) = await factory.SeedUserAsync(tenantId: lab.Tenant, permissions: ViewerPermissions, branchIds: [lab.Branch]);
+        await GrantResultRightsAsync(lab.Tenant, both, SpecialRights.None, lab.Group, micro);
+
+        var partial = (await (await SignedInClientAsync(chemist)).GetFromJsonAsync<ResultCaseView>($"{Results}?accession={visit.Accession}"))!;
+        var unit = Assert.Single(partial.Units);
+        Assert.Equal((0, 1, 1), (partial.HiddenUnits, partial.HiddenResults, unit.HiddenResults));
+        Assert.Equal(lab.Test, Assert.Single(unit.Results).TestId);
+        var hiddenGroup = Assert.Single(unit.HiddenGroups);
+        Assert.Equal((micro, "MICRO", "Microbiology"), (hiddenGroup.Id, hiddenGroup.Code, hiddenGroup.NameEn));
+
+        var full = (await (await SignedInClientAsync(both)).GetFromJsonAsync<ResultCaseView>($"{Results}?accession={visit.Accession}"))!;
+        var whole = Assert.Single(full.Units);
+        Assert.Equal((0, 0, 0, 2), (full.HiddenUnits, full.HiddenResults, whole.HiddenResults, whole.Results.Count));
+        Assert.Empty(whole.HiddenGroups);
+    }
+
     private sealed record Lab(Guid Tenant, Guid Branch, Guid Group, Guid SampleType, Guid Test, Guid Service);
+
+    /// <summary>Two clinical groups, a potassium test in the first, a culture-like test in the second, and one print-alone profile holding both.</summary>
+    private async Task<(Lab Lab, Guid SecondGroup, Guid SecondTest)> SeedPrintAloneLabAsync()
+    {
+        var tenant = Guid.CreateVersion7();
+        using var scope = factory.Services.CreateScope();
+        using var tenantScope = scope.ServiceProvider.GetRequiredService<ICurrentTenantSetter>().ForTenant(tenant);
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var now = factory.Clock.UtcNow;
+
+        var chemistry = ClinicalGroup.Create("CHEM", "C", new LocalizedText("Chemistry", "الكيمياء"), "Clinical chemistry", null, 1, now);
+        var micro = ClinicalGroup.Create("MICRO", "M", new LocalizedText("Microbiology", "الميكروبيولوجي"), "Microbiology", null, 2, now);
+        var sampleType = SampleType.Create("URN", "Urine", new LocalizedText("Urine", "بول"), [], now);
+        context.Set<ClinicalGroup>().AddRange(chemistry, micro);
+        context.Set<SampleType>().Add(sampleType);
+        await unitOfWork.SaveChangesAsync(CancellationToken.None);
+
+        var potassium = LabTest.Create("K", new LabTestDefinition(new LocalizedText("Potassium", "بوتاسيوم"), "Potassium", null, null, chemistry.Id, LabTestType.Numeric, null, null, null, GenderRestriction.Any, null, 1, false, true, 1, null), now);
+        var culture = LabTest.Create("UCS", new LabTestDefinition(new LocalizedText("Urine culture", "مزرعة بول"), "Urine culture", null, null, micro.Id, LabTestType.Numeric, null, null, null, GenderRestriction.Any, null, 0, false, true, 1, null), now);
+        context.Set<LabTest>().AddRange(potassium, culture);
+        await unitOfWork.SaveChangesAsync(CancellationToken.None);
+
+        var service = Service.Create(
+            "UCS",
+            ServiceType.Profile,
+            new ServiceDefinition("UCS", null, new LocalizedText("Urine C/S", "مزرعة بول"), null, null, null, micro.Id, sampleType.Id, null, null, [], null, GenderRestriction.Any, 48, 1, true, true, false, null),
+            20,
+            [
+                new ResolvedServiceMember(ServiceMemberKind.Test, culture.Id, 1, false, true, LabTestType.Numeric, null),
+                new ResolvedServiceMember(ServiceMemberKind.Test, potassium.Id, 2, false, true, LabTestType.Numeric, null),
+            ],
+            now);
+        context.Set<Service>().Add(service);
+        await unitOfWork.SaveChangesAsync(CancellationToken.None);
+        return (new Lab(tenant, Guid.CreateVersion7(), chemistry.Id, sampleType.Id, potassium.Id, service.Id), micro.Id, culture.Id);
+    }
 
     /// <summary>A clinical group, a sample type, a numeric potassium test with its band and a single-test service in a new tenant.</summary>
     private async Task<Lab> SeedLabAsync()
@@ -184,11 +246,11 @@ public sealed class ResultsFlowTests(ApiFactory factory) : IClassFixture<ApiFact
     }
 
     /// <summary>Runs the Samples and Results policies for a registration the way the outbox processor would (Release 1 defaults: the tube is received at once).</summary>
-    private async Task<VisitRegistered> RegisterVisitAsync(Lab lab)
+    private async Task<VisitRegistered> RegisterVisitAsync(Lab lab, Guid? secondTest = null)
     {
         var suffix = Guid.CreateVersion7().ToString("N")[^6..].ToUpperInvariant();
         var tube = Guid.CreateVersion7();
-        var line = new RegisteredLine(Guid.CreateVersion7(), lab.Service, tube, "Ordered", [lab.Test]);
+        var line = new RegisteredLine(Guid.CreateVersion7(), lab.Service, tube, "Ordered", secondTest is { } extra ? [lab.Test, extra] : [lab.Test]);
         var registered = new VisitRegistered(
             Guid.CreateVersion7(),
             $"ACC-{suffix}",
@@ -210,13 +272,13 @@ public sealed class ResultsFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         return registered;
     }
 
-    /// <summary>Result rights on the group in every branch and the given special rights, on the role the seeding gave the user.</summary>
-    private async Task GrantResultRightsAsync(Guid tenant, string username, Guid group, SpecialRights special)
+    /// <summary>Full result rights on the groups in every branch and the given special rights, on the role the seeding gave the user.</summary>
+    private async Task GrantResultRightsAsync(Guid tenant, string username, SpecialRights special, params Guid[] groups)
     {
         using var scope = factory.Services.CreateScope();
         using var tenantScope = scope.ServiceProvider.GetRequiredService<ICurrentTenantSetter>().ForTenant(tenant);
         var role = (await scope.ServiceProvider.GetRequiredService<IRoleRepository>().FindByNameAsync($"role-{username}", CancellationToken.None))!;
-        role.SetResultRights([new ResultRight(group, null, true, true, true, true, true)], factory.Clock.UtcNow);
+        role.SetResultRights(groups.Select(group => ResultRight.Full(group)), factory.Clock.UtcNow);
         role.SetSpecialRights(special.Copy(), factory.Clock.UtcNow);
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
     }

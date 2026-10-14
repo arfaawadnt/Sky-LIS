@@ -30,6 +30,35 @@ public sealed class RoleTests
     }
 
     [Fact]
+    public void A_result_right_is_granted_once_and_an_existing_row_is_left_as_set()
+    {
+        var group = Guid.CreateVersion7();
+        var role = Role.Create(Name, ["organization.manage"], FixedClock.Instant);
+        role.ClearDomainEvents();
+
+        Assert.True(role.GrantResultRight(ResultRight.Full(group), FixedClock.Instant));
+        Assert.False(role.GrantResultRight(ResultRight.Full(group), FixedClock.Instant));   // a retried policy run
+        var changed = Assert.IsType<RoleChanged>(Assert.Single(role.DomainEvents));
+        Assert.Equal(RoleChangeAspects.ResultRights, changed.Aspect);
+        Assert.Equal(new ResultRight(group, null, true, true, true, true, true), Assert.Single(role.ResultRightValues()));
+
+        var seeOnly = Guid.CreateVersion7();
+        role.SetResultRights([ResultRight.Full(group), new ResultRight(seeOnly, null, true, false, false, false, false)], FixedClock.Instant);
+        Assert.False(role.GrantResultRight(ResultRight.Full(seeOnly), FixedClock.Instant));
+        Assert.Equal(new ResultRight(seeOnly, null, true, false, false, false, false), role.ResultRightValues().Single(right => right.ClinicalGroupId == seeOnly));
+
+        var invalid = Assert.Throws<DomainException>(() => role.GrantResultRight(new ResultRight(Guid.Empty, null, true, true, true, true, true), FixedClock.Instant));
+        Assert.Equal(OrganizationCodes.ResultRightInvalid, invalid.Code);
+    }
+
+    [Fact]
+    public void A_role_manages_roles_when_it_holds_organization_manage()
+    {
+        Assert.True(Role.Create(Name, ["organization.manage"], FixedClock.Instant).ManagesRoles);
+        Assert.False(Role.Create(Name, ["organization.view", "organization.edit", "results.approve"], FixedClock.Instant).ManagesRoles);
+    }
+
+    [Fact]
     public void A_membership_takes_a_role_of_its_own_active_tenant_only()
     {
         var tenant = Guid.CreateVersion7();

@@ -23,6 +23,9 @@
           @if (view.hiddenUnits > 0) {
             <span class="tag">{{ countText('results.case.hiddenUnits', view.hiddenUnits) }}</span>
           }
+          @if (view.hiddenResults > 0) {
+            <span class="tag">{{ countText('results.case.hiddenResults', view.hiddenResults) }}</span>
+          }
         </span>
         <button type="button" class="btn sm ghost details-toggle" [attr.aria-expanded]="detailsOpen()" aria-controls="case-details" (click)="detailsOpen.set(!detailsOpen())">
           <app-icon name="info" [size]="14" />{{ i18n.t('results.case.details') }}
@@ -120,6 +123,11 @@
                 <span class="tag">{{ i18n.t('results.case.missingValues') }}</span>
               }
             </p>
+            @if (unit.hiddenResults > 0) {
+              <p class="unit-hidden small" role="note">
+                <app-icon name="shield" [size]="13" />{{ hiddenResultsText(unit) }}
+              </p>
+            }
             <div class="unit-actions">
               @if (canEnter(unit)) {
                 <button type="button" class="btn sm primary" [disabled]="busy() || facade.dirtyCount() === 0" (click)="save(unit)"><app-icon name="check" [size]="14" />{{ i18n.t('results.case.save') }}@if (facade.dirtyCount() > 0) { ({{ num(facade.dirtyCount()) }}) }</button>
