@@ -234,7 +234,12 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Installation record.** WIN-9S2KO4FA64L upgraded to 0.12.0 on 2026-10-14 (`docs/deploy/Installations.md`): clean-tag
+  build, verified backup, nothing pending in the migrations, configuration unchanged, smoke tests 20 / 20 by name and
+  20 / 20 by IP. The first start was refused by the start-up guard because of a stray machine-wide variable
+  `Auth__CredentialEnvelope__Mode` set earlier that day; the administrator removed it (API down about eight minutes).
+  The runbook's upgrade steps now say to check the machine environment for `*CredentialEnvelope*` first.
+  Documentation only; the installed 0.12.0 build is the same code as this release.
 
 ### v0.13.0 — 2026-10-14
 

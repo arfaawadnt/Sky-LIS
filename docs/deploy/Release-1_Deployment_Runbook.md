@@ -228,7 +228,10 @@ the scripts at hand; the scripts contain no secret. Replicate `E:\lis-backups` o
 ## 6. Upgrade
 
 1. **Build** the package for the new tag on the build box (§4) and copy it to `E:\lis-data\releases\<version>`.
-2. **Dry run** both install scripts with `-WhatIf`.
+2. **Dry run** both install scripts with `-WhatIf`. Also check that no machine-wide environment variable carries a key
+   the start-up guard refuses (`[Environment]::GetEnvironmentVariables('Machine').Keys -match 'CredentialEnvelope'`
+   must return nothing): the service inherits the machine environment, and such a variable stops every build,
+   including the rollback (found on 2026-10-14, 0.12.0).
 3. **Backup**: `backup-database.ps1 -EnvFile E:\lis-data\postgres.env` → note the dump name.
 4. **Stop the API** so no request runs across the schema change: `Stop-Service NTLIS`.
 5. **Migrations**: `psql -U lis_owner -d lis -v ON_ERROR_STOP=1 -f migrations.sql` with `PGCLIENTENCODING=UTF8` (idempotent; applies only what is missing).
