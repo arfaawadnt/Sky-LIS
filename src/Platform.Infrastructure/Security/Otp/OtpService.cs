@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Platform.Application.Abstractions.Notifications;
 using Platform.Application.Identity;
+using Platform.Infrastructure.Notifications;
 using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Persistence.Identity;
 using Platform.Infrastructure.Security.Hashing;
@@ -22,6 +23,7 @@ public sealed partial class OtpService(
     AppDbContext context,
     MasterKeyedHash mac,
     INotificationSender sender,
+    NotificationOptions notifications,
     SessionPolicy policy,
     SecurityOptions options,
     IClock clock,
@@ -30,7 +32,7 @@ public sealed partial class OtpService(
     private const string TargetPurpose = "otp-target";
     private const string CodePurpose = "otp-code";
 
-    public async Task<Guid> IssueAsync(string purpose, string target, string language, CancellationToken cancellationToken, string templateCode = NotificationTemplateCodes.Otp, NotificationChannel channel = NotificationChannel.Sms)
+    public async Task<OtpIssue> IssueAsync(string purpose, string target, string language, CancellationToken cancellationToken, string templateCode = NotificationTemplateCodes.Otp, NotificationChannel channel = NotificationChannel.Sms)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
         ArgumentException.ThrowIfNullOrWhiteSpace(target);
@@ -61,7 +63,8 @@ public sealed partial class OtpService(
         }
 
         LogIssued(logger, purpose, challenge.Id);
-        return challenge.Id;
+        // Lis:Notifications:RevealCodes (interim without an SMS gateway; ConfigGuard refuses it beside a gateway): the caller may show the code
+        return new OtpIssue(challenge.Id, notifications.RevealCodes ? code : null);
     }
 
     public async Task<bool> VerifyAsync(string purpose, string target, string code, CancellationToken cancellationToken)

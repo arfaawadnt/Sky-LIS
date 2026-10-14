@@ -14,6 +14,9 @@ public sealed class NotificationConfigGuardTests
     {
         Assert.Empty(ConfigGuard.InspectNotifications(new NotificationOptions(), production: true));
         Assert.Empty(ConfigGuard.InspectNotifications(new NotificationOptions { PickupDirectory = @"E:\lis-data\mail-pickup" }, production: true));
+        // revealing codes is an interim for a host without an SMS gateway: accepted alone (even in Production), refused beside a gateway
+        Assert.Empty(ConfigGuard.InspectNotifications(new NotificationOptions { PickupDirectory = @"E:\lis-data\mail-pickup", RevealCodes = true }, production: true));
+        Assert.Contains(ConfigGuard.InspectNotifications(new NotificationOptions { RevealCodes = true, Sms = new SmsGatewayOptions { Url = "https://sms.example.net/send", ApiKey = "k", Sender = "LIS" } }, production: false), violation => violation.Contains(NotificationOptions.RevealCodesKey, StringComparison.Ordinal));
         Assert.Empty(ConfigGuard.InspectNotifications(new NotificationOptions { PickupDirectory = @"E:\LIS\.local\mail-pickup" }, production: false));
         Assert.Empty(ConfigGuard.InspectNotifications(new NotificationOptions
         {

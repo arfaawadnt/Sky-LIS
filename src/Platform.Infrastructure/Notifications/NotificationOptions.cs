@@ -25,6 +25,7 @@ public sealed class NotificationOptions
     public const string SmsSenderKey = "Lis:Notifications:Sms:Sender";
     public const string SmsBodyTemplateKey = "Lis:Notifications:Sms:BodyTemplate";
     public const string SmsTimeoutKey = "Lis:Notifications:Sms:Timeout";
+    public const string RevealCodesKey = "Lis:Notifications:RevealCodes";
 
     /// <summary>The reserved production data root of CLAUDE.md §2; in Production the pickup directory lies under it.</summary>
     public const string ProductionDataRoot = @"E:\lis-data";
@@ -39,6 +40,13 @@ public sealed class NotificationOptions
     public SmtpNotificationOptions Smtp { get; init; } = new();
 
     public SmsGatewayOptions Sms { get; init; } = new();
+
+    /// <summary>
+    /// Interim of a host without an SMS gateway (2026-10-14): one-time codes are handed back to the flow that issued them so
+    /// the subscription wizard can show the code on the page. Refused by <c>ConfigGuard</c> once <see cref="Sms"/> is
+    /// configured; off by default.
+    /// </summary>
+    public bool RevealCodes { get; init; }
 
     public bool HasPickupDirectory => !string.IsNullOrWhiteSpace(PickupDirectory);
 

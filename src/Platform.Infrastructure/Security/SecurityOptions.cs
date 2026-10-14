@@ -172,6 +172,11 @@ public static class ConfigGuard
             }
         }
 
+        if (options.RevealCodes && options.Sms.IsConfigured)
+        {
+            violations.Add($"{NotificationOptions.RevealCodesKey} must be false once {NotificationOptions.SmsUrlKey} is configured");
+        }
+
         var smtp = options.Smtp;
         if (smtp.IsConfigured)
         {

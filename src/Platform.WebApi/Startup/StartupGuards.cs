@@ -73,7 +73,12 @@ public static class StartupGuards
 
         RefuseForbiddenKeys(app.Configuration);
         ConfigGuard.Enforce(app.Services.GetRequiredService<SecurityOptions>(), app.Services.GetRequiredService<SessionPolicy>());
-        ConfigGuard.EnforceNotifications(app.Services.GetRequiredService<NotificationOptions>(), app.Environment.IsProduction());
+        var notifications = app.Services.GetRequiredService<NotificationOptions>();
+        ConfigGuard.EnforceNotifications(notifications, app.Environment.IsProduction());
+        if (notifications.RevealCodes)
+        {
+            app.Logger.LogWarning("{Key} is on: one-time codes of the subscription wizard are shown on the page (interim until an SMS gateway is configured)", NotificationOptions.RevealCodesKey);
+        }
 
         var bindViolations = InspectBindings(ConfiguredBindings(app.Configuration).Concat(app.Urls));
         if (bindViolations.Count > 0)

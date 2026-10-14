@@ -131,6 +131,31 @@ describe('Public pages (CP-01, CP-02)', () => {
       await render();
       expect(root.textContent).toContain('public.wizard.verifyTitle');
       expect(root.querySelector<HTMLButtonElement>('button.link')?.disabled).toBe(true);
+      // without a revealed code (an SMS gateway sends it) the page shows nothing but the masked mobile
+      expect(root.querySelector('.code-reveal')).toBeNull();
+    });
+
+    it('shows the verification code on the page when the host reveals it (no SMS gateway yet, 2026-10-14)', async () => {
+      setValue(root, 'select[formcontrolname=countryId]', 'eg');
+      await render();
+      backend.expectOne((request) => request.url === PUBLIC_SUBSCRIPTION_API.governorates).flush([{ id: 'cairo', countryId: 'eg', nameEn: 'Cairo', nameAr: 'القاهرة' }]);
+      await render();
+      setValue(root, 'input[formcontrolname=labNameEn]', 'Al Noor Laboratories');
+      setValue(root, 'input[formcontrolname=labNameAr]', 'مختبرات النور');
+      setValue(root, 'select[formcontrolname=governorateId]', 'cairo');
+      setValue(root, 'input[formcontrolname=address]', 'Nasr City');
+      setValue(root, 'input[formcontrolname=mobile]', '01012345678');
+      setValue(root, 'input[formcontrolname=managerName]', 'Ahmed Hassan');
+      setValue(root, 'input[formcontrolname=managerMobile]', '01012345679');
+      (root.querySelector('form button[type=submit]') as HTMLButtonElement).click();
+      await render();
+      backend.expectOne(PUBLIC_SUBSCRIPTION_API.start).flush({ subscriptionId: 'sub-1', expiresAtUtc: '2026-10-09T13:00:00Z', maskedMobile: '+201******679', codeLifetimeSeconds: 300, verificationCode: '482913' });
+      await render();
+      const reveal = root.querySelector('.code-reveal');
+      expect(reveal?.textContent).toContain('public.wizard.codeShown');
+      expect(reveal?.querySelector('.mono')?.textContent?.trim()).toBe('482913');
+      // the code is shown, not typed in: the person still enters it
+      expect(root.querySelector<HTMLInputElement>('input[formcontrolname=code]')?.value).toBe('');
     });
   });
 });

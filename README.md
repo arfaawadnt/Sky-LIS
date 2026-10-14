@@ -234,7 +234,11 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Subscription wizard shows the verification code (interim).** Until an SMS gateway is connected, the public
+  *Subscribe* page shows the one-time code sent to the manager's mobile right on the verification step (the person still
+  types it). Controlled by the host setting `Lis:Notifications:RevealCodes` (off by default; the start-up guard refuses
+  it once `Lis:Notifications:Sms:Url` is configured, and logs a warning while it is on). The start / resend answer of
+  `/api/v1/public/subscriptions` carries `verificationCode` on such a host; password recovery is unchanged.
 
 ### v0.12.0 — 2026-10-14
 

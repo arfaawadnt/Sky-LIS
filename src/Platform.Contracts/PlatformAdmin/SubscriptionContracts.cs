@@ -19,7 +19,8 @@ public sealed record StartSubscriptionRequest(
     string? Language);
 
 /// <summary>The request to continue with; the code went to <paramref name="MaskedMobile"/> and lives <paramref name="CodeLifetimeSeconds"/>.</summary>
-public sealed record SubscriptionStarted(Guid SubscriptionId, DateTimeOffset ExpiresAtUtc, string MaskedMobile, int CodeLifetimeSeconds);
+/// <summary><see cref="VerificationCode"/> is present only on a host that reveals codes (<c>Lis:Notifications:RevealCodes</c>, no SMS gateway yet): the wizard shows it.</summary>
+public sealed record SubscriptionStarted(Guid SubscriptionId, DateTimeOffset ExpiresAtUtc, string MaskedMobile, int CodeLifetimeSeconds, string? VerificationCode = null);
 
 public sealed record VerifySubscriptionRequest(Guid SubscriptionId, string Code);
 

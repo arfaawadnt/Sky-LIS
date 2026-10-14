@@ -39,6 +39,7 @@ public sealed partial class NotificationDeliveryFlowTests : IClassFixture<ApiFac
     {
         _factory = factory;
         _factory.Overrides[NotificationOptions.PickupDirectoryKey] = PickupDirectory;   // the real sender, not the recording one
+        _factory.Overrides[NotificationOptions.RevealCodesKey] = "true";   // the subscription answer carries the code (no SMS gateway yet, 2026-10-14)
     }
 
     [DatabaseFact]
@@ -82,6 +83,7 @@ public sealed partial class NotificationDeliveryFlowTests : IClassFixture<ApiFac
         });
         Assert.Equal("otp", otp.Header("Template"));
         Assert.Equal($"Your Sky LIS verification code is {otp.Code}. It is valid for 5 minutes.", otp.Body);
+        Assert.Equal(otp.Code, started!.VerificationCode);   // the host reveals codes: the wizard shows this one on the page
 
         Assert.Equal(HttpStatusCode.NoContent, (await anonymous.PostAsJsonAsync($"{Subscriptions}/verify", new VerifySubscriptionRequest(started!.SubscriptionId, otp.Code))).StatusCode);
 

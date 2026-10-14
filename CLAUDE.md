@@ -347,7 +347,9 @@ QMS source is never read or copied (section 1); everything here is written from 
   with channel, recipient, template, language, subject, body); `DeliveringNotificationSender` renders through the template
   source (so an inactive SA-20 template falls back to the built-in text, TPL-07) and absorbs a gateway failure (logged,
   event 7204); with nothing configured `LoggingNotificationSender` stays the default. `ConfigGuard.InspectNotifications`
-  (transport rules everywhere; in Production the pickup folder under `E:\lis-data`). Dev API: `appsettings.Development.json`;
+  (transport rules everywhere; in Production the pickup folder under `E:\lis-data`; `Lis:Notifications:RevealCodes` (interim without an
+  SMS gateway, 2026-10-14) makes `IOtpService.IssueAsync` return the code in `OtpIssue.RevealedCode` so the subscription wizard shows it
+  (`SubscriptionStarted.VerificationCode`); refused beside `Sms:Url`, warned at start-up; on in `appsettings.Development.json`). Dev API: `appsettings.Development.json`;
   validation API: launch argument; read codes from the folder (`NotificationDeliveryFlowTests` shows how);
   `PlatformUser.Mobile`; `POST /api/v1/auth/recovery/{start,complete}` (always 202 /
   204 or `AUTH-013`). **Tenant settings** — `app.tenant_settings` + `Platform.Domain.Settings.SettingKeys` (26 typed

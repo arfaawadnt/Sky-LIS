@@ -96,6 +96,7 @@
   "wizard.sendCode": "Send verification code",
   "wizard.verifyTitle": "Enter the verification code",
   "wizard.codeSent": "We sent a code to {mobile}.",
+  "wizard.codeShown": "SMS sending is not connected yet — your verification code is:",
   "wizard.codeValidity": "The code is valid for {minutes} minutes.",
   "wizard.startAgain": "Start again",
   "wizard.resendIn": "Send a new code in {seconds} s",

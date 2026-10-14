@@ -76,13 +76,18 @@ public static class NotificationTemplateCodes
 /// <summary>
 /// One-time codes (02 §4.5 as a capability; SRS CP-02/CP-03): issued for a purpose and a target (mobile or e-mail),
 /// hashed at rest, valid five minutes, five attempts, consumed on first success. The code is sent through
-/// <see cref="INotificationSender"/> and never returned to the caller.
+/// <see cref="INotificationSender"/>; it comes back to the caller only on a host configured to reveal codes
+/// (<c>Lis:Notifications:RevealCodes</c>, the interim of a laboratory without an SMS gateway: the subscription wizard
+/// shows it on the page, 2026-10-14).
 /// </summary>
 public interface IOtpService
 {
-    /// <summary>Issues and sends a code; returns the challenge id. An earlier live challenge for the same purpose and target is superseded.</summary>
-    Task<Guid> IssueAsync(string purpose, string target, string language, CancellationToken cancellationToken, string templateCode = NotificationTemplateCodes.Otp, NotificationChannel channel = NotificationChannel.Sms);
+    /// <summary>Issues and sends a code; returns the challenge id and, when the host reveals codes, the code. An earlier live challenge for the same purpose and target is superseded.</summary>
+    Task<OtpIssue> IssueAsync(string purpose, string target, string language, CancellationToken cancellationToken, string templateCode = NotificationTemplateCodes.Otp, NotificationChannel channel = NotificationChannel.Sms);
 
     /// <summary>True once, for the live challenge of this purpose and target; every wrong code counts an attempt and the fifth closes the challenge.</summary>
     Task<bool> VerifyAsync(string purpose, string target, string code, CancellationToken cancellationToken);
 }
+
+/// <summary>An issued one-time code: its challenge id and, only when <c>Lis:Notifications:RevealCodes</c> is on, the code.</summary>
+public sealed record OtpIssue(Guid ChallengeId, string? RevealedCode);

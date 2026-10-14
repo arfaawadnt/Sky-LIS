@@ -211,3 +211,22 @@ a.btn {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.code-reveal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md, 10px);
+  background: var(--warn-soft);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+}
+
+.code-reveal b {
+  font-size: 1.5rem;
+  letter-spacing: 0.15em;
+}

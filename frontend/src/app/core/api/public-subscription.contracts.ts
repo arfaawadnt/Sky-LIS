@@ -52,6 +52,8 @@ export interface SubscriptionStarted {
   /** `+201******678` */
   readonly maskedMobile: string;
   readonly codeLifetimeSeconds: number;
+  /** Present only on a host that reveals codes (no SMS gateway yet, `Lis:Notifications:RevealCodes`): the wizard shows it on the page. */
+  readonly verificationCode?: string | null;
 }
 
 export interface VerifySubscriptionRequest {

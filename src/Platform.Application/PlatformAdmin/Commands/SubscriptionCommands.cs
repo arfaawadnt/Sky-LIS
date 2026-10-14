@@ -92,9 +92,9 @@ public sealed class StartSubscriptionHandler(
         requests.Add(request);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        await otp.IssueAsync(SubscriptionOtp.Purpose, request.ManagerMobile, request.Language, cancellationToken, NotificationTemplateCodes.Otp);
+        var issued = await otp.IssueAsync(SubscriptionOtp.Purpose, request.ManagerMobile, request.Language, cancellationToken, NotificationTemplateCodes.Otp);
         await events.WriteAsync(new SecurityEvent(PlatformAdminSecurityEvents.SubscriptionStarted, SecurityEvent.Info, Detail: $"subscription:{request.Id}"), cancellationToken);
-        return new SubscriptionStarted(request.Id, request.ExpiresAtUtc, SubscriptionOtp.Mask(request.ManagerMobile), (int)sessionPolicy.OtpLifetime.TotalSeconds);
+        return new SubscriptionStarted(request.Id, request.ExpiresAtUtc, SubscriptionOtp.Mask(request.ManagerMobile), (int)sessionPolicy.OtpLifetime.TotalSeconds, issued.RevealedCode);
     }
 }
 
@@ -116,8 +116,8 @@ public sealed class ResendSubscriptionCodeHandler(ISubscriptionRequestRepository
         request.RecordCodeSent(clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        await otp.IssueAsync(SubscriptionOtp.Purpose, request.ManagerMobile, request.Language, cancellationToken, NotificationTemplateCodes.Otp);
-        return new SubscriptionStarted(request.Id, request.ExpiresAtUtc, SubscriptionOtp.Mask(request.ManagerMobile), (int)sessionPolicy.OtpLifetime.TotalSeconds);
+        var issued = await otp.IssueAsync(SubscriptionOtp.Purpose, request.ManagerMobile, request.Language, cancellationToken, NotificationTemplateCodes.Otp);
+        return new SubscriptionStarted(request.Id, request.ExpiresAtUtc, SubscriptionOtp.Mask(request.ManagerMobile), (int)sessionPolicy.OtpLifetime.TotalSeconds, issued.RevealedCode);
     }
 }
 

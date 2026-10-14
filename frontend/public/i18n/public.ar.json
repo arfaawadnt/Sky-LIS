@@ -96,6 +96,7 @@
   "wizard.sendCode": "إرسال رمز التحقق",
   "wizard.verifyTitle": "أدخل رمز التحقق",
   "wizard.codeSent": "أرسلنا رمزاً إلى {mobile}.",
+  "wizard.codeShown": "إرسال الرسائل النصية غير مفعّل بعد — رمز التحقق الخاص بك هو:",
   "wizard.codeValidity": "الرمز صالح لمدة {minutes} دقائق.",
   "wizard.startAgain": "البدء من جديد",
   "wizard.resendIn": "إرسال رمز جديد بعد {seconds} ث",

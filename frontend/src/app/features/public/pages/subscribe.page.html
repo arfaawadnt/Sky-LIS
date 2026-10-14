@@ -89,6 +89,12 @@
           <span class="badge-icon" aria-hidden="true"><app-icon name="shield" [size]="26" /></span>
           <h2>{{ i18n.t('public.wizard.verifyTitle') }}</h2>
           <p class="muted">{{ i18n.tf('public.wizard.codeSent', { mobile: facade.started()?.maskedMobile ?? '' }) }}</p>
+          @if (facade.started()?.verificationCode; as code) {
+            <p class="code-reveal" role="status">
+              <span>{{ i18n.t('public.wizard.codeShown') }}</span>
+              <b class="mono" dir="ltr">{{ code }}</b>
+            </p>
+          }
           <p class="info-strip">{{ i18n.tf('public.wizard.codeValidity', { minutes: facade.codeMinutes() }) }}</p>
 
           <app-form-field [label]="i18n.t('public.field.code')">
