@@ -234,7 +234,7 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Installation record.** WIN-9S2KO4FA64L upgraded to 0.14.0 on 2026-10-14 (`docs/deploy/Installations.md`): clean-tag build, verified backup, nothing pending, configuration unchanged, smoke tests 20 / 20 by name and 20 / 20 by IP; the demo laboratory's administrator flagged as primary administrator so the new self-approval applies there. Documentation only; the installed 0.14.0 build is the same code as this release.
 
 ### v0.14.0 — 2026-10-14
 
