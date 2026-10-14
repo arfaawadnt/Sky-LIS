@@ -38,6 +38,11 @@ internal sealed class ServiceRepository(AppDbContext context) : Repository<Servi
         return await Set.Where(service => list.Contains(service.Id)).ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<Service>> GetCarryingTestForUpdateAsync(Guid testId, CancellationToken cancellationToken) =>
+        await Set.Where(service => service.Members.Any(member => member.Kind == ServiceMemberKind.Test && member.MemberId == testId))
+            .OrderBy(service => service.Sequence)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
     public async Task<IReadOnlyDictionary<Guid, ServiceMemberState>> MemberStatesAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(ids);

@@ -71,6 +71,7 @@ internal sealed class LabTestRepository(AppDbContext context) : Repository<LabTe
         }
 
         var timing = new LabTestTimingItem(test.DurationHours, test.MinDurationHours, test.FrequencyCheckDays, test.FrequencyAction.ToString(), test.DeltaPercent, test.DeltaWindowDays, test.TestDays);
+        var parents = await ParentServicesAsync(id, cancellationToken).ConfigureAwait(false);
         return new LabTestDetail(
             test.Id,
             test.Code,
@@ -109,7 +110,22 @@ internal sealed class LabTestRepository(AppDbContext context) : Repository<LabTe
                 band.TextRange)).ToList(),
             test.ListValues.OrderBy(value => value.DisplayOrder).Select(value => new ListValueItem(value.Value, value.IsNormal, value.IsCritical, value.IsDefault, value.IsPlaceholder, value.Colour)).ToList(),
             test.Paragraphs.OrderBy(paragraph => paragraph.DisplayOrder).Select(paragraph => new ParagraphItem(paragraph.Title, paragraph.Text)).ToList(),
+            parents,
             test.IsActive);
+    }
+
+    /// <summary>The services carrying the test as a member (CP-41 "parent services"), in the global report order.</summary>
+    private async Task<IReadOnlyList<LabTestParentView>> ParentServicesAsync(Guid testId, CancellationToken cancellationToken)
+    {
+        var rows = await (
+            from member in Context.Set<ServiceMember>().AsNoTracking()
+            join service in Context.Set<Service>().AsNoTracking().IgnoreAutoIncludes()
+                on new { member.TenantId, Id = member.ServiceId } equals new { service.TenantId, service.Id }
+            where member.Kind == ServiceMemberKind.Test && member.MemberId == testId
+            orderby service.Sequence, service.Code
+            select new { service.Id, service.Code, NameEn = service.Name.En, NameAr = service.Name.Ar, service.Type, service.IsActive, member.Order })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        return rows.Select(row => new LabTestParentView(row.Id, row.Code, row.NameEn, row.NameAr, row.Type.ToString(), row.IsActive, row.Order)).ToList();
     }
 
     public async Task<Paged<TestLookupItem>> LookupAsync(string? search, LabTestType? type, PageRequest page, CancellationToken cancellationToken)

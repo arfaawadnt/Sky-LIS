@@ -116,6 +116,49 @@
         @if (general.controls.isHiddenHelper.value) {
           <p class="full warn-strip">{{ i18n.t('catalogue-a.tests.hiddenHelperHint') }}</p>
         }
+
+        <!-- parent services (CP-41): the services carrying this test; a profile or culture is joined or left from here -->
+        <div class="full parents" role="group" [attr.aria-label]="i18n.t('catalogue-a.tests.parents.title')">
+          <div class="parents-head">
+            <span class="parents-title">{{ i18n.t('catalogue-a.tests.parents.title') }}</span>
+            <span class="muted small">{{ i18n.t('catalogue-a.tests.parents.hint') }}</span>
+          </div>
+          <ul class="chips">
+            @for (parent of parents(); track parent.serviceId) {
+              <li class="chip" [class.inactive]="!parent.isActive">
+                <span class="mono">{{ parent.code }}</span>
+                <span>{{ name(parent) }}</span>
+                <app-badge tone="neutral">{{ serviceTypeLabel(parent.type) }}</app-badge>
+                @if (!parent.isActive) {
+                  <app-badge status="Inactive" />
+                }
+                @if (canLeave(parent)) {
+                  <button type="button" class="row-btn danger" [disabled]="!canEdit()" (click)="removeParent(parent.serviceId)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="13" /></button>
+                } @else {
+                  <span class="chip-note" [title]="i18n.t('catalogue-a.tests.parents.locked')">{{ i18n.t('catalogue-a.tests.parents.lockedShort') }}</span>
+                }
+              </li>
+            } @empty {
+              <li class="muted small">{{ i18n.t('catalogue-a.tests.parents.none') }}</li>
+            }
+          </ul>
+          @if (canEdit()) {
+            <div class="parents-picker">
+              <app-search-box [placeholder]="i18n.t('catalogue-a.tests.parents.search')" (searchChange)="searchParents($event)" />
+              <ul class="candidates">
+                @for (item of parentCandidates(); track item.id) {
+                  <li>
+                    <span class="mono">{{ item.code }}</span>
+                    <span class="grow">{{ name(item) }} <app-badge tone="neutral">{{ serviceTypeLabel(item.type) }}</app-badge></span>
+                    <button type="button" class="btn sm soft" (click)="addParent(item)"><app-icon name="plus" [size]="13" />{{ i18n.t('catalogue-a.add') }}</button>
+                  </li>
+                } @empty {
+                  <li class="muted">{{ i18n.t(facade.parentSearch() === null ? 'catalogue-a.tests.parents.searchHint' : 'catalogue-a.tests.parents.noCandidates') }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
       </div>
     </form>
 

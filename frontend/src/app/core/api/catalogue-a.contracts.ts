@@ -352,7 +352,19 @@ export interface LabTestDetail extends LabTestGeneral {
   readonly rangeBands: readonly RangeBandItem[];
   readonly listValues: readonly ListValueItem[];
   readonly paragraphs: readonly ParagraphItem[];
+  readonly parentServices: readonly LabTestParentView[];
   readonly isActive: boolean;
+}
+
+/** A service that carries the test as a member (CP-41 "parent services"), with the test's order in it. */
+export interface LabTestParentView {
+  readonly serviceId: string;
+  readonly code: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly type: ServiceType;
+  readonly isActive: boolean;
+  readonly order: number;
 }
 
 export interface LabTestListFilter extends CatalogueListFilter {
@@ -388,6 +400,15 @@ export function serviceCarriesSample(type: ServiceType): boolean {
 /** `Package` holds services, `Additional` nothing, every other type holds tests. */
 export function serviceMemberKind(type: ServiceType): ServiceMemberKind | null {
   return type === 'Package' ? 'Service' : type === 'Additional' ? null : 'Test';
+}
+
+/**
+ * Profiles and cultures take any number of tests, so a test joins or leaves them from its own page (CP-41 "parent
+ * services"); a test service or a text report carries exactly one test and a package none, so those are set up from
+ * the service (the server refuses with CAT-021 / CAT-022 regardless).
+ */
+export function serviceTakesTestsFreely(type: ServiceType): boolean {
+  return type === 'Profile' || type === 'Culture';
 }
 
 export const CATALOGUE_A_API = {

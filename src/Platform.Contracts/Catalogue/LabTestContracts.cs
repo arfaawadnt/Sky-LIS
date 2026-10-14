@@ -120,7 +120,14 @@ public sealed record LabTestDetail(
     IReadOnlyList<RangeBandItem> RangeBands,
     IReadOnlyList<ListValueItem> ListValues,
     IReadOnlyList<ParagraphItem> Paragraphs,
+    IReadOnlyList<LabTestParentView> ParentServices,
     bool IsActive);
+
+/// <summary>A service that carries the test as a member (CP-41 "parent services", intake T21): its identity, type, activity and the test's order in it.</summary>
+public sealed record LabTestParentView(Guid ServiceId, string Code, string NameEn, string NameAr, string Type, bool IsActive, int Order);
+
+/// <summary>The services that are to carry the test after the call (T21): the test joins the new ones and leaves the omitted ones.</summary>
+public sealed record SetParentServicesRequest(IReadOnlyList<Guid> ServiceIds);
 
 /// <summary>Lookup row for every module's test picker (active tests only).</summary>
 public sealed record TestLookupItem(Guid Id, string Code, string NameEn, string NameAr, string Type, Guid ClinicalGroupId, string ClinicalGroupNameEn, string ClinicalGroupNameAr, string? UnitName);

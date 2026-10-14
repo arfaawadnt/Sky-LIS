@@ -7,7 +7,16 @@ import type { FormArray, FormControl, FormGroup } from '@angular/forms';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
-import { CATALOGUE_A_API, CATALOGUE_A_PERMISSIONS, type ClinicalGroupListItem, type LabTestDetail, type Paged, type SampleConditionView } from '../../../core/api/catalogue-a.contracts';
+import {
+  CATALOGUE_A_API,
+  CATALOGUE_A_PERMISSIONS,
+  type ClinicalGroupListItem,
+  type LabTestDetail,
+  type LabTestParentView,
+  type Paged,
+  type SampleConditionView,
+  type ServiceLookupItem,
+} from '../../../core/api/catalogue-a.contracts';
 import type { ProblemDetails } from '../../../core/api/problem-details';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
@@ -38,6 +47,11 @@ interface TestEditorInternals {
   readonly activeTab: () => string | null;
   readonly problems: () => Partial<Record<string, ProblemDetails>>;
   removeAt(kind: 'bands' | 'values' | 'paragraphs', index: number): void;
+  readonly parents: () => readonly LabTestParentView[];
+  readonly parentCandidates: () => readonly ServiceLookupItem[];
+  searchParents(search: string): void;
+  addParent(item: ServiceLookupItem): void;
+  removeParent(serviceId: string): void;
   save(): Promise<void>;
 }
 
@@ -75,6 +89,7 @@ const glucose: LabTestDetail = {
   rangeBands: [{ sex: 'Any', ageFrom: 0, ageTo: 150, ageUnit: 'Years', patientConditionId: null, low: 70, high: 110, panicLow: null, panicHigh: null, reportableLow: null, reportableHigh: null, textRange: null }],
   listValues: [],
   paragraphs: [],
+  parentServices: [],
   isActive: true,
 };
 
@@ -482,6 +497,89 @@ describe('TestEditorPage (CP-41)', () => {
       expect(root().querySelector('.editor > p.problem[role="alert"]')?.textContent).toContain('masterData.invalid');
       expect(document.activeElement).toBe(root().querySelector('input[formcontrolname="code"]'));
       expect(editor.activeTab()).toBe('general');
+    });
+  });
+
+  describe('parent services (CP-41, change request 2026-10-14)', () => {
+    const parent = (serviceId: string, code: string, type: LabTestParentView['type']): LabTestParentView => ({ serviceId, code, nameEn: code, nameAr: code, type, isActive: true, order: 1 });
+    const lookupItem = (id: string, type: ServiceLookupItem['type']): ServiceLookupItem => ({
+      id, code: id.toUpperCase(), shortName: id, shortcutNo: null, nameEn: id, nameAr: id, type, clinicalGroupId: null, clinicalGroupNameEn: null, clinicalGroupNameAr: null, isOrderable: true,
+    });
+    const carried: LabTestDetail = { ...glucose, parentServices: [parent('s1', 'GLU', 'Test'), parent('s2', 'RENAL', 'Profile')] };
+
+    it('shows the carrying services, lets the test leave a profile but not its own test service, and saves the list with the test', async () => {
+      const editor = await open('/catalogue/tests/t1', carried);
+      expect(editor.parents().map((row) => row.code)).toEqual(['GLU', 'RENAL']);
+
+      editor.removeParent('s1');   // a test service carries exactly this test: set up from the service
+      expect(editor.parents().map((row) => row.code)).toEqual(['GLU', 'RENAL']);
+      editor.removeParent('s2');
+      expect(editor.parents().map((row) => row.code)).toEqual(['GLU']);
+
+      const saving = editor.save();
+      await settle();
+      const put = backend.expectOne(`${CATALOGUE_A_API.tests}/t1/parent-services`);
+      expect(put.request.body).toEqual({ serviceIds: ['s1'] });
+      backend.expectNone((request) => request.method === 'PUT' && request.url === `${CATALOGUE_A_API.tests}/t1`);
+      put.flush(null, { status: 204, statusText: 'No Content' });
+      await saving;
+      await settle();
+      TestBed.tick();
+
+      // the re-read carries the new list
+      backend.expectOne((request) => request.method === 'GET' && request.url === `${CATALOGUE_A_API.tests}/t1`).flush({ ...carried, parentServices: [parent('s1', 'GLU', 'Test')] });
+      await settle();
+      TestBed.tick();
+      expect(editor.parents().map((row) => row.code)).toEqual(['GLU']);
+      expect(editor.problems()).toEqual({});
+    });
+
+    it('offers only profiles and cultures the test is not in yet; a refusal shows on the general tab and keeps the choice', async () => {
+      const editor = await open('/catalogue/tests/t1', carried);
+      editor.searchParents('ren');
+      await settle();
+      const lookup = backend.expectOne((request) => request.url === CATALOGUE_A_API.lookupServices);
+      expect(lookup.request.params.get('search')).toBe('ren');
+      lookup.flush(page([lookupItem('s2', 'Profile'), lookupItem('s3', 'Culture'), lookupItem('s4', 'Test'), lookupItem('s5', 'Package'), lookupItem('s6', 'Additional'), lookupItem('s7', 'Profile')]));
+      await settle();
+      TestBed.tick();
+      expect(editor.parentCandidates().map((row) => row.id)).toEqual(['s3', 's7']);
+
+      editor.addParent(lookupItem('s3', 'Culture'));
+      editor.addParent(lookupItem('s4', 'Test'));   // never offered, never taken
+      expect(editor.parents().map((row) => row.code)).toEqual(['GLU', 'RENAL', 'S3']);
+      expect(editor.parentCandidates().map((row) => row.id)).toEqual(['s7']);
+
+      const saving = editor.save();
+      await settle();
+      const put = backend.expectOne(`${CATALOGUE_A_API.tests}/t1/parent-services`);
+      expect(put.request.body).toEqual({ serviceIds: ['s1', 's2', 's3'] });
+      put.flush(refusal('CAT-036'), { status: 422, statusText: 'Unprocessable Entity' });
+      await saving;
+
+      expect(editor.activeTab()).toBe('general');
+      expect(editor.problems()['general']?.code).toBe('CAT-036');
+      expect(editor.parents().map((row) => row.code)).toEqual(['GLU', 'RENAL', 'S3']);
+      backend.expectNone((request) => request.method === 'GET' && request.url === `${CATALOGUE_A_API.tests}/t1`);
+    });
+
+    it('sends the chosen parents right after creating the test', async () => {
+      const editor = await open('/catalogue/tests/new', null);
+      editor.general.controls.code.setValue('UREA');
+      editor.general.controls.name.setValue({ en: 'Urea', ar: 'يوريا' });
+      editor.general.controls.clinicalGroupId.setValue('g1');
+      editor.addParent(lookupItem('s2', 'Profile'));
+      const saving = editor.save();
+      await settle();
+
+      backend.expectOne((request) => request.method === 'POST' && request.url === CATALOGUE_A_API.tests).flush({ id: 't9' }, { status: 201, statusText: 'Created' });
+      await settle();
+      const put = backend.expectOne(`${CATALOGUE_A_API.tests}/t9/parent-services`);
+      expect(put.request.body).toEqual({ serviceIds: ['s2'] });
+      put.flush(null, { status: 204, statusText: 'No Content' });
+      await saving;
+
+      expect(TestBed.inject(Router).url).toBe('/catalogue/tests/t9');
     });
   });
 });

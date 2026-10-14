@@ -32,4 +32,17 @@ public sealed class LabTestValidatorTests
 
         Assert.True(new ReplaceListValuesValidator().Validate(command).IsValid);
     }
+
+    [Fact]
+    public void Parent_services_are_distinct_non_empty_ids_and_may_be_none()
+    {
+        var renal = Guid.CreateVersion7();
+        var validator = new SetLabTestParentServicesValidator();
+
+        Assert.False(validator.Validate(new SetLabTestParentServicesCommand(Guid.CreateVersion7(), [renal, renal])).IsValid);
+        Assert.False(validator.Validate(new SetLabTestParentServicesCommand(Guid.CreateVersion7(), [Guid.Empty])).IsValid);
+        Assert.False(validator.Validate(new SetLabTestParentServicesCommand(Guid.Empty, [renal])).IsValid);
+        Assert.True(validator.Validate(new SetLabTestParentServicesCommand(Guid.CreateVersion7(), [])).IsValid);
+        Assert.True(validator.Validate(new SetLabTestParentServicesCommand(Guid.CreateVersion7(), [renal, Guid.CreateVersion7()])).IsValid);
+    }
 }

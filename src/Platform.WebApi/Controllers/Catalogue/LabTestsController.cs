@@ -95,6 +95,15 @@ public sealed class LabTestsController(ISender sender) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>The services that carry the test (CP-41 "parent services"): the test joins the new ones and leaves the omitted ones.</summary>
+    [HttpPut("{id:guid}/parent-services")]
+    public async Task<IActionResult> SetParentServices(Guid id, [FromBody] SetParentServicesRequest body, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        await sender.Send(new SetLabTestParentServicesCommand(id, body.ServiceIds), cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("formula/check")]
     public async Task<ActionResult<FormulaCheckResult>> CheckFormula([FromBody] CheckFormulaRequest body, CancellationToken cancellationToken)
     {

@@ -21,6 +21,9 @@ public interface IServiceRepository : IRepository<Service>
 
     Task<IReadOnlyList<Service>> GetManyForUpdateAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
 
+    /// <summary>Every service of the tenant that carries the test as a member, tracked with its members, in the global order (T21, parent services).</summary>
+    Task<IReadOnlyList<Service>> GetCarryingTestForUpdateAsync(Guid testId, CancellationToken cancellationToken);
+
     Task<IReadOnlyDictionary<Guid, ServiceMemberState>> MemberStatesAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
 
     Task<Paged<ServiceListItem>> ListAsync(ServiceListFilter filter, PageRequest page, CancellationToken cancellationToken);

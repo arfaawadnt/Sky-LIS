@@ -4,7 +4,7 @@
 | --- | --- |
 | Module | `catalogue` (half A; slot `cat`). Client pages CP-39 Clinical groups, CP-40 Services, CP-41 Tests, CP-42 Service sequence, CP-43 Sample types, CP-44 Units of measurement, CP-45 Patient conditions, CP-55 Additional services; admin SA-12/SA-13 reuse the same pages under the platform tenant. Business rules BR-02 (input), BR-08, BR-11, BR-12, BR-13, BR-19, BR-20, BR-24, BR-25. |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), the Sky LIS prototypes synthesis and the LDM knowledge base (`docs/knowledge/ldm/LDM_Business_Knowledge.md` §2.2, §2.5, §3.1–§3.8, §5.6, §6). **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.0 — 2026-10-09 |
+| Version | 1.1 — 2026-10-14 (parent services on the test page, change request: T21, scenario S-T21, question Q17) |
 | Implemented in | `src/Platform.Domain/Catalogue` (ClinicalGroup, SampleType, MeasurementUnit, PatientCondition, Service, LabTest, ReferenceRangeResolver), `src/Platform.Contracts/Catalogue`, `src/Platform.Application/Catalogue` (+ `Services/` formula evaluator, `ICatalogueLookup`, `ICatalogueACloner`), `src/Platform.Infrastructure/Persistence/Catalogue`, `src/Platform.WebApi/Controllers/Catalogue`, `frontend/src/app/features/catalogue/{pages-a,data-a,state-a,ui-a}`, `frontend/src/app/core/api/catalogue-a.contracts.ts`, `frontend/public/i18n/catalogue-a.{en,ar}.json` |
 | Codes | `CAT-001`…`CAT-199` (catalogue B uses `CAT-200`…`CAT-399`) |
 
@@ -94,6 +94,9 @@ aggregates are by id with a composite FK and `Restrict`.
   `PanicHigh`, `ReportableLow`, `ReportableHigh` (decimal), `TextRange` (≤200), `DisplayOrder`), **ListValue**
   (`Value` ≤200, `IsNormal`, `IsCritical`, `IsDefault`, `IsPlaceholder`, `Colour` `#RRGGBB`, `DisplayOrder`),
   **TestParagraph** (`Title` ≤200, `Text` ≤4000, `DisplayOrder`).
+  The test stores no link to its services: its **parent services** (prototype "Parent Service", CP-41) are read from
+  the `ServiceMember` rows that point at it (`LabTestDetail.ParentServices`, in the global sequence) and changed from
+  the test page through T21, which rewrites the members of each affected service.
 
 Configuration allowed per test type: range bands — Numeric, Formula (limits) and NonNumeric (text range only);
 list values — OptionalList, RestrictedList; formula — Formula; paragraphs — FormattedText; Culture has none.
@@ -140,6 +143,7 @@ No terminal state; nothing is deleted (BR-15).
 | T18 | Replace paragraphs | edit | type FormattedText (CAT-068); title 1–200, text ≤4000, ≤50 (CAT-069) | `LabTestParagraphsChanged` |
 | T19 | Set timing | edit | ranges of §5 (CAT-070) | `LabTestTimingChanged` |
 | T20 | Check formula | view | none (returns the verdict, never refuses) | — |
+| T21 | Set parent services (from the test page, v1.1) | edit | test exists (CAT-195); every listed service exists (CAT-194); ids distinct (VALIDATION-400); the test joins each listed service it is not in (appended last, printed, not in the sum) and leaves each carrying service no longer listed, each through T11 on that service, so its member rules decide: a Test or TextReport service keeps its single test (CAT-021), a Package takes no test (CAT-022), a Culture keeps exactly one culture test (CAT-036), a profile sum keeps an in-sum member (CAT-037), an inactive test joins nothing (CAT-027, BR-24); one refusal leaves every service unchanged | `ServiceMembersChanged` (per changed service) |
 
 ## 8. Invariants
 
@@ -241,6 +245,9 @@ Scenario S-FORMULA: evaluation of arithmetic, precedence, ROUND, IF, MIN/MAX/ABS
 Scenario S-AUTHZ: without catalogue.create the API answers 403 AUTHZ-001; a shape violation answers 400 VALIDATION-400
 Scenario S-TENANT: rows of tenant X are invisible to tenant Y (query filter and FORCE RLS)
 Scenario S-CLONE: the cloner copies the active rows of the platform tenant to a new tenant with fresh ids and remapped references
+Scenario S-T21: the test detail lists its carrying services in sequence order; leaving the only test of a Test service (CAT-021), joining a
+                Test service that has its test (CAT-021) or a Package (CAT-022) and an unknown service (CAT-194) are refused and change nothing;
+                leaving a profile then joining it again appends the test last; a deactivated test cannot join (CAT-027); a viewer gets 403
 ```
 
 Open questions (assumed answers let the build proceed; confirm or change):
@@ -263,3 +270,4 @@ Open questions (assumed answers let the build proceed; confirm or change):
 | Q14 | Does deactivating a clinical group / sample type / unit cascade to services and tests? | No; existing references keep working, new selections are refused (BR-24). |
 | Q15 | Cloning (BR-25): which rows reach a new tenant? | Active rows only; formulas verbatim; report templates cleared unless the catalogue B map is supplied. |
 | Q16 | Is a "publish" step needed for the global catalogue (SA-12)? | Not in this intake; edits of the platform tenant are immediate and reach only tenants created afterwards. |
+| Q17 | Which services may a test join or leave from its own page (prototype "Parent Service", v1.1)? | Profiles and cultures, which take any number of tests; a Test service or a text report carries exactly one test and a package none, so those are set up from the service (the page shows them locked, the server refuses regardless). A test joining a profile is appended last, printed and not in the sum; order and flags are then edited on the service. |

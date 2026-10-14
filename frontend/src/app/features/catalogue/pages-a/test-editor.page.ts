@@ -16,6 +16,7 @@ import {
   type GenderRestriction,
   type LabTestDetail,
   type LabTestGeneral,
+  type LabTestParentView,
   type LabTestTiming,
   type LabTestType,
   type ListValueItem,
@@ -23,7 +24,9 @@ import {
   type RangeAgeUnit,
   type RangeBandItem,
   type SampleConditionView,
+  type ServiceLookupItem,
   type TestLookupItem,
+  serviceTakesTestsFreely,
 } from '../../../core/api/catalogue-a.contracts';
 import { type FieldRule, type ProblemDetails, ProblemCodes } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
@@ -87,9 +90,10 @@ type ParagraphForm = FormGroup<{ title: FormControl<string>; text: FormControl<s
 const COLOUR = /^#[0-9A-Fa-f]{6}$/;
 
 /**
- * The test editor (SRS CP-41): general data, then one tab per configuration the type allows (range bands, list
- * values, formula with "check formula", paragraphs) and the timing; one save (Ctrl+S) writes only what changed.
- * Clearing a configuration is saved before a type change, so changing a test's type is a single save (CAT-071).
+ * The test editor (SRS CP-41): general data (with the parent services that carry the test), then one tab per
+ * configuration the type allows (range bands, list values, formula with "check formula", paragraphs) and the timing;
+ * one save (Ctrl+S) writes only what changed. Clearing a configuration is saved before a type change, so changing a
+ * test's type is a single save (CAT-071).
  */
 @Component({
   selector: 'app-test-editor-page',
@@ -265,6 +269,16 @@ export class TestEditorPage {
   protected readonly verdict = signal<{ readonly valid: boolean; readonly text: string } | null>(null);
   protected readonly referenceResults = computed<readonly TestLookupItem[]>(() => (this.facade.references.hasValue() ? this.facade.references.value() : []));
 
+  /** The services carrying this test (CP-41 "parent services"): chips on the general tab, edited here and saved with the test. */
+  protected readonly parents = signal<readonly LabTestParentView[]>([]);
+  private readonly parentsDirty = signal(false);
+
+  /** The profiles and cultures matching the picker's search that do not carry the test yet. */
+  protected readonly parentCandidates = computed<readonly ServiceLookupItem[]>(() => {
+    const chosen = new Set(this.parents().map((parent) => parent.serviceId));
+    return (this.facade.parentCandidates.hasValue() ? this.facade.parentCandidates.value() : []).filter((item) => !chosen.has(item.id));
+  });
+
   constructor() {
     void this.i18n.load('catalogue-a');
     this.options.refresh();   // the options outlive the page: re-read on open (UAT D-14)
@@ -326,6 +340,10 @@ export class TestEditorPage {
 
   protected typeLabel(type: string): string {
     return this.i18n.t(`catalogue-a.testType.${type}`);
+  }
+
+  protected serviceTypeLabel(type: string): string {
+    return this.i18n.t(`catalogue-a.serviceType.${type}`);
   }
 
   protected name(item: { nameEn: string; nameAr: string }): string {
@@ -451,6 +469,37 @@ export class TestEditorPage {
     this.formula.setValue(current === '' ? `[${item.code}]` : `${current} [${item.code}]`);
     this.formula.markAsDirty();
     this.verdict.set(null);
+  }
+
+  // ---- parent services (CP-41)
+
+  protected searchParents(search: string): void {
+    this.facade.searchParents(search);
+  }
+
+  /** A test joins or leaves a profile or a culture from here; the other types carry exactly this one test and are set up from the service. */
+  protected canLeave(parent: LabTestParentView): boolean {
+    return serviceTakesTestsFreely(parent.type);
+  }
+
+  protected addParent(item: ServiceLookupItem): void {
+    if (!this.canEdit() || !serviceTakesTestsFreely(item.type) || this.parents().some((parent) => parent.serviceId === item.id)) {
+      return;
+    }
+
+    // the order is the service's to give (appended last): 0 until the detail is read back
+    this.parents.update((rows) => [...rows, { serviceId: item.id, code: item.code, nameEn: item.nameEn, nameAr: item.nameAr, type: item.type, isActive: true, order: 0 }]);
+    this.parentsDirty.set(true);
+  }
+
+  protected removeParent(serviceId: string): void {
+    const parent = this.parents().find((row) => row.serviceId === serviceId);
+    if (!this.canEdit() || parent === undefined || !this.canLeave(parent)) {
+      return;
+    }
+
+    this.parents.update((rows) => rows.filter((row) => row.serviceId !== serviceId));
+    this.parentsDirty.set(true);
   }
 
   // ---- save
@@ -581,6 +630,10 @@ export class TestEditorPage {
       steps.push(['paragraphs', () => this.run('paragraphs', this.facade.paragraphs, { id: created.id, paragraphs: this.paragraphItems() }, this.paragraphs)]);
     }
 
+    if (this.parents().length > 0) {
+      steps.push(['general', () => this.runParents(created.id)]);
+    }
+
     // the sections are independent: each one is tried, so every refusal shows on its own tab
     const refused = await this.runEach(steps);
     if (refused.length === 0) {
@@ -649,6 +702,10 @@ export class TestEditorPage {
       independent.push(['paragraphs', () => this.run('paragraphs', this.facade.paragraphs, { id, paragraphs: this.paragraphItems() }, this.paragraphs)]);
     }
 
+    if (this.parentsDirty()) {
+      independent.push(['general', () => this.runParents(id)]);
+    }
+
     let saved = 0;
     const refused: Section[] = [];
     for (const [section, step] of ordered) {
@@ -704,7 +761,19 @@ export class TestEditorPage {
     return true;
   }
 
-  private fail(section: Section, problem: ProblemDetails | null, control: AbstractControl): void {
+  /** Writes the parent services; a refusal (a member rule of one service) shows on the general tab and the chips keep the choice. */
+  private async runParents(id: string): Promise<boolean> {
+    const done = await this.facade.parents.execute({ id, serviceIds: this.parents().map((parent) => parent.serviceId) });
+    if (done === null) {
+      this.fail('general', this.facade.parents.problem(), null);
+      return false;
+    }
+
+    this.parentsDirty.set(false);
+    return true;
+  }
+
+  private fail(section: Section, problem: ProblemDetails | null, control: AbstractControl | null): void {
     if (problem === null) {
       return;
     }
@@ -755,6 +824,8 @@ export class TestEditorPage {
     this.filledId = null;
     this.problems.set({});
     this.verdict.set(null);
+    this.parents.set([]);
+    this.parentsDirty.set(false);
     this.activeTab.set('general');
     this.facade.load(id);
     this.applyAccess();
@@ -889,6 +960,11 @@ export class TestEditorPage {
     if (refill(this.formula)) {
       this.formula.reset(detail.formulaExpression ?? '');
       this.verdict.set(null);
+    }
+
+    if (!keep || !this.parentsDirty()) {
+      this.parents.set(detail.parentServices);
+      this.parentsDirty.set(false);
     }
 
     this.applyAccess();

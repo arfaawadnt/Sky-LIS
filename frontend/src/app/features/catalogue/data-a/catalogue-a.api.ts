@@ -241,6 +241,11 @@ export class CatalogueAApi {
     return this.put(`${CATALOGUE_A_API.tests}/${encodeURIComponent(id)}/paragraphs`, { paragraphs });
   }
 
+  /** The services that carry the test after the call (CP-41 "parent services"): it joins the new ones and leaves the omitted ones. */
+  setParentServices(id: string, serviceIds: readonly string[]): Promise<void> {
+    return this.put(`${CATALOGUE_A_API.tests}/${encodeURIComponent(id)}/parent-services`, { serviceIds });
+  }
+
   checkFormula(expression: string, testId: string | null): Promise<FormulaCheckResult> {
     return firstValueFrom(this.http.post<FormulaCheckResult>(CATALOGUE_A_API.formulaCheck, { expression, testId }));
   }

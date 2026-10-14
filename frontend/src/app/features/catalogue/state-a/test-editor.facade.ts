@@ -1,12 +1,23 @@
 import { Injectable, inject, resource, signal } from '@angular/core';
 
-import type { CreateLabTestRequest, LabTestGeneral, LabTestTiming, ListValueItem, ParagraphItem, RangeBandItem, TestLookupItem } from '../../../core/api/catalogue-a.contracts';
+import {
+  type CreateLabTestRequest,
+  type LabTestGeneral,
+  type LabTestTiming,
+  type ListValueItem,
+  type ParagraphItem,
+  type RangeBandItem,
+  type ServiceLookupItem,
+  type TestLookupItem,
+  serviceTakesTestsFreely,
+} from '../../../core/api/catalogue-a.contracts';
 import { mutation } from '../../../core/state/mutation';
 import { CatalogueAApi } from '../data-a/catalogue-a.api';
 
 /**
  * The test editor (CP-41): the loaded detail and one write per configuration (general, timing, range bands, list
- * values, formula, paragraphs), the formula check and the test-reference picker. Provided at the editor route.
+ * values, formula, paragraphs, parent services), the formula check, the test-reference picker and the parent-service
+ * picker. Provided at the editor route.
  */
 @Injectable()
 export class TestEditorFacade {
@@ -28,6 +39,15 @@ export class TestEditorFacade {
     loader: async ({ params, abortSignal }): Promise<readonly TestLookupItem[]> => (await this.api.lookupTests(params, null, abortSignal)).items,
   });
 
+  /** The search of the parent-service picker of the general tab (null = closed): only profiles and cultures are offered. */
+  readonly parentSearch = signal<string | null>(null);
+
+  readonly parentCandidates = resource({
+    params: () => this.parentSearch() ?? undefined,
+    loader: async ({ params, abortSignal }): Promise<readonly ServiceLookupItem[]> =>
+      (await this.api.lookupServices(params, null, abortSignal)).items.filter((item) => serviceTakesTestsFreely(item.type)),
+  });
+
   readonly create = mutation((request: CreateLabTestRequest) => this.api.createTest(request));
 
   readonly update = mutation((input: { readonly id: string; readonly request: LabTestGeneral }) => this.api.updateTest(input.id, input.request));
@@ -42,6 +62,8 @@ export class TestEditorFacade {
 
   readonly paragraphs = mutation((input: { readonly id: string; readonly paragraphs: readonly ParagraphItem[] }) => this.api.replaceParagraphs(input.id, input.paragraphs));
 
+  readonly parents = mutation((input: { readonly id: string; readonly serviceIds: readonly string[] }) => this.api.setParentServices(input.id, input.serviceIds));
+
   readonly check = mutation((input: { readonly expression: string; readonly testId: string | null }) => this.api.checkFormula(input.expression, input.testId));
 
   readonly setActive = mutation((input: { readonly id: string; readonly active: boolean }) => this.api.setTestActive(input.id, input.active), {
@@ -53,9 +75,14 @@ export class TestEditorFacade {
     this.id.set(id);
     this.detail.reload();
     this.references.reload();
+    this.parentCandidates.reload();
   }
 
   searchReferences(search: string): void {
     this.referenceSearch.set(search);
+  }
+
+  searchParents(search: string): void {
+    this.parentSearch.set(search);
   }
 }

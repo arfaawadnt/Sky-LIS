@@ -134,6 +134,62 @@ public sealed class CatalogueAFlowTests(ApiFactory factory) : IClassFixture<ApiF
     }
 
     [DatabaseFact]
+    public async Task Parent_services_are_set_from_the_test_page_through_the_member_rules_of_each_service()
+    {
+        var tenant = Guid.CreateVersion7();
+        var (admin, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: Administrator);
+        var (viewer, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: Viewer);
+        var client = await SignedInClientAsync(admin);
+
+        var groupId = await CreateAsync(client, "clinical-groups", new CreateClinicalGroupRequest("CHEM", "C", "Chemistry", "الكيمياء", null, null, 1));
+        var sampleTypeId = await CreateAsync(client, "sample-types", new CreateSampleTypeRequest("SERUM", "SER", "Serum", "مصل", []));
+        var gluId = await CreateAsync(client, "tests", TestRequest("GLU", "Numeric", groupId, sampleTypeId, null));
+        var ureaId = await CreateAsync(client, "tests", TestRequest("UREA", "Numeric", groupId, sampleTypeId, null));
+        var gluService = await CreateAsync(client, "services", ServiceRequest("GLU", "Test", groupId, sampleTypeId, [new ServiceMemberItem("Test", gluId, 1, false, true)]));
+        var renal = await CreateAsync(client, "services", ServiceRequest("RENAL", "Profile", groupId, sampleTypeId, [new ServiceMemberItem("Test", gluId, 1, false, true), new ServiceMemberItem("Test", ureaId, 2, false, true)]));
+        var package = await CreateAsync(client, "services", ServiceRequest("CHECKUP", "Package", groupId, null, [new ServiceMemberItem("Service", gluService, 1, false, true)]));
+
+        // the detail lists the carrying services in the global order, with the test's order in each
+        var glu = (await client.GetFromJsonAsync<LabTestDetail>($"{Root}/tests/{gluId}"))!;
+        Assert.Equal(["GLU", "RENAL"], glu.ParentServices.Select(parent => parent.Code).ToArray());
+        Assert.Equal(("Test", 1, true), (glu.ParentServices[0].Type, glu.ParentServices[0].Order, glu.ParentServices[0].IsActive));
+
+        // leaving the test service would empty it: refused as a whole, so the profile it would also leave is untouched
+        var emptied = await client.PutAsJsonAsync($"{Root}/tests/{gluId}/parent-services", new SetParentServicesRequest([]));
+        Assert.Equal(("CAT-021", HttpStatusCode.UnprocessableEntity), (await AuthClient.CodeOf(emptied), emptied.StatusCode));
+        Assert.Equal(2, (await client.GetFromJsonAsync<ServiceDetail>($"{Root}/services/{renal}"))!.Members.Count);
+
+        // a second test cannot join a test service (CAT-021), no test joins a package (CAT-022), an unknown service is 404, a repeated id is a shape error
+        var second = await client.PutAsJsonAsync($"{Root}/tests/{ureaId}/parent-services", new SetParentServicesRequest([renal, gluService]));
+        Assert.Equal("CAT-021", await AuthClient.CodeOf(second));
+        var packaged = await client.PutAsJsonAsync($"{Root}/tests/{ureaId}/parent-services", new SetParentServicesRequest([renal, package]));
+        Assert.Equal("CAT-022", await AuthClient.CodeOf(packaged));
+        var unknown = await client.PutAsJsonAsync($"{Root}/tests/{ureaId}/parent-services", new SetParentServicesRequest([renal, Guid.CreateVersion7()]));
+        Assert.Equal(("CAT-194", HttpStatusCode.NotFound), (await AuthClient.CodeOf(unknown), unknown.StatusCode));
+        var twice = await client.PutAsJsonAsync($"{Root}/tests/{ureaId}/parent-services", new SetParentServicesRequest([renal, renal]));
+        Assert.Equal(HttpStatusCode.BadRequest, twice.StatusCode);
+        Assert.Equal(2, (await client.GetFromJsonAsync<ServiceDetail>($"{Root}/services/{renal}"))!.Members.Count);
+
+        // leaving the profile, then joining it again: appended last, printed, not in the sum
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Root}/tests/{ureaId}/parent-services", new SetParentServicesRequest([]))).StatusCode);
+        Assert.Empty((await client.GetFromJsonAsync<LabTestDetail>($"{Root}/tests/{ureaId}"))!.ParentServices);
+        Assert.Equal(["GLU"], (await client.GetFromJsonAsync<ServiceDetail>($"{Root}/services/{renal}"))!.Members.Select(member => member.Code).ToArray());
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Root}/tests/{ureaId}/parent-services", new SetParentServicesRequest([renal]))).StatusCode);
+        var members = (await client.GetFromJsonAsync<ServiceDetail>($"{Root}/services/{renal}"))!.Members;
+        Assert.Equal([("GLU", 1, false, true), ("UREA", 2, false, true)], members.Select(member => (member.Code, member.Order, member.InSum, member.Visible)).ToArray());
+        Assert.Equal(["RENAL"], (await client.GetFromJsonAsync<LabTestDetail>($"{Root}/tests/{ureaId}"))!.ParentServices.Select(parent => parent.Code).ToArray());
+
+        // the same list again changes nothing; a viewer cannot set parents; an inactive test joins nothing (CAT-027, BR-24)
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Root}/tests/{ureaId}/parent-services", new SetParentServicesRequest([renal]))).StatusCode);
+        var viewerClient = await SignedInClientAsync(viewer);
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewerClient.PutAsJsonAsync($"{Root}/tests/{ureaId}/parent-services", new SetParentServicesRequest([]))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Root}/tests/{ureaId}/parent-services", new SetParentServicesRequest([]))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync($"{Root}/tests/{ureaId}/deactivate", null)).StatusCode);
+        var inactive = await client.PutAsJsonAsync($"{Root}/tests/{ureaId}/parent-services", new SetParentServicesRequest([renal]));
+        Assert.Equal("CAT-027", await AuthClient.CodeOf(inactive));
+    }
+
+    [DatabaseFact]
     public async Task A_viewer_reads_but_cannot_create_nor_export_and_shapes_are_refused_with_400()
     {
         var tenant = Guid.CreateVersion7();
