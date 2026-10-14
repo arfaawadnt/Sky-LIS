@@ -170,6 +170,7 @@ public sealed class DashboardActivityTests
 
     private sealed class SessionUser(Guid branchId) : ICurrentUser
     {
+        public bool IsPrimaryAdministrator { get; set; }
         public bool IsAuthenticated => true;
 
         public Guid? UserId { get; } = Guid.CreateVersion7();

@@ -171,4 +171,21 @@ describe('TreasuryAccessPage (CP-29)', () => {
     expect(first).toMatch(/,checked at the desk,$/);
     expect(second).toMatch(/,,use your own desk$/);
   });
+
+  it('shows Approve (never Reject) on the primary administrator\'s own pending request — the SOD-TRS-001 exception (2026-10-14)', async () => {
+    const own = { ...pending, requestedByUserId: 'u-approver', requestedByName: 'Shift Manager' };
+    const labels = (root: HTMLElement): string[] => [...root.querySelectorAll<HTMLButtonElement>('app-data-table button.btn.sm')].map((button) => button.textContent?.trim() ?? '');
+
+    // an ordinary approver: nothing to decide on their own row, only Cancel
+    const first = await open([own]);
+    expect(labels(first.root)).toEqual(['Cancel request']);
+
+    // the primary administrator: Approve appears, Reject does not, Cancel stays
+    const user = TestBed.inject(AuthStore).currentUser as unknown as { set(value: CurrentUser | null): void };
+    user.set({ id: 'u-approver', displayName: 'Shift Manager', language: 'en', scope: 'tenant', isPrimaryAdministrator: true });
+    first.detect();
+    await settle();
+    first.detect();
+    expect(labels(first.root)).toEqual(['Approve', 'Cancel request']);
+  });
 });

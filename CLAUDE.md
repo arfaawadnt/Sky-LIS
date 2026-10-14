@@ -310,7 +310,9 @@ QMS source is never read or copied (section 1); everything here is written from 
   (`TRQ-yyyy-nnnnn`) come from `IReferenceNumbers` over `app.reference_counters` (atomic upsert). Endpoints:
   `/api/v1/treasuries`, `/api/v1/treasury-access-requests`. Frontend route `/treasury/access`, nav entry gated by
   `treasury.view`, dictionaries `public/i18n/treasury.{en,ar}.json`, device id minted by `core/device` (the only allowed
-  localStorage use, documented inline).
+  localStorage use, documented inline). SOD-TRS-001 exception (2026-10-14): `ICurrentUser.IsPrimaryAdministrator` (from the session
+  principal, `CurrentUserAccessor.Set`) lets `TreasuryAccessRequest.Approve(…, actorMayApproveOwn: true)` skip the self-approval refusal
+  for the laboratory's primary administrator (never for Reject); `AuthProfile.IsPrimaryAdministrator` shows the button (intake TRS-001 §9).
 - Dev tooling: `tools/Platform.DevTools` (`seed-user <username> <password> [tenantId]`,
   `grant-role <username> <tenantId> <roleNameEn> <perm,perm,…>`, `seed-treasury <tenantId> <code> <nameEn> <nameAr>`,
   `seed-demo-lab <username> <password> [tenantId]` (a complete Release-1 laboratory: branch, catalogue with prices, reasons, treasury, a

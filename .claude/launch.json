@@ -175,6 +175,19 @@
         "--Lis:Notifications:PickupDirectory=E:\\LIS\\.local\\mail-pickup\\validation"
       ],
       "port": 5102
+    },
+    {
+      "name": "installed-ui",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/Users/Administrator/AppData/Local/Temp/2/claude/E--LIS/a6c7625a-d96e-49e4-a842-2e43cc754164/scratchpad/serve-installed.mjs",
+        "C:/inetpub/wwwroot/lis-ui",
+        "5111",
+        "http://127.0.0.1:5100",
+        "https://WIN-9S2KO4FA64L"
+      ],
+      "port": 5111,
+      "url": "http://127.0.0.1:5111"
     }
   ]
 }

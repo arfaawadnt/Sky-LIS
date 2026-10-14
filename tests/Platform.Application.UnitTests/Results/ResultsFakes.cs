@@ -300,6 +300,7 @@ internal sealed class ResultsUnitOfWork : IUnitOfWork
 
 internal sealed class ResultsUser(Guid userId, Guid? branchId) : ICurrentUser
 {
+        public bool IsPrimaryAdministrator { get; set; }
     public bool IsAuthenticated => true;
 
     public Guid? UserId { get; } = userId;

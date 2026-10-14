@@ -78,8 +78,9 @@ public sealed class CurrentUserAccessor : ICurrentUser
     public string? DisplayName { get; private set; }
 
     public Guid? BranchId { get; private set; }
+    public bool IsPrimaryAdministrator { get; private set; }
 
-    public void Set(Guid userId, Guid? sessionId, string displayName, Guid? branchId = null)
+    public void Set(Guid userId, Guid? sessionId, string displayName, Guid? branchId = null, bool isPrimaryAdministrator = false)
     {
         if (userId == Guid.Empty)
         {
@@ -90,6 +91,7 @@ public sealed class CurrentUserAccessor : ICurrentUser
         SessionId = sessionId;
         DisplayName = displayName;
         BranchId = branchId;
+        IsPrimaryAdministrator = isPrimaryAdministrator;
     }
 
     public void Clear()
@@ -98,5 +100,6 @@ public sealed class CurrentUserAccessor : ICurrentUser
         SessionId = null;
         DisplayName = null;
         BranchId = null;
+        IsPrimaryAdministrator = false;
     }
 }

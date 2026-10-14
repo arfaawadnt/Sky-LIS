@@ -91,6 +91,7 @@ internal sealed class CountingUnitOfWork : IUnitOfWork
 
 internal sealed class FakeUser(Guid? userId, Guid? branchId) : ICurrentUser
 {
+        public bool IsPrimaryAdministrator { get; set; }
     public bool IsAuthenticated => UserId is not null;
 
     public Guid? UserId { get; } = userId;

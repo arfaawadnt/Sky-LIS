@@ -95,7 +95,7 @@ public sealed class ApproveTreasuryAccessHandler(ITreasuryAccessRequestRepositor
         var request = await requests.GetForUpdateAsync(command.RequestId, cancellationToken)
             ?? throw new DomainException(TreasuryCodes.RequestNotFound, "Treasury access request not found.", DomainFault.NotFound);
 
-        request.Approve(actor, clock.UtcNow, command.Comment);   // state guard, SOD-TRS-001, recorded Approval, event
+        request.Approve(actor, clock.UtcNow, command.Comment, actorMayApproveOwn: user.IsPrimaryAdministrator);   // state guard, SOD-TRS-001 (primary administrator excepted), recorded Approval, event
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

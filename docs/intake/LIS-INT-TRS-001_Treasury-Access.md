@@ -100,11 +100,15 @@ SOD-TRS-001  Approver is not the requester.
   On transitions T2, T3: the acting user must not be the user recorded as RequestedByUserId.
   Refusal: "You cannot decide on your own request."
   Configurable: no.
+  Exception (2026-10-14, user decision): on T2 only, the laboratory's primary administrator (CP-38, the membership
+  flagged IsPrimaryAdministrator) may approve their own request — a one-person desk has no second approver. T3 keeps
+  the rule (the requester withdraws with T5 instead). The audit trail shows the same user as requester and approver.
 ```
 
-The rule lives inside `TreasuryAccessRequest.Approve/Reject` (`EnsureActorIsNot(RequestedByUserId, …)`), not in a
-validator or handler. The client hides the Approve/Reject buttons on the user's own rows; the server still refuses
-(403, code SOD-TRS-001).
+The rule lives inside `TreasuryAccessRequest.Approve/Reject` (`EnsureActorIsNot(RequestedByUserId, …)`); the exception is
+the `actorMayApproveOwn` argument of `Approve`, which the handler sets from `ICurrentUser.IsPrimaryAdministrator` (filled
+per request from the session principal). The client hides Approve/Reject on the user's own rows except Approve for the
+primary administrator (`AuthProfile.isPrimaryAdministrator`); the server still refuses everyone else (403, SOD-TRS-001).
 
 ## 10. Approval gates
 
@@ -201,6 +205,11 @@ Scenario S-T2-sod: T2 Approve — refused by SOD-TRS-001
   Given a Pending request of user A who also holds treasury.approve
   When A attempts to approve
   Then the attempt is refused with SOD-TRS-001 (403) and the request stays Pending
+
+Scenario S-T2-admin: T2 Approve — the primary administrator's own request (SOD-TRS-001 exception)
+  Given a Pending request of user A who is the laboratory's primary administrator and holds treasury.approve
+  When A approves with an optional comment
+  Then the request is Approved, the approval records A, and A's profile says isPrimaryAdministrator; A still cannot reject it
 
 Scenario S-T2-state: T2 Approve — refused by INV-TRS-003
   Given an Approved request

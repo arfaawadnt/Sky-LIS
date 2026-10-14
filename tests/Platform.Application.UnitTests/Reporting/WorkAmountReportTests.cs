@@ -314,6 +314,7 @@ public sealed class WorkAmountReportTests
 
     private sealed class FakeUser : ICurrentUser
     {
+        public bool IsPrimaryAdministrator { get; set; }
         public bool IsAuthenticated => true;
 
         public Guid? UserId { get; } = Guid.CreateVersion7();

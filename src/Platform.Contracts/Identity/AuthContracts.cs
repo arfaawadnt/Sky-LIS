@@ -91,7 +91,8 @@ public sealed record AuthProfile(
     string? DisplayNameEn = null,
     string? DisplayNameAr = null,
     int? SessionTimeoutMinutes = null,
-    string? ResultsDensity = null);
+    string? ResultsDensity = null,
+    bool IsPrimaryAdministrator = false);
 
 public sealed record TenantChoice(Guid TenantId, string DisplayName);
 

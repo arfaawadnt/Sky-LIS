@@ -101,11 +101,18 @@ public sealed class TreasuryAccessRequest : AggregateRoot, ITenantScoped
             DomainFault.Validation);
     }
 
-    /// <summary>T2 Approve (<c>treasury.approve</c>, approval gate): Pending only (TRS-013); SOD-TRS-001; records the approval; the request is frozen afterwards.</summary>
-    public void Approve(Guid actorUserId, DateTimeOffset nowUtc, string? comment = null)
+    /// <summary>
+    /// T2 Approve (<c>treasury.approve</c>, approval gate): Pending only (TRS-013); SOD-TRS-001 unless
+    /// <paramref name="actorMayApproveOwn"/> (the laboratory's primary administrator, 2026-10-14: a one-person desk needs no second
+    /// approver; the audit trail still shows the same user as requester and approver); records the approval; the request is frozen afterwards.
+    /// </summary>
+    public void Approve(Guid actorUserId, DateTimeOffset nowUtc, string? comment = null, bool actorMayApproveOwn = false)
     {
         RequirePending("approve");
-        EnsureActorIsNot(RequestedByUserId, actorUserId, TreasuryCodes.SodApproverIsRequester, "The requester cannot approve their own request.");
+        if (!actorMayApproveOwn)
+        {
+            EnsureActorIsNot(RequestedByUserId, actorUserId, TreasuryCodes.SodApproverIsRequester, "The requester cannot approve their own request.");
+        }
 
         Approval = new Approval(actorUserId, nowUtc, comment);
         DecidedByUserId = actorUserId;

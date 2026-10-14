@@ -23,6 +23,8 @@ export interface CurrentUser {
   readonly displayName: string;
   readonly language: string;
   readonly scope: string;
+  /** The primary administrator of the laboratory (CP-38): the SOD-TRS-001 exception on the treasury access page. */
+  readonly isPrimaryAdministrator?: boolean;
 }
 
 /**
@@ -90,7 +92,9 @@ export class AuthStore {
 
   readonly currentUser = computed<CurrentUser | null>(() => {
     const profile = this.profileState();
-    return profile ? { id: profile.userId, displayName: profile.displayName, language: profile.language, scope: profile.scope } : null;
+    return profile
+      ? { id: profile.userId, displayName: profile.displayName, language: profile.language, scope: profile.scope, isPrimaryAdministrator: profile.isPrimaryAdministrator === true }
+      : null;
   });
 
   readonly currentTenant = computed(() => this.profileState()?.tenantId ?? null);

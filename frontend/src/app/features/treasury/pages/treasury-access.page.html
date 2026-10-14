@@ -62,10 +62,10 @@
       </ng-template>
       <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
         @if (canApprove(row)) {
-          <ng-container *appCan="permissions.approve">
-            <button type="button" class="btn sm primary" (click)="approve(row)" [disabled]="facade.approve.pending()">{{ i18n.t('treasury.approve') }}</button>
-            <button type="button" class="btn sm" (click)="reject(row)">{{ i18n.t('treasury.reject') }}</button>
-          </ng-container>
+          <button type="button" class="btn sm primary" *appCan="permissions.approve" (click)="approve(row)" [disabled]="facade.approve.pending()">{{ i18n.t('treasury.approve') }}</button>
+        }
+        @if (canReject(row)) {
+          <button type="button" class="btn sm" *appCan="permissions.approve" (click)="reject(row)">{{ i18n.t('treasury.reject') }}</button>
         }
         @if (row.status === 'Approved') {
           <button type="button" class="btn sm" *appCan="permissions.approve" (click)="revoke(row)">{{ i18n.t('treasury.revoke') }}</button>

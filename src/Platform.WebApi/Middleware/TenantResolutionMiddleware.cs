@@ -16,7 +16,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
     {
         if (context.Items[EncryptedSubjectEvents.PrincipalItem] is SessionPrincipal principal)
         {
-            context.RequestServices.GetRequiredService<CurrentUserAccessor>().Set(principal.UserId, principal.SessionId, principal.DisplayName, principal.BranchId);
+            context.RequestServices.GetRequiredService<CurrentUserAccessor>().Set(principal.UserId, principal.SessionId, principal.DisplayName, principal.BranchId, principal.IsPrimaryAdministrator);
             context.RequestServices.GetRequiredService<UserPrivilegesAccessor>().Set(principal);   // keys, special rights and result rights (IUserPrivileges)
             if (principal.TenantId is { } tenantId)
             {

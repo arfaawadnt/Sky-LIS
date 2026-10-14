@@ -233,7 +233,12 @@ export class TreasuryAccessPage {
     }
   }
 
+  /** Approve on another user's pending row, and on the administrator's own one (SOD-TRS-001 exception); Reject never on an own row. */
   protected canApprove(item: TreasuryAccessRequestListItem): boolean {
+    return item.status === 'Pending' && (!this.facade.isOwn(item) || this.facade.isPrimaryAdministrator());
+  }
+
+  protected canReject(item: TreasuryAccessRequestListItem): boolean {
     return item.status === 'Pending' && !this.facade.isOwn(item);
   }
 

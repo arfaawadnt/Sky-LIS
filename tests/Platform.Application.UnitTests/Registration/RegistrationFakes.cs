@@ -356,6 +356,7 @@ internal sealed class CommitCounter : IUnitOfWork
 
 internal sealed class FakeRegistrationUser : ICurrentUser
 {
+    public bool IsPrimaryAdministrator { get; set; }
     public bool IsAuthenticated => UserId is not null;
 
     public Guid? UserId { get; set; }

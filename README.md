@@ -234,7 +234,11 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **The laboratory administrator approves their own treasury access request.** On Treasury access, the primary
+  administrator of the laboratory (the account that subscribed or was provisioned as the main administrator) now sees
+  *Approve* on their own pending request and may approve it — a one-person desk needs no second approver. Everyone else
+  keeps SOD-TRS-001 (the server refuses a self-approval with 403), and nobody can reject their own request (withdraw it
+  with *Cancel*). The session profile carries `isPrimaryAdministrator`.
 
 ### v0.13.2 — 2026-10-14
 

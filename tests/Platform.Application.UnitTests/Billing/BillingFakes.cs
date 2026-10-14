@@ -337,6 +337,7 @@ internal sealed class FakePrivileges : IUserPrivileges
 
 internal sealed class FakeUser : ICurrentUser
 {
+    public bool IsPrimaryAdministrator { get; set; }
     public bool IsAuthenticated => UserId is not null;
 
     public Guid? UserId { get; set; }

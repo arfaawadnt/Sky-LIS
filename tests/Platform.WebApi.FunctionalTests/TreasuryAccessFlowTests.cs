@@ -145,6 +145,40 @@ public sealed class TreasuryAccessFlowTests(ApiFactory factory) : IClassFixture<
     }
 
     [DatabaseFact]
+    public async Task The_primary_administrator_approves_their_own_request_and_the_profile_says_so()
+    {
+        var tenant = Guid.CreateVersion7();
+        var (admin, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["treasury.view", "treasury.create", "treasury.approve", "treasury.manage"]);   // what a laboratory administrator holds
+        await using (var connection = new Npgsql.NpgsqlConnection(TestDatabase.OwnerConnection))
+        {
+            await connection.OpenAsync();
+            await using var command = new Npgsql.NpgsqlCommand("UPDATE app.tenant_memberships m SET is_primary_administrator = TRUE FROM identity.platform_users u WHERE m.platform_user_id = u.id AND m.tenant_id = @tenant AND u.username = @username", connection);
+            command.Parameters.AddWithValue("tenant", tenant);
+            command.Parameters.AddWithValue("username", admin);
+            Assert.Equal(1, await command.ExecuteNonQueryAsync());
+        }
+
+        var auth = new AuthClient(factory.CreateClient());
+        var (signedIn, _, _) = await auth.SignInExpectingSuccessAsync(admin, ApiFactory.Password);
+        Assert.True(signedIn.Profile!.IsPrimaryAdministrator);
+        var adminClient = await SignedInClientAsync(admin);
+
+        var created = await adminClient.PostAsJsonAsync(Treasuries, new CreateTreasuryRequest("own", "Own desk", "خزينة", Guid.CreateVersion7()));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var treasuryId = (await created.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+        var requested = await adminClient.PostAsJsonAsync(Requests, new RequestTreasuryAccessRequest(treasuryId, "device-admin", null));
+        Assert.Equal(HttpStatusCode.Created, requested.StatusCode);
+        var requestId = (await requested.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+
+        // the named exception of SOD-TRS-001: the laboratory's primary administrator approves their own request
+        var selfApproval = await adminClient.PostAsJsonAsync($"{Requests}/{requestId}/approve", new ApproveTreasuryAccessRequest("one-person desk"));
+        Assert.Equal(HttpStatusCode.NoContent, selfApproval.StatusCode);
+        var detail = (await adminClient.GetFromJsonAsync<TreasuryAccessRequestDetail>($"{Requests}/{requestId}"))!;
+        Assert.Equal("Approved", detail.Status);
+        Assert.Equal("one-person desk", detail.Approval?.Comment);
+    }
+
+    [DatabaseFact]
     public async Task Only_the_requester_cancels_a_pending_request()
     {
         var tenant = Guid.CreateVersion7();

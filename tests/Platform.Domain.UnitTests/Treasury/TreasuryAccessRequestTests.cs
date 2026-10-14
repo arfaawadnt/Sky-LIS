@@ -77,6 +77,22 @@ public sealed class TreasuryAccessRequestTests
     }
 
     [Fact]
+    public void T2_Approve_by_the_primary_administrator_of_their_own_request_is_recorded_like_any_approval()
+    {
+        var request = Pending();
+        request.ClearDomainEvents();
+
+        request.Approve(Requester, Now, "one-person desk", actorMayApproveOwn: true);
+
+        Assert.Equal(TreasuryAccessStatus.Approved, request.Status);
+        Assert.Equal((Requester, Now, "one-person desk"), (request.Approval!.ActorUserId, request.Approval.AtUtc, request.Approval.Comment));
+        Assert.Equal(Requester, request.DecidedByUserId);
+        Assert.Contains(request.DomainEvents, e => e is TreasuryAccessApproved approved && approved.ApprovedByUserId == Requester);
+        // the exception never reaches Reject: the requester withdraws with Cancel instead
+        Assert.Equal(TreasuryCodes.SodApproverIsRequester, Assert.Throws<DomainException>(() => Pending().Reject(Requester, Now, "reason")).Code);
+    }
+
+    [Fact]
     public void T2_Approve_refused_by_SOD_TRS_001_when_the_requester_approves_and_nothing_is_recorded()
     {
         var request = Pending();

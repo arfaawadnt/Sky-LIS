@@ -86,4 +86,7 @@ export class TreasuryAccessFacade {
   isOwn(item: TreasuryAccessRequestListItem): boolean {
     return item.requestedByUserId === this.currentUserId();
   }
+
+  /** The laboratory's primary administrator may approve (not reject) their own request: the named exception of SOD-TRS-001 (2026-10-14). */
+  readonly isPrimaryAdministrator = computed(() => this.auth.currentUser()?.isPrimaryAdministrator === true);
 }
