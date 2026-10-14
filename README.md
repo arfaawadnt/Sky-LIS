@@ -234,7 +234,11 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Installation record.** WIN-9S2KO4FA64L upgraded on 2026-10-14 to 0.13.0 (configuration changed:
+  `Lis:Notifications:RevealCodes = true` while no SMS gateway exists) and, two minutes later, to 0.13.1
+  (`docs/deploy/Installations.md`): clean-tag builds, verified backups, nothing pending, smoke tests 20 / 20 by name
+  and by IP each time; the rollback folders now hold 0.13.0. The runbook's configuration table dates the setting to
+  0.13.0. Documentation only; the installed 0.13.1 build is the same code as this release.
 
 ### v0.13.1 — 2026-10-14
 
