@@ -108,13 +108,16 @@ internal sealed class PatientRepository(AppDbContext context) : Repository<Patie
         return family;
     }
 
-    public async Task<IReadOnlyList<PatientRow>> FindSimilarCandidatesAsync(IReadOnlyList<string> nameTokens, string? mobile, int limit, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<PatientRow>> FindSimilarCandidatesAsync(IReadOnlyList<string> nameTokens, IReadOnlyList<string> phones, int limit, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(nameTokens);
+        ArgumentNullException.ThrowIfNull(phones);
         Expression<Func<Patient, bool>>? predicate = null;
-        if (mobile is not null)
+        var numbers = phones.Where(phone => phone.Length > 0).Distinct(StringComparer.Ordinal).Take(4).ToList();
+        if (numbers.Count > 0)
         {
-            predicate = patient => patient.Mobile == mobile;
+            // C3: a typed phone stored as the mobile or as the second phone
+            predicate = patient => (patient.Mobile != null && numbers.Contains(patient.Mobile)) || (patient.SecondPhone != null && numbers.Contains(patient.SecondPhone));
         }
 
         var tokens = nameTokens.Where(token => token.Length > 0).Distinct(StringComparer.Ordinal).Take(6).ToList();
@@ -273,7 +276,11 @@ internal static class PatientQueries
             patient.CreatedByDisplayName,
             patient.ModifiedAtUtc,
             patient.ModifiedByDisplayName,
-            patient.RowVersion);
+            patient.RowVersion,
+            patient.CityId,
+            patient.DistrictId,
+            patient.AreaId,
+            patient.SecondPhone);
 
     /// <summary>Stable order of a fetched page: newest registration first (UUID v7 ids break ties in time order).</summary>
     public static List<PatientRow> Newest(IEnumerable<PatientRow> rows) => rows.OrderByDescending(row => row.CreatedAtUtc).ThenByDescending(row => row.Id).ToList();
@@ -290,7 +297,8 @@ internal static class PatientQueries
         Expression<Func<Patient, bool>> predicate = patient => patient.Number.Contains(number);
         if (terms.Digits is { } digits)
         {
-            predicate = Or(predicate, patient => patient.Mobile != null && patient.Mobile.Contains(digits));
+            // the second phone is searched like the mobile (C3)
+            predicate = Or(predicate, patient => (patient.Mobile != null && patient.Mobile.Contains(digits)) || (patient.SecondPhone != null && patient.SecondPhone.Contains(digits)));
         }
 
         if (terms.NationalId is { } nationalId)

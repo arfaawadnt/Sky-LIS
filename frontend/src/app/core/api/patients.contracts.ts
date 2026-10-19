@@ -43,6 +43,12 @@ export interface RegisterPatientRequest {
   readonly address: string | null;
   readonly comments: string | null;
   readonly isVip: boolean | null;
+  /** The picked city, district and area of the platform's location hierarchy (A2): each must chain to the governorate (PAT-014…016); omitted = none. */
+  readonly cityId?: string | null;
+  readonly districtId?: string | null;
+  readonly areaId?: string | null;
+  /** A second phone (C3): cleaned like the mobile, ≤ 16 digits, no uniqueness (PAT-017). */
+  readonly secondPhone?: string | null;
 }
 
 /**
@@ -105,6 +111,26 @@ export interface PatientListItem {
    * name, mobile or national id; show `patients.vipMasked` instead. Opening the file shows the real identity.
    */
   readonly identityMasked?: boolean;
+  /** C3: the second phone (null when masked). */
+  readonly secondPhone?: string | null;
+  /** A2: the picked city / district / area with their names; null when none is set. */
+  readonly location?: PatientLocation | null;
+}
+
+/**
+ * The picked city, district and area of a file (A2): ids and bilingual names from the platform's location hierarchy; a level not
+ * set is null; the whole record is null when no level is set. The free-text `city` of the file carries the picked city's English name too.
+ */
+export interface PatientLocation {
+  readonly cityId: string | null;
+  readonly cityNameEn: string | null;
+  readonly cityNameAr: string | null;
+  readonly districtId: string | null;
+  readonly districtNameEn: string | null;
+  readonly districtNameAr: string | null;
+  readonly areaId: string | null;
+  readonly areaNameEn: string | null;
+  readonly areaNameAr: string | null;
 }
 
 export interface PatientMergeView {
@@ -153,6 +179,10 @@ export interface PatientDetail {
   readonly modifiedAtUtc: string | null;
   readonly modifiedByName: string | null;
   readonly rowVersion: number;
+  /** C3: the second phone. */
+  readonly secondPhone?: string | null;
+  /** A2: the picked city / district / area with their names; null when none is set. */
+  readonly location?: PatientLocation | null;
 }
 
 export interface SimilarPatient {
@@ -173,6 +203,8 @@ export interface SimilarPatient {
    * created, with the number and the match; no name, Arabic name, mobile or national id. Show `patients.vipMasked`.
    */
   readonly identityMasked?: boolean;
+  /** C3: the second phone (null when masked); a candidate matches on it like on the mobile. */
+  readonly secondPhone?: string | null;
 }
 
 /** At most 10 candidates; `warningEnabled` is the tenant parameter `similarNameWarning`. */
@@ -268,6 +300,30 @@ export interface GovernorateOption {
   readonly countryId?: string | null;
 }
 
+/** An active city of a governorate (anonymous `/api/v1/public/cities?governorateId=`, A2). */
+export interface CityOption {
+  readonly id: string;
+  readonly governorateId: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+}
+
+/** An active district of a city (anonymous `/api/v1/public/districts?cityId=`). */
+export interface DistrictOption {
+  readonly id: string;
+  readonly cityId: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+}
+
+/** An active area of a district (anonymous `/api/v1/public/areas?districtId=`). */
+export interface AreaOption {
+  readonly id: string;
+  readonly districtId: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+}
+
 /** An active patient condition (`GET /api/v1/patients/conditions`, `patients.view`; round 2 R2-04: the catalogue's own list needs `catalogue.view`). */
 export interface ConditionOption {
   readonly id: string;
@@ -292,6 +348,9 @@ export const PATIENTS_API = {
   documents: '/api/v1/patients/documents',
   countries: '/api/v1/public/countries',
   governorates: '/api/v1/public/governorates',
+  cities: '/api/v1/public/cities',
+  districts: '/api/v1/public/districts',
+  areas: '/api/v1/public/areas',
   conditions: '/api/v1/patients/conditions',
   visits: '/api/v1/registration/visits',
 } as const;

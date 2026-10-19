@@ -34,7 +34,11 @@ export class CsvExportService {
   private readonly document = inject(DOCUMENT);
 
   download<T>(fileName: string, columns: readonly CsvColumn<T>[], rows: readonly T[]): void {
-    const blob = new Blob([toCsv(columns, rows)], { type: 'text/csv;charset=utf-8' });
+    this.downloadBlob(fileName, new Blob([toCsv(columns, rows)], { type: 'text/csv;charset=utf-8' }));
+  }
+
+  /** Hands a file the server built (a CSV export) to the browser's download under the server's file name. */
+  downloadBlob(fileName: string, blob: Blob): void {
     const url = URL.createObjectURL(blob);
     const anchor = this.document.createElement('a');
     anchor.href = url;

@@ -153,9 +153,9 @@ internal sealed class ServiceRepository(AppDbContext context) : Repository<Servi
             members);
     }
 
-    public async Task<IReadOnlyList<ServiceSequenceRow>> SequenceRowsAsync(string? search, ServiceType? type, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ServiceSequenceRow>> SequenceRowsAsync(string? search, ServiceType? type, Guid? clinicalGroupId, CancellationToken cancellationToken)
     {
-        var query = Filtered(new ServiceListFilter(search, type, null, null));
+        var query = Filtered(new ServiceListFilter(search, type, clinicalGroupId, null));
         var rows = await (
             from service in query.OrderBy(service => service.Sequence).Take(CatalogueALimits.MaxExportRows)
             from grp in Context.Set<ClinicalGroup>().AsNoTracking().Where(grp => grp.Id == service.ClinicalGroupId).DefaultIfEmpty()
@@ -166,13 +166,14 @@ internal sealed class ServiceRepository(AppDbContext context) : Repository<Servi
                 NameEn = service.Name.En,
                 NameAr = service.Name.Ar,
                 service.Type,
+                service.ClinicalGroupId,
                 GroupEn = grp == null ? null : grp.Name.En,
                 GroupAr = grp == null ? null : grp.Name.Ar,
                 service.Sequence,
                 service.IsActive,
             }).ToListAsync(cancellationToken).ConfigureAwait(false);
 
-        return rows.OrderBy(row => row.Sequence).Select(row => new ServiceSequenceRow(row.Id, row.Code, row.NameEn, row.NameAr, row.Type.ToString(), row.GroupEn, row.GroupAr, row.Sequence, row.IsActive)).ToList();
+        return rows.OrderBy(row => row.Sequence).Select(row => new ServiceSequenceRow(row.Id, row.Code, row.NameEn, row.NameAr, row.Type.ToString(), row.ClinicalGroupId, row.GroupEn, row.GroupAr, row.Sequence, row.IsActive)).ToList();
     }
 
     public async Task<Paged<ServiceLookupItem>> LookupAsync(string? search, ServiceType? type, bool? orderable, PageRequest page, CancellationToken cancellationToken)

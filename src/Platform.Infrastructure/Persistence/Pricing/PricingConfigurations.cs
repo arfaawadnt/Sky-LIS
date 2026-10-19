@@ -28,6 +28,12 @@ internal sealed class PayerConfiguration : IEntityTypeConfiguration<Payer>
         builder.Property(payer => payer.Type).IsRequired();
         builder.Property(payer => payer.WebPortalEnabled).IsRequired();
         builder.Property(payer => payer.WebUsername).HasMaxLength(Payer.MaxWebUsernameLength);
+        // office contacts (CR 2026-10-19 C19): nullable columns added by the PrototypeGaps migration; existing rows keep NULL
+        builder.Property(payer => payer.Phone1).HasMaxLength(Payer.MaxContactNumberLength);
+        builder.Property(payer => payer.Phone2).HasMaxLength(Payer.MaxContactNumberLength);
+        builder.Property(payer => payer.WhatsApp).HasColumnName("whatsapp").HasMaxLength(Payer.MaxContactNumberLength);
+        builder.Property(payer => payer.Email).HasMaxLength(Payer.MaxEmailLength);
+        builder.Ignore(payer => payer.Contacts);
         builder.Property(payer => payer.IsActive).IsRequired();
         builder.Property(payer => payer.IsDefault).IsRequired();
 

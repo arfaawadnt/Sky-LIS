@@ -168,6 +168,109 @@ internal sealed class PricingServiceCatalog(AppDbContext context) : IPricingServ
             .ConfigureAwait(false);
         return found.ToHashSet();
     }
+
+    public async Task<IReadOnlyDictionary<string, Guid>> ServiceIdsByCodeAsync(IReadOnlyCollection<string> codes, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(codes);
+        var keys = codes.Select(code => code.Trim().ToUpperInvariant()).Where(code => code.Length > 0).Distinct(StringComparer.Ordinal).ToArray();
+        if (keys.Length == 0)
+        {
+            return new Dictionary<string, Guid>(StringComparer.Ordinal);
+        }
+
+        var tenantId = context.CurrentTenantIdOrNil;
+        var rows = await context.Database
+            .SqlQuery<ServiceLabelRow>($"SELECT id, code, name_en, name_ar, is_active FROM app.services WHERE tenant_id = {tenantId} AND code = ANY({keys})")
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return rows.GroupBy(row => row.Code, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First().Id, StringComparer.Ordinal);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, CatalogueServiceLabel>> ServiceLabelsAsync(IReadOnlyCollection<Guid> serviceIds, CancellationToken cancellationToken)
+    {
+        var labels = await PricingReads.ServiceLabelsAsync(context, serviceIds, cancellationToken).ConfigureAwait(false);
+        return labels.ToDictionary(pair => pair.Key, pair => new CatalogueServiceLabel(pair.Value.Id, pair.Value.Code, pair.Value.NameEn, pair.Value.NameAr));
+    }
+}
+
+/// <summary>
+/// <see cref="IServicePricesReader"/> (CR 2026-10-19 C22): the service by raw SQL on <c>app.services</c> (same-wave rule), then its
+/// base lines joined to their lists and its contract prices joined to pricing, tier and payer. Reads only, no tracking.
+/// </summary>
+internal sealed class ServicePricesReader(AppDbContext context, IClock clock) : IServicePricesReader
+{
+    public async Task<ServicePricesView?> ReadAsync(Guid serviceId, CancellationToken cancellationToken)
+    {
+        var tenantId = context.CurrentTenantIdOrNil;
+        var service = await context.Database
+            .SqlQuery<ServiceHeadRow>($"SELECT id, code, name_en, name_ar, type, is_active FROM app.services WHERE tenant_id = {tenantId} AND id = {serviceId}")
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (service is null)
+        {
+            return null;
+        }
+
+        var basePrices = await (
+            from line in context.Set<PriceLine>().AsNoTracking()
+            where line.ServiceId == serviceId
+            join list in context.Set<BasePriceList>().AsNoTracking() on line.PriceListId equals list.Id
+            orderby list.Year descending, list.Code
+            select new ServiceBasePriceItem(list.Id, list.Code, list.Name.En, list.Name.Ar, list.Year, list.IsActive, line.Price, line.IsActive))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+        var contractRows = await (
+            from price in context.Set<ContractPrice>().AsNoTracking()
+            where price.ServiceId == serviceId
+            join pricing in context.Set<ContractPricing>().AsNoTracking() on price.ContractPricingId equals pricing.Id
+            join tier in context.Set<ContractTier>().AsNoTracking() on pricing.ContractTierId equals tier.Id
+            join payer in context.Set<Payer>().AsNoTracking() on pricing.PayerId equals payer.Id
+            from source in context.Set<BasePriceList>().AsNoTracking().Where(list => list.Id == price.SourceListId).DefaultIfEmpty()
+            orderby payer.IsDefault descending, payer.Name.En, tier.IsDefault descending, tier.Name.En
+            select new
+            {
+                TierId = tier.Id,
+                PayerId = payer.Id,
+                PayerNameEn = payer.Name.En,
+                PayerNameAr = payer.Name.Ar,
+                TierNameEn = tier.Name.En,
+                TierNameAr = tier.Name.Ar,
+                price.ListPrice,
+                price.PatientShare,
+                price.PayerShare,
+                price.IsExcluded,
+                SourceListCode = source == null ? null : source.Code,
+                TierActive = tier.IsActive,
+                PayerActive = payer.IsActive,
+                pricing.EffectiveFrom,
+                pricing.EffectiveTo,
+            })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        var contractPrices = contractRows.Select(row => new ServiceContractPriceItem(
+            row.TierId, row.PayerId, row.PayerNameEn, row.PayerNameAr, row.TierNameEn, row.TierNameAr,
+            row.ListPrice, row.PatientShare, row.PayerShare, row.IsExcluded, row.SourceListCode, row.TierActive, row.PayerActive,
+            today >= row.EffectiveFrom && (row.EffectiveTo == null || today <= row.EffectiveTo.Value))).ToList();
+
+        return new ServicePricesView(service.Id, service.Code, service.NameEn, service.NameAr, service.Type, service.IsActive, string.Empty, basePrices, contractPrices);
+    }
+}
+
+/// <summary>The head of one catalogue service for the service prices page (materialised from raw SQL).</summary>
+internal sealed class ServiceHeadRow
+{
+    public Guid Id { get; set; }
+
+    public string Code { get; set; } = string.Empty;
+
+    public string NameEn { get; set; } = string.Empty;
+
+    public string NameAr { get; set; } = string.Empty;
+
+    public string Type { get; set; } = string.Empty;
+
+    public bool IsActive { get; set; }
 }
 
 /// <summary>One catalogue service as the pricing projections show it (materialised from raw SQL).</summary>

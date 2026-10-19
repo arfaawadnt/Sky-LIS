@@ -100,7 +100,7 @@ public sealed class ExportPaymentsValidator : AbstractValidator<ExportPaymentsQu
 
 public sealed class ExportPaymentsHandler(IVisitAccountRepository accounts, IBillableVisitLookup visits, IClock clock) : IQueryHandler<ExportPaymentsQuery, BillingExportFile>
 {
-    private static readonly string[] Header = ["Receipt", "Paid at (UTC)", "Accession", "Amount", "Method", "Reference", "Treasury", "Cashier", "Device", "Status", "Void reason", "Voided by", "Voided at (UTC)"];
+    private static readonly string[] Header = ["Receipt", "Paid at (UTC)", "Accession", "Amount", "Method", "Method code", "Reference", "Treasury", "Cashier", "Device", "Status", "Void reason", "Voided by", "Voided at (UTC)"];
 
     public async Task<BillingExportFile> Handle(ExportPaymentsQuery query, CancellationToken cancellationToken)
     {
@@ -116,7 +116,7 @@ public sealed class ExportPaymentsHandler(IVisitAccountRepository accounts, IBil
 
         return BillingCsv.Build("payments", clock.UtcNow, Header, rows.Select(row => (IReadOnlyList<object?>)
         [
-            row.ReceiptNumber, row.PaidAtUtc, row.Accession, row.Amount, row.Method, row.Reference, row.TreasuryCode, row.CashierName, row.DeviceId, row.Status,
+            row.ReceiptNumber, row.PaidAtUtc, row.Accession, row.Amount, row.Method, row.MethodCode, row.Reference, row.TreasuryCode, row.CashierName, row.DeviceId, row.Status,
             row.VoidReason, row.VoidedByName, row.VoidedAtUtc,
         ]), BillingCsv.Zone(query.TimeZone));
     }
@@ -175,7 +175,10 @@ public sealed class GetPaymentReceiptHandler(
             payment.VoidedAtUtc,
             currency,
             user.DisplayName ?? string.Empty,
-            clock.UtcNow);
+            clock.UtcNow,
+            payment.MethodCode,
+            payment.MethodNameEn,
+            payment.MethodNameAr);
     }
 }
 
@@ -224,7 +227,7 @@ public sealed class ExportRefundsValidator : AbstractValidator<ExportRefundsQuer
 
 public sealed class ExportRefundsHandler(IVisitAccountRepository accounts, IBillableVisitLookup visits, IRefundReasonLookup reasons, IClock clock) : IQueryHandler<ExportRefundsQuery, BillingExportFile>
 {
-    private static readonly string[] Header = ["Number", "Refunded at (UTC)", "Accession", "Amount", "Method", "Reference", "Reason", "Reason (Arabic)", "Note", "Treasury", "Cashier", "Device"];
+    private static readonly string[] Header = ["Number", "Refunded at (UTC)", "Accession", "Amount", "Method", "Method code", "Reference", "Reason", "Reason (Arabic)", "Note", "Treasury", "Cashier", "Device"];
 
     public async Task<BillingExportFile> Handle(ExportRefundsQuery query, CancellationToken cancellationToken)
     {
@@ -240,7 +243,7 @@ public sealed class ExportRefundsHandler(IVisitAccountRepository accounts, IBill
 
         return BillingCsv.Build("refunds", clock.UtcNow, Header, rows.Select(row => (IReadOnlyList<object?>)
         [
-            row.Number, row.RefundedAtUtc, row.Accession, row.Amount, row.Method, row.Reference, row.ReasonNameEn, row.ReasonNameAr, row.Note, row.TreasuryCode, row.CashierName, row.DeviceId,
+            row.Number, row.RefundedAtUtc, row.Accession, row.Amount, row.Method, row.MethodCode, row.Reference, row.ReasonNameEn, row.ReasonNameAr, row.Note, row.TreasuryCode, row.CashierName, row.DeviceId,
         ]), BillingCsv.Zone(query.TimeZone));
     }
 }
@@ -295,6 +298,9 @@ public sealed class GetRefundReceiptHandler(
             refund.CashierName,
             currency,
             user.DisplayName ?? string.Empty,
-            clock.UtcNow);
+            clock.UtcNow,
+            refund.MethodCode,
+            refund.MethodNameEn,
+            refund.MethodNameAr);
     }
 }

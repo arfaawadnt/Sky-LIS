@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 
 import { ClientsFacade } from './state/clients.facade';
 import { DashboardFacade } from './state/dashboard.facade';
+import { LoginLogsFacade } from './state/login-logs.facade';
 import { ParametersFacade, PcrKitsFacade, TemplatesFacade } from './state/reference.facades';
 import { SessionsFacade } from './state/sessions.facade';
 import { WalletsFacade } from './state/wallets.facade';
@@ -31,6 +32,11 @@ export const PLATFORM_ROUTES: Routes = [
     path: 'sessions',
     providers: [SessionsFacade],
     loadComponent: () => import('./pages/sessions.page').then((m) => m.SessionsPage),
+  },
+  {
+    path: 'login-logs',
+    providers: [LoginLogsFacade],
+    loadComponent: () => import('./pages/login-logs.page').then((m) => m.LoginLogsPage),
   },
   {
     path: 'countries',

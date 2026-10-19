@@ -4,7 +4,7 @@
 | --- | --- |
 | Module | `catalogue` (half A; slot `cat`). Client pages CP-39 Clinical groups, CP-40 Services, CP-41 Tests, CP-42 Service sequence, CP-43 Sample types, CP-44 Units of measurement, CP-45 Patient conditions, CP-55 Additional services; admin SA-12/SA-13 reuse the same pages under the platform tenant. Business rules BR-02 (input), BR-08, BR-11, BR-12, BR-13, BR-19, BR-20, BR-24, BR-25. |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), the Sky LIS prototypes synthesis and the LDM knowledge base (`docs/knowledge/ldm/LDM_Business_Knowledge.md` §2.2, §2.5, §3.1–§3.8, §5.6, §6). **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.1 — 2026-10-14 (parent services on the test page, change request: T21, scenario S-T21, question Q17) |
+| Version | 1.2 — 2026-10-19 (service sequence reordering, change request LIS-CR-003 P-C18: §17, scenario S-T12b, questions Q18–Q20); 1.1 — 2026-10-14 (parent services on the test page, change request: T21, scenario S-T21, question Q17) |
 | Implemented in | `src/Platform.Domain/Catalogue` (ClinicalGroup, SampleType, MeasurementUnit, PatientCondition, Service, LabTest, ReferenceRangeResolver), `src/Platform.Contracts/Catalogue`, `src/Platform.Application/Catalogue` (+ `Services/` formula evaluator, `ICatalogueLookup`, `ICatalogueACloner`), `src/Platform.Infrastructure/Persistence/Catalogue`, `src/Platform.WebApi/Controllers/Catalogue`, `frontend/src/app/features/catalogue/{pages-a,data-a,state-a,ui-a}`, `frontend/src/app/core/api/catalogue-a.contracts.ts`, `frontend/public/i18n/catalogue-a.{en,ar}.json` |
 | Codes | `CAT-001`…`CAT-199` (catalogue B uses `CAT-200`…`CAT-399`) |
 
@@ -271,3 +271,44 @@ Open questions (assumed answers let the build proceed; confirm or change):
 | Q15 | Cloning (BR-25): which rows reach a new tenant? | Active rows only; formulas verbatim; report templates cleared unless the catalogue B map is supplied. |
 | Q16 | Is a "publish" step needed for the global catalogue (SA-12)? | Not in this intake; edits of the platform tenant are immediate and reach only tenants created afterwards. |
 | Q17 | Which services may a test join or leave from its own page (prototype "Parent Service", v1.1)? | Profiles and cultures, which take any number of tests; a Test service or a text report carries exactly one test and a package none, so those are set up from the service (the page shows them locked, the server refuses regardless). A test joining a profile is appended last, printed and not in the sum; order and flags are then edited on the service. |
+
+## 17. Change request 2026-10-19 — service sequence reordering (LIS-CR-003, package P-C18, CP-42b)
+
+The business owner asked for the prototype's reorder page: drag a row to a new position, move it up / down, type a position, and
+reorder inside a clinical-group filter so that only the visible rows renumber. Nothing in the data model changes (no migration).
+
+**What changes**
+
+- `ListServiceSequenceQuery` gains `ClinicalGroupId?` (`GET /api/v1/catalogue/services/sequence?clinicalGroupId=`), beside the
+  existing search and type filters; `ServiceSequenceRow` carries `ClinicalGroupId` next to the group names.
+- `SaveServiceSequenceCommand` keeps its shape (the list of `(serviceId, sequence)`); the handler now refuses one number sent for two
+  listed services before anything is read — new code **`CAT-033`** (`ServiceCodes.SequenceRepeated`, 422, rule `Service.EnsureDistinctSequences`,
+  T12). A number held by a row outside the list is still `CAT-105` (409, tenant-wide INV-CAT-004) and nothing is applied in either case.
+- Page CP-42 (`/catalogue/service-sequence`, same route and permissions `catalogue.view` / `catalogue.edit`): the rows move by native
+  HTML5 drag and drop (handle with screen-reader text), by ↑ / ↓ buttons (disabled at the ends), by Alt+↑ / Alt+↓ on the focused row, or
+  by typing a number in the position input — the row takes the place of that number and the rows in between shift. A clinical-group
+  select stands beside the type filter. The page is *dirty* once the order differs from the stored one: a strip names the count of rows
+  that will change with *Save order* / *Discard* (confirmed), the filters and *Refresh* are disabled until the order is saved or
+  discarded, leaving the page asks first (`canDeactivate`), F10 saves. Every move is announced to assistive technology.
+- Rule of the page (`ui-a/sequence-order.ts`, pure): **the visible rows keep the set of sequence numbers they already occupy and only
+  their order changes**. With a filter on, a reorder therefore renumbers only within the numbers those rows held, so the rows outside the
+  filter keep their numbers and no duplicate can arise; the save sends only the rows whose number changed.
+
+**Scenarios added**
+
+```gherkin
+Scenario S-T12b: one number for two listed services is refused with CAT-033 (422) and nothing changes; the sequence rows filter by
+                 clinical group and carry the group id (a service without a group is outside every group filter; an unknown group is
+                 empty); a reorder of a filtered subset sends the subset's own numbers and leaves the rows outside it untouched
+Scenario S-T12b-ui: the arrow buttons, a drop before / after a row, a typed number (its place, or the place of the last number below it)
+                 and Alt+↑ / Alt+↓ reorder the visible rows within their numbers; an invalid entry is flagged and dropped; the dirty
+                 strip, the disabled filters, the discard and leave confirmations, the read-only viewer (UAT B-12)
+```
+
+**Open questions (assumed answers let the build proceed; confirm or change)**
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| Q18 | What does a typed number mean on the reorder page: the row's new sequence number, or the position whose number it is? | The position: the row takes the place of that number (between two numbers, the place of the lower one) and every visible row keeps a number the set already uses. A laboratory that wants gaps for later inserts gives a service its number on the service page (CP-40), as before. |
+| Q19 | May the filters change while an order is unsaved? | No: the filters and *Refresh* are disabled until the order is saved or discarded, because the renumbering is defined over the rows on screen. |
+| Q20 | Should a reorder of a filtered subset be allowed to renumber rows outside the filter (for example to close gaps)? | No: only the visible rows change, within their own numbers (the prototype's "only the visible rows renumber"). |

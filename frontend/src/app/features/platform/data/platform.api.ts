@@ -9,6 +9,8 @@ import {
   type ClientDetail,
   type ClientFilter,
   type ClientListItem,
+  type ClientLoginLogFilter,
+  type ClientLoginLogItem,
   type CodeSystemImportResult,
   type CodeSystemItemView,
   type CodeSystemListItem,
@@ -19,12 +21,16 @@ import {
   type DashboardPeriod,
   type GovernorateListItem,
   type GovernorateRequest,
+  type LocationLevel,
+  type LocationListItem,
+  type LocationRequest,
   type NotificationTemplateListItem,
   type NotificationTemplateRequest,
   type Paged,
   type PcrKitListItem,
   type PcrKitRequest,
   PLATFORM_API,
+  PLATFORM_LOCATIONS_API,
   type PlanListItem,
   type PlanRequest,
   type PlatformDashboard,
@@ -253,6 +259,18 @@ export class PlatformApi {
     return firstValueFrom(this.http.put<TenantSettingsResponse>(SETTINGS_API.settings, request));
   }
 
+  // client login logs (SA-08b, LIS-CR-003 §2)
+  listLoginLogs(filter: ClientLoginLogFilter, signal?: AbortSignal): Promise<Paged<ClientLoginLogItem>> {
+    return this.get<Paged<ClientLoginLogItem>>(PLATFORM_API.loginLogs, { ...filter }, signal);
+  }
+
+  /** The CSV the server builds for the same filter (UTF-8 with BOM, at most 10 000 rows), with the file name it chose. */
+  async exportLoginLogs(filter: Omit<ClientLoginLogFilter, 'page' | 'pageSize'>, language: string): Promise<DownloadedFile> {
+    const params = toHttpParams({ ...filter, language });
+    const response = await firstValueFrom(this.http.get(`${PLATFORM_API.loginLogs}/export`, { params, responseType: 'blob', observe: 'response' }));
+    return { blob: response.body ?? new Blob([], { type: 'text/csv' }), fileName: fileNameOf(response.headers.get('Content-Disposition')) ?? 'client-login-logs.csv' };
+  }
+
   /** Every page of a register (for the CSV export), at most `MAX_PAGE_SIZE` rows per call and `maxRows` in all. */
   async all<T>(load: (page: PageRequest) => Promise<Paged<T>>, maxRows = 10_000): Promise<readonly T[]> {
     const rows: T[] = [];
@@ -265,6 +283,23 @@ export class PlatformApi {
     }
   }
 
+  // location hierarchy under a governorate (SA-11b, LIS-CR-003 §3): cities of a governorate, districts of a city, areas of a district
+  listLocations(level: LocationLevel, parentId: string, filter: { readonly search: string | null; readonly isActive: boolean | null }, signal?: AbortSignal): Promise<readonly LocationListItem[]> {
+    return this.get<readonly LocationListItem[]>(`${PLATFORM_LOCATIONS_API[level].parents}/${encodeURIComponent(parentId)}/${level}`, { ...filter }, signal);
+  }
+
+  createLocation(level: LocationLevel, parentId: string, request: LocationRequest): Promise<CreatedResource> {
+    return firstValueFrom(this.http.post<CreatedResource>(`${PLATFORM_LOCATIONS_API[level].parents}/${encodeURIComponent(parentId)}/${level}`, request));
+  }
+
+  renameLocation(level: LocationLevel, id: string, request: LocationRequest): Promise<void> {
+    return this.send('put', `${PLATFORM_LOCATIONS_API[level].items}/${encodeURIComponent(id)}`, request);
+  }
+
+  setLocationActive(level: LocationLevel, id: string, active: boolean): Promise<void> {
+    return this.send('post', `${PLATFORM_LOCATIONS_API[level].items}/${encodeURIComponent(id)}/${active ? 'reactivate' : 'deactivate'}`, null);
+  }
+
   private get<T>(url: string, query: Readonly<Record<string, string | number | boolean | null | undefined>>, signal?: AbortSignal): Promise<T> {
     return firstValueFrom(this.http.get<T>(url, { params: toHttpParams(query) })).then(abortable<T>(signal));
   }
@@ -273,6 +308,22 @@ export class PlatformApi {
     // A 204 answer has a null body and `firstValueFrom` resolves it as null, which `mutation()` reports as failure; success is undefined.
     return firstValueFrom(method === 'put' ? this.http.put<void>(url, body) : this.http.post<void>(url, body), { defaultValue: undefined }).then(() => undefined);
   }
+}
+
+/** A file the server built (a CSV export): its bytes and the name of the Content-Disposition header. */
+export interface DownloadedFile {
+  readonly blob: Blob;
+  readonly fileName: string;
+}
+
+/** `attachment; filename=client-login-logs-2026-10-19-0830.csv; filename*=UTF-8''…` → the plain file name. */
+export function fileNameOf(contentDisposition: string | null): string | null {
+  if (!contentDisposition) {
+    return null;
+  }
+
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(contentDisposition);
+  return match?.[1] ? decodeURIComponent(match[1].trim()) : null;
 }
 
 /** Resources pass an abort signal; HttpClient has no fetch-level abort here, so a late result for an aborted load is dropped. */

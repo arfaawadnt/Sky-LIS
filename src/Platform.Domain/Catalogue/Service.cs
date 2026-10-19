@@ -251,6 +251,23 @@ public sealed class Service : AggregateRoot, ITenantScoped
         return sequence;
     }
 
+    /// <summary>
+    /// T12 (change request 2026-10-19): the numbers of one bulk sequence save must be distinct among themselves before the
+    /// tenant-wide check (INV-CAT-004); a number sent for two services is refused with CAT-033 and nothing is applied.
+    /// </summary>
+    public static void EnsureDistinctSequences(IEnumerable<int> sequences)
+    {
+        ArgumentNullException.ThrowIfNull(sequences);
+        var seen = new HashSet<int>();
+        foreach (var sequence in sequences)
+        {
+            if (!seen.Add(sequence))
+            {
+                CatalogueAGuard.Refuse(ServiceCodes.SequenceRepeated, $"The sequence {sequence} is given to more than one of the listed services.");
+            }
+        }
+    }
+
     private void Apply(ServiceDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition.Name);

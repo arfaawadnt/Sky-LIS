@@ -7,19 +7,24 @@ import { provideRouter } from '@angular/router';
 import type { PageRequest } from '../../../core/api/paging';
 import { PRICING_API, type PriceLineItem } from '../../../core/api/pricing.contracts';
 import type { TableSort } from '../../../shared/ui/data-table/data-table.types';
+import { AuthStore } from '../../../core/auth/auth.store';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
+import { type PrintRequest, PrintService } from '../../../shared/print/print.service';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { PriceListEditorFacade } from '../state/price-list-editor.facade';
 import { ServiceNamesStore } from '../state/service-names.store';
 import { LIST_DETAIL, LIST_LINES, LISTS_PAGE } from '../testing/pricing.fixtures';
+import { PriceListDocumentComponent } from '../ui/documents/price-list-document.component';
 import { PriceListEditorPage } from './price-list-editor.page';
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('PriceListEditorPage (CP-33)', () => {
   let backend: HttpTestingController;
+  let printed: PrintRequest[];
 
   beforeEach(async () => {
+    printed = [];
     await TestBed.configureTestingModule({
       imports: [PriceListEditorPage],
       providers: [
@@ -30,6 +35,9 @@ describe('PriceListEditorPage (CP-33)', () => {
         PriceListEditorFacade,
         ServiceNamesStore,
         { provide: PermissionsService, useValue: { can: () => true } satisfies Pick<PermissionsService, 'can'> },
+        { provide: PrintService, useValue: { print: async (request: PrintRequest): Promise<void> => void printed.push(request) } satisfies Pick<PrintService, 'print'> },
+        // the print names the signed-in user; the page only reads the profile
+        { provide: AuthStore, useValue: { profile: () => null } },
       ],
     }).compileComponents();
     backend = TestBed.inject(HttpTestingController);
@@ -283,6 +291,125 @@ describe('PriceListEditorPage (CP-33)', () => {
 
     const code = document.querySelector<HTMLInputElement>('app-copy-list-dialog input[formcontrolname="code"]') ?? host.querySelector<HTMLInputElement>('app-copy-list-dialog input[formcontrolname="code"]');
     expect(code?.value).toBe('PL27-2');
+    backend.verify();
+  });
+
+  // ---- tools (CR 2026-10-19 C21) ----
+
+  /** The tool handlers the dialogs call (kept protected by the page). */
+  interface ToolInternals {
+    readonly importOpen: () => boolean;
+    readonly adjustOpen: () => boolean;
+    readonly importResult: () => { applied: boolean } | null;
+    readonly adjustResult: () => { applied: boolean } | null;
+    openImport(): void;
+    openAdjust(): void;
+    checkImport(rows: readonly { row: number; serviceCode: string | null; price: number | null }[]): Promise<void>;
+    applyImport(rows: readonly { row: number; serviceCode: string | null; price: number | null }[]): Promise<void>;
+    previewAdjust(request: { mode: 'Percent' | 'Amount'; value: number; rounding: 'None' | 'Whole' | 'Nearest5' | 'Nearest10'; serviceIds: readonly string[] | null; preview: boolean }): Promise<void>;
+    applyAdjust(request: { mode: 'Percent' | 'Amount'; value: number; rounding: 'None' | 'Whole' | 'Nearest5' | 'Nearest10'; serviceIds: readonly string[] | null; preview: boolean }): Promise<void>;
+    print(): Promise<void>;
+  }
+
+  function expectReload(): void {
+    backend.expectOne(`${PRICING_API.basePriceLists}/pl26`).flush(LIST_DETAIL);
+    backend.expectOne(`${PRICING_API.basePriceLists}/pl26/lines`).flush(LIST_LINES);
+  }
+
+  it('Upload Excel: checks the parsed rows as a dry run (nothing re-read), then applies them and re-reads the grid', async () => {
+    const { host, page } = await render();
+    const tools = page as unknown as ToolInternals;
+    const rows = [{ row: 2, serviceCode: 'CBC', price: 190 }, { row: 3, serviceCode: 'TSH', price: 95 }];
+
+    [...host.querySelectorAll<HTMLButtonElement>('app-page-header button')].find((button) => button.textContent?.includes('pricing.tools.uploadExcel'))?.click();
+    await flush();
+    expect(tools.importOpen()).toBe(true);
+
+    const checking = tools.checkImport(rows);
+    await settle();
+    const dryRun = backend.expectOne({ method: 'POST', url: `${PRICING_API.basePriceLists}/pl26/import` });
+    expect(dryRun.request.body).toEqual({ rows, dryRun: true });
+    dryRun.flush({ accepted: 2, added: 1, changed: 1, applied: false, errors: [] });
+    await checking;
+    await flush();
+    expect(tools.importResult()?.applied).toBe(false);
+    backend.expectNone(`${PRICING_API.basePriceLists}/pl26/lines`);
+
+    const applying = tools.applyImport(rows);
+    await settle();
+    const real = backend.expectOne({ method: 'POST', url: `${PRICING_API.basePriceLists}/pl26/import` });
+    expect(real.request.body).toEqual({ rows, dryRun: false });
+    real.flush({ accepted: 2, added: 1, changed: 1, applied: true, errors: [] });
+    await applying;
+    await flush();
+    expectReload();
+    await flush();
+    expect(tools.importOpen()).toBe(false);
+    backend.verify();
+  });
+
+  it('Bulk adjust: a preview writes nothing, an apply re-reads the grid; both carry the request as the dialog built it', async () => {
+    const { page } = await render();
+    const tools = page as unknown as ToolInternals;
+    const request = { mode: 'Percent' as const, value: 10, rounding: 'Whole' as const, serviceIds: null, preview: true };
+    const answer = { rows: [{ serviceId: 's-cbc', code: 'CBC', nameEn: 'CBC', nameAr: 'س', oldPrice: 180, newPrice: 198, clamped: false }], changed: 1, clamped: 0, applied: false };
+
+    tools.openAdjust();
+    expect(tools.adjustOpen()).toBe(true);
+    const previewing = tools.previewAdjust(request);
+    await settle();
+    const preview = backend.expectOne({ method: 'POST', url: `${PRICING_API.basePriceLists}/pl26/adjust` });
+    expect(preview.request.body).toEqual(request);
+    preview.flush(answer);
+    await previewing;
+    await flush();
+    expect(tools.adjustResult()?.applied).toBe(false);
+    backend.expectNone(`${PRICING_API.basePriceLists}/pl26/lines`);
+
+    const applying = tools.applyAdjust({ ...request, preview: false });
+    await settle();
+    const apply = backend.expectOne({ method: 'POST', url: `${PRICING_API.basePriceLists}/pl26/adjust` });
+    expect(apply.request.body).toEqual({ ...request, preview: false });
+    apply.flush({ ...answer, applied: true });
+    await applying;
+    await flush();
+    expectReload();
+    await flush();
+    expect(tools.adjustOpen()).toBe(false);
+    backend.verify();
+  });
+
+  it('the tools do not open while prices are unsaved (save or discard first)', async () => {
+    const { host, page } = await render();
+    const tools = page as unknown as ToolInternals;
+    const price = host.querySelector<HTMLInputElement>('tbody tr[data-row] input.price');
+    if (!price) {
+      throw new Error('price input missing');
+    }
+
+    price.value = '1';
+    price.dispatchEvent(new Event('input'));
+    await flush();
+
+    tools.openImport();
+    tools.openAdjust();
+    expect([tools.importOpen(), tools.adjustOpen()]).toEqual([false, false]);
+    backend.verify();
+  });
+
+  it('Print renders the list document with every stored line in code order', async () => {
+    const { page } = await render();
+
+    await (page as unknown as ToolInternals).print();
+
+    expect(printed.length).toBe(1);
+    expect(printed[0]?.component?.type).toBe(PriceListDocumentComponent);
+    const inputs = printed[0]?.component?.inputs as { detail: { code: string }; lines: readonly { code: string; price: number; active: boolean }[] };
+    expect(inputs.detail.code).toBe('PL26');
+    expect(inputs.lines.map((line) => [line.code, line.price, line.active])).toEqual([
+      ['CBC', 180, true],
+      ['LIP', 300, true],
+    ]);
     backend.verify();
   });
 });

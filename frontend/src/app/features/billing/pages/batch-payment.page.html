@@ -51,6 +51,7 @@
         } @else {
           <app-billing-movement-form
             [treasuries]="desk.approved()"
+            [methods]="desk.methodOptions()"
             [(treasuryId)]="desk.treasuryId"
             [dueAmount]="payable()"
             [currency]="batch.currency"
@@ -86,6 +87,7 @@
       <p class="muted">{{ current.patientName ?? current.patientNumber ?? '—' }}</p>
       <app-billing-movement-form
         [treasuries]="desk.approved()"
+        [methods]="desk.methodOptions()"
         [(treasuryId)]="desk.treasuryId"
         [dueAmount]="current.remaining"
         [currency]="facade.current()?.currency ?? ''"

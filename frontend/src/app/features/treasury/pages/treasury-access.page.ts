@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 
 import type { PageRequest } from '../../../core/api/paging';
 import { TREASURY_ACCESS_STATUSES, TREASURY_PERMISSIONS, type TreasuryAccessRequestListItem, type TreasuryAccessStatus } from '../../../core/api/treasury.contracts';
@@ -39,6 +40,7 @@ const OUTSIDE_USER_BRANCHES = 'TRS-015';
   selector: 'app-treasury-access-page',
   imports: [
     ReactiveFormsModule,
+    RouterLink,
     CanDirective,
     SaveShortcutDirective,
     PageHeaderComponent,

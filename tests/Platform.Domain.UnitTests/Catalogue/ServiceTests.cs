@@ -140,6 +140,17 @@ public sealed class ServiceTests
     }
 
     [Fact]
+    public void T12b_A_bulk_save_refuses_a_sequence_given_to_two_services_CAT_033()
+    {
+        Service.EnsureDistinctSequences([]);
+        Service.EnsureDistinctSequences([3, 1, 2]);
+
+        var refused = Assert.Throws<DomainException>(() => Service.EnsureDistinctSequences([1, 2, 1]));
+        Assert.Equal((ServiceCodes.SequenceRepeated, DomainFault.Validation), (refused.Code, refused.Fault));
+        Assert.Contains("1", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void T10_Edit_changes_the_definition_but_never_the_code_or_type()
     {
         var service = Service.Create("GLU", ServiceType.Test, ServiceDefinition(), 1, [TestMember(1)], Now);

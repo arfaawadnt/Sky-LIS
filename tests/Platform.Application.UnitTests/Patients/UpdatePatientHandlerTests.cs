@@ -125,9 +125,19 @@ public sealed class UpdatePatientHandlerTests
                 Results = results,
                 Privileges = privileges,
                 UnitOfWork = unitOfWork,
-                Handler = new UpdatePatientHandler(patients, new DefaultSettings(), privileges, results, new NoZone(), unitOfWork, new FixedClock(Now)),
+                Handler = new UpdatePatientHandler(patients, new DefaultSettings(), privileges, results, new NoZone(), new NoLocations(), unitOfWork, new FixedClock(Now)),
             };
         }
+    }
+
+    /// <summary>These commands pick no city, district or area: the chain check reads nothing (change request 2026-10-19, A2).</summary>
+    private sealed class NoLocations : IPatientLocations
+    {
+        public Task<IReadOnlyDictionary<Guid, LocationNode>> CitiesAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<IReadOnlyDictionary<Guid, LocationNode>> DistrictsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<IReadOnlyDictionary<Guid, LocationNode>> AreasAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class FakeResults(DemographicsEditLimit highest) : IPatientResultStatusLookup
@@ -174,7 +184,7 @@ public sealed class UpdatePatientHandlerTests
 
         public Task<IReadOnlyList<Guid>> MergedFamilyAsync(Guid survivorId, CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        public Task<IReadOnlyList<PatientRow>> FindSimilarCandidatesAsync(IReadOnlyList<string> nameTokens, string? mobile, int limit, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<PatientRow>> FindSimilarCandidatesAsync(IReadOnlyList<string> nameTokens, IReadOnlyList<string> phones, int limit, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class DefaultSettings : ITenantSettings

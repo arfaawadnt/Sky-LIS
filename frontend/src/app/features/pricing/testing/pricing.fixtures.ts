@@ -1,4 +1,4 @@
-import type { BasePriceListDetail, BasePriceListItem, ContractPricingDetail, Paged, PriceLineItem, TierOption } from '../../../core/api/pricing.contracts';
+import type { BasePriceListDetail, BasePriceListItem, ContractPricingDetail, Paged, PriceLineItem, ServicePricesView, TierOption } from '../../../core/api/pricing.contracts';
 
 /** Shared test data of the pricing specs (not shipped: nothing outside specs imports this file). */
 
@@ -50,6 +50,24 @@ export const GOLD: ContractPricingDetail = {
   prices: [
     { serviceId: 's-cbc', listPrice: 180, patientShare: 18, payerShare: 162, isExcluded: false, alertCondition: null, sourceListId: 'pl26', sourceListCode: 'PL26', serviceCode: 'CBC', serviceNameEn: 'Complete blood count', serviceNameAr: 'صورة دم' },
     { serviceId: 's-lip', listPrice: 300, patientShare: 20, payerShare: 250, isExcluded: true, alertCondition: 'Prior approval', sourceListId: 'pl26', sourceListCode: 'PL26', serviceCode: 'LIP', serviceNameEn: 'Lipid profile', serviceNameAr: 'دهون' },
+  ],
+};
+
+/** CP-33b (C22): CBC on two lists (the older one inactive) and in one derived contract tier. */
+export const SERVICE_PRICES: ServicePricesView = {
+  serviceId: 's-cbc',
+  code: 'CBC',
+  nameEn: 'Complete blood count',
+  nameAr: 'صورة دم كاملة',
+  type: 'Test',
+  isActive: true,
+  currency: 'EGP',
+  basePrices: [
+    { listId: 'pl26', listCode: 'PL26', listNameEn: 'Main 2026', listNameAr: 'رئيسية 2026', year: 2026, listActive: true, price: 180, lineActive: true },
+    { listId: 'pl25', listCode: 'PL25', listNameEn: 'Main 2025', listNameAr: 'رئيسية 2025', year: 2025, listActive: false, price: 160, lineActive: false },
+  ],
+  contractPrices: [
+    { tierId: 't-gold', payerId: 'p-axa', payerNameEn: 'AXA', payerNameAr: 'أكسا', tierNameEn: 'Gold', tierNameAr: 'ذهبي', listPrice: 180, patientPrice: 18, payerPrice: 162, isExcluded: false, sourceListCode: 'PL26', tierActive: true, payerActive: true, inEffect: true },
   ],
 };
 

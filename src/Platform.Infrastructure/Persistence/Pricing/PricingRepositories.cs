@@ -90,7 +90,7 @@ internal sealed class PayerRepository(AppDbContext context) : Repository<Payer>(
         return rows.Select(row => new TierOption(row.Id, row.PayerId, row.PayerNameEn, row.PayerNameAr, row.Type.ToString(), row.NameEn, row.NameAr, row.IsActive, row.PayerIsActive, row.IsDefault, row.HasPricing)).ToList();
     }
 
-    private sealed record PayerRow(Guid Id, string NameEn, string NameAr, string SearchKey, PayerType Type, bool WebPortalEnabled, string? WebUsername, bool IsActive, bool IsDefault, List<ContractTierItem> Tiers)
+    private sealed record PayerRow(Guid Id, string NameEn, string NameAr, string SearchKey, PayerType Type, bool WebPortalEnabled, string? WebUsername, string? Phone1, string? Phone2, string? WhatsApp, string? Email, bool IsActive, bool IsDefault, List<ContractTierItem> Tiers)
     {
         public static readonly System.Linq.Expressions.Expression<Func<Payer, PayerRow>> Projection = payer => new PayerRow(
             payer.Id,
@@ -100,13 +100,17 @@ internal sealed class PayerRepository(AppDbContext context) : Repository<Payer>(
             payer.Type,
             payer.WebPortalEnabled,
             payer.WebUsername,
+            payer.Phone1,
+            payer.Phone2,
+            payer.WhatsApp,
+            payer.Email,
             payer.IsActive,
             payer.IsDefault,
             payer.Tiers.OrderByDescending(tier => tier.IsDefault).ThenBy(tier => tier.Name.En)
                 .Select(tier => new ContractTierItem(tier.Id, tier.PayerId, tier.Name.En, tier.Name.Ar, tier.IsActive, tier.IsDefault))
                 .ToList());
 
-        public PayerListItem ToItem() => new(Id, NameEn, NameAr, SearchKey, Type.ToString(), WebPortalEnabled, WebUsername, IsActive, IsDefault, Tiers);
+        public PayerListItem ToItem() => new(Id, NameEn, NameAr, SearchKey, Type.ToString(), WebPortalEnabled, WebUsername, Phone1, Phone2, WhatsApp, Email, IsActive, IsDefault, Tiers);
     }
 }
 

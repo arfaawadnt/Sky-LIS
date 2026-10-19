@@ -97,3 +97,12 @@ VALUES
      'Panic value for {patient} (accession {acc}): {test} = {value}. Please act now.',
      'قيمة حرجة للمريض {patient} (رقم الطلب {acc}): {test} = {value}. يرجى التصرف فورًا.', true, now(), 'seed')
 ON CONFLICT (code) DO NOTHING;
+
+-- 5. Change request 2026-10-19 (LIS-CR-003 A2, migration PrototypeGaps): the location hierarchy under a governorate.
+--    Grants for the runtime role on the three new saas tables (no deletes: rows are deactivated) and the per-parent
+--    unique English names (case-insensitive, like ux_governorates_country_name). No seed rows: the business owner
+--    enters the cities of each governorate (intake LIS-INT-PLT-001 §17). Idempotent.
+GRANT SELECT, INSERT, UPDATE ON saas.cities, saas.districts, saas.areas TO lis_app;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_cities_governorate_name ON saas.cities (governorate_id, lower(name_en));
+CREATE UNIQUE INDEX IF NOT EXISTS ux_districts_city_name ON saas.districts (city_id, lower(name_en));
+CREATE UNIQUE INDEX IF NOT EXISTS ux_areas_district_name ON saas.areas (district_id, lower(name_en));

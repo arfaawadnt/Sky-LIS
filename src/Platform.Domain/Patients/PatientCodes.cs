@@ -15,6 +15,14 @@ public static class PatientCodes
     public const string EmailInvalid = "PAT-012";
     public const string TextTooLong = "PAT-013";
 
+    /// <summary>The city does not exist or does not belong to the chosen governorate (change request 2026-10-19, A2); also a district or area given without its parent.</summary>
+    public const string CityNotInGovernorate = "PAT-014";
+    public const string DistrictNotInCity = "PAT-015";
+    public const string AreaNotInDistrict = "PAT-016";
+
+    /// <summary>The second phone is not 8–15 digits with an optional <c>+</c> (change request 2026-10-19, C3).</summary>
+    public const string SecondPhoneInvalid = "PAT-017";
+
     public const string PatientMerged = "PAT-020";
     public const string MergeWithItself = "PAT-021";
     public const string SurvivorNotActive = "PAT-022";

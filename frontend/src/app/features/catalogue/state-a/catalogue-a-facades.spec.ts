@@ -120,7 +120,7 @@ describe('catalogue A facades (01 §6.3)', () => {
   it('ServiceSequenceFacade saves the changed rows in one PUT and reloads', async () => {
     const facade = TestBed.inject(ServiceSequenceFacade);
     await runEffects();
-    const rows: ServiceSequenceRow[] = [{ id: 's1', code: 'GLU', nameEn: 'Glucose', nameAr: 'جلوكوز', type: 'Test', clinicalGroupNameEn: null, clinicalGroupNameAr: null, sequence: 1, isActive: true }];
+    const rows: ServiceSequenceRow[] = [{ id: 's1', code: 'GLU', nameEn: 'Glucose', nameAr: 'جلوكوز', type: 'Test', clinicalGroupId: null, clinicalGroupNameEn: null, clinicalGroupNameAr: null, sequence: 1, isActive: true }];
     backend.expectOne((request) => request.url === CATALOGUE_A_API.serviceSequence).flush(rows);
     await runEffects();
     expect(facade.rows.value()?.length).toBe(1);

@@ -8,27 +8,35 @@
 <div appSaveShortcut (appSaveShortcut)="save()">
   <app-section-card [padded]="false">
     <app-toolbar>
-      <app-search-box toolbarFilters [placeholder]="i18n.t('catalogue-a.sequence.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
-      <label toolbarFilters class="filter">
-        <span class="visually-hidden">{{ i18n.t('catalogue-a.sequence.column.type') }}</span>
-        <select class="inp" (change)="onType($event)">
-          <option value="">{{ i18n.t('catalogue-a.allTypes') }}</option>
-          @for (type of types; track type) {
-            <option [value]="type" [selected]="facade.filter().type === type">{{ typeLabel(type) }}</option>
-          }
-        </select>
-      </label>
+      <fieldset toolbarFilters class="filters-set" [disabled]="dirty()" [attr.aria-label]="i18n.t('catalogue-a.sequence.filters')">
+        <app-search-box [placeholder]="i18n.t('catalogue-a.sequence.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+        <label class="filter">
+          <span class="visually-hidden">{{ i18n.t('catalogue-a.sequence.column.type') }}</span>
+          <select class="inp" (change)="onType($event)">
+            <option value="">{{ i18n.t('catalogue-a.allTypes') }}</option>
+            @for (type of types; track type) {
+              <option [value]="type" [selected]="facade.filter().type === type">{{ typeLabel(type) }}</option>
+            }
+          </select>
+        </label>
+        <label class="filter">
+          <span class="visually-hidden">{{ i18n.t('catalogue-a.sequence.column.group') }}</span>
+          <select class="inp group-filter" (change)="onGroup($event)">
+            <option value="">{{ i18n.t('catalogue-a.allGroups') }}</option>
+            @for (group of groups(); track group.value) {
+              <option [value]="group.value" [selected]="facade.filter().clinicalGroupId === group.value" [disabled]="!group.isActive && facade.filter().clinicalGroupId !== group.value">{{ groupLabel(group) }}</option>
+            }
+          </select>
+        </label>
+      </fieldset>
       @if (canEdit()) {
-        <button toolbarActions ngProjectAs="[toolbarActions]" type="button" class="btn ghost" [disabled]="changes().length === 0" (click)="discard()"><app-icon name="x" [size]="15" />{{ i18n.t('catalogue-a.sequence.discard') }}</button>
+        <button toolbarActions ngProjectAs="[toolbarActions]" type="button" class="btn ghost" [disabled]="!dirty()" (click)="discard()"><app-icon name="x" [size]="15" />{{ i18n.t('catalogue-a.sequence.discard') }}</button>
       }
-      <button toolbarActions type="button" class="btn ghost" (click)="facade.rows.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('catalogue-a.refresh') }}</button>
+      <button toolbarActions type="button" class="btn ghost" [disabled]="dirty()" (click)="facade.rows.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('catalogue-a.refresh') }}</button>
     </app-toolbar>
 
     @if (facade.save.problem()) {
       <p class="problem list-problem" role="alert">{{ problemText() }}</p>
-    }
-    @if (duplicateIds().size > 0) {
-      <p class="warn-strip list-problem" role="status">{{ i18n.t('catalogue-a.sequence.duplicates') }}</p>
     }
     @if (invalidIds().size > 0) {
       <p class="warn-strip list-problem" role="status">{{ i18n.t('catalogue-a.sequence.invalid') }}</p>
@@ -36,13 +44,35 @@
     @if (facade.rows.error()) {
       <p class="problem list-problem" role="alert">{{ i18n.t('catalogue-a.loadError') }}</p>
     }
+    @if (dirty()) {
+      <div class="dirty-bar list-problem" role="status">
+        <span>{{ i18n.tc('catalogue-a.sequence.pending', changes().length) }} {{ i18n.t('catalogue-a.sequence.pendingHint') }}</span>
+        <span class="dirty-actions">
+          <button type="button" class="btn ghost sm" (click)="discard()">{{ i18n.t('catalogue-a.sequence.discard') }}</button>
+          <button type="button" class="btn primary sm" [disabled]="!canSave()" (click)="save()">{{ i18n.t('catalogue-a.sequence.saveOrder') }}</button>
+        </span>
+      </div>
+    }
+    <p class="visually-hidden" aria-live="polite" role="status">{{ announcement() }}</p>
+    @if (canEdit()) {
+      <p class="muted hint list-problem">{{ i18n.t('catalogue-a.sequence.hint') }}</p>
+    }
 
-    <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.rows.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('catalogue-a.sequence.empty')" [caption]="i18n.t('catalogue-a.sequence.title')">
-      <ng-template appCell="sequence" [appCellOf]="rows()" let-row>
-        <input class="inp sm mono seq" type="number" min="1" step="1" [value]="value(row)" [readOnly]="!canEdit()" [disabled]="!canEdit()" (input)="onInput(row, $event)" [attr.aria-label]="i18n.t('catalogue-a.sequence.column.sequence') + ' ' + row.code" [class.invalid]="invalidIds().has(row.id) || duplicateIds().has(row.id)" [class.changed]="changed(row)" />
-      </ng-template>
-      <ng-template appCell="type" [appCellOf]="rows()" let-row><app-badge tone="info">{{ typeLabel(row.type) }}</app-badge></ng-template>
-      <ng-template appCell="status" [appCellOf]="rows()" let-row><app-badge [status]="row.isActive ? 'Active' : 'Inactive'" /></ng-template>
-    </app-data-table>
+    <div class="seq-body" (dragover)="onDragOver($event)" (drop)="onDrop($event)" (dragleave)="onDragLeave($event)">
+      <app-data-table [columns]="columns()" [rows]="view()" [rowClass]="rowClass" [loading]="facade.rows.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('catalogue-a.sequence.empty')" [caption]="i18n.t('catalogue-a.sequence.title')">
+        <ng-template appCell="move" [appCellOf]="view()" let-row>
+          <span class="move-cell">
+            <button type="button" class="icon-btn handle" draggable="true" (dragstart)="onDragStart(row, $event)" (dragend)="onDragEnd()" [attr.aria-label]="handleLabel(row)" [title]="i18n.t('catalogue-a.sequence.dragHint')"><app-icon name="menu" [size]="14" /></button>
+            <button type="button" class="icon-btn move-up" [disabled]="isFirst(row)" (click)="moveUp(row)" [attr.aria-label]="i18n.tf('catalogue-a.sequence.moveUp', { code: row.code })" [title]="i18n.t('catalogue-a.sequence.moveUpHint')"><app-icon name="arrow-up" [size]="14" /></button>
+            <button type="button" class="icon-btn move-down" [disabled]="isLast(row)" (click)="moveDown(row)" [attr.aria-label]="i18n.tf('catalogue-a.sequence.moveDown', { code: row.code })" [title]="i18n.t('catalogue-a.sequence.moveDownHint')"><app-icon name="arrow-down" [size]="14" /></button>
+          </span>
+        </ng-template>
+        <ng-template appCell="sequence" [appCellOf]="view()" let-row>
+          <input class="inp sm mono seq" type="number" min="1" step="1" [value]="inputValue(row)" [readOnly]="!canEdit()" [disabled]="!canEdit()" (input)="onTyped(row, $event)" (change)="commitTyped(row, $event)" (blur)="commitTyped(row, $event)" (keydown.enter)="commitTyped(row, $event)" [attr.aria-label]="i18n.t('catalogue-a.sequence.column.sequence') + ' ' + row.code" [class.invalid]="invalidIds().has(row.id)" [class.changed]="changedIds().has(row.id)" />
+        </ng-template>
+        <ng-template appCell="type" [appCellOf]="view()" let-row><app-badge tone="info">{{ typeLabel(row.type) }}</app-badge></ng-template>
+        <ng-template appCell="status" [appCellOf]="view()" let-row><app-badge [status]="row.isActive ? 'Active' : 'Inactive'" /></ng-template>
+      </app-data-table>
+    </div>
   </app-section-card>
 </div>

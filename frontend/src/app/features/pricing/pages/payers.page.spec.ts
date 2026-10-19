@@ -21,6 +21,10 @@ const axa: PayerListItem = {
   type: 'Insurance',
   webPortalEnabled: true,
   webUsername: 'axa.portal',
+  phone1: '+20 (2) 2735-1234',
+  phone2: null,
+  whatsApp: null,
+  email: 'contracts@axa.example.com',
   isActive: true,
   isDefault: false,
   tiers: [{ id: 't-gold', payerId: 'p-axa', nameEn: 'Gold', nameAr: 'ذهبي', isActive: true, isDefault: false }],
@@ -100,8 +104,19 @@ describe('PayersPage (CP-32)', () => {
       type: 'Insurance',
       webPortalEnabled: false,
       webUsername: null,
+      phone1: null,
+      phone2: null,
+      whatsApp: null,
+      email: null,
     });
     expect(toPayerRequest({ name: { en: 'X', ar: 'س' }, searchKey: 'X', type: 'nonsense', webPortalEnabled: true, webUsername: ' x.portal ' })).toMatchObject({ type: 'Credit', webUsername: 'x.portal' });
+    // office contacts (C19): trimmed, blanks sent as null
+    expect(toPayerRequest({ name: { en: 'X', ar: 'س' }, searchKey: 'X', type: 'Credit', webPortalEnabled: false, phone1: ' +20 (2) 2735-1234 ', phone2: '   ', whatsApp: '01001234567', email: ' a@axa.com ' })).toMatchObject({
+      phone1: '+20 (2) 2735-1234',
+      phone2: null,
+      whatsApp: '01001234567',
+      email: 'a@axa.com',
+    });
     expect(toListRequest({ code: ' pl27 ', name: { en: 'Main 2027', ar: 'رئيسية 2027' }, year: '2027' })).toEqual({ code: 'pl27', nameEn: 'Main 2027', nameAr: 'رئيسية 2027', year: 2027 });
   });
 

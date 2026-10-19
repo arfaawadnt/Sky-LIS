@@ -227,3 +227,23 @@ public sealed class QuotePricesHandler(IPayerLookup payers, IPriceLookup prices,
             ?? throw new DomainException(PricingCodes.TierNotFound, "Contract tier not found.", DomainFault.NotFound);
     }
 }
+
+/// <summary>CP-33b Service prices (CR 2026-10-19 C22): one service's line in every base list and its price in every contract tier.</summary>
+[RequirePermissionPolicy(PermissionCatalog.Pricing, PermissionAction.View)]
+public sealed record GetServicePricesQuery(Guid ServiceId) : IQuery<ServicePricesView>;
+
+public sealed class GetServicePricesValidator : AbstractValidator<GetServicePricesQuery>
+{
+    public GetServicePricesValidator() => RuleFor(query => query.ServiceId).NotEmpty();
+}
+
+public sealed class GetServicePricesHandler(IServicePricesReader reader, ITenantSettings settings) : IQueryHandler<GetServicePricesQuery, ServicePricesView>
+{
+    public async Task<ServicePricesView> Handle(GetServicePricesQuery query, CancellationToken cancellationToken)
+    {
+        var view = await reader.ReadAsync(query.ServiceId, cancellationToken)
+            ?? throw new DomainException(PricingCodes.ServiceNotFound, "Service not found.", DomainFault.NotFound);
+        var currency = await settings.GetAsync(SettingKeys.DefaultCurrency, cancellationToken);
+        return view with { Currency = currency };
+    }
+}

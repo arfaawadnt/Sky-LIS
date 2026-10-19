@@ -70,6 +70,28 @@ internal static class BillingNotFound
     public static DomainException Closing() => new(BillingCodes.ClosingNotFound, "Cash closing not found.", DomainFault.NotFound);
 
     public static DomainException Treasury() => new(BillingCodes.TreasuryNotFound, "Treasury not found.", DomainFault.NotFound);
+
+    public static DomainException Method() => new(BillingCodes.MethodNotFound, "Payment method not found.", DomainFault.NotFound);
+}
+
+/// <summary>
+/// How a movement names its method (change request 2026-10-19): with a <c>methodCode</c> the active definition decides
+/// the kind and the reference rule (BIL-053 when unknown or inactive); without one the request's kind applies with the
+/// legacy rule "every kind but cash needs a reference".
+/// </summary>
+internal static class BillingMethods
+{
+    public static async Task<PaymentMethodUse> ResolveAsync(IPaymentMethodRepository methods, string kind, string? methodCode, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(methodCode))
+        {
+            return PaymentMethodUse.Legacy(BillingNames.Method(kind));
+        }
+
+        var definition = await methods.FindActiveByCodeAsync(methodCode.Trim(), cancellationToken).ConfigureAwait(false)
+            ?? throw new DomainException(BillingCodes.MethodUnknownOrInactive, "Choose an active payment method.", DomainFault.Validation);
+        return definition.AsUse();
+    }
 }
 
 /// <summary>Enum names as they travel (validators have checked them with <c>IsEnumName</c>).</summary>

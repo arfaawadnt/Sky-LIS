@@ -60,3 +60,53 @@ BEGIN
     END IF;
 END
 $$;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 2026-10-19 Payment methods (change request LIS-CR-003, P-C10): the set-up list app.payment_methods, method_code on
+-- payments and refunds. Appended to the PrototypeGaps migration after EF created the table and the columns. Idempotent.
+-- ---------------------------------------------------------------------------------------------------------------------
+
+-- (1) Every existing client starts with the four default methods (CASH, CARD, POS, TRANSFER); the platform tenant takes
+--     none and a tenant that already defined a code keeps its own row (ON CONFLICT DO NOTHING on (tenant_id, code)).
+INSERT INTO app.payment_methods (tenant_id, id, code, name_en, name_ar, kind, requires_reference, is_active, sequence, created_at_utc)
+SELECT t.id, gen_random_uuid(), d.code, d.name_en, d.name_ar, d.kind, d.requires_reference, true, d.sequence, now()
+FROM saas.tenants t
+CROSS JOIN (VALUES
+    ('CASH', 'Cash', 'نقدي', 'Cash', false, 1),
+    ('CARD', 'Card', 'بطاقة', 'Card', true, 2),
+    ('POS', 'POS', 'نقطة بيع', 'Pos', true, 3),
+    ('TRANSFER', 'Bank transfer', 'تحويل بنكي', 'Transfer', true, 4)) AS d (code, name_en, name_ar, kind, requires_reference, sequence)
+WHERE t.id <> '00000000-0000-0000-0000-000000000001'
+ON CONFLICT (tenant_id, code) DO NOTHING;
+
+-- (2) The payment guard keeps method_code immutable like the other posting facts (a payment changes only by its void).
+CREATE OR REPLACE FUNCTION app.billing_guard_payment() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'payments are never deleted (receipt %)', OLD.receipt_number;
+    END IF;
+
+    IF OLD.status = 'Voided' THEN
+        RAISE EXCEPTION 'a voided payment is frozen (receipt %)', OLD.receipt_number;
+    END IF;
+
+    IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
+       OR NEW.id IS DISTINCT FROM OLD.id
+       OR NEW.visit_id IS DISTINCT FROM OLD.visit_id
+       OR NEW.receipt_number IS DISTINCT FROM OLD.receipt_number
+       OR NEW.amount IS DISTINCT FROM OLD.amount
+       OR NEW.method IS DISTINCT FROM OLD.method
+       OR NEW.method_code IS DISTINCT FROM OLD.method_code
+       OR NEW.reference IS DISTINCT FROM OLD.reference
+       OR NEW.treasury_id IS DISTINCT FROM OLD.treasury_id
+       OR NEW.device_id IS DISTINCT FROM OLD.device_id
+       OR NEW.cashier_user_id IS DISTINCT FROM OLD.cashier_user_id
+       OR NEW.branch_id IS DISTINCT FROM OLD.branch_id
+       OR NEW.batch_id IS DISTINCT FROM OLD.batch_id
+       OR NEW.paid_at_utc IS DISTINCT FROM OLD.paid_at_utc THEN
+        RAISE EXCEPTION 'a payment changes only by its void (receipt %)', OLD.receipt_number;
+    END IF;
+
+    RETURN NEW;
+END
+$fn$;

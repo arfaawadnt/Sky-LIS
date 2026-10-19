@@ -187,8 +187,8 @@ export class CatalogueAApi {
     return this.activation(CATALOGUE_A_API.services, id, active);
   }
 
-  listServiceSequence(search: string, type: ServiceType | null, signal?: AbortSignal): Promise<readonly ServiceSequenceRow[]> {
-    return firstValueFrom(this.http.get<readonly ServiceSequenceRow[]>(CATALOGUE_A_API.serviceSequence, { params: toHttpParams({ search, type }) }), { defaultValue: [] }).then(abortable(signal));
+  listServiceSequence(search: string, type: ServiceType | null, clinicalGroupId: string | null, signal?: AbortSignal): Promise<readonly ServiceSequenceRow[]> {
+    return firstValueFrom(this.http.get<readonly ServiceSequenceRow[]>(CATALOGUE_A_API.serviceSequence, { params: toHttpParams({ search, type, clinicalGroupId }) }), { defaultValue: [] }).then(abortable(signal));
   }
 
   saveServiceSequence(items: readonly ServiceSequenceChange[]): Promise<void> {

@@ -68,8 +68,8 @@ public sealed class ServicesController(ISender sender) : ControllerBase
     }
 
     [HttpGet("sequence")]
-    public async Task<ActionResult<IReadOnlyList<ServiceSequenceRow>>> Sequence([FromQuery] string? search, [FromQuery] string? type, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListServiceSequenceQuery(search, type), cancellationToken));
+    public async Task<ActionResult<IReadOnlyList<ServiceSequenceRow>>> Sequence([FromQuery] string? search, [FromQuery] string? type, [FromQuery] Guid? clinicalGroupId, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListServiceSequenceQuery(search, type, clinicalGroupId), cancellationToken));
 
     [HttpPut("sequence")]
     public async Task<IActionResult> SaveSequence([FromBody] SaveServiceSequenceRequest body, CancellationToken cancellationToken)

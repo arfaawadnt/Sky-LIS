@@ -33,7 +33,11 @@ public sealed record RegisterPatientCommand(
     string? City,
     string? Address,
     string? Comments,
-    bool? IsVip) : ICommand<CreatedPatient>;
+    bool? IsVip,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null,
+    string? SecondPhone = null) : ICommand<CreatedPatient>;
 
 public sealed class RegisterPatientValidator : AbstractValidator<RegisterPatientCommand>
 {
@@ -45,6 +49,7 @@ public sealed class RegisterPatientValidator : AbstractValidator<RegisterPatient
         RuleFor(command => command.NameAr).MaximumLength(Patient.MaxNameLength);
         RuleFor(command => command.Age!).SetValidator(new PatientAgeValidator()).When(command => command.Age is not null);
         RuleFor(command => command.Mobile).MaximumLength(PatientShape.MaxRawMobileLength);
+        RuleFor(command => command.SecondPhone).MaximumLength(PatientShape.MaxRawMobileLength);
         RuleFor(command => command.NationalId).MaximumLength(PatientShape.MaxRawNationalIdLength);
         RuleFor(command => command.Nationality).MaximumLength(Patient.MaxNationalityLength);
         RuleFor(command => command.Email).MaximumLength(Patient.MaxEmailLength).EmailAddress().When(command => !string.IsNullOrWhiteSpace(command.Email));
@@ -60,6 +65,7 @@ public sealed class RegisterPatientHandler(
     ITenantSettings settings,
     IUserPrivileges privileges,
     ILaboratoryTimeZone laboratoryZone,
+    IPatientLocations locations,
     IUnitOfWork unitOfWork,
     IClock clock) : ICommandHandler<RegisterPatientCommand, CreatedPatient>
 {
@@ -71,7 +77,10 @@ public sealed class RegisterPatientHandler(
         }
 
         var rules = await PatientShape.ReadRulesAsync(settings, cancellationToken);
-        var demographics = PatientShape.Demographics(command.Title, command.FullName, command.NameAr, command.Gender, command.DateOfBirth, command.Age, command.PatientConditionId, command.Mobile, command.NationalId, command.Nationality, command.Email, command.GovernorateId, command.City, command.Address, command.Comments);
+        var demographics = await PatientLocationChain.ResolveAsync(   // the city must chain to the governorate (PAT-014…016); its English name becomes the text city
+            locations,
+            PatientShape.Demographics(command.Title, command.FullName, command.NameAr, command.Gender, command.DateOfBirth, command.Age, command.PatientConditionId, command.Mobile, command.NationalId, command.Nationality, command.Email, command.GovernorateId, command.City, command.Address, command.Comments, command.CityId, command.DistrictId, command.AreaId, command.SecondPhone),
+            cancellationToken);
         var now = clock.UtcNow;
         var zone = await laboratoryZone.FindAsync(cancellationToken);   // the laboratory's day, not the UTC one (validation R-11)
         Patient.Check(demographics, rules, now, zone);   // refuse before drawing a number (numbers are never reused)
@@ -109,7 +118,11 @@ public sealed record UpdatePatientCommand(
     string? Comments,
     bool? IsVip,
     uint? RowVersion,
-    Guid? VisitId = null) : ICommand;
+    Guid? VisitId = null,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null,
+    string? SecondPhone = null) : ICommand;
 
 public sealed class UpdatePatientValidator : AbstractValidator<UpdatePatientCommand>
 {
@@ -122,6 +135,7 @@ public sealed class UpdatePatientValidator : AbstractValidator<UpdatePatientComm
         RuleFor(command => command.NameAr).MaximumLength(Patient.MaxNameLength);
         RuleFor(command => command.Age!).SetValidator(new PatientAgeValidator()).When(command => command.Age is not null);
         RuleFor(command => command.Mobile).MaximumLength(PatientShape.MaxRawMobileLength);
+        RuleFor(command => command.SecondPhone).MaximumLength(PatientShape.MaxRawMobileLength);
         RuleFor(command => command.NationalId).MaximumLength(PatientShape.MaxRawNationalIdLength);
         RuleFor(command => command.Nationality).MaximumLength(Patient.MaxNationalityLength);
         RuleFor(command => command.Email).MaximumLength(Patient.MaxEmailLength).EmailAddress().When(command => !string.IsNullOrWhiteSpace(command.Email));
@@ -135,7 +149,7 @@ public sealed class UpdatePatientValidator : AbstractValidator<UpdatePatientComm
 /// T2 with the demographics lock (change request 2026-10-13 item 1): an <b>identity</b> field (title, names, gender, date of
 /// birth or age, condition, national id, nationality) changes only while the highest live result status of the visit (or of
 /// the patient, from the file) is within the member's <c>DemographicsEditUpTo</c> special right; otherwise PAT-032 (403).
-/// Contact fields (mobile, e-mail, governorate, city, address, comments) and the VIP flag need <c>patients.edit</c> alone.
+/// Contact fields (mobile, second phone, e-mail, governorate, city, district, area, address, comments) and the VIP flag need <c>patients.edit</c> alone.
 /// The field history is the ordinary patient update in <c>audit.field_changes</c>.
 /// </summary>
 public sealed class UpdatePatientHandler(
@@ -144,6 +158,7 @@ public sealed class UpdatePatientHandler(
     IUserPrivileges privileges,
     IPatientResultStatusLookup results,
     ILaboratoryTimeZone laboratoryZone,
+    IPatientLocations locations,
     IUnitOfWork unitOfWork,
     IClock clock) : ICommandHandler<UpdatePatientCommand>
 {
@@ -164,7 +179,10 @@ public sealed class UpdatePatientHandler(
         }
 
         var rules = await PatientShape.ReadRulesAsync(settings, cancellationToken);
-        var demographics = PatientShape.Demographics(command.Title, command.FullName, command.NameAr, command.Gender, command.DateOfBirth, command.Age, command.PatientConditionId, command.Mobile, command.NationalId, command.Nationality, command.Email, command.GovernorateId, command.City, command.Address, command.Comments);
+        var demographics = await PatientLocationChain.ResolveAsync(
+            locations,
+            PatientShape.Demographics(command.Title, command.FullName, command.NameAr, command.Gender, command.DateOfBirth, command.Age, command.PatientConditionId, command.Mobile, command.NationalId, command.Nationality, command.Email, command.GovernorateId, command.City, command.Address, command.Comments, command.CityId, command.DistrictId, command.AreaId, command.SecondPhone),
+            cancellationToken);
         var now = clock.UtcNow;
         var zone = await laboratoryZone.FindAsync(cancellationToken);
 
@@ -210,7 +228,8 @@ internal static class PatientShape
 
     public static PatientDemographics Demographics(
         string title, string fullName, string? nameAr, string gender, DateOnly? dateOfBirth, PatientAgeView? age, Guid? conditionId, string? mobile,
-        string? nationalId, string? nationality, string? email, Guid? governorateId, string? city, string? address, string? comments) =>
+        string? nationalId, string? nationality, string? email, Guid? governorateId, string? city, string? address, string? comments,
+        Guid? cityId = null, Guid? districtId = null, Guid? areaId = null, string? secondPhone = null) =>
         new(
             Enum.Parse<PatientTitle>(title, ignoreCase: true),
             fullName,
@@ -226,7 +245,11 @@ internal static class PatientShape
             governorateId,
             city,
             address,
-            comments);
+            comments,
+            cityId,
+            districtId,
+            areaId,
+            secondPhone);
 
     public static async Task<PatientFieldRules> ReadRulesAsync(ITenantSettings settings, CancellationToken cancellationToken) =>
         new(

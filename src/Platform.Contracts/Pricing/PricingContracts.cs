@@ -5,9 +5,10 @@ namespace Platform.Contracts.Pricing;
 
 // ---- payers and tiers (CP-32) ----
 
-public sealed record CreatePayerRequest(string NameEn, string NameAr, string SearchKey, string Type, bool WebPortalEnabled, string? WebUsername);
+/// <summary>The four contact values (CR 2026-10-19 C19) are optional: phones and WhatsApp as typed (≤ 32: digits, spaces, + - ( )), e-mail ≤ 254 of basic shape.</summary>
+public sealed record CreatePayerRequest(string NameEn, string NameAr, string SearchKey, string Type, bool WebPortalEnabled, string? WebUsername, string? Phone1 = null, string? Phone2 = null, string? WhatsApp = null, string? Email = null);
 
-public sealed record UpdatePayerRequest(string NameEn, string NameAr, string SearchKey, string Type, bool WebPortalEnabled, string? WebUsername);
+public sealed record UpdatePayerRequest(string NameEn, string NameAr, string SearchKey, string Type, bool WebPortalEnabled, string? WebUsername, string? Phone1 = null, string? Phone2 = null, string? WhatsApp = null, string? Email = null);
 
 public sealed record ContractTierRequest(string NameEn, string NameAr);
 
@@ -21,6 +22,10 @@ public sealed record PayerListItem(
     string Type,
     bool WebPortalEnabled,
     string? WebUsername,
+    string? Phone1,
+    string? Phone2,
+    string? WhatsApp,
+    string? Email,
     bool IsActive,
     bool IsDefault,
     IReadOnlyList<ContractTierItem> Tiers);
@@ -190,3 +195,64 @@ public sealed record PriceQuote(
     decimal TotalListPrice,
     decimal TotalPatientShare,
     decimal TotalPayerShare);
+
+// ---- price list tools (CR 2026-10-19 C21): Excel import and bulk adjust ----
+
+/// <summary>One row of an uploaded sheet: the sheet row number (for the error list), the service code and the new price as parsed by the SPA (null when the cell is empty or not a number).</summary>
+public sealed record ImportPriceRowRequest(int Row, string? ServiceCode, decimal? Price);
+
+/// <summary><paramref name="DryRun"/> validates only; otherwise the rows are applied when every row is valid (all-or-nothing).</summary>
+public sealed record ImportPriceLinesRequest(IReadOnlyList<ImportPriceRowRequest> Rows, bool DryRun);
+
+/// <summary>A refused row: PRC-041 (no code), PRC-015 (unknown code), PRC-006 (price missing or invalid), PRC-016 (code repeated).</summary>
+public sealed record ImportRowError(int Row, string? ServiceCode, string Code, string Message);
+
+/// <summary>
+/// <paramref name="Accepted"/> rows passed (of which <paramref name="Added"/> are new lines and <paramref name="Changed"/> change a price);
+/// <paramref name="Applied"/> is true only when nothing was refused and the call was not a dry run. With any error nothing is written.
+/// </summary>
+public sealed record ImportPriceLinesResult(int Accepted, int Added, int Changed, bool Applied, IReadOnlyList<ImportRowError> Errors);
+
+/// <summary><paramref name="Mode"/> Amount|Percent, <paramref name="Rounding"/> None|Whole|Nearest5|Nearest10, <paramref name="ServiceIds"/> null = every line; <paramref name="Preview"/> computes without writing.</summary>
+public sealed record AdjustBasePriceListRequest(string Mode, decimal Value, string Rounding, IReadOnlyList<Guid>? ServiceIds, bool Preview);
+
+public sealed record PriceAdjustmentRow(Guid ServiceId, string? Code, string? NameEn, string? NameAr, decimal OldPrice, decimal NewPrice, bool Clamped);
+
+/// <summary>The rows in list order; <paramref name="Changed"/> rows differ from their old price, <paramref name="Clamped"/> rows were held at 0.</summary>
+public sealed record AdjustBasePriceListResult(IReadOnlyList<PriceAdjustmentRow> Rows, int Changed, int Clamped, bool Applied);
+
+// ---- service prices (CR 2026-10-19 C22) ----
+
+public sealed record ServiceBasePriceItem(Guid ListId, string ListCode, string ListNameEn, string ListNameAr, int Year, bool ListActive, decimal Price, bool LineActive);
+
+/// <summary>A derived (or negotiated) price of the service in a tier; <paramref name="InEffect"/> compares today with the tier's effective dates.</summary>
+public sealed record ServiceContractPriceItem(
+    Guid TierId,
+    Guid PayerId,
+    string PayerNameEn,
+    string PayerNameAr,
+    string TierNameEn,
+    string TierNameAr,
+    decimal ListPrice,
+    decimal PatientPrice,
+    decimal PayerPrice,
+    bool IsExcluded,
+    string? SourceListCode,
+    bool TierActive,
+    bool PayerActive,
+    bool InEffect);
+
+/// <summary>Every price of one catalogue service: its line in each base list and its derived price in each contract tier (page CP-33b).</summary>
+public sealed record ServicePricesView(
+    Guid ServiceId,
+    string Code,
+    string NameEn,
+    string NameAr,
+    string Type,
+    bool IsActive,
+    string Currency,
+    IReadOnlyList<ServiceBasePriceItem> BasePrices,
+    IReadOnlyList<ServiceContractPriceItem> ContractPrices);
+
+/// <summary>A catalogue service as the pricing read ports label it (code and bilingual name).</summary>
+public sealed record CatalogueServiceLabel(Guid Id, string Code, string NameEn, string NameAr);

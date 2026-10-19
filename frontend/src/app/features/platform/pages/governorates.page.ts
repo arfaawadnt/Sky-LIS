@@ -8,13 +8,17 @@ import type { MasterDataConfig, MasterDataFilter, SelectOption } from '../../../
 import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { fileStamp, pick } from '../ui/format';
+import { LocationsDrawerComponent } from '../ui/locations-drawer.component';
 import { sortParams } from '../../../shared/forms/paging';
 import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
 
-/** SA-11 Governorates and districts, per country; the country is fixed once created and filters the list. */
+/**
+ * SA-11 Governorates and districts, per country; the country is fixed once created and filters the list. The row action
+ * *Locations* opens the SA-11b drawer (cities → districts → areas, LIS-CR-003 §3).
+ */
 @Component({
   selector: 'app-platform-governorates-page',
-  imports: [MasterDataPageComponent, IconComponent],
+  imports: [MasterDataPageComponent, IconComponent, LocationsDrawerComponent],
   template: `
     <app-master-data-page [config]="config">
       <label pageActions class="inline-filter">
@@ -28,6 +32,7 @@ import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types
       </label>
       <button pageActions type="button" class="btn ghost" (click)="exportCsv()"><app-icon name="printer" [size]="15" />{{ i18n.t('platform.exportCsv') }}</button>
     </app-master-data-page>
+    <app-platform-locations-drawer [governorate]="locationsOf()" (closed)="locationsOf.set(null)" />
   `,
   styleUrl: './platform-pages.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -43,6 +48,9 @@ export class GovernoratesPage {
   private readonly page = viewChild.required(MasterDataPageComponent);
 
   protected readonly countryFilter = signal<string | null>(null);
+
+  /** The governorate whose Locations drawer is open (SA-11b). */
+  protected readonly locationsOf = signal<GovernorateListItem | null>(null);
 
   private readonly countries = resource({
     loader: ({ abortSignal }) => this.api.listCountries({ search: null, isActive: null, page: 1, pageSize: 200 }, abortSignal),
@@ -87,6 +95,15 @@ export class GovernoratesPage {
       setActive: (id, active) => this.api.setGovernorateActive(id, active),
     },
     permissions: { create: PLATFORM_PERMISSIONS.tenancyManage, update: PLATFORM_PERMISSIONS.tenancyManage, activate: PLATFORM_PERMISSIONS.tenancyManage },
+    rowActions: [
+      {
+        id: 'locations',
+        label: 'platform.locations.open',
+        icon: 'layers',
+        permission: PLATFORM_PERMISSIONS.tenancyManage,
+        run: (row) => this.locationsOf.set(row),
+      },
+    ],
   };
 
   constructor() {

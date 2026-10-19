@@ -4,7 +4,7 @@
 | --- | --- |
 | Module | `billing` (Sky LIS Client Portal, pages CP-23 Payments, CP-24 Refunds, CP-27 Batch payment, CP-30 Cash closing; business rules BR-14, BR-16, BR-26, BR-27; workflow WF-09 and the payment steps of WF-02 / WF-04) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), MODULES.md (LIS-BM-001 §1, §3, §5) and the LDM synthesis. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.2 — 2026-10-13 (collections report of the Payments register: change request item 2; 1.1 — 2026-10-10 CP-37 special rights enforced) |
+| Version | 1.3 — 2026-10-19 (payment methods set-up list CP-30b, change request LIS-CR-003 P-C10, §17; 1.2 — 2026-10-13 collections report of the Payments register: change request item 2; 1.1 — 2026-10-10 CP-37 special rights enforced) |
 | Slot / wave | `bill`, wave 2 (built in parallel with Registration, Samples and Account) |
 | Implemented in | `src/Platform.Domain/Billing`, `src/Platform.Contracts/Billing`, `src/Platform.Application/Billing` (+ `Platform.Application/Registration/IVisitBalanceLookup.cs`), `src/Platform.Infrastructure/Persistence/Billing`, `src/Platform.WebApi/Controllers/Billing`, `frontend/src/app/features/billing`, `frontend/src/app/core/api/billing.contracts.ts` |
 
@@ -322,3 +322,66 @@ Integration dependencies (wave 1/2 modules built in parallel; placeholders marke
 | `IRefundReasonLookup` | accepts any non-empty reason id, no names | reads `app.reasons` (Catalogue B) — kind Refund, active |
 | `IBillingDirectory` | neutral letterhead, no patient / service / payer names | tenant name (`identity.tenants`), branch name (`app.branches`), patients (`app.patients`), services (`app.services`), payers (Pricing) |
 | `IVisitBalanceLookup` (declared in `Platform.Application.Registration`) | — (Billing ships the real adapter) | consumed by Registration |
+
+## 17. Change request 2026-10-19 — Payment methods set-up list (LIS-CR-003, package P-C10, Sky LIS CP-30b)
+
+**What changes.** The four payment kinds were a fixed enum on every cash desk form. The laboratory now keeps its own list
+of payment methods (Setup › Payment methods, `/billing/payment-methods`, nav entry `shell.nav.paymentMethods` under
+`billing.view`): code, English and Arabic names, kind, whether a transaction reference is required, the order of the pick
+lists and the active flag. The cash desk (CP-23, CP-24, CP-27) and the payment panel of the registration page (CP-06) offer
+the active methods by name and ask for the reference only when the chosen method requires it; the receipt, the refund
+receipt, the invoice movements and the registers show the method's name and code. The money semantics stay on the kind:
+cash lives in the treasury drawer, the cash closing and the collections report keep grouping by kind.
+
+**Aggregate.** `PaymentMethodDefinition` (`app.payment_methods`, key `(tenant_id, id)`, RLS declared by the `PrototypeGaps`
+migration): `Code` (≤ 20, upper-case, `[A-Z0-9_-]`, unique per tenant, immutable), `Name` (`LocalizedText`, ≤ 100), `Kind`
+(`PaymentMethod` Cash / Card / Pos / Transfer), `RequiresReference`, `IsActive`, `Sequence` (0…9999). Transitions: T10 Define,
+T11 Update (everything but the code), T12 Deactivate (idempotent; posted movements keep the code), T13 Reactivate, T14 Ensure
+defaults. Invariant INV-BIL-010: at least one active method of kind Cash per tenant (so a cash desk can always take cash);
+enforced on T12 and on a T11 that re-kinds the last active cash method. Events `PaymentMethodDefined`, `PaymentMethodUpdated`
+(only when something changed), `PaymentMethodDeactivated`, `PaymentMethodReactivated`.
+
+**Defaults.** `PaymentMethodDefinition.Defaults()` = CASH / Cash / نقدي (Cash, no reference), CARD / Card / بطاقة (Card, reference),
+POS / POS / نقطة بيع (Pos, reference), TRANSFER / Bank transfer / تحويل بنكي (Transfer, reference). Seeded (1) for every existing
+client by `Billing.migration.sql` (INSERT … SELECT over `saas.tenants`, platform tenant excluded, `ON CONFLICT (tenant_id, code) DO
+NOTHING`), (2) for new clients by the policy `SeedPaymentMethodsPolicy : IDomainEventHandler<TenantProvisioned>` (scopes itself to
+the new tenant, idempotent on the code, skips the platform tenant, accepts a lost race on the unique index), (3) on demand by
+`POST /api/v1/billing/payment-methods/defaults` [`billing.manage`], which the set-up page calls once when its unfiltered list is empty
+and offers as "Add the default methods".
+
+**Movements.** `Payment` and `Refund` gain `MethodCode` (nullable, ≤ 20; the definition's code at posting time; legacy rows null and
+shown as the kind; immutable under the payment guard trigger). `RecordPaymentRequest`, `RecordRefundRequest` and `PayBatchRequest`
+gain an optional `methodCode`: when present the handler loads the active definition (`BIL-053` when unknown or inactive), takes the
+kind from it and passes its reference rule to the aggregate (`PaymentMethodUse`); without a code the legacy rule "every kind but cash
+needs a reference" (BIL-003) stays, so older clients keep working. The CHECK constraints `ck_payments_reference_for_non_cash` /
+`ck_refunds_reference_for_non_cash` admit a non-cash row without reference only when it carries a method code.
+
+**Endpoints** (`BillingPaymentMethodsController`, `/api/v1/billing/payment-methods`): `GET` list (search over code and both names,
+`isActive`, sort keys `code | nameEn | nameAr | kind | sequence`, paged) and `GET {id}` [`billing.view`]; `GET options` (active, in
+sequence then code order: id, code, names, kind, requiresReference) [`billing.view`, read like `my-treasuries`: the reception role
+holds that key to pay from the registration page, BR-26]; `GET export` (CSV under the grid's filter, ≤ 200 rows, BIL-050 beyond)
+[`billing.export`]; `POST` create, `PUT {id}`, `POST {id}/deactivate`, `POST {id}/reactivate`, `POST defaults` [`billing.manage`].
+
+**Codes.** `BIL-051` code shape (422), `BIL-052` last active cash method (409), `BIL-053` unknown or inactive method code on a
+movement (422), `BIL-054` sequence out of range (422), `BIL-055` unknown kind (422), `BIL-121` duplicate code (409), `BIL-410`
+method not found (404). Shape violations (empty names, a kind outside the enum, a sequence above 9999) answer `VALIDATION-400`.
+
+**Frontend.** `features/billing/pages/payment-methods.page.ts` on the master-data page kit (list: code, name, kind, reference
+required, order, status; drawer with a "Rules at the cash desk" section; deactivate / reactivate; CSV written by the server;
+`billing.paymentMethods.*` dictionary). `CashDeskFacade.methods` (options resource, re-read on every page open) feeds the movement
+form (`[methods]`): the select shows the localized names, the reference input appears only when `requiresReference`, and the input
+sends `method` (kind) and `methodCode`; with no options (no definitions yet, or a refused read) the form falls back to the four
+kinds and the legacy rule. The registration facade gains the `methods` resource (`data/payment-methods.api.ts`, tolerant like
+`myTreasuries`), `methodOptions`, `selectedMethod` (the chosen code, else the first option) and `referenceRequired`; the payment
+block of CP-06 renders the options as the radio group and posts kind + code. `movementMethodLabel` names a movement as "name · code"
+in the receipt, refund receipt, invoice and register rows, or the kind on a legacy row.
+
+**Open questions and the assumptions built on.**
+
+| # | Question | Assumption |
+| --- | --- | --- |
+| Q23 | Does the collections report group by method definition or by kind? | By kind (unchanged): the money semantics and the drawer are per kind; a per-definition split is a Release-2 report. |
+| Q24 | May a method change kind after movements were posted with it? | Yes (T11): history keeps the kind on each movement; only the last active cash method cannot leave kind Cash (BIL-052). |
+| Q25 | Who reads the pick list? | Every holder of `billing.view` (as `my-treasuries`): the reception role holds it to pay from the registration page. No second permission path was needed. |
+| Q26 | A request with a `methodCode` whose kind differs from the request's `method` | The definition wins (its kind is stored); the request's kind is only the legacy path. |
+| Q27 | Delete a method? | Never: deactivate (the code lives on posted movements). A deactivated definition still names its history. |

@@ -18,6 +18,7 @@ import {
   type CollectionsReportDocument,
   type CollectionsReportPrivileges,
   type CollectionsReportRequest,
+  type CreatedResource,
   type DrawerCashier,
   type DrawerScopeFilter,
   type InvoiceDocument,
@@ -25,6 +26,11 @@ import {
   type PayBatchRequest,
   type PaymentCreated,
   type PaymentListItem,
+  type PaymentMethodDefaultsResult,
+  type PaymentMethodFilter,
+  type PaymentMethodListItem,
+  type PaymentMethodOption,
+  type PaymentMethodRequest,
   type PaymentReceiptDocument,
   type PaymentRegisterFilter,
   type RecordPaymentRequest,
@@ -33,6 +39,7 @@ import {
   type RefundListItem,
   type RefundReceiptDocument,
   type RefundRegisterFilter,
+  type UpdatePaymentMethodRequest,
   type VisitAccountView,
 } from '../../../core/api/billing.contracts';
 import { type MyPrivileges, ORGANIZATION_API } from '../../../core/api/organization.contracts';
@@ -190,6 +197,38 @@ export class BillingApi {
     return { canViewBranchCollections: mine.privileges.specialRights.canViewBranchCollections, reportDaysLimit: mine.privileges.specialRights.reportDaysLimit };
   }
 
+  // ---- payment method definitions (set-up list CP-30b, change request 2026-10-19) ------------------------------------
+
+  /** The active methods in pick-list order (`billing.view`); an empty list when the read fails, like the treasuries. */
+  paymentMethodOptions(signal?: AbortSignal): Promise<readonly PaymentMethodOption[]> {
+    return this.get<readonly PaymentMethodOption[]>(BILLING_API.paymentMethodOptions, new HttpParams(), [], signal);
+  }
+
+  listPaymentMethods(filter: PaymentMethodFilter, signal?: AbortSignal): Promise<Paged<PaymentMethodListItem>> {
+    return this.get<Paged<PaymentMethodListItem>>(BILLING_API.paymentMethods, methodParams(filter, true), emptyPage<PaymentMethodListItem>(), signal);
+  }
+
+  createPaymentMethod(request: PaymentMethodRequest): Promise<CreatedResource> {
+    return firstValueFrom(this.http.post<CreatedResource>(BILLING_API.paymentMethods, request));
+  }
+
+  updatePaymentMethod(id: string, request: UpdatePaymentMethodRequest): Promise<void> {
+    return firstValueFrom(this.http.put<void>(`${BILLING_API.paymentMethods}/${encodeURIComponent(id)}`, request));
+  }
+
+  setPaymentMethodActive(id: string, active: boolean): Promise<void> {
+    return firstValueFrom(this.http.post<void>(`${BILLING_API.paymentMethods}/${encodeURIComponent(id)}/${active ? 'reactivate' : 'deactivate'}`, null));
+  }
+
+  /** Adds the defaults the laboratory lacks (CASH, CARD, POS, TRANSFER); idempotent (`billing.manage`). */
+  ensureDefaultPaymentMethods(): Promise<PaymentMethodDefaultsResult> {
+    return firstValueFrom(this.http.post<PaymentMethodDefaultsResult>(`${BILLING_API.paymentMethods}/defaults`, null));
+  }
+
+  exportPaymentMethods(filter: PaymentMethodFilter): Promise<DownloadedFile> {
+    return this.download(`${BILLING_API.paymentMethods}/export`, methodParams(filter, false), 'payment-methods.csv');
+  }
+
   // ---- plumbing ---------------------------------------------------------------------------------------------------
 
   private get<T>(url: string, params: HttpParams, fallback: T, signal?: AbortSignal): Promise<T> {
@@ -204,6 +243,17 @@ export class BillingApi {
     const response: HttpResponse<Blob> = await firstValueFrom(this.http.get(url, { params, responseType: 'blob', observe: 'response' }));
     return { blob: response.body ?? new Blob([]), fileName: localCsvName(fallbackName.replace(/\.csv$/i, '')) };
   }
+}
+
+function methodParams(filter: PaymentMethodFilter, paged: boolean): HttpParams {
+  return toHttpParams({
+    search: filter.search,
+    isActive: filter.isActive,
+    sort: paged ? filter.sort : undefined,
+    direction: paged ? filter.direction : undefined,
+    page: paged ? filter.page : undefined,
+    pageSize: paged ? filter.pageSize : undefined,
+  });
 }
 
 function paymentParams(filter: PaymentRegisterFilter, paged: boolean): HttpParams {

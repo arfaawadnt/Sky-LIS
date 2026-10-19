@@ -2,7 +2,7 @@
 
 import type { HttpTestingController } from '@angular/common/http/testing';
 
-import { BILLING_API, type CashClosingPreview, type CollectionsReportDocument, type CollectionsReportRow, type VisitAccountView } from '../../../core/api/billing.contracts';
+import { BILLING_API, type CashClosingPreview, type CollectionsReportDocument, type CollectionsReportRow, type PaymentMethodOption, type VisitAccountView } from '../../../core/api/billing.contracts';
 import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
 
 export function account(overrides: Partial<VisitAccountView> = {}): VisitAccountView {
@@ -156,4 +156,16 @@ export function flushCashDesk(backend: HttpTestingController, autoPrintReceipt =
   for (const request of backend.match((candidate) => candidate.url === BILLING_API.printSettings)) {
     request.flush({ autoPrintReceipt });
   }
+
+  for (const request of backend.match((candidate) => candidate.url === BILLING_API.paymentMethodOptions)) {
+    request.flush(methodOptions);
+  }
 }
+
+/** The four default methods of CP-30b as the options endpoint answers them (CARD, POS and TRANSFER need a reference). */
+export const methodOptions: readonly PaymentMethodOption[] = [
+  { id: 'pm-cash', code: 'CASH', nameEn: 'Cash', nameAr: 'نقدي', kind: 'Cash', requiresReference: false },
+  { id: 'pm-card', code: 'CARD', nameEn: 'Card', nameAr: 'بطاقة', kind: 'Card', requiresReference: true },
+  { id: 'pm-pos', code: 'POS', nameEn: 'POS', nameAr: 'نقطة بيع', kind: 'Pos', requiresReference: true },
+  { id: 'pm-transfer', code: 'TRANSFER', nameEn: 'Bank transfer', nameAr: 'تحويل بنكي', kind: 'Transfer', requiresReference: true },
+];

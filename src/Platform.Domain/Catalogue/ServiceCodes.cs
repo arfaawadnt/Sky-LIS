@@ -15,6 +15,7 @@ public static class ServiceCodes
     public const string ConditionMismatch = "CAT-030";
     public const string SequenceInvalid = "CAT-031";
     public const string ShortcutInvalid = "CAT-032";
+    public const string SequenceRepeated = "CAT-033";
     public const string AliasesInvalid = "CAT-034";
     public const string TypeImmutable = "CAT-035";
     public const string MemberTestTypeMismatch = "CAT-036";

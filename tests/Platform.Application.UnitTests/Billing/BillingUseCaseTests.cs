@@ -15,10 +15,10 @@ public sealed class BillingUseCaseTests
     private const string Device = "device-reception-1";
 
     private static RecordPaymentHandler PaymentHandler(BillingWorld world) =>
-        new(world.Visits, world.Stations, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        new(world.Visits, world.Stations, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
     private static RecordRefundHandler RefundHandler(BillingWorld world) =>
-        new(world.Visits, world.Stations, world.Reasons, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        new(world.Visits, world.Stations, world.Reasons, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
     [Fact]
     public async Task T1_A_first_payment_opens_the_account_draws_a_receipt_and_commits_once()
@@ -129,7 +129,7 @@ public sealed class BillingUseCaseTests
         var second = world.AddVisit(150m, "ACC-2026-00012", batchId, "Group", "BTH-2026-00001");
         var settled = world.AddVisit(0m, "ACC-2026-00011", batchId, "Group", "BTH-2026-00001");
         var first = world.AddVisit(100m, "ACC-2026-00010", batchId, "Group", "BTH-2026-00001");
-        var handler = new PayBatchHandler(world.Visits, world.Stations, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        var handler = new PayBatchHandler(world.Visits, world.Stations, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
         var result = await handler.Handle(new PayBatchCommand(batchId, 200m, "Cash", null, world.TreasuryId, Device), CancellationToken.None);
 
@@ -151,7 +151,7 @@ public sealed class BillingUseCaseTests
         var batchId = Guid.CreateVersion7();
         world.Visits.Batches.Add(new BillableBatch(batchId, "BTH-2026-00002", "LabToLab", null, null, Guid.CreateVersion7()));
         world.AddVisit(100m, "ACC-2026-00020", batchId, "LabToLab", "BTH-2026-00002");
-        var handler = new PayBatchHandler(world.Visits, world.Stations, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        var handler = new PayBatchHandler(world.Visits, world.Stations, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
         Assert.Equal(BillingCodes.BilledThroughClaims, (await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new PayBatchCommand(batchId, 10m, "Cash", null, world.TreasuryId, Device), CancellationToken.None))).Code);
         Assert.Equal(BillingCodes.BatchNotFound, (await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new PayBatchCommand(Guid.CreateVersion7(), 10m, "Cash", null, world.TreasuryId, Device), CancellationToken.None))).Code);
@@ -190,7 +190,7 @@ public sealed class BillingUseCaseTests
 
         var pay = await Refused(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 1m, "Cash", null, world.TreasuryId, Device), CancellationToken.None));
         Assert.Equal((BillingCodes.PayRightRequired, DomainFault.Refused), (pay.Code, pay.Fault));
-        var batch = await Refused(() => new PayBatchHandler(world.Visits, world.Stations, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock)
+        var batch = await Refused(() => new PayBatchHandler(world.Visits, world.Stations, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock)
             .Handle(new PayBatchCommand(Guid.CreateVersion7(), 1m, "Cash", null, world.TreasuryId, Device), CancellationToken.None));
         Assert.Equal(BillingCodes.PayRightRequired, batch.Code);
         var refund = await Refused(() => RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 100m, "Cash", null, world.RefundReasonId, null, world.TreasuryId, Device), CancellationToken.None));

@@ -173,7 +173,7 @@ describe('Release-1 action targets (R1-01)', () => {
 describe('landingEntry (R1-04)', () => {
   it('is the dashboard for whoever holds dashboard.view, else the first menu entry the user may open', () => {
     expect(landingEntry('client', (permission) => permission === 'dashboard.view' || permission === 'registration.view')?.path).toBe('/account/dashboard');
-    expect(landingEntry('client', (permission) => permission === 'billing.view')?.path).toBe('/billing/payments');
+    expect(landingEntry('client', (permission) => permission === 'billing.view')?.path).toBe('/billing/payment-methods');   // Payments is action-only since C11
     expect(landingEntry('client', () => false)?.path).toBe('/account/profile');
     expect(landingEntry('admin', () => false)?.path).toBe('/admin');
   });

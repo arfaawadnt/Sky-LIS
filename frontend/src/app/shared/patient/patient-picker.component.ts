@@ -51,7 +51,7 @@ export class PatientPickerComponent {
   protected readonly permissions = PATIENTS_PERMISSIONS;
   protected readonly mode = signal<'search' | 'create'>('search');
   protected readonly query = signal('');
-  private readonly typedIdentity = signal<TypedIdentity>({ name: '', mobile: '' });
+  private readonly typedIdentity = signal<TypedIdentity>({ name: '', mobile: '', secondPhone: '' });
 
   protected readonly results = resource({
     params: () => (this.query().length >= MIN_QUERY_LENGTH ? this.query() : undefined),
@@ -81,9 +81,9 @@ export class PatientPickerComponent {
   protected readonly similar = resource({
     params: () => {
       const typed = this.typedIdentity();
-      return this.mode() === 'create' && (typed.name.length >= MIN_QUERY_LENGTH || typed.mobile.length >= 8) ? typed : undefined;
+      return this.mode() === 'create' && (typed.name.length >= MIN_QUERY_LENGTH || typed.mobile.length >= 8 || typed.secondPhone.length >= 8) ? typed : undefined;
     },
-    loader: ({ params, abortSignal }) => this.api.similar(params.name, params.mobile, abortSignal),
+    loader: ({ params, abortSignal }) => this.api.similar(params, abortSignal),
   });
 
   protected readonly candidates = computed<readonly SimilarPatient[]>(() => {
@@ -130,7 +130,7 @@ export class PatientPickerComponent {
 
   protected startCreate(): void {
     this.register.reset();
-    this.typedIdentity.set({ name: this.initialName(), mobile: '' });
+    this.typedIdentity.set({ name: this.initialName(), mobile: '', secondPhone: '' });
     this.mode.set('create');
   }
 

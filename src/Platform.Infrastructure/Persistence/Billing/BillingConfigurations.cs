@@ -46,7 +46,8 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.ToTable("payments", AppDbContext.AppSchema, table =>
         {
             table.HasCheckConstraint("ck_payments_amount_positive", "amount > 0");
-            table.HasCheckConstraint("ck_payments_reference_for_non_cash", "method = 'Cash' OR reference IS NOT NULL");
+            // without a definition every kind but cash needs a reference; with one (method_code) the definition decided (change request 2026-10-19)
+            table.HasCheckConstraint("ck_payments_reference_for_non_cash", "method = 'Cash' OR method_code IS NOT NULL OR reference IS NOT NULL");
             table.HasCheckConstraint(
                 "ck_payments_void_consistency",
                 "(status = 'Voided') = (void_reason IS NOT NULL AND voided_at_utc IS NOT NULL AND voided_by_user_id IS NOT NULL)");
@@ -57,6 +58,7 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 
         builder.Property(payment => payment.Amount).HasPrecision(BillingAmounts.Precision, BillingAmounts.Scale).IsRequired();
         builder.Property(payment => payment.Method).IsRequired();
+        builder.Property(payment => payment.MethodCode).HasMaxLength(Payment.MaxMethodCodeLength);   // the definition's code at posting time; null on legacy rows
         builder.Property(payment => payment.Reference).HasMaxLength(Payment.MaxReferenceLength);
         builder.Property(payment => payment.DeviceId).HasMaxLength(CashierStation.MaxDeviceIdLength).IsRequired();
         builder.Property(payment => payment.BranchId).IsRequired();   // the session branch; FK to app.branches belongs to the Organization package
@@ -86,7 +88,7 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         builder.ToTable("refunds", AppDbContext.AppSchema, table =>
         {
             table.HasCheckConstraint("ck_refunds_amount_positive", "amount > 0");
-            table.HasCheckConstraint("ck_refunds_reference_for_non_cash", "method = 'Cash' OR reference IS NOT NULL");
+            table.HasCheckConstraint("ck_refunds_reference_for_non_cash", "method = 'Cash' OR method_code IS NOT NULL OR reference IS NOT NULL");
         });
 
         builder.Property(refund => refund.Number).HasMaxLength(Refund.MaxNumberLength).IsRequired();
@@ -94,6 +96,7 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
 
         builder.Property(refund => refund.Amount).HasPrecision(BillingAmounts.Precision, BillingAmounts.Scale).IsRequired();
         builder.Property(refund => refund.Method).IsRequired();
+        builder.Property(refund => refund.MethodCode).HasMaxLength(Payment.MaxMethodCodeLength);
         builder.Property(refund => refund.Reference).HasMaxLength(Payment.MaxReferenceLength);
         builder.Property(refund => refund.ReasonId).IsRequired();   // app.reasons (Catalogue B), referenced by id
         builder.Property(refund => refund.Note).HasMaxLength(Refund.MaxNoteLength);

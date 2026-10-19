@@ -40,8 +40,8 @@ public sealed class PatientsController(ISender sender) : ControllerBase
     }
 
     [HttpGet("similar")]
-    public async Task<ActionResult<SimilarPatientsResponse>> Similar([FromQuery] string? name, [FromQuery] string? mobile, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new FindSimilarPatientsQuery(name, mobile), cancellationToken));
+    public async Task<ActionResult<SimilarPatientsResponse>> Similar([FromQuery] string? name, [FromQuery] string? mobile, [FromQuery] string? secondPhone, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new FindSimilarPatientsQuery(name, mobile, secondPhone), cancellationToken));
 
     [HttpGet("form-settings")]
     public async Task<ActionResult<PatientFormSettings>> FormSettings(CancellationToken cancellationToken) =>
@@ -63,7 +63,8 @@ public sealed class PatientsController(ISender sender) : ControllerBase
         var created = await sender.Send(
             new RegisterPatientCommand(
                 request.Title, request.FullName, request.NameAr, request.Gender, request.DateOfBirth, request.Age, request.PatientConditionId, request.Mobile,
-                request.NationalId, request.Nationality, request.Email, request.GovernorateId, request.City, request.Address, request.Comments, request.IsVip),
+                request.NationalId, request.Nationality, request.Email, request.GovernorateId, request.City, request.Address, request.Comments, request.IsVip,
+                request.CityId, request.DistrictId, request.AreaId, request.SecondPhone),
             cancellationToken);
         return Created($"/api/v1/patients/{created.Id}", created);
     }
@@ -75,7 +76,8 @@ public sealed class PatientsController(ISender sender) : ControllerBase
         await sender.Send(
             new UpdatePatientCommand(
                 id, request.Title, request.FullName, request.NameAr, request.Gender, request.DateOfBirth, request.Age, request.PatientConditionId, request.Mobile,
-                request.NationalId, request.Nationality, request.Email, request.GovernorateId, request.City, request.Address, request.Comments, request.IsVip, request.RowVersion, request.VisitId),
+                request.NationalId, request.Nationality, request.Email, request.GovernorateId, request.City, request.Address, request.Comments, request.IsVip, request.RowVersion, request.VisitId,
+                request.CityId, request.DistrictId, request.AreaId, request.SecondPhone),
             cancellationToken);
         return NoContent();
     }

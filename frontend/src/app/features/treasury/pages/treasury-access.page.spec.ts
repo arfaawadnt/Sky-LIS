@@ -2,6 +2,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import type { FormGroup } from '@angular/forms';
 
 import treasuryEn from '../../../../../public/i18n/treasury.en.json';
@@ -58,6 +59,7 @@ describe('TreasuryAccessPage (CP-29)', () => {
       imports: [TreasuryAccessPage],
       providers: [
         provideZonelessChangeDetection(),
+        provideRouter([]),   // the C11 links (RouterLink) need a router
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
         TreasuryAccessFacade,

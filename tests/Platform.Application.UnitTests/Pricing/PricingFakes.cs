@@ -194,6 +194,15 @@ internal sealed class FakeCatalog : IPricingServiceCatalog
         Calls.Add(serviceIds);
         return Task.FromResult<IReadOnlySet<Guid>>(serviceIds.Where(Known.Contains).ToHashSet());
     }
+
+    /// <summary>Code → id of the known services (C21 import); codes compare upper-case.</summary>
+    public Dictionary<string, Guid> Codes { get; } = new(StringComparer.Ordinal);
+
+    public Task<IReadOnlyDictionary<string, Guid>> ServiceIdsByCodeAsync(IReadOnlyCollection<string> codes, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<string, Guid>>(codes.Select(code => code.Trim().ToUpperInvariant()).Distinct().Where(Codes.ContainsKey).ToDictionary(code => code, code => Codes[code], StringComparer.Ordinal));
+
+    public Task<IReadOnlyDictionary<Guid, CatalogueServiceLabel>> ServiceLabelsAsync(IReadOnlyCollection<Guid> serviceIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, CatalogueServiceLabel>>(Codes.Where(pair => serviceIds.Contains(pair.Value)).ToDictionary(pair => pair.Value, pair => new CatalogueServiceLabel(pair.Value, pair.Key, $"{pair.Key} service", $"خدمة {pair.Key}")));
 }
 
 internal sealed class RecordingPriceLookup : IPriceLookup

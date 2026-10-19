@@ -34,3 +34,13 @@ public interface IPayerLookup
     /// <summary>The cash payer and its default tier, or <see langword="null"/> until <c>EnsureDefaultPayerCommand</c> has run (intake Q1).</summary>
     Task<DefaultPayerIds?> FindDefaultAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// Read side of the service prices page (CR 2026-10-19 C22): one catalogue service with its line in every base list and its
+/// derived price in every contract tier. The adapter reads <c>app.services</c> by raw SQL (same-wave rule) and the module's own
+/// tables; <see langword="null"/> when the service is not the tenant's. <c>Currency</c> is left empty for the handler to fill.
+/// </summary>
+public interface IServicePricesReader
+{
+    Task<ServicePricesView?> ReadAsync(Guid serviceId, CancellationToken cancellationToken);
+}

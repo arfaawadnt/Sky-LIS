@@ -4,6 +4,8 @@ import { firstValueFrom } from 'rxjs';
 
 import { emptyPage } from '../../../core/api/paging';
 import {
+  type AdjustBasePriceListRequest,
+  type AdjustBasePriceListResult,
   type ApplyBasePriceListResult,
   type BasePriceListDetail,
   type BasePriceListFilter,
@@ -17,6 +19,8 @@ import {
   type CreateBasePriceListRequest,
   type CreatedResource,
   type DefaultPayerIds,
+  type ImportPriceLinesResult,
+  type ImportPriceRowRequest,
   type NegotiatePriceRequest,
   type Paged,
   type PayerListFilter,
@@ -25,6 +29,7 @@ import {
   PRICING_API,
   type PriceLineItem,
   type PriceLineRequest,
+  type ServicePricesView,
   type SetContractFormulaRequest,
   type TierOption,
   type UpdateBasePriceListRequest,
@@ -126,6 +131,22 @@ export class PricingApi {
 
   applyBasePriceList(id: string): Promise<ApplyBasePriceListResult> {
     return firstValueFrom(this.http.post<ApplyBasePriceListResult>(`${this.list(id)}/apply`, null));
+  }
+
+  /** L8 (C21): checks the uploaded rows (`dryRun`) or applies them all when none is refused. */
+  importPriceLines(id: string, rows: readonly ImportPriceRowRequest[], dryRun: boolean): Promise<ImportPriceLinesResult> {
+    return firstValueFrom(this.http.post<ImportPriceLinesResult>(`${this.list(id)}/import`, { rows, dryRun }));
+  }
+
+  /** L7 (C21): previews or applies a bulk adjustment of the list's prices. */
+  adjustBasePriceList(id: string, request: AdjustBasePriceListRequest): Promise<AdjustBasePriceListResult> {
+    return firstValueFrom(this.http.post<AdjustBasePriceListResult>(`${this.list(id)}/adjust`, request));
+  }
+
+  // ---- service prices (C22) ----
+
+  getServicePrices(serviceId: string, signal?: AbortSignal): Promise<ServicePricesView> {
+    return firstValueFrom(this.http.get<ServicePricesView>(`${PRICING_API.servicePrices}/${encodeURIComponent(serviceId)}`)).then(abortable(signal));
   }
 
   // ---- contract pricing (CP-34) ----

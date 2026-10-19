@@ -1,10 +1,13 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, input, output, resource, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { type AbstractControl, FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors, type ValidatorFn, Validators } from '@angular/forms';
 
 import {
+  type AreaOption,
+  type CityOption,
   type ConditionOption,
   type CountryOption,
+  type DistrictOption,
   type GovernorateOption,
   PATIENT_GENDERS,
   PATIENT_TITLES,
@@ -31,11 +34,13 @@ import { FormFieldComponent } from '../ui/form-field/form-field.component';
 import { IconComponent } from '../ui/icon/icon.component';
 import { type NationalIdFacts, readEgyptianNationalId } from './egyptian-national-id';
 import { ageBetween, ageText, birthDateFromAge, defaultGender, isValidAge, isValidMobile, localDigits, mobileForStorage, parseIso, todayIso } from './patient-demographics';
+import { PatientLookupApi } from './patient-lookup.api';
 
-/** What the user is typing in a new file, for the similar-patient lookup (BR-01). */
+/** What the user is typing in a new file, for the similar-patient lookup (BR-01): the second phone matches like the mobile (C3). */
 export interface TypedIdentity {
   readonly name: string;
   readonly mobile: string;
+  readonly secondPhone: string;
 }
 
 const EARLIEST_BIRTH = '1900-01-01';
@@ -52,6 +57,10 @@ const FIELD_OF_CODE: Readonly<Record<string, string>> = {
   'PAT-010': 'nationalId',
   'PAT-011': 'nationalId',
   'PAT-012': 'email',
+  'PAT-014': 'cityId',
+  'PAT-015': 'districtId',
+  'PAT-016': 'areaId',
+  'PAT-017': 'secondPhone',
 };
 
 /** ISO code of Egypt in the platform's country list (the only national id the form reads). */
@@ -61,7 +70,7 @@ const EGYPT = 'EG';
 type IdField = 'dob' | 'gender' | 'governorate';
 
 /** The optional fields folded under "More details". */
-const DETAIL_FIELDS = ['nationality', 'email', 'governorateId', 'city', 'address', 'comments'] as const;
+const DETAIL_FIELDS = ['nationality', 'email', 'governorateId', 'cityId', 'districtId', 'areaId', 'city', 'address', 'comments'] as const;
 
 /** The identity fields a result-status lock freezes (PAT-032; the server's list): everything else is contact data and stays editable. */
 const IDENTITY_FIELDS = ['title', 'fullName', 'nameAr', 'gender', 'dateOfBirth', 'ageYears', 'ageMonths', 'ageDays', 'patientConditionId', 'nationalId', 'nationality'] as const;
@@ -73,9 +82,11 @@ const IDENTITY_FIELDS = ['title', 'fullName', 'nameAr', 'gender', 'dateOfBirth',
  * birth (`egyptian-national-id.ts`) and lists what it contradicts; title proposes the gender, date of birth ↔ age sync in both
  * directions (the last one typed is what is saved), mobile digits checked against the chosen country's length when the
  * platform publishes it (8–15 otherwise), mandatory mobile / national id from the tenant parameters, VIP only for
- * `patients.viewConfidential`, and the similar-patient warning while a new file is typed. Presentational: inputs in,
- * `save` / `typed` / `useExisting` out; the host puts the buttons where it wants and calls `submit()`. Moves to
- * `shared/` with the patient picker.
+ * `patients.viewConfidential`, and the similar-patient warning while a new file is typed. A second phone follows the mobile
+ * (C3). After the governorate, the city / district / area of the platform's location hierarchy are picked from linked selects
+ * when the governorate has active cities (read here through `PatientLookupApi` from the public lookups, A2); otherwise the
+ * free-text city stays. Presentational otherwise: inputs in, `save` / `typed` / `useExisting` out; the host puts the
+ * buttons where it wants and calls `submit()`.
  */
 @Component({
   selector: 'app-patient-form',
@@ -87,6 +98,7 @@ const IDENTITY_FIELDS = ['title', 'fullName', 'nameAr', 'gender', 'dateOfBirth',
 export class PatientFormComponent {
   protected readonly i18n = inject(I18nService);
   private readonly permissions = inject(PermissionsService);
+  private readonly lookup = inject(PatientLookupApi);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly injector = inject(Injector);
   private typedTimer: ReturnType<typeof setTimeout> | null = null;
@@ -168,10 +180,14 @@ export class PatientFormComponent {
       ageDays: new FormControl<number | null>(null, { validators: [Validators.min(0), Validators.max(31), integer] }),
       patientConditionId: new FormControl('', { nonNullable: true }),
       mobile: new FormControl('', { nonNullable: true, validators: [(control) => this.validateMobile(control)] }),
+      secondPhone: new FormControl('', { nonNullable: true, validators: [(control) => this.validateMobile(control)] }),
       nationalId: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(32), Validators.pattern(/^[\sA-Za-z0-9\u0660-\u0669-]*$/)] }),
       nationality: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64)] }),
       email: new FormControl('', { nonNullable: true, validators: [Validators.email, Validators.maxLength(254)] }),
       governorateId: new FormControl('', { nonNullable: true }),
+      cityId: new FormControl('', { nonNullable: true }),
+      districtId: new FormControl('', { nonNullable: true }),
+      areaId: new FormControl('', { nonNullable: true }),
       city: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(100)] }),
       address: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] }),
       comments: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(2000)] }),
@@ -182,6 +198,30 @@ export class PatientFormComponent {
 
   /** The form value as a signal, so the national-id checks follow every change. */
   private readonly formValue = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
+
+  // A2: the location hierarchy under the chosen governorate, one level feeding the next; an absent list is empty. Each
+  // level's key is its own computed (string equality), so a resource reloads only when its parent changes, never on
+  // another keystroke of the form (a reload would blank `hasValue()` and swap the selects for the text input).
+  private readonly governorateKey = computed(() => this.formValue().governorateId || undefined);
+  private readonly cityKey = computed(() => this.formValue().cityId || undefined);
+  private readonly districtKey = computed(() => this.formValue().districtId || undefined);
+  private readonly cities = resource({
+    params: () => this.governorateKey(),
+    loader: ({ params }) => this.lookup.cities(params),
+  });
+  private readonly districts = resource({
+    params: () => this.cityKey(),
+    loader: ({ params }) => this.lookup.districts(params),
+  });
+  private readonly areas = resource({
+    params: () => this.districtKey(),
+    loader: ({ params }) => this.lookup.areas(params),
+  });
+  protected readonly cityOptions = computed<readonly CityOption[]>(() => (this.cities.hasValue() ? this.cities.value() : []));
+  protected readonly districtOptions = computed<readonly DistrictOption[]>(() => (this.districts.hasValue() ? this.districts.value() : []));
+  protected readonly areaOptions = computed<readonly AreaOption[]>(() => (this.areas.hasValue() ? this.areas.value() : []));
+  /** The governorate has cities: the selects replace the free-text city (its hidden value is dropped on save when a city is picked). */
+  protected readonly hasCities = computed(() => this.cityOptions().length > 0);
 
   /** Fields whose current value came from the national id: they follow a corrected id, a user edit releases them. */
   private readonly fromId = new Set<IdField>();
@@ -269,7 +309,10 @@ export class PatientFormComponent {
     // The mobile country decides the mobile rule: re-check the number when the laboratory's default arrives (F-08).
     effect(() => {
       this.mobileCountry();
-      untracked(() => this.form.controls.mobile.updateValueAndValidity());
+      untracked(() => {
+        this.form.controls.mobile.updateValueAndValidity();
+        this.form.controls.secondPhone.updateValueAndValidity();
+      });
     });
 
     // Server refusals land on their field when they name one (VALIDATION-400 or a field code).
@@ -322,6 +365,7 @@ export class PatientFormComponent {
     const value = this.form.getRawValue();
     const source = this.birthSource();
     const age = this.typedAge();
+    const cityId = blankToNull(value.cityId);
     this.save.emit({
       title: value.title,
       fullName: value.fullName.trim(),
@@ -335,10 +379,15 @@ export class PatientFormComponent {
       nationality: blankToNull(value.nationality),
       email: blankToNull(value.email),
       governorateId: blankToNull(value.governorateId),
-      city: blankToNull(value.city),
+      // a picked city names the file's city on the server (its English name); the free text is sent only without one
+      city: cityId === null ? blankToNull(value.city) : null,
       address: blankToNull(value.address),
       comments: blankToNull(value.comments),
       isVip: this.permissions.can(PATIENTS_PERMISSIONS.viewConfidential) ? value.isVip : null,
+      cityId,
+      districtId: cityId === null ? null : blankToNull(value.districtId),
+      areaId: cityId === null ? null : blankToNull(value.areaId),
+      secondPhone: blankToNull(mobileForStorage(value.secondPhone, this.mobileLength())),
     });
     return true;
   }
@@ -375,10 +424,10 @@ export class PatientFormComponent {
 
     const governorate = this.governorateOf(facts);
     if (governorate !== null && (this.fromId.has('governorate') || controls.governorateId.value === '')) {
-      controls.governorateId.setValue(governorate.id);
+      this.setGovernorate(governorate.id);
       this.fromId.add('governorate');
     } else if (governorate === null && this.fromId.has('governorate')) {
-      controls.governorateId.setValue('');
+      this.setGovernorate('');
       this.fromId.delete('governorate');
     }
 
@@ -396,6 +445,36 @@ export class PatientFormComponent {
 
   protected governorateEdited(): void {
     this.releaseFromId('governorate');
+    this.clearLocationBelow('governorate');
+  }
+
+  /** A level changed by the clerk: the levels under it no longer chain to it (PAT-014…016) and are cleared. */
+  protected onCityChange(): void {
+    this.clearLocationBelow('city');
+  }
+
+  protected onDistrictChange(): void {
+    this.clearLocationBelow('district');
+  }
+
+  private setGovernorate(id: string): void {
+    if (this.form.controls.governorateId.value !== id) {
+      this.form.controls.governorateId.setValue(id);
+      this.clearLocationBelow('governorate');
+    }
+  }
+
+  private clearLocationBelow(level: 'governorate' | 'city' | 'district'): void {
+    const controls = this.form.controls;
+    if (level === 'governorate') {
+      controls.cityId.setValue('');
+    }
+
+    if (level !== 'district') {
+      controls.districtId.setValue('');
+    }
+
+    controls.areaId.setValue('');
   }
 
   private releaseFromId(field: IdField): void {
@@ -467,7 +546,12 @@ export class PatientFormComponent {
     this.clearTimer();
     this.typedTimer = setTimeout(() => {
       this.typedTimer = null;
-      this.typed.emit({ name: this.form.controls.fullName.value.trim(), mobile: mobileForStorage(this.form.controls.mobile.value, this.mobileLength()) });
+      const length = this.mobileLength();
+      this.typed.emit({
+        name: this.form.controls.fullName.value.trim(),
+        mobile: mobileForStorage(this.form.controls.mobile.value, length),
+        secondPhone: mobileForStorage(this.form.controls.secondPhone.value, length),
+      });
     }, SIMILAR_DEBOUNCE_MS);
   }
 
@@ -492,6 +576,7 @@ export class PatientFormComponent {
   protected onMobileCountryChange(event: Event): void {
     this.chosenMobileCountry.set((event.target as HTMLSelectElement).value);
     this.form.controls.mobile.updateValueAndValidity();
+    this.form.controls.secondPhone.updateValueAndValidity();
   }
 
   /** A number in the page language's digits (validation v0.5.0 F-09). */
@@ -536,10 +621,14 @@ export class PatientFormComponent {
       ageDays: patient.age.days,
       patientConditionId: patient.patientConditionId ?? '',
       mobile: patient.mobile ?? '',
+      secondPhone: patient.secondPhone ?? '',
       nationalId: patient.nationalId ?? '',
       nationality: patient.nationality ?? '',
       email: patient.email ?? '',
       governorateId: patient.governorateId ?? '',
+      cityId: patient.location?.cityId ?? '',
+      districtId: patient.location?.districtId ?? '',
+      areaId: patient.location?.areaId ?? '',
       city: patient.city ?? '',
       address: patient.address ?? '',
       comments: patient.comments ?? '',

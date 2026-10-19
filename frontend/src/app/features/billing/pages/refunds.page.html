@@ -35,6 +35,7 @@
         <app-billing-movement-form
           mode="refund"
           [treasuries]="desk.approved()"
+          [methods]="desk.methodOptions()"
           [(treasuryId)]="desk.treasuryId"
           [dueAmount]="account.refundable"
           [currency]="account.currency"
@@ -88,7 +89,7 @@
   }
 
   <app-data-table [columns]="columns" [rows]="rows()" [loading]="facade.register.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('billing.refunds.empty')" [caption]="i18n.t('billing.refunds.register')">
-    <ng-template appCell="method" [appCellOf]="rows()" let-row>{{ methodLabel(row.method) }}</ng-template>
+    <ng-template appCell="method" [appCellOf]="rows()" let-row>{{ movementMethod(row) }}</ng-template>
     <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
       <button type="button" class="btn sm ghost" (click)="reprint(row)" [attr.aria-label]="i18n.t('billing.reprint') + ' ' + row.number"><app-icon name="printer" [size]="14" /></button>
     </ng-template>

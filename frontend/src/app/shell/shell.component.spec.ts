@@ -74,13 +74,13 @@ describe('ShellComponent', () => {
   });
 
   it('shows the client navigation filtered by permission, with the user name and initials', async () => {
-    await signIn('11111111-1111-1111-1111-111111111111', ['dashboard.view', 'treasury.view']);
+    await signIn('11111111-1111-1111-1111-111111111111', ['dashboard.view', 'pricing.view']);
     const fixture = TestBed.createComponent(ShellComponent);
     await fixture.whenStable();
     const host = fixture.nativeElement as HTMLElement;
 
     // group order (overview … finance … account), then registry order inside a group
-    expect(navLinks(host)).toEqual(['/account/dashboard', '/treasury/treasuries', '/treasury/access', '/account/profile']);
+    expect(navLinks(host)).toEqual(['/account/dashboard', '/pricing/payers', '/pricing/base-price-lists', '/pricing/service-prices', '/account/profile']);
     expect(host.querySelector('.avatar')?.textContent?.trim()).toBe('MA');
     expect(host.querySelector('.who b')?.textContent?.trim()).toBe('Mona Adel');
   });

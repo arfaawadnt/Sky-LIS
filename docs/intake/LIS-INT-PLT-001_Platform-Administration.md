@@ -5,7 +5,7 @@
 | Slot / modules | `plat` — permission modules `tenancy` (clients, plans, wallets), `platform` (dashboard, sessions), `notifications` (templates), `integration` (library), `wallet` (tenant-facing wallet), `settings` (SA-19 over the foundation's settings API) |
 | SRS pages | SA-03 Dashboard, SA-04 Clients, SA-05 Subscriptions & wallets, SA-08 Sessions, SA-10 Countries, SA-11 Governorates, SA-15 Analyser models, SA-16 PCR kits, SA-17 Code systems, SA-18 Rule templates, SA-19 Platform parameters, SA-20 Notification templates; CP-02 Subscription wizard (backend only), CP-66 Wallet (API only); workflows WF-01 (onboarding), WF-12 (platform operations); rule BR-25 |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001) and the architecture pack. **For review by the business owner**; assumptions in §16. |
-| Version | 1.0 — 2026-10-09 |
+| Version | 1.2 — 2026-10-19 (change request LIS-CR-003: P-A1 client login logs, SA-08b; P-A2 location hierarchy under a governorate, SA-11b, §17) |
 | Implemented in | `src/Platform.Domain/PlatformAdmin`, `src/Platform.Contracts/PlatformAdmin`, `src/Platform.Application/PlatformAdmin`, `src/Platform.Infrastructure/Persistence/PlatformAdmin` (+ `PlatformAdmin.migration.sql`), `src/Platform.WebApi/Controllers/PlatformAdmin`, `frontend/src/app/features/platform`, `frontend/src/app/core/api/{platform,public-subscription}.contracts.ts`, `frontend/public/i18n/platform.{en,ar}.json` |
 | Namespace | `PlatformAdmin`, not `Platform`: a namespace `Platform.Application.Platform` would capture every `Platform.*` qualified name written inside `Platform.Application.*` (C# resolves `Platform` to the nearest enclosing member first), breaking other modules' code. |
 
@@ -288,3 +288,104 @@ row-version race, serialised in-process), `src/Platform.WebApi/Startup/WalletCha
 `POST /api/v1/platform/wallets/charge-run` → `WalletChargeRunSummary` (charged, skipped, failed, at or below zero, one row per
 due wallet). SA-05 "Run charges now" button. Tests: `tests/Platform.IntegrationTests/WalletChargeRunTests.cs`,
 `PlatformAdminFlowTests.Run_charges_now_…`, `frontend/…/subscriptions.page.spec.ts` ("Run charges now (W2)").
+
+### Change request 2026-10-19 — Client login logs (LIS-CR-003 §2, package P-A1, SA-08b)
+
+**What changes.** A history grid of the client users' browser sessions beside the live list of SA-08: one row per
+rotation family of `identity.refresh_sessions` with client, user, login and logout (UTC), IP address, device (Computer /
+Mobile / Tablet / Unknown), OS, browser, duration (minutes) and status; filters by client, user (username or display
+name), login window, logout window, device, duration bounds and status; CSV export. No model change, no migration: the
+facts were already stored by the security edge (02 §4.3).
+
+**Grouping rules** (`ClientLoginLogReader`, one SQL statement, composed with EF for the filters, the order and the page):
+login = the first member's `IssuedAtUtc`; last seen = the latest `LastSeenAtUtc` of any member; logout and status =
+the revocation with reason Logout (**SignedOut**), else the first revocation for another reason (**Revoked**, reason
+shown: Admin, PasswordChanged, ReuseDetected, Expired = idle timeout, TenantSuspended), else the latest sliding
+`ExpiresAtUtc` when it is past (**Expired**), else **Active** (logout empty); duration = (logout ?? last seen) − login in
+whole minutes, never negative. The address and the user agent are the first member's (the sign-in request). Machine
+sessions (`SessionKind.Machine`) and the platform tenant's own sessions are excluded; the platform tenant is listed only
+when the client filter names it. A tenant without a client record (development seeding) shows "No client record".
+
+**User agent.** `UserAgentParser` (`Platform.Application/PlatformAdmin/`, pure, unit-tested) reads device class, OS
+family + version and browser family + major version from the stored string: Chrome, Edge, Firefox, Safari, Opera,
+Samsung Internet, Internet Explorer on Windows, macOS, iOS, Android, ChromeOS, Linux; anything else is "Unknown".
+Client hints are not stored, so Windows 11 reads as Windows 10. The device cannot be classified by the database, so a
+device filter is applied after the read on the server-sorted families (capped at 10 000 like the export) and paged in memory.
+
+**Requests** (`Queries/ClientLoginLogQueries.cs`, both `[platform.view]` + `IPlatformAdministrationRequest`):
+`ListClientLoginLogsQuery(tenantId?, search?, loginFromUtc?, loginToUtc?, logoutFromUtc?, logoutToUtc?, device?,
+minMinutes?, maxMinutes?, status?, page?, pageSize?, sort?, direction?)` → `Paged<ClientLoginLogItem>`;
+`ExportClientLoginLogsQuery(same filters, language?, sort?, direction?)` → CSV (UTF-8 with BOM, RFC 4180, formula-safe
+cells, headers in the language, at most 10 000 rows, times `yyyy-MM-dd HH:mm:ss` UTC). Shape (VALIDATION-400): search ≤ 100,
+windows ordered, minutes ≥ 0 and min ≤ max, device and status among the known names, page bounds, sort key of
+`PlatformAdminSortKeys.ClientLoginLogs` = `login`, `logout`, `client` (English name), `clientAr`, `user`, `duration`,
+`status` (default login desc). No new domain codes: refusals are PLT-403 (client tenant), AUTHZ-001 (no key) and VALIDATION-400.
+
+**Endpoints.** `GET /api/v1/platform/login-logs` (paged, sorted) and `GET /api/v1/platform/login-logs/export`
+(`text/csv; charset=utf-8`, attachment `client-login-logs-<utc stamp>.csv`), `PlatformLoginLogsController`.
+
+**Frontend.** `features/platform/pages/login-logs.page.*` (route `/admin/login-logs`, facade `LoginLogsFacade`): a filter
+card (client select from the clients register, user search, two UTC date-time windows, device, status, duration bounds;
+applied on submit, a reversed window or crossed minutes is refused in the browser), a server-sorted and server-paged table,
+"Export CSV" downloading the server's file, empty state. Every time on the page is UTC (`ui/utc-time.ts`), as the prototype
+labels them. Dictionary keys `platform.loginLogs.*` (English and Arabic). Nav entry (integrator): admin · administration ·
+`/admin/login-logs` · `platform.view` · `shell.nav.loginLogs` · "Client login logs" / "سجل دخول العملاء".
+
+**Tests.** `Platform.Application.UnitTests/PlatformAdmin/ClientLoginLogTests.cs` (parser, validators, mapping, CSV),
+`Platform.IntegrationTests/ClientLoginLogReaderTests.cs` (grouping, statuses, durations, filters, every sort key, paging),
+`Platform.WebApi.FunctionalTests/ClientLoginLogsFlowTests.cs` (sign-in → sign-out = one SignedOut row with duration and
+device, filters, sort keys, CSV, 400 on a reversed window, 403 without `platform.view` or from a client tenant),
+`login-logs.facade.spec.ts`, `login-logs.page.spec.ts`.
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| Q13 | Which address and agent does a row show when a family rotated across addresses? | The first member's (the sign-in); a later refresh from another address is not shown (the live list SA-08 shows the current one). |
+| Q14 | Are the times shown in UTC or in the viewer's zone? | UTC on the page, the filters and the CSV, as the prototype's column names say; the client's own time zone (`timeZone` setting) is not applied. |
+| Q15 | Is a session ended by the idle timeout (`RevocationReason.Expired`) "Expired" or "Revoked"? | Revoked, reason "Idle timeout": it is an explicit revocation; "Expired" is reserved for a session nobody touched until its sliding lifetime ran out. |
+| Q16 | How far back does the history go? | As far as `identity.refresh_sessions` is kept; no retention purge exists yet (CLAUDE.md §5 "not yet built"), so the list grows until one does. |
+| Q17 | Should a device filter page on the server? | Not possible without storing the parsed device: it is applied after the read, capped at 10 000 families of the other filters; a "truncated" flag is not surfaced on the page. |
+
+## 17. Change request 2026-10-19 — location hierarchy under a governorate (LIS-CR-003 §3, package P-A2, SA-11b "Locations")
+
+Source: `docs/build/CR-2026-10-19_Prototype-Gaps.md` §3 (prototype difference item A2). Built in slot `pat` beside the
+Patients change (intake LIS-INT-PAT-001 §18); the tables arrive with the wave migration `PrototypeGaps`.
+
+**What changes.**
+
+| Item | Decision |
+| --- | --- |
+| Aggregates | `City` (governorate id), `District` (city id), `Area` (district id) in `Platform.Domain/PlatformAdmin/Locations.cs`: `LocalizedText Name` (both languages required, ≤ 100), `IsActive`; `Rename`, `Deactivate`, `Reactivate`; the parent is fixed once created. No domain events (reference data, like countries and governorates). |
+| Tables | `saas.cities`, `saas.districts`, `saas.areas` (no tenant), `name_en` / `name_ar`, `is_active`, `xmin` concurrency. `PlatformAdmin.migration.sql` block 5 grants `SELECT, INSERT, UPDATE` to `lis_app` (no deletes: rows are deactivated) and the per-parent case-insensitive unique English names `ux_cities_governorate_name`, `ux_districts_city_name`, `ux_areas_district_name`. No seed rows: the business owner enters the cities of each governorate. |
+| Rules | Parent must be active to create under it (`GEO-015`); English name unique within the parent, case-insensitive (`GEO-102` city, `GEO-103` district, `GEO-104` area; checked in the handler, backed by the index → `UNIQUE-409` on a race); deactivating a parent with active children is refused (`GEO-112`); not found `GEO-406` city, `GEO-407` district, `GEO-408` area (`GEO-405` governorate); name shape `GEO-006` / `VALIDATION-400`. Reactivating a child under an inactive parent is refused with `GEO-015`. |
+| Commands / queries | `Create{City,District,Area}Command`, `Rename…Command`, `Set…ActiveCommand` [`tenancy.manage`]; `List{Cities,Districts,Areas}Query(parentId, search?, isActive?)` [`tenancy.view`], ordered by English name; all `IPlatformAdministrationRequest` (platform tenant only, `PLT-403`). Public `Public{Cities,Districts,Areas}Query(parentId?)`: active rows, id + names, every row when unfiltered. |
+| Governorates page (SA-11b) | Row action *Locations* (`tenancy.manage`) opens a drawer (`features/platform/ui/locations-drawer.component.ts`, facade `state/locations.facade.ts`, column `ui/location-column.component.ts`) with three linked columns — cities of the governorate → districts of the selected city → areas of the selected district — each with a server search, *Show inactive*, *Add* / *Rename* through an inline bilingual editor and *Activate* / *Deactivate*; the level a refusal addressed shows it. Dictionary keys `platform.locations.*` (English and Arabic). |
+| Consumers | Patients (the patient form's linked selects and the chain rule, intake LIS-INT-PAT-001 §18) through the public lookups. The client (tenant) address of the subscription wizard and SA-04 **stays free text** in this change. |
+
+**Endpoints.** `GET/POST /api/v1/platform/governorates/{id}/cities`, `PUT /api/v1/platform/cities/{id}`,
+`POST /api/v1/platform/cities/{id}/deactivate|reactivate`, `GET/POST /api/v1/platform/cities/{id}/districts`,
+`PUT /api/v1/platform/districts/{id}` (+ the activate pair), `GET/POST /api/v1/platform/districts/{id}/areas`,
+`PUT /api/v1/platform/areas/{id}` (+ the pair) — `PlatformLocationsController` in `PlatformReferenceDataControllers.cs`; list
+queries take `search` and `isActive`. Anonymous pick lists beside `GET /api/v1/public/governorates`:
+`GET /api/v1/public/cities?governorateId=`, `GET /api/v1/public/districts?cityId=`, `GET /api/v1/public/areas?districtId=`
+(`PublicReferenceController`).
+
+**Tests.** `Platform.Domain.UnitTests/PlatformAdmin/LocationTests.cs` (factory, rename, activate pair, name rules),
+`Platform.IntegrationTests/LocationsModuleTests.cs` (unique indexes → `UNIQUE-409`, list projections, public lookups),
+`Platform.WebApi.FunctionalTests/LocationsFlowTests.cs` (an administrator builds the hierarchy and every rule answers with its code;
+a viewer lists but does not change; a client tenant is fenced out; the anonymous pick lists answer the asked parent's active rows),
+`locations.facade.spec.ts`, `locations-drawer.component.spec.ts`.
+
+```gherkin
+Scenario S-GEO-tree: Cairo → "Nasr City" → "7th district" → "Area 1" created in turn; each list shows its rows; the public lookups answer them
+Scenario S-GEO-dup: a second "nasr city" under Cairo → GEO-102 (409), nothing created
+Scenario S-GEO-parent: a district under a deactivated city → GEO-015 (409)
+Scenario S-GEO-children: deactivating a city with an active district → GEO-112 (409); after the district is deactivated → 204
+Scenario S-GEO-view: tenancy.view lists; create / rename / deactivate → 403; a client tenant → PLT-403
+```
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| Q18 | Who enters the hierarchy, and is any of it seeded? | The platform administrator from SA-11b; nothing is seeded (the LDM manual carries no city list), so every governorate starts without cities and the laboratories keep the free-text city until it is filled. |
+| Q19 | Are deletes allowed? | No: like countries with governorates, rows are deactivated; an unreferenced row could be deleted later if the business owner asks (the countries' delete rule, SA-10). |
+| Q20 | Is the unique name per parent on the English name only? | Yes (as governorates within a country): the Arabic spelling may vary. |
+| Q21 | Does the client (tenant) address use the hierarchy? | Not in this change (LIS-CR-003 §3): the wizard and SA-04 keep free text; a later change may add the selects once the hierarchy is filled. |

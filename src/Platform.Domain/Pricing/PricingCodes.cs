@@ -20,6 +20,8 @@ public static class PricingCodes
     public const string AlertInvalid = "PRC-014";
     public const string ServiceUnknown = "PRC-015";
     public const string DuplicateServiceLine = "PRC-016";
+    public const string ContactNumberInvalid = "PRC-017";
+    public const string EmailInvalid = "PRC-018";
 
     public const string DefaultPayerLocked = "PRC-020";
     public const string DefaultTierLocked = "PRC-021";
@@ -34,6 +36,12 @@ public static class PricingCodes
     public const string TierRequired = "PRC-037";
     public const string FormulaListUnknown = "PRC-038";
 
+    // price list tools (CR 2026-10-19 C21)
+    public const string ImportCodeMissing = "PRC-041";
+    public const string AdjustmentInvalid = "PRC-044";
+    public const string AdjustScopeUnknown = "PRC-045";
+    public const string AdjustResultOutOfRange = "PRC-046";
+
     // 100–199: conflicts with existing data
     public const string SearchKeyExists = "PRC-100";
     public const string ListCodeExists = "PRC-101";
@@ -45,4 +53,5 @@ public static class PricingCodes
     public const string TierNotFound = "PRC-405";
     public const string BaseListNotFound = "PRC-406";
     public const string ContractPricingNotFound = "PRC-407";
+    public const string ServiceNotFound = "PRC-408";
 }

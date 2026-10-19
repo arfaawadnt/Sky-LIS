@@ -19,7 +19,11 @@ public sealed record PatientDemographics(
     Guid? GovernorateId,
     string? City,
     string? Address,
-    string? Comments);
+    string? Comments,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null,
+    string? SecondPhone = null);
 
 /// <summary>The tenant parameters that make a field mandatory (CP-57: <c>mandatoryMobile</c>, <c>mandatoryNationalId</c>); the handler reads them, the aggregate applies them.</summary>
 public sealed record PatientFieldRules(bool MobileRequired, bool NationalIdRequired)
@@ -121,7 +125,18 @@ public sealed class Patient : AggregateRoot, ITenantScoped
 
     public Guid? GovernorateId { get; private set; }
 
+    /// <summary>The city as text: typed when the governorate has no cities, else the English name of the picked city (change request 2026-10-19, A2), so lists, exports and labels keep working.</summary>
     public string? City { get; private set; }
+
+    /// <summary>The picked city, district and area of the platform's location hierarchy (<c>saas.cities</c>…), referenced by id without a FK; the handler checks that they chain to <see cref="GovernorateId"/> (PAT-014…016).</summary>
+    public Guid? CityId { get; private set; }
+
+    public Guid? DistrictId { get; private set; }
+
+    public Guid? AreaId { get; private set; }
+
+    /// <summary>A second phone (change request 2026-10-19, C3): cleaned like <see cref="Mobile"/> (PAT-017), optional, never unique, no country rule.</summary>
+    public string? SecondPhone { get; private set; }
 
     public string? Address { get; private set; }
 
@@ -218,8 +233,8 @@ public sealed class Patient : AggregateRoot, ITenantScoped
     /// <summary>
     /// True when applying <paramref name=demographics/> through <see cref=Update/> would change an <b>identity</b> field:
     /// title, name, Arabic name, gender, date of birth or stated age, patient condition, national id or nationality. These are
-    /// the fields a result-status lock protects (PAT-032, change request 2026-10-13 item 1); mobile, e-mail, governorate, city,
-    /// address, comments and the VIP flag are contact fields and stay free. Same cleaning as the update (a restated age equal
+    /// the fields a result-status lock protects (PAT-032, change request 2026-10-13 item 1); mobile, second phone, e-mail, governorate, city,
+    /// district, area, address, comments and the VIP flag are contact fields and stay free. Same cleaning as the update (a restated age equal
     /// to today's age is no change), so an untouched form never counts as a change.
     /// </summary>
     public bool IdentityChangesWith(PatientDemographics demographics, PatientFieldRules rules, DateTimeOffset nowUtc, TimeZoneInfo? zone = null)
@@ -267,19 +282,24 @@ public sealed class Patient : AggregateRoot, ITenantScoped
     }
 
     /// <summary>A mobile number as stored: separators removed, Arabic-Indic digits folded, optional <c>+</c> and 8–15 digits; <see langword="null"/> when blank; PAT-008 otherwise.</summary>
-    public static string? CleanMobile(string? mobile)
+    public static string? CleanMobile(string? mobile) => CleanPhone(mobile, PatientCodes.MobileInvalid, "mobile number");
+
+    /// <summary>The second phone (C3), cleaned exactly like the mobile; PAT-017 when malformed so the form marks its own field.</summary>
+    public static string? CleanSecondPhone(string? phone) => CleanPhone(phone, PatientCodes.SecondPhoneInvalid, "second phone");
+
+    private static string? CleanPhone(string? phone, string code, string field)
     {
-        if (string.IsNullOrWhiteSpace(mobile))
+        if (string.IsNullOrWhiteSpace(phone))
         {
             return null;
         }
 
-        var value = FoldDigits(mobile).Where(character => character is not (' ' or '-' or '(' or ')' or '.' or '/')).ToArray();
+        var value = FoldDigits(phone).Where(character => character is not (' ' or '-' or '(' or ')' or '.' or '/')).ToArray();
         var digits = value.Length > 0 && value[0] == '+' ? value[1..] : value;
         Require(
             digits.Length is >= MinMobileDigits and <= MaxMobileDigits && digits.All(char.IsAsciiDigit),
-            PatientCodes.MobileInvalid,
-            $"The mobile number must have {MinMobileDigits} to {MaxMobileDigits} digits.",
+            code,
+            $"The {field} must have {MinMobileDigits} to {MaxMobileDigits} digits.",
             DomainFault.Validation);
         return new string(value);
     }
@@ -369,7 +389,11 @@ public sealed class Patient : AggregateRoot, ITenantScoped
             input.GovernorateId == Guid.Empty ? null : input.GovernorateId,
             OptionalText(input.City, MaxCityLength),
             OptionalText(input.Address, MaxAddressLength),
-            OptionalText(input.Comments, MaxCommentsLength));
+            OptionalText(input.Comments, MaxCommentsLength),
+            input.CityId == Guid.Empty ? null : input.CityId,
+            input.DistrictId == Guid.Empty ? null : input.DistrictId,
+            input.AreaId == Guid.Empty ? null : input.AreaId,
+            CleanSecondPhone(input.SecondPhone));
     }
 
     private void Apply(Cleaned value)
@@ -394,6 +418,10 @@ public sealed class Patient : AggregateRoot, ITenantScoped
         City = value.City;
         Address = value.Address;
         Comments = value.Comments;
+        CityId = value.CityId;
+        DistrictId = value.DistrictId;
+        AreaId = value.AreaId;
+        SecondPhone = value.SecondPhone;
     }
 
     /// <summary>A stated age equal to the age computed today keeps the original statement (no artificial change) when neither side has a date of birth.</summary>
@@ -407,7 +435,7 @@ public sealed class Patient : AggregateRoot, ITenantScoped
         (value.Title, value.FullName, value.NameAr, value.Gender, value.DateOfBirth, value.StatedAge, value.AgeRecordedOn, value.PatientConditionId, value.NationalId, value.Nationality);
 
     private Cleaned Current() => new(
-        Title, FullName, NameAr, Gender, DateOfBirth, StatedAge, AgeRecordedOn, PatientConditionId, Mobile, NationalId, Nationality, Email, GovernorateId, City, Address, Comments);
+        Title, FullName, NameAr, Gender, DateOfBirth, StatedAge, AgeRecordedOn, PatientConditionId, Mobile, NationalId, Nationality, Email, GovernorateId, City, Address, Comments, CityId, DistrictId, AreaId, SecondPhone);
 
     private static string? CleanEmail(string? email)
     {
@@ -461,5 +489,9 @@ public sealed class Patient : AggregateRoot, ITenantScoped
         Guid? GovernorateId,
         string? City,
         string? Address,
-        string? Comments);
+        string? Comments,
+        Guid? CityId,
+        Guid? DistrictId,
+        Guid? AreaId,
+        string? SecondPhone);
 }

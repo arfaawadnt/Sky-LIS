@@ -11,6 +11,17 @@ public enum PaymentMethod
     Transfer = 3,
 }
 
+/// <summary>
+/// How a movement names its method (change request 2026-10-19, P-C10): the <see cref="PaymentMethod"/> kind that carries
+/// the money semantics, the code of the laboratory's <see cref="PaymentMethodDefinition"/> when one was chosen (stored on
+/// the movement), and whether a transaction reference is required. <see cref="Legacy"/> is the rule before definitions
+/// existed and still applies to a request without a code: every kind but cash needs a reference (BR-26).
+/// </summary>
+public sealed record PaymentMethodUse(PaymentMethod Kind, string? Code, bool RequiresReference)
+{
+    public static PaymentMethodUse Legacy(PaymentMethod kind) => new(kind, null, kind != PaymentMethod.Cash);
+}
+
 /// <summary>Posted counts in the balance and the drawer; Voided (with a reason) counts nowhere and is terminal.</summary>
 public enum PaymentStatus
 {

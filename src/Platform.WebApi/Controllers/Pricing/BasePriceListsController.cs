@@ -54,6 +54,22 @@ public sealed class BasePriceListsController(ISender sender) : ControllerBase
         return Ok(await sender.Send(new UpsertPriceLinesCommand(id, request.Lines ?? []), cancellationToken));
     }
 
+    /// <summary>L8 (C21): checks every uploaded row and, without a dry run and without errors, upserts them all (all-or-nothing).</summary>
+    [HttpPost("{id:guid}/import")]
+    public async Task<ActionResult<ImportPriceLinesResult>> Import(Guid id, [FromBody] ImportPriceLinesRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return Ok(await sender.Send(new ImportPriceLinesCommand(id, request.Rows ?? [], request.DryRun), cancellationToken));
+    }
+
+    /// <summary>L7 (C21): previews or applies a bulk adjustment of the list's prices (amount or percent, rounding, optional scope).</summary>
+    [HttpPost("{id:guid}/adjust")]
+    public async Task<ActionResult<AdjustBasePriceListResult>> Adjust(Guid id, [FromBody] AdjustBasePriceListRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return Ok(await sender.Send(new AdjustBasePriceListCommand(id, request.Mode, request.Value, request.Rounding, request.ServiceIds, request.Preview), cancellationToken));
+    }
+
     /// <summary>L4: copies this list into a new (inactive) list with × factor or + amount and a rounding step.</summary>
     [HttpPost("{id:guid}/copy")]
     public async Task<ActionResult<CreatedResource>> Copy(Guid id, [FromBody] CopyBasePriceListRequest request, CancellationToken cancellationToken)

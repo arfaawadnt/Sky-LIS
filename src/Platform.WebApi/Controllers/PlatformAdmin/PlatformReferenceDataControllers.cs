@@ -95,6 +95,118 @@ public sealed class PlatformGovernoratesController(ISender sender) : ControllerB
     }
 }
 
+/// <summary>
+/// The location hierarchy under a governorate (SRS SA-11b "Locations", change request 2026-10-19 A2): cities of a
+/// governorate, districts of a city, areas of a district. Lists per parent [tenancy.view]; create, rename and the
+/// activation pair [tenancy.manage]. Nothing is deleted.
+/// </summary>
+[ApiController]
+[Route("api/v1/platform")]
+public sealed class PlatformLocationsController(ISender sender) : ControllerBase
+{
+    [HttpGet("governorates/{id:guid}/cities")]
+    public async Task<ActionResult<IReadOnlyList<LocationListItem>>> ListCities(Guid id, [FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListCitiesQuery(id, search, isActive), cancellationToken));
+
+    [HttpPost("governorates/{id:guid}/cities")]
+    public async Task<ActionResult<CreatedResource>> CreateCity(Guid id, [FromBody] LocationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var created = await sender.Send(new CreateCityCommand(id, request.NameEn, request.NameAr), cancellationToken);
+        return Created($"/api/v1/platform/cities/{created.Id}", created);
+    }
+
+    [HttpPut("cities/{id:guid}")]
+    public async Task<IActionResult> RenameCity(Guid id, [FromBody] LocationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        await sender.Send(new RenameCityCommand(id, request.NameEn, request.NameAr), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("cities/{id:guid}/deactivate")]
+    public async Task<IActionResult> DeactivateCity(Guid id, CancellationToken cancellationToken)
+    {
+        await sender.Send(new SetCityActiveCommand(id, Active: false), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("cities/{id:guid}/reactivate")]
+    public async Task<IActionResult> ReactivateCity(Guid id, CancellationToken cancellationToken)
+    {
+        await sender.Send(new SetCityActiveCommand(id, Active: true), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpGet("cities/{id:guid}/districts")]
+    public async Task<ActionResult<IReadOnlyList<LocationListItem>>> ListDistricts(Guid id, [FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListDistrictsQuery(id, search, isActive), cancellationToken));
+
+    [HttpPost("cities/{id:guid}/districts")]
+    public async Task<ActionResult<CreatedResource>> CreateDistrict(Guid id, [FromBody] LocationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var created = await sender.Send(new CreateDistrictCommand(id, request.NameEn, request.NameAr), cancellationToken);
+        return Created($"/api/v1/platform/districts/{created.Id}", created);
+    }
+
+    [HttpPut("districts/{id:guid}")]
+    public async Task<IActionResult> RenameDistrict(Guid id, [FromBody] LocationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        await sender.Send(new RenameDistrictCommand(id, request.NameEn, request.NameAr), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("districts/{id:guid}/deactivate")]
+    public async Task<IActionResult> DeactivateDistrict(Guid id, CancellationToken cancellationToken)
+    {
+        await sender.Send(new SetDistrictActiveCommand(id, Active: false), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("districts/{id:guid}/reactivate")]
+    public async Task<IActionResult> ReactivateDistrict(Guid id, CancellationToken cancellationToken)
+    {
+        await sender.Send(new SetDistrictActiveCommand(id, Active: true), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpGet("districts/{id:guid}/areas")]
+    public async Task<ActionResult<IReadOnlyList<LocationListItem>>> ListAreas(Guid id, [FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListAreasQuery(id, search, isActive), cancellationToken));
+
+    [HttpPost("districts/{id:guid}/areas")]
+    public async Task<ActionResult<CreatedResource>> CreateArea(Guid id, [FromBody] LocationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var created = await sender.Send(new CreateAreaCommand(id, request.NameEn, request.NameAr), cancellationToken);
+        return Created($"/api/v1/platform/areas/{created.Id}", created);
+    }
+
+    [HttpPut("areas/{id:guid}")]
+    public async Task<IActionResult> RenameArea(Guid id, [FromBody] LocationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        await sender.Send(new RenameAreaCommand(id, request.NameEn, request.NameAr), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("areas/{id:guid}/deactivate")]
+    public async Task<IActionResult> DeactivateArea(Guid id, CancellationToken cancellationToken)
+    {
+        await sender.Send(new SetAreaActiveCommand(id, Active: false), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("areas/{id:guid}/reactivate")]
+    public async Task<IActionResult> ReactivateArea(Guid id, CancellationToken cancellationToken)
+    {
+        await sender.Send(new SetAreaActiveCommand(id, Active: true), cancellationToken);
+        return NoContent();
+    }
+}
+
 /// <summary>Notification templates (SRS SA-20).</summary>
 [ApiController]
 [Route("api/v1/platform/notification-templates")]

@@ -40,7 +40,7 @@ public sealed class ListPatientsValidator : AbstractValidator<ListPatientsQuery>
 /// special right VIP files are found only by their full number or national id and listed masked (validation A-03); the
 /// patient picker reads this page too.
 /// </summary>
-public sealed class ListPatientsHandler(IPatientRepository patients, IPatientVisitStatistics visits, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, ILaboratoryCountry laboratoryCountry, IClock clock) : IQueryHandler<ListPatientsQuery, Paged<PatientListItem>>
+public sealed class ListPatientsHandler(IPatientRepository patients, IPatientVisitStatistics visits, IPatientLocations locations, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, ILaboratoryCountry laboratoryCountry, IClock clock) : IQueryHandler<ListPatientsQuery, Paged<PatientListItem>>
 {
     public async Task<Paged<PatientListItem>> Handle(ListPatientsQuery query, CancellationToken cancellationToken)
     {
@@ -51,8 +51,9 @@ public sealed class ListPatientsHandler(IPatientRepository patients, IPatientVis
         var page = await patients.SearchAsync(filter, PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
         var today = Patient.LocalDate(clock.UtcNow, await laboratoryZone.FindAsync(cancellationToken));   // the laboratory's day (R2-01)
         var figures = await visits.ForPatientsAsync([.. page.Items.Select(row => row.Id)], cancellationToken);
+        var located = await PatientLocationChain.NamesAsync(locations, page.Items, cancellationToken);   // city / district / area names (A2)
         return new Paged<PatientListItem>(
-            page.Items.Select(row => PatientProjections.ToListItem(row, today, confidential, figures.GetValueOrDefault(row.Id), canSeeVip)).ToList(),
+            page.Items.Select(row => PatientProjections.ToListItem(row, today, confidential, figures.GetValueOrDefault(row.Id), canSeeVip, located.GetValueOrDefault(row.Id))).ToList(),
             page.Page,
             page.PageSize,
             page.TotalCount);
@@ -81,7 +82,7 @@ public sealed class GetPatientDemographicsLockHandler(IPatientRepository patient
     }
 }
 
-public sealed class GetPatientHandler(IPatientRepository patients, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, IClock clock) : IQueryHandler<GetPatientQuery, PatientDetail>
+public sealed class GetPatientHandler(IPatientRepository patients, IPatientLocations locations, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, IClock clock) : IQueryHandler<GetPatientQuery, PatientDetail>
 {
     public async Task<PatientDetail> Handle(GetPatientQuery query, CancellationToken cancellationToken)
     {
@@ -92,17 +93,19 @@ public sealed class GetPatientHandler(IPatientRepository patients, IUserPrivileg
 
         // The merger's display name as of the action is the modifier stamp of the merge (the last change of a frozen file).
         var mergedByName = row.Status == PatientStatus.Merged ? row.ModifiedByName : null;
-        return PatientProjections.ToDetail(row, today, privileges.Has(PatientPermissions.ViewConfidential), mergedByName, mergedFiles);
+        var located = await PatientLocationChain.NamesAsync(locations, [row], cancellationToken);
+        return PatientProjections.ToDetail(row, today, privileges.Has(PatientPermissions.ViewConfidential), mergedByName, mergedFiles, located.GetValueOrDefault(row.Id));
     }
 }
 
 /// <summary>
 /// Similar existing files while the clerk types (BR-01, REG-002): always answered; the setting tells the UI whether to
 /// warn. For a user without the See-VIP special right a VIP file still takes part (a duplicate file is the worse harm) but
-/// is listed masked: number, sex, age and the match reason only (validation A-03, R-06).
+/// is listed masked: number, sex, age and the match reason only (validation A-03, R-06). A typed mobile or second phone
+/// matches a file's mobile or second phone (change request 2026-10-19, C3).
 /// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Patients, PermissionAction.View)]
-public sealed record FindSimilarPatientsQuery(string? Name, string? Mobile) : IQuery<SimilarPatientsResponse>;
+public sealed record FindSimilarPatientsQuery(string? Name, string? Mobile, string? SecondPhone = null) : IQuery<SimilarPatientsResponse>;
 
 public sealed class FindSimilarPatientsValidator : AbstractValidator<FindSimilarPatientsQuery>
 {
@@ -110,6 +113,7 @@ public sealed class FindSimilarPatientsValidator : AbstractValidator<FindSimilar
     {
         RuleFor(query => query.Name).MaximumLength(Patient.MaxNameLength);
         RuleFor(query => query.Mobile).MaximumLength(32);
+        RuleFor(query => query.SecondPhone).MaximumLength(32);
     }
 }
 
@@ -123,17 +127,17 @@ public sealed class FindSimilarPatientsHandler(IPatientRepository patients, ITen
         var warn = await settings.GetAsync(SettingKeys.SimilarNameWarning, cancellationToken);
         var key = PatientNameNormalizer.Normalize(query.Name);
         string[] tokens = key.Length == 0 ? [] : key.Split(' ');
-        var mobile = TryCleanMobile(query.Mobile);
-        if (tokens.Length == 0 && mobile is null)
+        var phones = new[] { TryCleanMobile(query.Mobile), TryCleanMobile(query.SecondPhone) }.Where(phone => phone is not null).Select(phone => phone!).Distinct(StringComparer.Ordinal).ToList();
+        if (tokens.Length == 0 && phones.Count == 0)
         {
             return new SimilarPatientsResponse(warn, []);
         }
 
         var canSeeVip = privileges.SpecialRights.CanSeeVip;
-        var rows = await patients.FindSimilarCandidatesAsync(tokens, mobile, PreFilterLimit, cancellationToken);
+        var rows = await patients.FindSimilarCandidatesAsync(tokens, phones, PreFilterLimit, cancellationToken);
         var today = Patient.LocalDate(clock.UtcNow, await laboratoryZone.FindAsync(cancellationToken));
         var candidates = rows
-            .Select(row => (Row: row, Match: Classify(key, mobile, row)))
+            .Select(row => (Row: row, Match: Classify(key, phones, row)))
             .Where(candidate => candidate.Match is not null)
             .OrderBy(candidate => candidate.Match)
             .ThenByDescending(candidate => candidate.Row.CreatedAtUtc)
@@ -143,12 +147,13 @@ public sealed class FindSimilarPatientsHandler(IPatientRepository patients, ITen
         return new SimilarPatientsResponse(warn, candidates);
     }
 
-    /// <summary>Exact = similar name and the same mobile; Mobile = the same mobile; Name = a similar Latin or Arabic name.</summary>
-    public static SimilarMatch? Classify(string queryKey, string? mobile, PatientRow row)
+    /// <summary>Exact = similar name and the same mobile; Mobile = one of the typed phones stored as the file's mobile or second phone (C3); Name = a similar Latin or Arabic name.</summary>
+    public static SimilarMatch? Classify(string queryKey, IReadOnlyList<string> phones, PatientRow row)
     {
         ArgumentNullException.ThrowIfNull(row);
+        ArgumentNullException.ThrowIfNull(phones);
         var byName = PatientNameNormalizer.KeysMatch(queryKey, row.NameKey) || PatientNameNormalizer.KeysMatch(queryKey, row.NameArKey);
-        var byMobile = mobile is not null && string.Equals(mobile, row.Mobile, StringComparison.Ordinal);
+        var byMobile = phones.Any(phone => string.Equals(phone, row.Mobile, StringComparison.Ordinal) || string.Equals(phone, row.SecondPhone, StringComparison.Ordinal));
         return (byName, byMobile) switch
         {
             (true, true) => SimilarMatch.Exact,
@@ -220,7 +225,7 @@ public sealed class ExportPatientsValidator : AbstractValidator<ExportPatientsQu
     }
 }
 
-public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, ILaboratoryCountry laboratoryCountry, IClock clock) : IQueryHandler<ExportPatientsQuery, ExportFile>
+public sealed class ExportPatientsHandler(IPatientRepository patients, IPatientLocations locations, IUserPrivileges privileges, ILaboratoryTimeZone laboratoryZone, ILaboratoryCountry laboratoryCountry, IClock clock) : IQueryHandler<ExportPatientsQuery, ExportFile>
 {
     public const int MaxRows = 10_000;
 
@@ -240,8 +245,9 @@ public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPriv
 
         var now = clock.UtcNow;
         var today = Patient.LocalDate(now, await laboratoryZone.FindAsync(cancellationToken));
+        var located = await PatientLocationChain.NamesAsync(locations, rows, cancellationToken);   // district and area names (A2)
         var csv = new StringBuilder();
-        var header = new List<string> { "Number", "Title", "Name", "Arabic name", "Gender", "Date of birth", "Estimated", "Age (years)", "Mobile", "National id", "Nationality", "E-mail", "City", "Address", "Status", "Merged into", "Registered on" };
+        var header = new List<string> { "Number", "Title", "Name", "Arabic name", "Gender", "Date of birth", "Estimated", "Age (years)", "Mobile", "Second phone", "National id", "Nationality", "E-mail", "City", "District", "Area", "Address", "Status", "Merged into", "Registered on" };
         if (confidential)
         {
             header.Add("VIP");
@@ -264,10 +270,13 @@ public sealed class ExportPatientsHandler(IPatientRepository patients, IUserPriv
                 row.DateOfBirth is null ? "yes" : "no",
                 PatientProjections.AgeOf(row, today).Years.ToString(CultureInfo.InvariantCulture),
                 masked ? null : row.Mobile,
+                masked ? null : row.SecondPhone,
                 masked ? null : row.NationalId,
                 row.Nationality,
                 masked ? null : row.Email,
                 row.City,
+                located.GetValueOrDefault(row.Id)?.DistrictNameEn,
+                located.GetValueOrDefault(row.Id)?.AreaNameEn,
                 masked ? null : row.Address,
                 row.Status.ToString(),
                 row.MergedIntoNumber,

@@ -1,9 +1,11 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import type { CountryOption, GovernorateOption, PatientDetail, PatientFormSettings, RegisterPatientRequest } from '../../core/api/patients.contracts';
+import { type CountryOption, type GovernorateOption, PATIENTS_API, type PatientDetail, type PatientFormSettings, type RegisterPatientRequest } from '../../core/api/patients.contracts';
 import { PermissionsService } from '../../core/permissions/permissions.service';
-import { PatientFormComponent } from './patient-form.component';
+import { PatientFormComponent, type TypedIdentity } from './patient-form.component';
 import { ageBetween, todayIso } from './patient-demographics';
 
 @Component({
@@ -34,6 +36,23 @@ function type(host: HTMLElement, control: string, value: string): void {
   element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }));
 }
 
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** Lets a flushed answer land, runs the effects (the lookups of the location hierarchy start) and lets the request reach the backend. */
+async function tick(): Promise<void> {
+  await settle();
+  TestBed.tick();
+  await settle();
+}
+
+/** Answers every pending public location lookup with an empty list, so `whenStable` has nothing to wait for. */
+async function flushLookups(): Promise<void> {
+  await tick();
+  const backend = TestBed.inject(HttpTestingController);
+  backend.match((r) => r.url === PATIENTS_API.cities || r.url === PATIENTS_API.districts || r.url === PATIENTS_API.areas).forEach((request) => request.flush([]));
+  await settle();
+}
+
 function value(host: HTMLElement, control: string): string {
   // the gender is a radio switch: its value is the checked option's
   const checked = host.querySelector<HTMLInputElement>(`input[type="radio"][formcontrolname="${control}"]:checked`);
@@ -45,7 +64,12 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
     granted = new Set<string>();
     await TestBed.configureTestingModule({
       imports: [HostComponent],
-      providers: [provideZonelessChangeDetection(), { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> }],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+      ],
     }).compileComponents();
   });
 
@@ -281,6 +305,7 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
     it('fills the empty date of birth, gender and governorate', async () => {
       const { fixture, host } = await renderWithLists();
       type(host, 'nationalId', '29601010100022');
+      await flushLookups();
       await fixture.whenStable();
 
       expect(value(host, 'dateOfBirth')).toBe('1996-01-01');
@@ -293,6 +318,7 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
 
       // a corrected id moves the values it filled
       type(host, 'nationalId', '28512252101235');
+      await flushLookups();
       await fixture.whenStable();
       expect(value(host, 'dateOfBirth')).toBe('1985-12-25');
       expect(value(host, 'gender')).toBe('Male');
@@ -311,6 +337,7 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
       await fixture.whenStable();
 
       type(host, 'nationalId', '28512252101235');   // a man born 1985-12-25 in Giza
+      await flushLookups();
       await fixture.whenStable();
       expect(value(host, 'dateOfBirth')).toBe('1990-05-05');
       expect(value(host, 'gender')).toBe('Female');
@@ -342,5 +369,153 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
     await fixture.whenStable();
     expect(fixture.componentInstance.form().submit()).toBe(true);
     expect(fixture.componentInstance.saved[0]?.gender).toBe('Female');
+  });
+
+  describe('location hierarchy and second phone (LIS-CR-003 §3, A2 / C3)', () => {
+    const governorates: GovernorateOption[] = [
+      { id: 'g-cairo', nameEn: 'Cairo', nameAr: 'القاهرة', countryId: 'c-eg' },
+      { id: 'g-aswan', nameEn: 'Aswan', nameAr: 'أسوان', countryId: 'c-eg' },
+    ];
+
+    function openMore(host: HTMLElement): void {
+      const details = host.querySelector<HTMLDetailsElement>('details.more');
+      if (details) {
+        details.open = true;
+        details.dispatchEvent(new Event('toggle'));
+      }
+    }
+
+    async function renderWithGovernorates(): Promise<Awaited<ReturnType<typeof render>> & { backend: HttpTestingController }> {
+      const rendered = await render();
+      rendered.fixture.componentInstance.governorates.set(governorates);
+      await rendered.fixture.whenStable();
+      openMore(rendered.host);
+      await rendered.fixture.whenStable();
+      return { ...rendered, backend: TestBed.inject(HttpTestingController) };
+    }
+
+    function lookup(backend: HttpTestingController, url: string, parent: [string, string]): ReturnType<HttpTestingController['expectOne']> {
+      const request = backend.expectOne((r) => r.url === url);
+      expect(request.request.params.get(parent[0])).toBe(parent[1]);
+      return request;
+    }
+
+    it('replaces the free-text city with linked selects when the governorate has cities, and saves the chain (A2)', async () => {
+      const { fixture, host, backend } = await renderWithGovernorates();
+      expect(host.querySelector('input[formcontrolname="city"]')).not.toBeNull();
+
+      type(host, 'governorateId', 'g-cairo');
+      await tick();
+      lookup(backend, PATIENTS_API.cities, ['governorateId', 'g-cairo']).flush([
+        { id: 'c-nasr', governorateId: 'g-cairo', nameEn: 'Nasr City', nameAr: 'مدينة نصر' },
+        { id: 'c-maadi', governorateId: 'g-cairo', nameEn: 'Maadi', nameAr: 'المعادي' },
+      ]);
+      await tick();
+      expect(host.querySelector('input[formcontrolname="city"]')).toBeNull();
+      expect(host.querySelectorAll('select[formcontrolname="cityId"] option').length).toBe(3);
+      expect(host.querySelector('select[formcontrolname="districtId"]')).toBeNull();   // nothing picked yet
+
+      type(host, 'cityId', 'c-nasr');
+      await tick();
+      lookup(backend, PATIENTS_API.districts, ['cityId', 'c-nasr']).flush([{ id: 'd-7', cityId: 'c-nasr', nameEn: '7th district', nameAr: 'الحي السابع' }]);
+      await tick();
+      type(host, 'districtId', 'd-7');
+      await tick();
+      lookup(backend, PATIENTS_API.areas, ['districtId', 'd-7']).flush([{ id: 'a-1', districtId: 'd-7', nameEn: 'Area 1', nameAr: 'منطقة 1' }]);
+      await tick();
+      type(host, 'areaId', 'a-1');
+
+      type(host, 'fullName', 'Mona');
+      type(host, 'ageYears', '30');
+      await tick();
+      expect(fixture.componentInstance.form().submit()).toBe(true);
+      // the server names the city from the picked id: no free text travels beside it
+      expect(fixture.componentInstance.saved[0]).toEqual(expect.objectContaining({ governorateId: 'g-cairo', cityId: 'c-nasr', districtId: 'd-7', areaId: 'a-1', city: null }));
+    });
+
+    it('clears the levels below a changed one, so nothing outside the chain is sent (PAT-014…016)', async () => {
+      const { fixture, host, backend } = await renderWithGovernorates();
+      type(host, 'governorateId', 'g-cairo');
+      await tick();
+      lookup(backend, PATIENTS_API.cities, ['governorateId', 'g-cairo']).flush([{ id: 'c-nasr', governorateId: 'g-cairo', nameEn: 'Nasr City', nameAr: 'مدينة نصر' }]);
+      await tick();
+      type(host, 'cityId', 'c-nasr');
+      await tick();
+      lookup(backend, PATIENTS_API.districts, ['cityId', 'c-nasr']).flush([{ id: 'd-7', cityId: 'c-nasr', nameEn: '7th district', nameAr: 'الحي السابع' }]);
+      await tick();
+      type(host, 'districtId', 'd-7');
+      await tick();
+      lookup(backend, PATIENTS_API.areas, ['districtId', 'd-7']).flush([]);
+      await tick();
+
+      type(host, 'governorateId', 'g-aswan');
+      await tick();
+      lookup(backend, PATIENTS_API.cities, ['governorateId', 'g-aswan']).flush([]);   // Aswan lists no cities: free text again
+      await tick();
+      expect(host.querySelector('input[formcontrolname="city"]')).not.toBeNull();
+      expect(host.querySelector('select[formcontrolname="cityId"]')).toBeNull();
+
+      type(host, 'city', 'Kom Ombo');
+      type(host, 'fullName', 'Mona');
+      type(host, 'ageYears', '30');
+      await tick();
+      expect(fixture.componentInstance.form().submit()).toBe(true);
+      expect(fixture.componentInstance.saved[0]).toEqual(expect.objectContaining({ governorateId: 'g-aswan', cityId: null, districtId: null, areaId: null, city: 'Kom Ombo' }));
+    });
+
+    it('fills the selects from the file being edited', async () => {
+      const { fixture, host, backend } = await renderWithGovernorates();
+      fixture.componentInstance.patient.set({
+        id: 'p-1', number: 'PAT-2026-00001', title: 'Mrs', fullName: 'Mona Hassan', nameAr: null, gender: 'Female', dateOfBirth: '1990-05-01', dateOfBirthIsEstimated: false,
+        age: ageBetween('1990-05-01', todayIso()), statedAge: null, ageRecordedOn: null, registeredOn: '2026-10-01', patientConditionId: null, mobile: '01001234567', nationalId: null,
+        nationality: null, email: null, governorateId: 'g-cairo', city: 'Maadi', address: null, comments: null, isVip: null, status: 'Active', merge: null, mergedFiles: [],
+        createdAtUtc: '2026-10-01T08:00:00Z', createdByName: null, modifiedAtUtc: null, modifiedByName: null, rowVersion: 3, secondPhone: '01112223333',
+        location: { cityId: 'c-maadi', cityNameEn: 'Maadi', cityNameAr: 'المعادي', districtId: null, districtNameEn: null, districtNameAr: null, areaId: null, areaNameEn: null, areaNameAr: null },
+      });
+      await tick();
+      lookup(backend, PATIENTS_API.cities, ['governorateId', 'g-cairo']).flush([{ id: 'c-maadi', governorateId: 'g-cairo', nameEn: 'Maadi', nameAr: 'المعادي' }]);
+      await tick();
+      lookup(backend, PATIENTS_API.districts, ['cityId', 'c-maadi']).flush([]);
+      await tick();
+
+      expect(value(host, 'cityId')).toBe('c-maadi');
+      expect(value(host, 'secondPhone')).toBe('01112223333');
+      expect(fixture.componentInstance.form().submit()).toBe(true);
+      expect(fixture.componentInstance.saved[0]).toEqual(expect.objectContaining({ cityId: 'c-maadi', districtId: null, areaId: null, city: null, secondPhone: '01112223333' }));
+    });
+
+    it('saves the second phone cleaned like the mobile and types it into the similar-patient lookup (C3)', async () => {
+      const { fixture, host } = await render();
+      fixture.componentInstance.countries.set([{ id: 'c-eg', code: 'EG', nameEn: 'Egypt', nameAr: 'مصر', mobileLength: 10 }]);
+      await tick();
+      const country = host.querySelector<HTMLSelectElement>('.mobile select')!;
+      country.value = 'EG';
+      country.dispatchEvent(new Event('change'));
+
+      const typed: TypedIdentity[] = [];
+      fixture.componentInstance.form().typed.subscribe((identity) => typed.push(identity));
+      type(host, 'fullName', 'Mona');
+      type(host, 'ageYears', '30');
+      type(host, 'secondPhone', '1 011 222 333');
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(typed.at(-1)).toEqual({ name: 'Mona', mobile: '', secondPhone: '01011222333' });
+
+      expect(fixture.componentInstance.form().submit()).toBe(true);
+      expect(fixture.componentInstance.saved[0]).toEqual(expect.objectContaining({ mobile: null, secondPhone: '01011222333' }));
+    });
+
+    it('refuses a second phone that is not a number and marks the field (PAT-017 from the server too)', async () => {
+      const { fixture, host } = await render();
+      type(host, 'fullName', 'Mona');
+      type(host, 'ageYears', '30');
+      type(host, 'secondPhone', 'abc');
+      await tick();
+      expect(fixture.componentInstance.form().submit()).toBe(false);
+      expect(host.querySelector('[formcontrolname="secondPhone"].ng-invalid')).not.toBeNull();
+
+      type(host, 'secondPhone', '');
+      await tick();
+      expect(fixture.componentInstance.form().submit()).toBe(true);
+    });
   });
 });

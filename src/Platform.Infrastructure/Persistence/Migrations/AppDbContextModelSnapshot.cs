@@ -417,6 +417,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("method");
 
+                    b.Property<string>("MethodCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("method_code");
+
                     b.Property<DateTimeOffset>("PaidAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("paid_at_utc");
@@ -494,11 +499,95 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_payments_method_domain", "\"method\" IN ('Cash', 'Card', 'Pos', 'Transfer')");
 
-                            t.HasCheckConstraint("ck_payments_reference_for_non_cash", "method = 'Cash' OR reference IS NOT NULL");
+                            t.HasCheckConstraint("ck_payments_reference_for_non_cash", "method = 'Cash' OR method_code IS NOT NULL OR reference IS NOT NULL");
 
                             t.HasCheckConstraint("ck_payments_status_domain", "\"status\" IN ('Posted', 'Voided')");
 
                             t.HasCheckConstraint("ck_payments_void_consistency", "(status = 'Voided') = (void_reason IS NOT NULL AND voided_at_utc IS NOT NULL AND voided_by_user_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Platform.Domain.Billing.PaymentMethodDefinition", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_display_name");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("modified_by_display_name");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<bool>("RequiresReference")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_reference");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_payment_methods");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payment_methods_tenant_id_code");
+
+                    b.HasIndex("TenantId", "IsActive", "Sequence")
+                        .HasDatabaseName("ix_payment_methods_tenant_id_is_active_sequence");
+
+                    b.ToTable("payment_methods", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_payment_methods_kind_domain", "\"kind\" IN ('Cash', 'Card', 'Pos', 'Transfer')");
+
+                            t.HasCheckConstraint("ck_payment_methods_sequence", "sequence >= 0 AND sequence <= 9999");
                         });
                 });
 
@@ -536,6 +625,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("method");
+
+                    b.Property<string>("MethodCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("method_code");
 
                     b.Property<string>("Note")
                         .HasMaxLength(500)
@@ -594,7 +688,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_refunds_method_domain", "\"method\" IN ('Cash', 'Card', 'Pos', 'Transfer')");
 
-                            t.HasCheckConstraint("ck_refunds_reference_for_non_cash", "method = 'Cash' OR reference IS NOT NULL");
+                            t.HasCheckConstraint("ck_refunds_reference_for_non_cash", "method = 'Cash' OR method_code IS NOT NULL OR reference IS NOT NULL");
                         });
                 });
 
@@ -3731,10 +3825,18 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("age_years");
 
+                    b.Property<Guid?>("AreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("area_id");
+
                     b.Property<string>("City")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("city");
+
+                    b.Property<Guid?>("CityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("city_id");
 
                     b.Property<string>("Comments")
                         .HasColumnType("text")
@@ -3756,6 +3858,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("DateOfBirth")
                         .HasColumnType("date")
                         .HasColumnName("date_of_birth");
+
+                    b.Property<Guid?>("DistrictId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("district_id");
 
                     b.Property<string>("Email")
                         .HasMaxLength(254)
@@ -3864,6 +3970,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("SecondPhone")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("second_phone");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -3894,6 +4005,9 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "Number")
                         .IsUnique()
                         .HasDatabaseName("ix_patients_tenant_id_number");
+
+                    b.HasIndex("TenantId", "SecondPhone")
+                        .HasDatabaseName("ix_patients_tenant_id_second_phone");
 
                     b.HasIndex("TenantId", "Status")
                         .HasDatabaseName("ix_patients_tenant_id_status");
@@ -4133,6 +4247,118 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Platform.Domain.PlatformAdmin.Area", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_display_name");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid>("DistrictId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("district_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("modified_by_display_name");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_areas");
+
+                    b.HasIndex("DistrictId")
+                        .HasDatabaseName("ix_areas_district_id");
+
+                    b.ToTable("areas", "saas");
+                });
+
+            modelBuilder.Entity("Platform.Domain.PlatformAdmin.City", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_display_name");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid>("GovernorateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("governorate_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("modified_by_display_name");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cities");
+
+                    b.HasIndex("GovernorateId")
+                        .HasDatabaseName("ix_cities_governorate_id");
+
+                    b.ToTable("cities", "saas");
+                });
+
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.CodeSystem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4340,6 +4566,62 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_countries_iso_code");
 
                     b.ToTable("countries", "saas");
+                });
+
+            modelBuilder.Entity("Platform.Domain.PlatformAdmin.District", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("city_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_display_name");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("modified_by_display_name");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_districts");
+
+                    b.HasIndex("CityId")
+                        .HasDatabaseName("ix_districts_city_id");
+
+                    b.ToTable("districts", "saas");
                 });
 
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.Governorate", b =>
@@ -5486,6 +5768,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_user_id");
 
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -5506,6 +5793,16 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ModifiedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("modified_by_user_id");
+
+                    b.Property<string>("Phone1")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("phone1");
+
+                    b.Property<string>("Phone2")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("phone2");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
@@ -5533,6 +5830,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("web_username");
+
+                    b.Property<string>("WhatsApp")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("whatsapp");
 
                     b.HasKey("TenantId", "Id")
                         .HasName("pk_payers");
@@ -8480,6 +8782,44 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_payments_visit_accounts_tenant_id_visit_id");
                 });
 
+            modelBuilder.Entity("Platform.Domain.Billing.PaymentMethodDefinition", b =>
+                {
+                    b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
+                        {
+                            b1.Property<Guid>("PaymentMethodDefinitionTenantId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("tenant_id");
+
+                            b1.Property<Guid>("PaymentMethodDefinitionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Ar")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("name_ar");
+
+                            b1.Property<string>("En")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("name_en");
+
+                            b1.HasKey("PaymentMethodDefinitionTenantId", "PaymentMethodDefinitionId")
+                                .HasName("pk_payment_methods");
+
+                            b1.ToTable("payment_methods", "app");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PaymentMethodDefinitionTenantId", "PaymentMethodDefinitionId")
+                                .HasConstraintName("fk_payment_methods_payment_methods_tenant_id_id");
+                        });
+
+                    b.Navigation("Name")
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Platform.Domain.Billing.Refund", b =>
                 {
                     b.HasOne("Platform.Domain.Identity.PlatformUser", null)
@@ -10128,6 +10468,86 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_patient_documents_patients_tenant_id_patient_id");
                 });
 
+            modelBuilder.Entity("Platform.Domain.PlatformAdmin.Area", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.District", null)
+                        .WithMany()
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_areas_district_district_id");
+
+                    b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
+                        {
+                            b1.Property<Guid>("AreaId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Ar")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("name_ar");
+
+                            b1.Property<string>("En")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("name_en");
+
+                            b1.HasKey("AreaId");
+
+                            b1.ToTable("areas", "saas");
+
+                            b1.WithOwner()
+                                .HasForeignKey("AreaId")
+                                .HasConstraintName("fk_areas_areas_id");
+                        });
+
+                    b.Navigation("Name")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Platform.Domain.PlatformAdmin.City", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Governorate", null)
+                        .WithMany()
+                        .HasForeignKey("GovernorateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cities_governorate_governorate_id");
+
+                    b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
+                        {
+                            b1.Property<Guid>("CityId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Ar")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("name_ar");
+
+                            b1.Property<string>("En")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("name_en");
+
+                            b1.HasKey("CityId");
+
+                            b1.ToTable("cities", "saas");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CityId")
+                                .HasConstraintName("fk_cities_cities_id");
+                        });
+
+                    b.Navigation("Name")
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.CodeSystemItem", b =>
                 {
                     b.HasOne("Platform.Domain.PlatformAdmin.CodeSystem", null)
@@ -10165,6 +10585,46 @@ namespace Platform.Infrastructure.Persistence.Migrations
                             b1.WithOwner()
                                 .HasForeignKey("CountryId")
                                 .HasConstraintName("fk_countries_countries_id");
+                        });
+
+                    b.Navigation("Name")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Platform.Domain.PlatformAdmin.District", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.City", null)
+                        .WithMany()
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_districts_cities_city_id");
+
+                    b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
+                        {
+                            b1.Property<Guid>("DistrictId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Ar")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("name_ar");
+
+                            b1.Property<string>("En")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("name_en");
+
+                            b1.HasKey("DistrictId");
+
+                            b1.ToTable("districts", "saas");
+
+                            b1.WithOwner()
+                                .HasForeignKey("DistrictId")
+                                .HasConstraintName("fk_districts_districts_id");
                         });
 
                     b.Navigation("Name")

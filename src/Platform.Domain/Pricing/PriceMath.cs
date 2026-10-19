@@ -29,6 +29,55 @@ public static class PriceMath
         return RoundAmount(Math.Round(value / step, 0, MidpointRounding.AwayFromZero) * step);
     }
 
+    /// <summary>Percent adjustments (C21) go from −100 % (every price becomes 0) to +1 000 %, with at most two decimals.</summary>
+    public const decimal MinPercentAdjustment = -100m;
+    public const decimal MaxPercentAdjustment = 1_000m;
+
+    /// <summary>
+    /// One adjusted price (C21 bulk adjust): the amount or percentage applied, the rounding applied, and a negative result
+    /// clamped to 0 (<paramref name="Clamped"/> reports it so the preview can show the line). Above the maximum the
+    /// adjustment is refused (PRC-046): a silent cap at 99 999 999.99 would hide a wrong percentage.
+    /// </summary>
+    public static AdjustedPrice Adjust(decimal price, PriceAdjustMode mode, decimal value, PriceRounding rounding)
+    {
+        RequireAdjustment(mode, value);
+        var raw = mode == PriceAdjustMode.Amount ? price + value : price * (1 + (value / 100m));
+        var rounded = rounding switch
+        {
+            PriceRounding.None => RoundAmount(raw),
+            PriceRounding.Whole => RoundToStep(raw, 1m),
+            PriceRounding.Nearest5 => RoundToStep(raw, 5m),
+            PriceRounding.Nearest10 => RoundToStep(raw, 10m),
+            _ => throw new DomainException(PricingCodes.AdjustmentInvalid, "Unknown rounding.", DomainFault.Validation),
+        };
+        if (rounded < 0)
+        {
+            return new AdjustedPrice(0m, true);
+        }
+
+        if (rounded > MaxAmount)
+        {
+            throw new DomainException(PricingCodes.AdjustResultOutOfRange, $"The adjustment would price a service at {rounded}; prices must not exceed {MaxAmount}.", DomainFault.Validation);
+        }
+
+        return new AdjustedPrice(rounded, false);
+    }
+
+    /// <summary>PRC-044: an amount within ±<see cref="MaxAmount"/> with two decimals, or a percentage between −100 and 1 000 with two decimals.</summary>
+    public static void RequireAdjustment(PriceAdjustMode mode, decimal value)
+    {
+        var valid = mode switch
+        {
+            PriceAdjustMode.Amount => Math.Abs(value) <= MaxAmount && decimal.Round(value, AmountScale) == value,
+            PriceAdjustMode.Percent => value >= MinPercentAdjustment && value <= MaxPercentAdjustment && decimal.Round(value, AmountScale) == value,
+            _ => false,
+        };
+        if (!valid)
+        {
+            throw new DomainException(PricingCodes.AdjustmentInvalid, $"Adjust by an amount within ±{MaxAmount} or by a percentage between {MinPercentAdjustment} and {MaxPercentAdjustment}, with at most two decimals.", DomainFault.Validation);
+        }
+    }
+
     public static bool IsValidAmount(decimal value) => value is >= 0 and <= MaxAmount && decimal.Round(value, AmountScale) == value;
 
     public static bool IsValidFactor(decimal value) => value is >= 0 and <= MaxFactor && decimal.Round(value, FactorScale) == value;
@@ -65,3 +114,6 @@ public static class PriceMath
         return cleaned;
     }
 }
+
+/// <summary>The result of <see cref="PriceMath.Adjust"/>: the new price and whether a negative result was clamped to 0.</summary>
+public readonly record struct AdjustedPrice(decimal Price, bool Clamped);

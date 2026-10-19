@@ -13,9 +13,10 @@ using Platform.SharedKernel.Primitives;
 namespace Platform.Application.Pricing.Commands;
 
 // Payers (P1–P4, P8). Each handler: load, call the aggregate, commit once (01 §3.3). Validators check shape only.
+// The contact fields (CR 2026-10-19 C19) are optional on both commands; the aggregate cleans and validates them (PRC-017 / PRC-018).
 
 [RequirePermissionPolicy(PermissionCatalog.Pricing, PermissionAction.Create)]
-public sealed record CreatePayerCommand(string NameEn, string NameAr, string SearchKey, string Type, bool WebPortalEnabled, string? WebUsername) : ICommand<CreatedResource>;
+public sealed record CreatePayerCommand(string NameEn, string NameAr, string SearchKey, string Type, bool WebPortalEnabled, string? WebUsername, string? Phone1 = null, string? Phone2 = null, string? WhatsApp = null, string? Email = null) : ICommand<CreatedResource>;
 
 public sealed class CreatePayerValidator : AbstractValidator<CreatePayerCommand>
 {
@@ -27,6 +28,10 @@ public sealed class CreatePayerValidator : AbstractValidator<CreatePayerCommand>
         RuleFor(command => command.Type).NotEmpty().IsEnumName(typeof(PayerType), caseSensitive: false);
         RuleFor(command => command.WebUsername).MaximumLength(Payer.MaxWebUsernameLength);
         RuleFor(command => command.WebUsername).NotEmpty().When(command => command.WebPortalEnabled);
+        RuleFor(command => command.Phone1).MaximumLength(Payer.MaxContactNumberLength);
+        RuleFor(command => command.Phone2).MaximumLength(Payer.MaxContactNumberLength);
+        RuleFor(command => command.WhatsApp).MaximumLength(Payer.MaxContactNumberLength);
+        RuleFor(command => command.Email).MaximumLength(Payer.MaxEmailLength);
     }
 }
 
@@ -38,7 +43,8 @@ public sealed class CreatePayerHandler(IPayerRepository payers, IUnitOfWork unit
         var username = Payer.CleanWebUsername(command.WebPortalEnabled, command.WebUsername);
         await PayerUniqueness.RequireAsync(payers, searchKey, username, null, cancellationToken);
 
-        var payer = Payer.Create(new LocalizedText(command.NameEn, command.NameAr), searchKey, Enum.Parse<PayerType>(command.Type, ignoreCase: true), command.WebPortalEnabled, username, clock.UtcNow);
+        var contacts = new PayerContacts(command.Phone1, command.Phone2, command.WhatsApp, command.Email);
+        var payer = Payer.Create(new LocalizedText(command.NameEn, command.NameAr), searchKey, Enum.Parse<PayerType>(command.Type, ignoreCase: true), command.WebPortalEnabled, username, contacts, clock.UtcNow);
         payers.Add(payer);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new CreatedResource(payer.Id);
@@ -46,7 +52,7 @@ public sealed class CreatePayerHandler(IPayerRepository payers, IUnitOfWork unit
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Pricing, PermissionAction.Edit)]
-public sealed record UpdatePayerCommand(Guid PayerId, string NameEn, string NameAr, string SearchKey, string Type, bool WebPortalEnabled, string? WebUsername) : ICommand;
+public sealed record UpdatePayerCommand(Guid PayerId, string NameEn, string NameAr, string SearchKey, string Type, bool WebPortalEnabled, string? WebUsername, string? Phone1 = null, string? Phone2 = null, string? WhatsApp = null, string? Email = null) : ICommand;
 
 public sealed class UpdatePayerValidator : AbstractValidator<UpdatePayerCommand>
 {
@@ -59,6 +65,10 @@ public sealed class UpdatePayerValidator : AbstractValidator<UpdatePayerCommand>
         RuleFor(command => command.Type).NotEmpty().IsEnumName(typeof(PayerType), caseSensitive: false);
         RuleFor(command => command.WebUsername).MaximumLength(Payer.MaxWebUsernameLength);
         RuleFor(command => command.WebUsername).NotEmpty().When(command => command.WebPortalEnabled);
+        RuleFor(command => command.Phone1).MaximumLength(Payer.MaxContactNumberLength);
+        RuleFor(command => command.Phone2).MaximumLength(Payer.MaxContactNumberLength);
+        RuleFor(command => command.WhatsApp).MaximumLength(Payer.MaxContactNumberLength);
+        RuleFor(command => command.Email).MaximumLength(Payer.MaxEmailLength);
     }
 }
 
@@ -73,7 +83,8 @@ public sealed class UpdatePayerHandler(IPayerRepository payers, IUnitOfWork unit
         var username = Payer.CleanWebUsername(command.WebPortalEnabled, command.WebUsername);
         await PayerUniqueness.RequireAsync(payers, searchKey, username, payer.Id, cancellationToken);
 
-        payer.Update(new LocalizedText(command.NameEn, command.NameAr), searchKey, Enum.Parse<PayerType>(command.Type, ignoreCase: true), command.WebPortalEnabled, username, clock.UtcNow);
+        var contacts = new PayerContacts(command.Phone1, command.Phone2, command.WhatsApp, command.Email);
+        payer.Update(new LocalizedText(command.NameEn, command.NameAr), searchKey, Enum.Parse<PayerType>(command.Type, ignoreCase: true), command.WebPortalEnabled, username, contacts, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

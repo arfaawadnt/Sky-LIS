@@ -253,3 +253,40 @@ internal sealed class SubscriptionRequestConfiguration : IEntityTypeConfiguratio
         builder.HasIndex(request => request.ExpiresAtUtc);
     }
 }
+
+// Location hierarchy under a governorate (change request 2026-10-19, A2): saas.cities, saas.districts, saas.areas.
+// The English name is unique per parent through the case-insensitive indexes of PlatformAdmin.migration.sql
+// (ux_cities_governorate_name, ux_districts_city_name, ux_areas_district_name); the parent FK is Restrict.
+
+internal sealed class CityConfiguration : IEntityTypeConfiguration<City>
+{
+    public void Configure(EntityTypeBuilder<City> builder)
+    {
+        builder.ToTable("cities", AppDbContext.SaasSchema);
+        SaasColumns.Bilingual(builder, city => city.Name, "name", City.MaxNameLength);
+        builder.HasIndex(city => city.GovernorateId);
+        builder.HasOne<Governorate>().WithMany().HasForeignKey(city => city.GovernorateId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class DistrictConfiguration : IEntityTypeConfiguration<District>
+{
+    public void Configure(EntityTypeBuilder<District> builder)
+    {
+        builder.ToTable("districts", AppDbContext.SaasSchema);
+        SaasColumns.Bilingual(builder, district => district.Name, "name", District.MaxNameLength);
+        builder.HasIndex(district => district.CityId);
+        builder.HasOne<City>().WithMany().HasForeignKey(district => district.CityId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class AreaConfiguration : IEntityTypeConfiguration<Area>
+{
+    public void Configure(EntityTypeBuilder<Area> builder)
+    {
+        builder.ToTable("areas", AppDbContext.SaasSchema);
+        SaasColumns.Bilingual(builder, area => area.Name, "name", Area.MaxNameLength);
+        builder.HasIndex(area => area.DistrictId);
+        builder.HasOne<District>().WithMany().HasForeignKey(area => area.DistrictId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

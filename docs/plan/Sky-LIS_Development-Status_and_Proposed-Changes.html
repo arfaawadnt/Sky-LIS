@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sky LIS — Development Status and Proposed Changes — LIS-DS-001 v1.1</title>
+<meta name="description" content="The state of the Sky LIS application as built and installed (v0.14.1), and the changes proposed by the Client Portal prototype v3 and the Super Admin prototype v4.1 against it.">
+<style>
+  :root{--bad:#C8102E;--bg:#F3F6FB;--blue-soft:#E8F1FE;--blue:#2A7DF5;--grad:linear-gradient(90deg,#2A7DF5,#6E3BE4);--ink:#14213A;--line-soft:#EAEFF6;--line:#DCE3EE;--muted:#6B7A90;--navy:#0B2A5B;--ok-soft:#E3F5EC;--ok:#13865A;--paper:#fff;--violet-soft:#EFE9FD;--violet:#6E3BE4;--warn-soft:#FFF3DF;--warn:#B26B00;--bad-soft:#FBE7EA}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+  .page{max-width:1180px;margin:0 auto;padding:32px 16px 64px}
+  header.doc{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:28px 32px;position:relative;overflow:hidden}
+  header.doc::before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:var(--grad)}
+  .kicker{display:inline-block;margin-bottom:10px;padding:3px 12px;border-radius:999px;background:var(--violet-soft);color:var(--violet);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  h1{margin:0 0 6px;font-size:28px;letter-spacing:-.01em;color:var(--navy)}
+  .sub{margin:0;color:var(--muted)}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 24px;margin-top:18px;font-size:13px}
+  .meta b{display:block;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:11px}
+  h2{font-size:20px;color:var(--navy);margin:40px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+  h3{font-size:16px;margin:24px 0 8px;color:var(--ink)}
+  h4{font-size:14px;margin:16px 0 6px;color:var(--navy);text-transform:uppercase;letter-spacing:.04em}
+  p{margin:8px 0}
+  ul{margin:6px 0 10px;padding-left:22px}
+  li{margin:3px 0}
+  .lead{color:var(--muted)}
+  .part{margin-top:48px;padding:22px 28px;border-radius:14px;background:var(--navy);color:#fff}
+  .part .k{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+  .part h2{margin:4px 0 4px;border:0;padding:0;color:#fff;font-size:24px}
+  .part p{margin:0;opacity:.85}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:18px 0}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card .n{font-size:30px;font-weight:700;color:var(--navy);line-height:1}
+  .card .l{color:var(--muted);font-size:13px;margin-top:6px}
+  .box{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px 24px;margin:18px 0}
+  .box-head{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:baseline;margin-bottom:6px}
+  .box-head h3{margin:0}
+  .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px 24px}
+  .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .pill.blue{background:var(--blue-soft);color:var(--blue)}
+  .pill.violet{background:var(--violet-soft);color:var(--violet)}
+  .pill.ok{background:var(--ok-soft);color:var(--ok)}
+  .pill.warn{background:var(--warn-soft);color:var(--warn)}
+  .pill.bad{background:var(--bad-soft);color:var(--bad)}
+  .pill.grey{background:var(--line-soft);color:var(--muted)}
+  table{width:100%;border-collapse:collapse;margin:12px 0 4px;font-size:14px;background:var(--paper)}
+  th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left}
+  th{background:var(--line-soft);font-weight:600;color:var(--navy);font-size:12.5px;text-transform:uppercase;letter-spacing:.03em}
+  td.id{font-family:Consolas,monospace;font-size:13px;white-space:nowrap;color:var(--navy)}
+  td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  code{font-family:Consolas,monospace;font-size:13px;background:var(--line-soft);padding:1px 5px;border-radius:4px}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:13px;color:var(--muted);margin:10px 0 0}
+  .bar{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:10px 0 4px;border:1px solid var(--line)}
+  .bar span{display:block;height:100%}
+  .timeline{list-style:none;padding:0;margin:10px 0}
+  .timeline li{display:grid;grid-template-columns:120px 1fr;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line)}
+  .timeline li:last-child{border-bottom:0}
+  .timeline .d{font-family:Consolas,monospace;font-size:13px;color:var(--navy);white-space:nowrap}
+  .note{border-left:4px solid var(--blue);background:var(--blue-soft);padding:10px 14px;border-radius:0 10px 10px 0;margin:12px 0;font-size:14px}
+  .note.warn{border-color:var(--warn);background:var(--warn-soft)}
+  footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+  @media (max-width:720px){table{display:block;overflow-x:auto}header.doc{padding:22px 18px}.timeline li{grid-template-columns:1fr}}
+  @media print{
+    body{background:#fff;font-size:11.5px}
+    .page{max-width:none;padding:0}
+    header.doc,.card,.box,.note,.part{break-inside:avoid;border-color:#bbb}
+    .part{background:#0B2A5B!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;break-before:page}
+    h2{break-after:avoid}
+    tr{break-inside:avoid}
+    thead{display:table-header-group}
+    a{color:inherit;text-decoration:none}
+    .pill,th,.bar span,.kicker{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="doc">
+  <span class="kicker">Sky LIS · National Technology</span>
+  <h1>Development Status and Proposed Changes</h1>
+  <p class="sub">Part A records what the Sky LIS application is today — modules, pages, platform foundations, verification and the installed state. Part B sets the Client Portal prototype v3 and the Super Admin prototype v4.1 against that application, item by item, and lists the decisions and candidate changes they imply.</p>
+  <div class="meta">
+    <div><b>Document</b>LIS-DS-001 · v1.1</div>
+    <div><b>Date</b>2026-10-19 (v1.0: 2026-10-18)</div>
+    <div><b>Software state</b>v0.14.1 (github.com/arfaawadnt/Sky-LIS); 0.14.0 installed on WIN-9S2KO4FA64L</div>
+    <div><b>Prototypes compared</b>Client Portal v3 · Super Admin v4.1 (supplied 2026-10-18)</div>
+    <div><b>Sources</b>README release history, docs/deploy/Installations.md, docs/build/MODULES.md, docs/srs (LIS-SRS-001 v1.1), docs/validation, docs/knowledge/sky-lis/SkyLIS_Prototypes_v3-v4.1_Difference.md</div>
+    <div><b>Related</b>LIS-RP-001 Remaining points, LIS-BP-001 Build plan, LIS-VR-001 / LIS-VR-002 Validation reports, LIS-UAT-001</div>
+    <div><b>Audience</b>Business owner and project management, National Technology</div>
+    <div><b>Status</b>Prepared by the development team for review</div>
+  </div>
+</header>
+
+<section>
+  <h2>1. Executive summary</h2>
+  <p class="lead">The Release-1 scope of Sky LIS — the pages of the v2.1 client and v3.1 admin prototype builds — is built, validated twice, and installed on the development server of National Technology. Four change requests of 13–14 October were delivered and installed within the same two days. <b>Update 2026-10-19 (v1.1):</b> the business owner asked for the <i>Not built</i> / <i>Partial</i> items of the comparison; they were built the same day as change request LIS-CR-003 (ten items: A1, A2, C3, C9, C10, C11, C18, C19, C21, C22 — see sections 5 and 11), verified by every gate and in the browser, and await release v0.15.0 and installation. The new prototypes (client v3, admin v4.1) are supersets of the prototypes Release 1 was specified from: of their 36 proposals, 21 exist as proposed, 6 exist in part, 4 exist in another form and 5 are not built. None of the 5 requires a change of the data model; the largest is a user-interface consolidation.</p>
+  <div class="cards">
+    <div class="card"><div class="n">45</div><div class="l">Release-1 pages delivered (28 client · 17 admin) of 89 specified in the Business SRS</div></div>
+    <div class="card"><div class="n">15</div><div class="l">business and platform modules built (Release-2 backends included)</div></div>
+    <div class="card"><div class="n">2,722</div><div class="l">automated tests green after LIS-CR-003 (1,661 backend · 1,061 frontend; 2,488 at v0.14.0)</div></div>
+    <div class="card"><div class="n">19</div><div class="l">installations on WIN-9S2KO4FA64L, 0.3.2 → 0.14.0, each with backup and smoke test</div></div>
+    <div class="card"><div class="n">36</div><div class="l">prototype proposals compared: 31 built · 3 partial · 2 different · 0 not built (before LIS-CR-003: 21 · 6 · 4 · 5)</div></div>
+    <div class="card"><div class="n">1</div><div class="l">business decision still open (D-1 terminology); D-2, D-3 and D-4 were settled by the request of 2026-10-19</div></div>
+  </div>
+  <div class="legend">
+    <span class="pill ok">Built</span>
+    <span class="pill blue">Partial</span>
+    <span class="pill violet">Different</span>
+    <span class="pill bad">Not built</span>
+    <span class="pill grey">Release 2 / parked</span>
+  </div>
+</section>
+
+<div class="part">
+  <div class="k">Part A</div>
+  <h2>Current development</h2>
+  <p>What has been built, how it was verified, and where it runs — as of release v0.14.1 (2026-10-14) plus change request LIS-CR-003 of 2026-10-19, built and verified in the repository and awaiting its release (v0.15.0) and installation.</p>
+</div>
+
+<section>
+  <h2>2. Product shape and architecture</h2>
+  <p>Sky LIS is a cloud, multi-tenant laboratory information system with two portals on one backend: the <b>Client Portal</b> used by each laboratory (reception, laboratory, finance, set-up, account) and the <b>Super Admin Portal</b> used by National Technology (clients, subscriptions, master data, platform). A laboratory subscribes on the public site, verifies the manager's mobile and receives a fully provisioned tenant with the global catalogue copied in.</p>
+  <div class="two">
+    <div class="box">
+      <h3>Backend</h3>
+      <ul>
+        <li>.NET 9 / C# 13, Clean Architecture in six projects (<code>Platform.*</code>), CQRS with MediatR, FluentValidation, EF Core 9 on PostgreSQL 17.</li>
+        <li>Tenant isolation by composite keys <code>(tenant_id, id)</code> and PostgreSQL row-level security on every tenant table; the runtime role cannot bypass it.</li>
+        <li>27 API controllers, about 500 operations under <code>/api/v1</code>; 96 tables in 15 migrations; one idempotent deployment script.</li>
+        <li>Every command and query carries a permission policy; architecture tests enforce the layer rules, the policy rule, atomic transitions and the migration script freshness.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h3>Frontend</h3>
+      <ul>
+        <li>Angular 22 (zoneless, signals), strict TypeScript 6, Vitest; 79 pages on a shared UI kit (tables with server-side paging and sorting, drawers, dialogs, tabs, print documents).</li>
+        <li>English and Arabic (RTL) on every page; language and results density saved as user preferences.</li>
+        <li>Release scope switch (<code>RELEASE_SCOPE = 'R1'</code>): Release-2 pages exist behind it and are hidden from menu and routes.</li>
+        <li>Session rules proven in validation: one identity per tab, cross-tab sign-out, idle timeout with warning, branch of the session.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>3. Modules and Release-1 pages</h2>
+  <p class="lead">Each module was specified in an intake document (<code>docs/intake/LIS-INT-&lt;MOD&gt;-001</code>), built in a wave with its own build slot and database, and integrated through documented event contracts. The SRS numbers the pages CP-nn (client) and SA-nn (admin).</p>
+  <table>
+    <thead><tr><th style="width:170px">Module</th><th>Delivered in Release 1</th><th>Built, parked for Release 2</th><th style="width:110px">State</th></tr></thead>
+    <tbody>
+      <tr><td>Foundation</td><td>Sign-in, refresh, branch of the session, password recovery (OTP), audit ledgers, outbox, notifications, tenant settings, idle timeout</td><td>MFA / TOTP, step-up re-authentication, retention purge</td><td><span class="pill ok">Built</span></td></tr>
+      <tr><td>Account &amp; onboarding</td><td>Public site, Subscribe wizard (OTP shown on the page until an SMS gateway exists), Login, Recovery, Branch selection, Dashboard (CP-05), Profile, laboratory logo</td><td>Wallet view, Support tickets, client audit log page</td><td><span class="pill ok">Built</span></td></tr>
+      <tr><td>Organization</td><td>Branches, Roles &amp; privileges (permissions, special rights, result rights per clinical group × branch), Users with overrides, Parameters</td><td>—</td><td><span class="pill ok">Built</span></td></tr>
+      <tr><td>Catalogue A / B</td><td>Clinical groups, Services (members, print alone, header), Tests (types, reference ranges by age and gender, list values with colour, formula, paragraphs, parent services), Service sequence, Sample types, Units, Preparations, Comment library, Doctors, Microbiology (drug types, commercial names, antibiotics, organisms, sensitivity values)</td><td>Patient conditions, Additional services, Diagnoses, Sending labs, Shortcut sets, Test rules, Reasons, Report templates (client pages; all are Release-1 pages on the admin portal)</td><td><span class="pill ok">Built</span></td></tr>
+      <tr><td>Pricing</td><td>Payers with contract tiers, Base price lists (per-service prices, effective dates, CSV), price lookup for registration, Price query (CP-12)</td><td>Contract pricing page (factors, per-service overrides, exclusions, alerts — backend complete)</td><td><span class="pill ok">Built</span></td></tr>
+      <tr><td>Patients</td><td>Patient register and file (demographics, Egyptian national-ID fill, documents, merge, similar-name check), VIP masking, identity lock by result status</td><td>—</td><td><span class="pill ok">Built</span></td></tr>
+      <tr><td>Registration</td><td>New registration desk (CP-06: patient + visit, service entry with typeahead, prices with patient / payer share, discount, preparations, payment on the page, labels, job order), Search registrations (CP-10) with row actions, visit edit, Price query</td><td>Home reservations, batches, transfers, cancellations register</td><td><span class="pill ok">Built</span></td></tr>
+      <tr><td>Samples</td><td>Auto-collect / auto-receive on save (decision A-03); samples dialog from the visit row</td><td>Collection, Samples by visit, Rejections, Tracking pages</td><td><span class="pill blue">Partial by decision</span></td></tr>
+      <tr><td>Results</td><td>Worklist (CP-18), Results by accession (CP-19: entry, review → verify with delta acknowledgement, amend, undo, comments, print, previous results, hidden-by-rights notes, previous / next visit)</td><td>Results by sample, Work queue, Quality control, analyser landing</td><td><span class="pill ok">Built</span></td></tr>
+      <tr><td>Billing &amp; Treasury</td><td>Payments register (CP-23) with refunds, Treasuries, Treasury access (device-bound requests, SoD with the administrator exception), collections report</td><td>Batch payment, Cash closing</td><td><span class="pill ok">Built</span></td></tr>
+      <tr><td>Reporting</td><td>Work amount report (eight groupings, CSV, report-days limit), dashboard KPIs</td><td>Claims, the sixteen financial reports</td><td><span class="pill blue">Partial by scope</span></td></tr>
+      <tr><td>Platform administration</td><td>Platform dashboard, Clients (source, status, reset password), Subscriptions &amp; wallets (plans, hourly charge run), Sessions, Audit log, Countries, Governorates, Platform parameters, Notification templates, Admin roles and users</td><td>Integration library (analyser models, PCR kits, code systems, rule templates), Support desk</td><td><span class="pill ok">Built</span></td></tr>
+      <tr><td>Integration &amp; Automation</td><td>—</td><td>Analysers, analyser tests and samples, site agents, PCR kits, verification settings, medical rules (backends and result intake built)</td><td><span class="pill grey">Release 2</span></td></tr>
+    </tbody>
+  </table>
+  <div class="bar" title="Business SRS pages by release">
+    <span style="width:51%;background:var(--ok)"></span><span style="width:49%;background:var(--line)"></span>
+  </div>
+  <p class="lead" style="font-size:13px">Business SRS pages: 45 of 89 are Release 1 (green) and delivered; the remaining 44 are Release 2 by the scope decision of LIS-RP-001, most of them with a finished backend.</p>
+</section>
+
+<section>
+  <h2>4. Platform foundations delivered</h2>
+  <div class="two">
+    <div class="box">
+      <h3>Security</h3>
+      <ul>
+        <li>Credential envelope (the browser seals passwords and codes with a per-request key), Argon2id hashing, ES256 access tokens of 15 minutes, encrypted subject identifiers.</li>
+        <li>Refresh-token rotation with reuse detection and family revocation, strict cookie scope, origin and CSRF checks, rate-limit matrix per endpoint.</li>
+        <li>Password policy and forced change, mobile numbers in E.164 and unique in every spelling, idle timeout per tenant, one identity per browser tab.</li>
+        <li>Start-up guards refuse a non-LIS database, foreign configuration keys and relaxed security in production.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h3>Audit and operations</h3>
+      <ul>
+        <li>Field-level change log, hash-chained audit trail per tenant with a verify-chain endpoint, security-event ledger; all append-only at database level.</li>
+        <li>Transactional outbox with a hosted processor, lease, back-off and dead letter; domain policies react to events (visit registered, sample collected, patients merged …).</li>
+        <li>Notifications over SMS gateway, SMTP or a pickup folder; templates editable on the admin portal with built-in fallback.</li>
+        <li>Windows service and IIS site installers, verified backups, restore drills, smoke test, runbook and installation records.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>5. Change requests delivered 13–14 October 2026</h2>
+  <p class="lead">Every request was specified against its intake, built with tests, released with notes and installed on the server the same day. Versions are those of the README release history.</p>
+  <table>
+    <thead><tr><th style="width:80px">Version</th><th style="width:100px">Date</th><th>Change</th><th style="width:120px">Installed</th></tr></thead>
+    <tbody>
+      <tr><td class="id">v0.9.0</td><td>2026-10-13</td><td><b>Change request of 13 October (four items).</b> Three new special rights (demographics editable up to a result status, treasury report of the whole branch, report time limit in days) on roles and per-user overrides; patient demographics editable from Search registrations with the identity lock by result status (<code>PAT-032</code>); treasury (collections) report on Payments by method, cashier or branch; the new <b>Work amount report</b> page under Finance with eight groupings, print and CSV; Results by accession criteria fold into a chip bar after a query.</td><td><span class="pill ok">2026-10-13</span></td></tr>
+      <tr><td class="id">v0.10.0</td><td>2026-10-13</td><td><b>Results by accession redesigned.</b> One sticky context strip replaces the header, the criteria card and the matching list once a visit is open; criteria in a dialog, matching visits in a side panel, unit tabs, sample chips and action buttons on one row. The first result row moves from about 470 px to about 110 px below the top bar; a single match opens at once with the cursor on the first editable cell.</td><td><span class="pill ok">2026-10-14</span></td></tr>
+      <tr><td class="id">v0.11.0</td><td>2026-10-13</td><td><b>Results by accession follow-ups.</b> Previous / next visit from the strip (and Ctrl+Alt+← / →) across the pages of the list or by accession number; hints folded behind the <i>i</i> button; <i>Compact rows</i> saved as a user preference (migration <code>MembershipResultsDensity</code>); the strip stays pinned on narrow screens.</td><td><span class="pill ok">2026-10-14</span></td></tr>
+      <tr><td class="id">v0.12.0</td><td>2026-10-14</td><td><b>Catalogue and rights.</b> Parent services on the test page (join or leave profiles and cultures under the service rules); Results by accession names the results a unit hides by result rights; new clinical groups are granted automatically to the roles that manage roles; review stack for browser checks beside the installed service.</td><td><span class="pill ok">2026-10-14</span></td></tr>
+      <tr><td class="id">v0.13.0</td><td>2026-10-14</td><td><b>Subscription wizard shows the verification code</b> (interim, until an SMS gateway is connected), controlled by the host setting <code>Lis:Notifications:RevealCodes</code>; the start-up guard refuses it once an SMS gateway is configured.</td><td><span class="pill ok">2026-10-14</span></td></tr>
+      <tr><td class="id">v0.14.0</td><td>2026-10-14</td><td><b>Treasury access: the laboratory's primary administrator approves their own request</b> (named exception of SOD-TRS-001). Everyone else keeps the segregation of duties; nobody can reject their own request. The session profile carries <code>isPrimaryAdministrator</code>.</td><td><span class="pill ok">2026-10-14</span></td></tr>
+      <tr><td class="id">v0.14.1</td><td>2026-10-14</td><td>Installation record of 0.14.0 (documentation only).</td><td><span class="pill grey">n/a</span></td></tr>
+      <tr><td class="id">v0.15.0</td><td>2026-10-19</td><td><b>Change request LIS-CR-003 — prototype v3 / v4.1 gaps</b> (<code>docs/build/CR-2026-10-19_Prototype-Gaps.md</code>, migration <code>PrototypeGaps</code>). Super Admin: client login logs (A1) and the location hierarchy governorate → city → district → area (A2). Client: second phone and location pick lists on the patient (C3), the Accession details page (C9), the menu change — treasuries, treasury access and payments reached from the pages that need them (C11), payment methods as set-up with a per-method reference rule (C10), service sequence reordering by drag / arrows / typed position inside a clinical-group filter (C18), payer contacts (C19), price list Excel download / upload, bulk adjustment and print (C21), the service prices page (C22). Six packages built in parallel build slots and integrated; gates: 106 architecture, 883 domain, 367 application, 149 integration, 156 functional, 1,061 frontend specs, lint, boundaries, production build; browser check of every new page on the review stack.</td><td><span class="pill warn">Release pending</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>6. Verification and quality</h2>
+  <div class="two">
+    <div class="box">
+      <h3>Automated gates (every release)</h3>
+      <table>
+        <thead><tr><th>Suite</th><th style="width:90px">Tests</th><th>Covers</th></tr></thead>
+        <tbody>
+          <tr><td>Domain unit tests</td><td class="num">795</td><td>Aggregates, state transitions, codes, segregation of duties</td></tr>
+          <tr><td>Architecture tests</td><td class="num">106</td><td>Layer rules, policy per request, atomic transitions, migration script, banned APIs</td></tr>
+          <tr><td>Application unit tests</td><td class="num">327</td><td>Handlers, validators, crypto primitives, configuration guard</td></tr>
+          <tr><td>Integration tests (PostgreSQL)</td><td class="num">142</td><td>Row-level security, interceptors, audit chain, outbox, migrations up and down</td></tr>
+          <tr><td>WebApi functional tests</td><td class="num">145</td><td>End-to-end flows per module through the HTTP edge and the database</td></tr>
+          <tr><td>Frontend specs (Vitest)</td><td class="num">973</td><td>Pages, facades, interceptors, session rules, UI kit</td></tr>
+          <tr><th>Total</th><th class="num">2,488</th><th>plus ESLint, boundary check and production build</th></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="box">
+      <h3>Validation campaigns and acceptance material</h3>
+      <ul>
+        <li><b>LIS-VR-001</b> (2026-10-11): first full validation — suites, every Release-1 page of both portals, public pages and the backend cycle from screen to database; defects fixed and re-tested, released as v0.4.0.</li>
+        <li><b>LIS-VR-002</b> (v0.5.0, 2026-10-11/12): second full validation with the verification of every fix — 32 defects (30 distinct) fixed with a test and re-tested in the browser and the database; 64 earlier items re-checked; released as v0.6.0.</li>
+        <li><b>LIS-UAT-001</b>: Release-1 acceptance scripts per persona (44 critical scripts dry-run, three rounds), with negative tests and the Arabic check.</li>
+        <li><b>Backend cycle</b> (<code>tests/validation/backend-cycle.mjs</code>): provisions a laboratory and drives registration → samples → results → payment against the deployed API with database assertions; run after every installation that touches the backend.</li>
+        <li>Each installation: clean build from the tagged worktree, dry-run of both installers, verified backup, migration check, smoke test by host name and by IP (20 / 20), rollback folders kept.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>7. Installed state</h2>
+  <div class="two">
+    <div class="box">
+      <h3>WIN-9S2KO4FA64L — production lane</h3>
+      <table>
+        <tbody>
+          <tr><th style="width:150px">Installed build</th><td><b>0.14.0</b> (2026-10-14); repository tip v0.14.1</td></tr>
+          <tr><th>API</th><td>Windows service <code>NTLIS</code>, <code>http://127.0.0.1:5100</code>, virtual service account</td></tr>
+          <tr><th>Site</th><td>IIS <code>lis-ui</code>, <code>https://WIN-9S2KO4FA64L</code> and <code>https://192.168.80.38:5443</code>, self-signed certificate</td></tr>
+          <tr><th>Database</th><td>PostgreSQL 17, private instance on 5433 as service <code>LIS_POSTGRES</code>; 15 of 15 migrations applied</td></tr>
+          <tr><th>Backups</th><td>daily scheduled task 02:00 to <code>E:\lis-backups</code>, verified dumps before every upgrade</td></tr>
+          <tr><th>Notifications</th><td>pickup folder only; <code>RevealCodes = true</code> while no SMS gateway is connected</td></tr>
+          <tr><th>Data</th><td>demo laboratory and validation data; primary administrator flagged for the demo laboratory</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="box">
+      <h3>Installation timeline</h3>
+      <ul class="timeline">
+        <li><span class="d">2026-10-10</span><span>0.3.2 first installation; 0.3.5 the same day</span></li>
+        <li><span class="d">2026-10-11</span><span>0.4.0 (validation fixes, first migration applied), 0.5.0 (registration desk), 0.5.1</span></li>
+        <li><span class="d">2026-10-12</span><span>0.5.2, 0.5.3, 0.6.0 (second validation fixes), 0.7.0 / 0.7.1 (laboratory brand), 0.7.2 (parameters page)</span></li>
+        <li><span class="d">2026-10-13</span><span>0.8.0 (idle timeout, report templates, notification delivery), 0.9.0 (change request of 13 October)</span></li>
+        <li><span class="d">2026-10-14</span><span>0.10.0, 0.11.0 (results page), 0.12.0, 0.13.0 / 0.13.1 (code on the subscribe page), 0.14.0 (treasury self-approval)</span></li>
+      </ul>
+      <p class="lead" style="font-size:13px">Nineteen installations in five days, each recorded in <code>docs/deploy/Installations.md</code> with build hash, backup, downtime window and smoke-test result. Typical API downtime per upgrade: about 20 seconds.</p>
+    </div>
+  </div>
+  <div class="note warn"><b>Not installed:</b> the test lane (<code>NTLIS_TEST</code>, <code>lis-ui-test</code>), an SMS / e-mail gateway, a trusted certificate and public host name, off-machine backup copies. These are the pilot prerequisites of LIS-RP-001 (Phase B).</div>
+</section>
+
+<section>
+  <h2>8. Open items carried from Release 1</h2>
+  <div class="two">
+    <div class="box">
+      <h3>Business decisions pending</h3>
+      <ul>
+        <li>Demographics edit limit, branch collections and report-days defaults for existing roles (Organization intake A14–A16).</li>
+        <li>Collections report scope and grouping defaults (Billing intake Q20–Q22); work amount report questions (Reporting intake Q12–Q18).</li>
+        <li>Treasury self-approval exception confirmed for the primary administrator only (Treasury intake §9) — implemented as decided on 2026-10-14.</li>
+        <li>VIP masking rule for users without <i>See VIP</i> (Patients Q8 / Registration Q12) — implemented as an assumption.</li>
+        <li>Phase-A decisions of LIS-RP-001 still open: public host name and certificate, master-data update policy, number formats, who prints.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h3>Engineering items parked</h3>
+      <ul>
+        <li>SMS gateway connection (then switch <code>RevealCodes</code> off in the same configuration change).</li>
+        <li>MFA / TOTP and step-up re-authentication; retention purge and other scheduled jobs beyond the wallet charge.</li>
+        <li>OpenAPI document and generated TypeScript client.</li>
+        <li>Release-2 pages: samples, contract pricing, bookings, batches, cash closing, claims and financial reports, quality control, integration and automation screens.</li>
+        <li>Data migration from LDM, load test and penetration test (LIS-RP-001 Phase B).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div class="part">
+  <div class="k">Part B</div>
+  <h2>Proposed changes — prototypes v3 / v4.1</h2>
+  <p>What the new prototypes propose beyond the ones Release 1 was built from, what the application already does, and what is left to decide and build.</p>
+</div>
+
+<section>
+  <h2>9. Method and scope of the comparison</h2>
+  <p>The two files supplied on 2026-10-18 are <b>supersets of the earlier prototypes</b>: the v3 client keeps everything v1 had and adds layers labelled v2, v2.1 and v3 (patches on the navigation, the dictionary and the pages); the v4.1 admin keeps the v2 screens and reworks the catalogue. The comparison therefore treats the <i>delta</i> as the proposal. Each prototype was inventoried structurally (navigation, pages, fields, buttons, grids, validation texts, dictionary patches), diffed against its predecessor, and every resulting proposal was checked against the built code — domain model, API contracts, routes and pages — not against documents.</p>
+  <div class="cards">
+    <div class="card"><div class="n">26</div><div class="l">client-portal proposals (C1–C26)</div></div>
+    <div class="card"><div class="n">10</div><div class="l">admin-portal proposals (A1–A10)</div></div>
+    <div class="card"><div class="n">0</div><div class="l">proposals that need a change of the stored data model</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>10. What the prototypes propose</h2>
+  <h3>10.1 Client Portal v3</h3>
+  <table>
+    <thead><tr><th style="width:190px">Area</th><th>Proposal (delta against v1)</th></tr></thead>
+    <tbody>
+      <tr><td>Terminology</td><td><i>Service</i> → <b>Test</b>; <i>Services / Packages</i> → <b>Profiles / Panels</b> (a profile contains tests, a panel contains profiles); <i>Payer</i> → <b>Contract</b>; <i>Contract</i> → <b>Relationship</b> (price list + patient share %); <i>Query service</i> → <i>Query test</i>.</td></tr>
+      <tr><td>Navigation</td><td>Added: Dashboard (insights), Accession details, Payment methods, Test price. <b>Removed:</b> Treasuries, Request treasury, Treasury requests, Search payments — payments handled inside registration / accession details.</td></tr>
+      <tr><td>Dashboard / Insights</td><td>Filters by registration date, contract and branch; KPIs (registrations, payments, active ordered items, unique patients, wallet); charts: daily registrations and payments, top-20 doctors and contracts, share / gender / paid-remaining / test-mix pies.</td></tr>
+      <tr><td>Registration</td><td>Patient block with second phone, e-mail, ID, insurance ID, address; contract → relationship selection; catalogue picker with LOINC search; patient and contract share per item; discount on the patient share; <b>several payments inside registration</b> with method and transaction number; payment summary with refund due; payment history; preparation answers on the page.</td></tr>
+      <tr><td>Accession details (new)</td><td>One page per accession: visit information, ordered tests, cancel a test with reason, collect sample with confirmation, enter a result, previous results, open payments.</td></tr>
+      <tr><td>Set-up</td><td>Payment methods (code, name, requires transaction no.); test configuration v2.1 (ranges by age, optional values with colour, formula check, culture set-up, aliases, <i>exists in profiles</i>); profiles / panels editor; global sequence by drag, arrows or typed position; contracts with a contact block (phone 1 / 2, WhatsApp, e-mail) and relationships; price lists with <b>Excel template / upload</b>, <b>bulk price adjustment</b> with rounding and print; Test price page; preparations with a default answer; grids with "in use → set inactive".</td></tr>
+    </tbody>
+  </table>
+  <h3>10.2 Super Admin Portal v4.1</h3>
+  <table>
+    <thead><tr><th style="width:190px">Area</th><th>Proposal (delta against v2)</th></tr></thead>
+    <tbody>
+      <tr><td>Navigation</td><td>Adds <b>Client login logs</b>; <i>Services</i> → <b>Profile / Panel</b>; global sequence of tests; <i>Export Excel</i> → <i>Export CSV</i>.</td></tr>
+      <tr><td>Client login logs</td><td>Per client user session: login / logout time (UTC), IP, computer / mobile, OS and browser, duration, status; filters and CSV.</td></tr>
+      <tr><td>Location set-up</td><td>Governorate → city → district → area, edited inside the governorate.</td></tr>
+      <tr><td>Countries</td><td>Flag as an uploaded image (JPG / PNG / SVG) beside dial code, currency, time zone and mobile length.</td></tr>
+      <tr><td>Dashboard</td><td>Operational period, KPIs, active / inactive clients donut, registrations by top laboratories, recent clients.</td></tr>
+      <tr><td>Catalogue</td><td>Tests configured as on the client v2.1; profile / panel editor with ordered members and type rules; drug types as dosage forms; commercial names carry a drug type.</td></tr>
+      <tr><td>Roles, users, clients</td><td>Screen privileges per role; admin users with country code and mobile; clients with source, reset password and activation; the main Super Admin protected.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>11. Difference against the developed application</h2>
+  <p class="lead">Status: <span class="pill ok">Built</span> exists as proposed · <span class="pill blue">Partial</span> part of it exists · <span class="pill violet">Different</span> exists with another model, name or place · <span class="pill bad">Not built</span> absent.</p>
+
+  <h3>11.1 Client portal (C1–C26)</h3>
+  <table>
+    <thead><tr><th style="width:46px">#</th><th style="width:26%">Prototype v3 proposal</th><th>Developed application (v0.14.1)</th><th style="width:92px">Status</th><th style="width:22%">Note</th></tr></thead>
+    <tbody>
+      <tr><td class="id">C1</td><td>Terminology: Test / Profile / Panel, Contract / Relationship</td><td>Service types Test, Profile, Package, Culture; a profile holds tests, a package holds services (rules CAT-021/022/027/036). Payer → contract tiers → contract pricing per base price list with patient / payer factors and per-service shares.</td><td><span class="pill violet">Different</span></td><td>Same structures, different names: Package ≈ Panel, Payer ≈ Contract, Contract tier ≈ Relationship. A dictionary and SRS change; the data model needs nothing.</td></tr>
+      <tr><td class="id">C2</td><td>Dashboard / Insights with period, contract and branch filters, top-20 lists, pies, test mix</td><td>CP-05 dashboard (registrations, collected today, samples received, pending / unverified / delayed, rejected, wallet, 7-day chart, recent activity, quick actions); Work amount report by day, payer, contract tier, user, doctor, clinical group, service or branch with CSV.</td><td><span class="pill blue">Partial</span></td><td>The numbers exist; the filterable insights page with ranked lists and pies is not built.</td></tr>
+      <tr><td class="id">C3</td><td>Registration: second phone, e-mail, ID, insurance ID, address on the patient block</td><td>Patient: names, gender, DOB / age, national ID, nationality, condition, mobile, e-mail, governorate, city, address, VIP; visit: insurance ID, treatment no.</td><td><span class="pill ok">Built</span></td><td>Delivered 2026-10-19 (LIS-CR-003): second phone on the patient (file, register, picker, similar check, CSV); location pick lists when the governorate has cities. Insurance ID stays on the visit (as in LDM).</td></tr>
+      <tr><td class="id">C4</td><td>Contract &amp; relationship selection; patient / contract share per item</td><td>CP-06: payer / contract chooser, service entry with typeahead, line prices with patient and payer share from the contract pricing.</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">C5</td><td>Discount as value or percentage on the patient share only</td><td>Visit discount as amount or percent, cap from the special right, reason; applied to the patient share.</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">C6</td><td>Several payments inside registration, method + transaction number when required, refund due, payment history</td><td>Registration takes one payment on the page (treasury approved for the device); further and partial payments and refunds on Payments (CP-23) by accession, with a reference field; refunds with reasons.</td><td><span class="pill violet">Different</span></td><td>The money flow is complete but split across Registration and Payments; the prototype folds it into the visit. Treasury / device approval (BR-27) has no counterpart in v3.</td></tr>
+      <tr><td class="id">C7</td><td>Result date = max test duration, no. of tests</td><td>Expected result per line from the test's duration and minimum duration; line count on the page.</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">C8</td><td>Continue to registration from Query test</td><td>CP-12 price query → registration.</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">C9</td><td>Accession details page: visit info, ordered tests, cancel with reason, collect sample, enter a result, previous results, payments</td><td>Search registrations row actions: edit, patient, samples, payments, documents, results, cancel services with reason; Results by accession (entry, review, verify, print, previous results); sample pages exist in the backend and the Release-2 menu.</td><td><span class="pill ok">Built</span></td><td>Delivered 2026-10-19 (LIS-CR-003): one Accession details page (search strip, header with the patient drawer, ordered tests with cancel, samples with label / collect, results status, payments and refunds, documents). Auto-collect stays on in Release 1, so <i>Collect</i> rarely shows (D-3).</td></tr>
+      <tr><td class="id">C10</td><td>Payment methods as set-up (code, name, requires transaction no.)</td><td>Fixed methods Cash, Card, POS, Transfer with an optional reference on every payment.</td><td><span class="pill ok">Built</span></td><td>Delivered 2026-10-19 (LIS-CR-003): tenant payment methods (code, names, kind, requires reference, order), seeded with the four defaults; the cash desk and the registration payment panel use them.</td></tr>
+      <tr><td class="id">C11</td><td>Treasuries, treasury requests and Search payments removed from the menu</td><td>Treasuries, Treasury access (device approval, SoD with the administrator exception), Payments register with the collections report.</td><td><span class="pill ok">Built</span></td><td>Followed on 2026-10-19 (LIS-CR-003) with the controls kept: Treasuries, Treasury access and Payments left the sidebar and are reached from the registration warning, each other, the accession page and the dashboard; BR-27 and the self-approval exception are unchanged (D-2).</td></tr>
+      <tr><td class="id">C12</td><td>Test types Numeric / Non-numeric / Optional list / Formatted text / Formula / Culture</td><td>Test types Numeric, Non-numeric, Optional list, Restricted list; formula expression on the test; culture through the Culture service type with organisms, antibiotics and sensitivity values; formatted text as paragraphs on results.</td><td><span class="pill ok">Built</span></td><td>Naming only (Restricted list ≈ optional list without free text).</td></tr>
+      <tr><td class="id">C13</td><td>Reference ranges by age (D/M/Y, inclusive), gender, normal and critical bounds, non-numeric comments</td><td>Range bands with age unit days / months / years, gender restriction, low / high, critical low / high, range resolver; reference text printed per range.</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">C14</td><td>Optional list values with colour, normal / critical flags, default</td><td>List values with value, normal, critical, default, placeholder and colour.</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">C15</td><td>Test short name, alias names, <i>Exists in profiles</i></td><td>Code, short name, LOINC, CPT, methodology; parent services on the test page (2026-10-14); aliases absent.</td><td><span class="pill blue">Partial</span></td><td>Alias names (search synonyms) are the only gap.</td></tr>
+      <tr><td class="id">C16</td><td>Duration (hours) and working days for the result date</td><td>Duration hours, minimum duration hours, test days (working days).</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">C17</td><td>Profiles / Panels editor: members, print alone, header, alias, LOINC unique</td><td>Services editor: members (tests / services) with sequence, print alone, report header, LOINC; type rules CAT-021/022/036.</td><td><span class="pill ok">Built</span></td><td>Panel ≈ Package.</td></tr>
+      <tr><td class="id">C18</td><td>Global sequence: drag / arrows / typed position, clinical-group filter</td><td>CP-42 service sequence: a sequence number typed per service, saved per row.</td><td><span class="pill ok">Built</span></td><td>Delivered 2026-10-19 (LIS-CR-003): drag and drop, ↑ / ↓, Alt+↑ / Alt+↓, typed position, clinical-group filter; the visible rows keep their own set of numbers.</td></tr>
+      <tr><td class="id">C19</td><td>Contracts: contact details (phone 1 / 2, WhatsApp, e-mail)</td><td>Payer: name, search key, web portal user, default flag, status; contract tiers; no contact block.</td><td><span class="pill ok">Built</span></td><td>Delivered 2026-10-19 (LIS-CR-003): phone 1 / 2, WhatsApp and e-mail on the payer, with CSV export.</td></tr>
+      <tr><td class="id">C20</td><td>Relationships with price list and patient share %</td><td>Contract pricing: priority, base price list, patient factor, payer factor, per-service overrides, exclusions, alert condition.</td><td><span class="pill ok">Built</span></td><td>Richer than the proposal.</td></tr>
+      <tr><td class="id">C21</td><td>Price lists: Excel template download / upload with validation, bulk adjustment with rounding, print</td><td>Base price lists with per-service prices, effective dates, CSV export.</td><td><span class="pill ok">Built</span></td><td>Delivered 2026-10-19 (LIS-CR-003): Excel download / validated all-or-nothing upload, bulk adjustment (amount / percent, rounding), printable list.</td></tr>
+      <tr><td class="id">C22</td><td>Test price page (which price lists price a test)</td><td>Price query by visit (CP-12); price list detail per list.</td><td><span class="pill ok">Built</span></td><td>Delivered 2026-10-19 (LIS-CR-003): Finance › Service prices — one service across the base price lists (editable inline) and the contract tiers.</td></tr>
+      <tr><td class="id">C23</td><td>Preparations: question types, ordered options with a default, assigned tests</td><td>Preparations with kinds Text, Yes / No, Option list, gender restriction, options, service assignment; answers captured at registration; no default option.</td><td><span class="pill blue">Partial</span></td><td>Small: a default answer per question.</td></tr>
+      <tr><td class="id">C24</td><td>Patient drawer: edit, visit history, open results / payments</td><td>Patient file (CP-11) with visits, documents, merge; patient drawer from the visits register (2026-10-13).</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">C25</td><td>Set-up grids: pagination, "in use → set inactive"</td><td>Master-data pages: server-side paging and sorting, deactivate instead of delete, read-only drawer without the edit right.</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">C26</td><td>Subscription wizard, OTP, branch choice, forgot password</td><td>CP-02 / CP-03 / CP-04 built; the OTP is shown on the page until an SMS gateway exists.</td><td><span class="pill ok">Built</span></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <h3>11.2 Super Admin portal (A1–A10)</h3>
+  <table>
+    <thead><tr><th style="width:46px">#</th><th style="width:26%">Prototype v4.1 proposal</th><th>Developed application (v0.14.1)</th><th style="width:92px">Status</th><th style="width:22%">Note</th></tr></thead>
+    <tbody>
+      <tr><td class="id">A1</td><td>Client login logs: login / logout times, IP, device, OS / browser, duration, filters, CSV</td><td>SA-08 Sessions: live sessions per client user with last seen, revoked at, IP address and user agent, revoke action; SA-09 audit log and the security-event ledger (sign-in, sign-out, refusals).</td><td><span class="pill ok">Built</span></td><td>Delivered 2026-10-19 (LIS-CR-003): history grid per session family with device / OS / browser parsed from the user agent, duration, status, filters and CSV.</td></tr>
+      <tr><td class="id">A2</td><td>Location set-up: governorate → city → district → area</td><td>Countries and governorates (with the mobile length per country); patients carry governorate, city (free text) and address.</td><td><span class="pill ok">Built</span></td><td>Delivered 2026-10-19 (LIS-CR-003): cities, districts and areas edited from the Governorates page; pick lists on the patient form (D-4 settled by the request). The client address stays free text.</td></tr>
+      <tr><td class="id">A3</td><td>Countries: dial code, currency, time zone, mobile length, flag image</td><td>Country: dial code, currency and code, language, time zone, mobile length, flag as text.</td><td><span class="pill ok">Built</span></td><td>Flag as an uploaded image instead of a code is a small change.</td></tr>
+      <tr><td class="id">A4</td><td>Dashboard with operational period, KPIs, clients donut, registrations by top labs, recent clients</td><td>SA-03 platform dashboard: period, client counts, admin users, activity totals, wallets at or below zero, plan distribution, registrations by client, recent clients.</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">A5</td><td>Roles with screen privileges; main Super Admin protected</td><td>SA-06 roles with catalogue permissions and special rights; primary administrator protected (TEN-012).</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">A6</td><td>Admin users with country code + mobile; privileges from the role only</td><td>SA-07: mobile in E.164 (unique), role, no overrides in the platform tenant.</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">A7</td><td>Clients grid with source, reset password, activation</td><td>SA-04 clients: source Subscription / Manual, status, reset client password, activate / deactivate, wallets and plans (SA-05).</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">A8</td><td>Profile / Panel catalogue, tests with configuration, global sequence of tests, aliases</td><td>SA-12 master data mirrors the client catalogue (services, tests with ranges / lists / formula, sequence, sample types, units, preparations, comments), copied to new laboratories.</td><td><span class="pill ok">Built</span></td><td>Aliases absent (as C15); naming as C1.</td></tr>
+      <tr><td class="id">A9</td><td>Drug types as dosage forms; commercial names with a drug type</td><td>SA-14 drug types, commercial names, antibiotics, organisms, sensitivity values.</td><td><span class="pill ok">Built</span></td><td></td></tr>
+      <tr><td class="id">A10</td><td>Export CSV on every grid</td><td>CSV export on every register (UTF-8 BOM, formula-safe).</td><td><span class="pill ok">Built</span></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <h3>11.3 Totals (after LIS-CR-003, 2026-10-19)</h3>
+  <table style="max-width:620px">
+    <thead><tr><th>Portal</th><th class="num">Built</th><th class="num">Partial</th><th class="num">Different</th><th class="num">Not built</th><th class="num">Total</th></tr></thead>
+    <tbody>
+      <tr><td>Client portal</td><td class="num">21</td><td class="num">3</td><td class="num">2</td><td class="num">0</td><td class="num">26</td></tr>
+      <tr><td>Super Admin portal</td><td class="num">10</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">10</td></tr>
+      <tr><th>Both</th><th class="num">31</th><th class="num">3</th><th class="num">2</th><th class="num">0</th><th class="num">36</th></tr>
+    </tbody>
+  </table>
+  <div class="bar" title="36 proposals by status">
+    <span style="width:86.1%;background:var(--ok)"></span><span style="width:8.3%;background:var(--blue)"></span><span style="width:5.6%;background:var(--violet)"></span>
+  </div>
+</section>
+
+<section>
+  <h2>12. Built, but absent from the prototypes</h2>
+  <p class="lead">The developed application covers the whole Release-1 scope of the Business SRS and a number of later decisions that the v3 / v4.1 prototypes do not show. Adopting the prototypes literally would remove them; the recommendation is to keep every item below.</p>
+  <div class="two">
+    <div class="box">
+      <ul>
+        <li><b>Treasury</b> (CP-28 / CP-29): treasuries per branch, device-bound access requests, approval with segregation of duties and the primary-administrator exception, revocation; cash accepted only on an approved treasury (BR-27).</li>
+        <li><b>Payments register and refunds</b> (CP-23), the <b>collections report</b> by method / cashier / branch with the branch right; cash closing (Release-2 backend).</li>
+        <li><b>Work amount report</b> with eight groupings, CSV and the per-user report-days limit.</li>
+        <li><b>Special rights</b> (discount cap, pay, refund, transfer, cancel, modify verified, preview unverified, print invoice, see VIP, demographics edit limit, branch collections, report days) and <b>result rights</b> per clinical group × branch.</li>
+        <li><b>Patient identity lock</b> by result status and VIP masking.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <ul>
+        <li><b>Results by accession</b> as built: sticky context strip, criteria dialog, matching-visits panel, previous / next visit, review → verify with delta acknowledgement, amend with reason, undo, comments and internal notes, print lists, report templates with logo and signature, hidden-by-rights notes.</li>
+        <li><b>Audit</b>: field changes, hash-chained audit trail, security events, verify-chain endpoint, audit log pages.</li>
+        <li><b>Platform</b>: subscriptions and wallets (plans, charge run), notification templates, platform parameters, sessions, 26 tenant settings including time zone and session timeout.</li>
+        <li><b>Security</b>: credential envelope, refresh-token rotation with reuse detection, idle timeout, password policy, mobile uniqueness, rate limits, row-level security per tenant.</li>
+        <li><b>Catalogue extras and Release-2 backends</b>: patient conditions, reasons, diagnoses, additional services, report templates, test rules, shortcut sets, sending labs, doctors; analysers, site agents, PCR kits, verification settings, medical rules.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>13. Decisions for the business owner</h2>
+  <p class="lead">Four decisions preceded the work on the proposals. D-2, D-3 and D-4 were settled on 2026-10-19 by the request to build C9 / C11, C9 and A2 (recorded in the rows below); D-1 stays open.</p>
+  <table>
+    <thead><tr><th style="width:60px">Id</th><th style="width:22%">Decision</th><th>Question</th><th>Recommendation</th></tr></thead>
+    <tbody>
+      <tr><td class="id">D-1</td><td>Terminology</td><td>Adopt the v3 words — Test / Profile / Panel, Contract / Relationship, Global sequence, Query test — in both portals? Dictionary, SRS and intake wording change only; the stored model stays.</td><td>Decide once for both portals. LDM-trained users know <i>Service / Package / Payer</i>; a rename costs little but must be complete (screens, documents, training).</td></tr>
+      <tr><td class="id">D-2</td><td>Payments inside the visit vs. the Payments page</td><td>The prototype removes <i>Search payments</i> and the treasury pages and folds payments into registration / accession details.</td><td>Keep the Payments register and the treasury controls (BR-27 and the self-approval decided on 2026-10-14). Optionally show the visit's payment history on the registration edit page. <b>Settled 2026-10-19:</b> the controls stay; the pages left the sidebar and are reached from the accession page and the pages that need them (C11).</td></tr>
+      <tr><td class="id">D-3</td><td>Sample collection in the client portal</td><td>The prototype confirms collection per visit; Release 1 runs with auto-collect / auto-receive on (decision A-03).</td><td>Keep as decided (Release 2) unless the pilot laboratory needs manual collection. <b>Settled 2026-10-19:</b> auto-collect stays on; the accession page offers <i>Collect</i> only for a sample still Ordered (C9).</td></tr>
+      <tr><td class="id">D-4</td><td>Location hierarchy</td><td>City → district → area as new master data with pick lists, or keep free-text city and address?</td><td>Pick lists only if the pilot's reporting needs them; otherwise keep free text and revisit with the claims module. <b>Settled 2026-10-19:</b> pick lists on the patient when the governorate has cities, free text otherwise; the client address stays free text (A2).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>14. Candidate changes by size</h2>
+  <p class="lead">Sizes are relative to the delivered change requests (a <i>small</i> item is of the order of the treasury self-approval of v0.14.0; a <i>medium</i> item of the order of the work amount report of v0.9.0). Durations are indicative engineering effort including tests, release and installation, and assume the decisions above.</p>
+  <table>
+    <thead><tr><th style="width:80px">Size</th><th>Change</th><th style="width:90px">Ref.</th><th style="width:120px">Indicative effort</th><th style="width:110px">Depends on</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill ok">Small</span></td><td><b>Delivered 2026-10-19 (LIS-CR-003).</b> Payment methods per tenant with <i>requires reference</i> (or a mandatory reference for Card / POS / Transfer)</td><td class="id">C10</td><td>1–2 days</td><td>—</td></tr>
+      <tr><td><span class="pill ok">Small</span></td><td><b>Delivered 2026-10-19 (LIS-CR-003).</b> Contact block on the payer (phone 1 / 2, WhatsApp, e-mail)</td><td class="id">C19</td><td>1 day</td><td>D-1 (naming)</td></tr>
+      <tr><td><span class="pill ok">Small</span></td><td>Alias names on tests (search synonyms, used by the service entry typeahead)</td><td class="id">C15, A8</td><td>1–2 days</td><td>—</td></tr>
+      <tr><td><span class="pill ok">Small</span></td><td><b>Delivered 2026-10-19 (LIS-CR-003) for C3; A3 (flag image) stays open.</b> Second phone on the patient; flag image on the country</td><td class="id">C3, A3</td><td>1–2 days</td><td>—</td></tr>
+      <tr><td><span class="pill ok">Small</span></td><td><b>Delivered 2026-10-19 (LIS-CR-003).</b> Test price view: one service across every price list, with edit</td><td class="id">C22</td><td>1–2 days</td><td>—</td></tr>
+      <tr><td><span class="pill ok">Small</span></td><td>Default answer per preparation question</td><td class="id">C23</td><td>½ day</td><td>—</td></tr>
+      <tr><td><span class="pill ok">Small</span></td><td>Terminology rename of both portals and the documents (if D-1 says yes)</td><td class="id">C1, A8</td><td>2–3 days</td><td>D-1</td></tr>
+      <tr><td><span class="pill warn">Medium</span></td><td><b>Delivered 2026-10-19 (LIS-CR-003).</b> Price list Excel import (validated, row-level messages) and bulk adjustment with rounding; printable price list</td><td class="id">C21</td><td>1–2 weeks</td><td>—</td></tr>
+      <tr><td><span class="pill warn">Medium</span></td><td>Insights dashboard: period / contract / branch filters, top-20 doctors and contracts, share / gender / paid-remaining / test-mix charts (data already served by the work amount report)</td><td class="id">C2</td><td>1–2 weeks</td><td>—</td></tr>
+      <tr><td><span class="pill warn">Medium</span></td><td><b>Delivered 2026-10-19 (LIS-CR-003).</b> Client login history grid (device from the user agent, duration, filters, CSV) over the stored sessions and security events</td><td class="id">A1</td><td>1 week</td><td>—</td></tr>
+      <tr><td><span class="pill warn">Medium</span></td><td><b>Delivered 2026-10-19 (LIS-CR-003).</b> Location hierarchy master data and address pick lists on patient and client</td><td class="id">A2</td><td>1–2 weeks</td><td>D-4</td></tr>
+      <tr><td><span class="pill warn">Medium</span></td><td><b>Delivered 2026-10-19 (LIS-CR-003).</b> Global sequence: drag-and-drop and move up / down, reordering within a clinical-group filter</td><td class="id">C18</td><td>1 week</td><td>—</td></tr>
+      <tr><td><span class="pill warn">Medium</span></td><td>Payment history and further payments on the registration edit page (keeping the Payments register)</td><td class="id">C6</td><td>1 week</td><td>D-2</td></tr>
+      <tr><td><span class="pill bad">Large</span></td><td><b>Delivered 2026-10-19 (LIS-CR-003).</b> Accession details as one page (visit, lines, cancel, collection, results, payments) — mostly a consolidation of existing pages; sample collection is a scope decision</td><td class="id">C9</td><td>2–3 weeks</td><td>D-2, D-3</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>Not recommended:</b> removing Treasuries, Treasury access and Search payments from the client menu (C11). They implement BR-27 and the decision of 2026-10-14, and the collections report depends on the Payments register.</div>
+</section>
+
+<section>
+  <h2>15. Suggested way forward</h2>
+  <table>
+    <thead><tr><th style="width:90px">Step</th><th>Content</th><th style="width:150px">Outcome</th></tr></thead>
+    <tbody>
+      <tr><td class="id">1</td><td>Business owner takes decisions D-1 … D-4 (one review session with this document and the difference analysis).</td><td>Scope of the change set fixed</td></tr>
+      <tr><td class="id">2</td><td>Small items as one change request (C10, C19, C15, C3 / A3, C22, C23, and the rename if decided), released and installed together.</td><td>About one week; one release</td></tr>
+      <tr><td class="id">3</td><td>Medium items in priority order chosen by the business — suggested: Excel import and bulk adjustment (C21), insights dashboard (C2), login history (A1), then sequence reordering (C18), payment history on the visit (C6), location hierarchy (A2) if D-4 says yes.</td><td>Each its own release, 1–2 weeks apart</td></tr>
+      <tr><td class="id">4</td><td>Accession details page (C9) after D-2 and D-3, or deferred to Release 2 with the sample pages.</td><td>Decision-dependent</td></tr>
+      <tr><td class="id">✓</td><td><b>Done 2026-10-19:</b> steps 2–4 were delivered together as LIS-CR-003 for A1, A2, C3, C9, C10, C11, C18, C19, C21 and C22 (release v0.15.0 pending); still open from the plan: C2 insights dashboard, C6 payment history on the visit, C15, C23, A3 and the rename (D-1).</td><td>One release</td></tr>
+      <tr><td class="id">—</td><td>In parallel and independent of the prototypes: SMS gateway (then <code>RevealCodes</code> off), trusted certificate and host name, test lane, the Phase-A decisions of LIS-RP-001.</td><td>Pilot prerequisites</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  LIS-DS-001 v1.1 · 2026-10-19 · Prepared by the development team of Sky LIS for National Technology. Facts in Part A come from the repository (release history, installation records, module map, test suites); facts in Part B from the structural comparison of the supplied prototypes against the built code. Every status in section 11 was checked against the domain model, contracts, routes and pages of v0.14.1. Efforts in section 14 are indicative and exclude business review time.
+</footer>
+
+</div>
+</body>
+</html>

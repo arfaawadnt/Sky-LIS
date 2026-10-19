@@ -15,7 +15,7 @@ namespace Platform.Application.Billing.Commands;
 /// right <c>CanRefund</c> (BIL-041, intake Q1).
 /// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Approve)]
-public sealed record RecordRefundCommand(Guid VisitId, decimal Amount, string Method, string? Reference, Guid ReasonId, string? Note, Guid TreasuryId, string DeviceId) : ICommand<RefundCreated>;
+public sealed record RecordRefundCommand(Guid VisitId, decimal Amount, string Method, string? Reference, Guid ReasonId, string? Note, Guid TreasuryId, string DeviceId, string? MethodCode = null) : ICommand<RefundCreated>;
 
 public sealed class RecordRefundValidator : AbstractValidator<RecordRefundCommand>
 {
@@ -23,6 +23,7 @@ public sealed class RecordRefundValidator : AbstractValidator<RecordRefundComman
     {
         RuleFor(command => command.VisitId).NotEmpty();
         RuleFor(command => command.Method).NotEmpty().IsEnumName(typeof(PaymentMethod), caseSensitive: false);
+        RuleFor(command => command.MethodCode).MaximumLength(Payment.MaxMethodCodeLength);
         RuleFor(command => command.Reference).MaximumLength(Payment.MaxReferenceLength);
         RuleFor(command => command.ReasonId).NotEmpty();
         RuleFor(command => command.Note).MaximumLength(Refund.MaxNoteLength);
@@ -35,6 +36,7 @@ public sealed class RecordRefundHandler(
     IBillableVisitLookup visits,
     ITreasuryStationLookup stations,
     IRefundReasonLookup reasons,
+    IPaymentMethodRepository methods,
     IVisitAccountRepository accounts,
     IReferenceNumbers numbers,
     IUnitOfWork unitOfWork,
@@ -49,7 +51,7 @@ public sealed class RecordRefundHandler(
         var branch = BranchScope.Require(user);
         var visit = await visits.GetAsync(command.VisitId, cancellationToken) ?? throw BillingNotFound.Visit();
         var station = await BillingStations.ResolveAsync(stations, command.TreasuryId, actor, command.DeviceId, branch, cancellationToken);
-        var method = BillingNames.Method(command.Method);
+        var method = await BillingMethods.ResolveAsync(methods, command.Method, command.MethodCode, cancellationToken);
         if (command.ReasonId != Guid.Empty && await reasons.GetActiveAsync(command.ReasonId, cancellationToken) is null)
         {
             throw new DomainException(BillingCodes.RefundReasonInvalid, "Choose an active reason of kind Refund.", DomainFault.Validation);

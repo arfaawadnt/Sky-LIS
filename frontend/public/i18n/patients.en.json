@@ -205,5 +205,14 @@
   "nationalId.field.governorate": "governorate",
   "nationalId.birthDiffers": "The national ID gives the date of birth {date}; the date entered differs.",
   "nationalId.genderDiffers": "The national ID belongs to a {gender} patient; the gender chosen differs.",
-  "nationalId.titleDiffers": "The national ID belongs to a {gender} patient; check the title."
+  "nationalId.titleDiffers": "The national ID belongs to a {gender} patient; check the title.",
+  "field.secondPhone": "Second phone",
+  "hint.secondPhone": "Optional: another number the patient can be reached on.",
+  "field.district": "District",
+  "field.area": "Area",
+  "column.secondPhone": "Second phone",
+  "error.PAT-014": "The city does not belong to the chosen governorate.",
+  "error.PAT-015": "The district does not belong to the chosen city.",
+  "error.PAT-016": "The area does not belong to the chosen district.",
+  "error.PAT-017": "Check the second phone: digits only, up to 16."
 }

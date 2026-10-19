@@ -1,4 +1,6 @@
 <app-page-header [title]="i18n.t('treasury.title')" [subtitle]="i18n.t('treasury.subtitle')">
+  <!-- C11 (change request 2026-10-19): the treasury catalogue left the menu; managers reach it from here -->
+  <a pageActions class="btn ghost" *appCan="permissions.manage" routerLink="/treasury/treasuries"><app-icon name="vault" [size]="15" />{{ i18n.t('treasury.catalogue.title') }}</a>
   <button pageActions type="button" class="btn ghost" (click)="facade.refresh()"><app-icon name="refresh" [size]="15" />{{ i18n.t('treasury.refresh') }}</button>
   <app-treasury-export-button pageActions ngProjectAs="[pageActions]" *appCan="permissions.export" [exporter]="exportCsv" />
 </app-page-header>

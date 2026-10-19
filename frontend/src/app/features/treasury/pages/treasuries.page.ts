@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { ORGANIZATION_PERMISSIONS } from '../../../core/api/organization.contracts';
 import { type CreateTreasuryRequest, TREASURY_PERMISSIONS, type TreasuryListItem } from '../../../core/api/treasury.contracts';
@@ -21,16 +22,18 @@ import { TreasuryExportButtonComponent } from '../ui/export-button.component';
  */
 @Component({
   selector: 'app-treasuries-page',
-  imports: [MasterDataPageComponent, CanDirective, TreasuryExportButtonComponent],
+  imports: [RouterLink, MasterDataPageComponent, CanDirective, TreasuryExportButtonComponent],
   template: `
     <app-master-data-page [config]="config">
+      <!-- C11 (change request 2026-10-19): the page is reached from Treasury access, which it links back to -->
+      <a pageActions ngProjectAs="[pageActions]" class="btn ghost" routerLink="/treasury/access">{{ i18n.t('treasury.title') }}</a>
       <app-treasury-export-button pageActions ngProjectAs="[pageActions]" *appCan="permissions.export" [exporter]="exportCsv" />
     </app-master-data-page>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TreasuriesPage {
-  private readonly i18n = inject(I18nService);
+  protected readonly i18n = inject(I18nService);
   private readonly api = inject(TreasuryApi);
   private readonly access = inject(PermissionsService);
 

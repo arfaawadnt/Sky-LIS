@@ -4,7 +4,7 @@ import type { CollectionsReportDocument, CollectionsReportRequest, PaymentCreate
 import type { PageRequest } from '../../../core/api/paging';
 import { mutation } from '../../../core/state/mutation';
 import { BillingApi, type DownloadedFile } from '../data/billing.api';
-import type { MovementInput } from '../ui/movement-form.component';
+import { type MovementInput, methodCodeOf } from '../ui/movement-form.component';
 import { CashDeskFacade } from './cash-desk.facade';
 
 /** How a page asks for a visit account: by accession (the search box) or by id (a link from Registration, BR-26). */
@@ -32,7 +32,7 @@ export class PaymentsFacade {
 
   readonly pay = mutation(
     (input: MovementInput & { readonly visitId: string }): Promise<PaymentCreated> =>
-      this.api.recordPayment({ visitId: input.visitId, amount: input.amount, method: input.method, reference: input.reference, treasuryId: input.treasuryId, deviceId: this.desk.deviceId() }),
+      this.api.recordPayment({ visitId: input.visitId, amount: input.amount, method: input.method, ...methodCodeOf(input), reference: input.reference, treasuryId: input.treasuryId, deviceId: this.desk.deviceId() }),
     { then: () => this.refresh() },
   );
 

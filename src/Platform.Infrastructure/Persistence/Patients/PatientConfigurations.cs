@@ -37,6 +37,7 @@ internal sealed class PatientConfiguration : IEntityTypeConfiguration<Patient>
         builder.Property(patient => patient.Gender).IsRequired();
         builder.Property(patient => patient.RegisteredOn).IsRequired();
         builder.Property(patient => patient.Mobile).HasMaxLength(Patient.MaxMobileLength);
+        builder.Property(patient => patient.SecondPhone).HasMaxLength(Patient.MaxMobileLength);   // C3 (change request 2026-10-19); city_id / district_id / area_id reference saas rows without a FK (A2)
         builder.Property(patient => patient.NationalId).HasMaxLength(Patient.MaxNationalIdLength);
         builder.Property(patient => patient.Nationality).HasMaxLength(Patient.MaxNationalityLength);
         builder.Property(patient => patient.Email).HasMaxLength(Patient.MaxEmailLength);
@@ -50,6 +51,7 @@ internal sealed class PatientConfiguration : IEntityTypeConfiguration<Patient>
         builder.HasOne<Patient>().WithMany().HasForeignKey(patient => new { patient.TenantId, patient.MergedIntoPatientId }).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(patient => new { patient.TenantId, patient.Mobile });
+        builder.HasIndex(patient => new { patient.TenantId, patient.SecondPhone });
         builder.HasIndex(patient => new { patient.TenantId, patient.NationalId });
         builder.HasIndex(patient => new { patient.TenantId, patient.NameKey });
         builder.HasIndex(patient => new { patient.TenantId, patient.Status });

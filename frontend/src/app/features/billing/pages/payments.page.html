@@ -49,6 +49,7 @@
           } @else {
             <app-billing-movement-form
               [treasuries]="desk.approved()"
+              [methods]="desk.methodOptions()"
               [(treasuryId)]="desk.treasuryId"
               [dueAmount]="account.remaining"
               [currency]="account.currency"
@@ -62,7 +63,7 @@
 
         <app-section-card class="list-card" [title]="i18n.t('billing.account.payments')" [padded]="false">
           <app-data-table [columns]="visitColumns" [rows]="account.payments" [interactive]="false" [compact]="true" [emptyTitle]="i18n.t('billing.account.noPayments')" [caption]="i18n.t('billing.account.payments')">
-            <ng-template appCell="method" [appCellOf]="account.payments" let-row>{{ methodLabel(row.method) }}</ng-template>
+            <ng-template appCell="method" [appCellOf]="account.payments" let-row>{{ movementMethod(row) }}</ng-template>
             <ng-template appCell="status" [appCellOf]="account.payments" let-row>
               <app-badge [tone]="tone(row.status)">{{ statusLabel(row.status) }}</app-badge>
             </ng-template>
@@ -81,7 +82,7 @@
                 <li>
                   <span class="mono">{{ refund.number }}</span>
                   <span>{{ money(refund.amount) }}</span>
-                  <span class="muted">{{ methodLabel(refund.method) }}</span>
+                  <span class="muted">{{ movementMethod(refund) }}</span>
                 </li>
               }
             </ul>
@@ -160,7 +161,7 @@
     }
 
     <app-data-table [columns]="registerColumns" [rows]="registerRows()" [loading]="facade.register.isLoading()" [interactive]="false" [emptyTitle]="i18n.t('billing.payments.empty')" [caption]="i18n.t('billing.payments.title')">
-      <ng-template appCell="method" [appCellOf]="registerRows()" let-row>{{ methodLabel(row.method) }}</ng-template>
+      <ng-template appCell="method" [appCellOf]="registerRows()" let-row>{{ movementMethod(row) }}</ng-template>
       <ng-template appCell="status" [appCellOf]="registerRows()" let-row>
         <app-badge [tone]="tone(row.status)">{{ statusLabel(row.status) }}</app-badge>
       </ng-template>

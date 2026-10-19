@@ -7,7 +7,7 @@
 | Business rules / workflow | BR-06 Contract sets the price, BR-07 Three-layer pricing; WF-10 Pricing maintenance and claims (pricing steps); BR-04 as cited by CP-34 (patient share + payer share per service) |
 | Domain reference | LDM synthesis `docs/knowledge/ldm/LDM_Business_Knowledge.md` §2.4 (Rank/Relative), §7.1 (three-layer pricing: `Main Price List`, `Price Lists`/`Rank Fees`, `Client Price List`, `Client Copy`), §7.2 (`Query`), §7.3 (`Print Client Fees`) — LDM manual ch. 10 §10.2–10.7 |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001) and the prototypes. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.0 — 2026-10-09 |
+| Version | 1.1 — 2026-10-19 (change request LIS-CR-003: §19 payer contacts, price list tools, service prices) |
 | Implemented in | `src/Platform.Domain/Pricing`, `src/Platform.Contracts/Pricing`, `src/Platform.Application/Pricing`, `src/Platform.Infrastructure/Persistence/Pricing`, `src/Platform.WebApi/Controllers/Pricing`, `frontend/src/app/features/pricing`, `frontend/src/app/core/api/pricing.contracts.ts`, `frontend/public/i18n/pricing.{en,ar}.json` |
 
 ## 1. Purpose and policy basis
@@ -405,3 +405,58 @@ drawer + "contract pricing" row action), `base-price-lists` (CP-33 register + co
 (CP-33 price grid: inline price and active flag, typeahead with Enter, Ctrl+S, apply, copy, activation, CSV, leave guard),
 `contract-pricing` and `contract-pricing/:tierId` (CP-34: payer/tier picker, formula, Apply, derived grid with negotiate /
 restore / alert, copy from tier, printable review report, CSV).
+
+## 19. Change request 2026-10-19 — LIS-CR-003 package P-PRC (C19 payer contacts, C21 price list tools, C22 service prices)
+
+Source: `docs/build/CR-2026-10-19_Prototype-Gaps.md` §7 (prototype gaps found when the client v3 / admin v4.1 prototypes were compared with
+the application as installed, LIS-DS-001). Compatibility: the installed server runs 0.14.0 with real data; every new column is nullable,
+every existing request shape keeps working (the new fields are optional), and no existing endpoint changed its answer except for the
+added fields of `PayerListItem`.
+
+### 19.1 What changes
+
+| Item | Change |
+| --- | --- |
+| C19 Payer contacts | `Payer` gains the office contacts `Phone1`, `Phone2`, `WhatsApp` (optional, ≤ 32 characters: digits, spaces, `+ - ( )`, at least one digit; inner whitespace collapsed) and `Email` (optional, ≤ 254, basic shape: one `@`, a dotted domain, no spaces), held in the value `PayerContacts` and cleaned on create and update. Columns `phone1`, `phone2`, `whatsapp`, `email` on `app.payers` (nullable; existing rows keep NULL). `Create/UpdatePayerRequest` and `PayerListItem`/detail carry them; the payers page form has a *Contact* block (phones and e-mail with the server's patterns as hints) and the CSV export four more columns. A change of the contacts alone is a `PayerUpdated` event (audit trail). |
+| C21 Download Excel | The SPA builds an `.xlsx` with `exceljs` (loaded on demand) holding the list's lines: `Code`, `Name`, `Current price`, `New price` (empty), sheet named after the list code. Permission `pricing.export`, like the CSV. |
+| C21 Upload Excel | The SPA parses the chosen `.xlsx` (first sheet; the header row is the first of the first ten rows holding a `Code` cell and a `New price` or `Price` cell, matched case-insensitively, Arabic headers accepted) into rows `{ row, serviceCode, price }` and posts them as a **dry run** first; the dialog lists the refused rows (sheet row, code, reason) and offers *Apply* only when every row passed. `ImportPriceLinesCommand(listId, rows, dryRun)` [`pricing.edit`] checks every row — `PRC-041` no code, `PRC-015` unknown code, `PRC-006` price missing or invalid, `PRC-016` code repeated — and answers `ImportPriceLinesResult(accepted, added, changed, applied, errors[])`; with any error nothing is written (all-or-nothing); without errors and `dryRun = false` the rows are upserted through `BasePriceList.UpsertLines` in one save (existing lines keep their active flag, new lines are active). Codes compare trimmed and upper-case. At most 2 000 rows per call. |
+| C21 Bulk adjust | `AdjustBasePriceListCommand(listId, mode Amount|Percent, value, rounding None|Whole|Nearest5|Nearest10, serviceIds?, preview)` [`pricing.edit`]: `PriceMath.Adjust` prices every line (or the scope) `+ amount` or `× (1 + percent / 100)`, rounds as asked (half away from zero), holds a negative result at 0 and reports it (`clamped`); the answer carries the rows `{ serviceId, code, name, oldPrice, newPrice, clamped }`, `changed`, `clamped`, `applied`. `preview = true` computes without writing; otherwise the changed rows are upserted in one save. Refusals: `PRC-044` adjustment outside the bounds (percent −100…1 000, amount within ±99 999 999.99, two decimals), `PRC-045` a scope id the list does not hold, `PRC-046` a result above the maximum price (refused, never capped silently). The dialog offers mode, value, rounding, scope (every line or the rows of the grid's filter), *Preview* table, *Apply*. |
+| C21 Print | `ui/documents/price-list-document.component.ts` on `shared/print` (A4 portrait): list code, name, year, status, every stored line (code, name, price, active at ordering) in code order, line count, printed by / at. Unsaved edits are not printed. |
+| C22 Service prices | `GET /api/v1/pricing/service-prices/{serviceId}` [`pricing.view`] → `ServicePricesView(serviceId, code, nameEn, nameAr, type, isActive, currency, basePrices[{ listId, listCode, listNameEn/Ar, year, listActive, price, lineActive }], contractPrices[{ tierId, payerId, payerNameEn/Ar, tierNameEn/Ar, listPrice, patientPrice, payerPrice, isExcluded, sourceListCode, tierActive, payerActive, inEffect }])` through the read port `IServicePricesReader` (the service by raw SQL on `app.services`, the module's own tables by EF; `PRC-408` when the service is not the tenant's). Page `/pricing/service-prices` (CP-33b): the catalogue picker, the two tables, inline edit of a base price (`PUT …/base-price-lists/{id}/lines` with one line, `pricing.edit`, Enter saves, Escape discards), a link to each list's editor; the chosen service travels in `?serviceId=`. Nav entry client · Finance · `pricing.view`. |
+
+The editor's tools refuse to open while the grid holds unsaved prices (save or discard first), so a dry run never races a pending save.
+None of the tools re-prices a contract: Apply to contracts stays the explicit, confirmed action (BR-07).
+
+### 19.2 New codes
+
+| Code | Meaning | Fault |
+| --- | --- | --- |
+| `PRC-017` | Phone / WhatsApp number malformed (digits, spaces, `+ - ( )`, ≤ 32, at least one digit) | Validation |
+| `PRC-018` | E-mail without the basic shape or longer than 254 | Validation |
+| `PRC-041` | Imported row without a service code | row error of the import answer |
+| `PRC-044` | Adjustment outside the bounds | Validation |
+| `PRC-045` | A scope id the list does not hold | Validation |
+| `PRC-046` | Adjusted price above 99 999 999.99 | Validation |
+| `PRC-408` | Service not found (service prices) | NotFound |
+
+Row errors of the import reuse `PRC-015` (unknown code), `PRC-006` (price missing or invalid) and `PRC-016` (code repeated).
+
+### 19.3 New endpoints
+
+| Method and path | Request | Permission |
+| --- | --- | --- |
+| `POST /api/v1/pricing/base-price-lists/{id}/import` | `ImportPriceLinesRequest(rows[{ row, serviceCode, price }], dryRun)` → `ImportPriceLinesResult` | edit |
+| `POST /api/v1/pricing/base-price-lists/{id}/adjust` | `AdjustBasePriceListRequest(mode, value, rounding, serviceIds?, preview)` → `AdjustBasePriceListResult` | edit |
+| `GET /api/v1/pricing/service-prices/{serviceId}` | — → `ServicePricesView` | view |
+
+`POST /api/v1/pricing/payers` and `PUT …/{id}` take the optional `phone1`, `phone2`, `whatsApp`, `email`.
+
+### 19.4 Open questions and the assumptions built on
+
+| # | Question | Assumption built on |
+| --- | --- | --- |
+| Q23 | Should the phone numbers be normalised to E.164 like user mobiles? | No: payer office numbers are free-form (extensions, local formats); they are stored as typed after cleaning, and never dialled by the system. |
+| Q24 | Should the Excel upload also take the active flag per line? | No: the sheet carries the price only; existing lines keep their flag, new lines are active (the grid changes flags). |
+| Q25 | Should a bulk adjustment that would exceed the maximum price cap the price? | No: it is refused (`PRC-046`) so a wrong percentage is noticed; the user narrows the scope or the value. |
+| Q26 | Should the service prices page let the user edit a contract price (negotiate) inline? | No: contract pricing is Release 2; the page shows the derived prices read-only and links to the tier when CP-34 is in scope. |
+| Q27 | Which laboratory name goes on the printed price list? | The same texts as the contract review document (`pricing.review.labName*`) until the print kit takes the laboratory brand. |

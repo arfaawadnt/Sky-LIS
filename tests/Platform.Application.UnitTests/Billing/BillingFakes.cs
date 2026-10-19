@@ -40,6 +40,9 @@ internal sealed class BillingWorld
 
     public FakeReasons Reasons { get; } = new();
 
+    /// <summary>The laboratory's payment method definitions (change request 2026-10-19); empty = every request uses the legacy kind rule.</summary>
+    public InMemoryPaymentMethods Methods { get; } = new();
+
     public FakeDirectory Directory { get; } = new();
 
     public CountingNumbers Numbers { get; } = new();
@@ -235,6 +238,43 @@ internal sealed class FakeReasons : IRefundReasonLookup
 
     public Task<IReadOnlyDictionary<Guid, RefundReasonView>> GetManyAsync(IReadOnlyCollection<Guid> reasonIds, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyDictionary<Guid, RefundReasonView>>(reasonIds.Where(Active.Contains).ToDictionary(id => id, id => new RefundReasonView(id, "Overpayment", "مبلغ زائد")));
+}
+
+internal sealed class InMemoryPaymentMethods : IPaymentMethodRepository
+{
+    public List<PaymentMethodDefinition> Items { get; } = [];
+
+    public Task<PaymentMethodDefinition?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(Items.FirstOrDefault(method => method.Id == id));
+
+    public void Add(PaymentMethodDefinition aggregate) => Items.Add(aggregate);
+
+    public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Any(method => method.Code == code.Trim().ToUpperInvariant()));
+
+    public Task<PaymentMethodDefinition?> FindActiveByCodeAsync(string code, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.FirstOrDefault(method => method.IsActive && method.Code == code.Trim().ToUpperInvariant()));
+
+    public Task<bool> OtherActiveCashExistsAsync(Guid excludedId, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Any(method => method.Id != excludedId && method.IsActive && method.Kind == PaymentMethod.Cash));
+
+    public Task<IReadOnlyCollection<string>> ExistingCodesAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyCollection<string>>(Items.Select(method => method.Code).ToList());
+
+    public Task<Paged<PaymentMethodListItem>> ListAsync(string? search, bool? isActive, ListSort sort, PageRequest page, CancellationToken cancellationToken)
+    {
+        var rows = Items.Where(method => isActive is null || method.IsActive == isActive).OrderBy(method => method.Sequence).ThenBy(method => method.Code).Select(Item).ToList();
+        return Task.FromResult(new Paged<PaymentMethodListItem>([.. rows.Skip(page.Skip).Take(page.PageSize)], page.Page, page.PageSize, rows.Count));
+    }
+
+    public Task<PaymentMethodListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Where(method => method.Id == id).Select(Item).FirstOrDefault());
+
+    public Task<IReadOnlyList<PaymentMethodOption>> OptionsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<PaymentMethodOption>>(Items.Where(method => method.IsActive).OrderBy(method => method.Sequence).ThenBy(method => method.Code)
+            .Select(method => new PaymentMethodOption(method.Id, method.Code, method.Name.En, method.Name.Ar, method.Kind.ToString(), method.RequiresReference)).ToList());
+
+    private static PaymentMethodListItem Item(PaymentMethodDefinition method) =>
+        new(method.Id, method.Code, method.Name.En, method.Name.Ar, method.Kind.ToString(), method.RequiresReference, method.IsActive, method.Sequence);
 }
 
 internal sealed class FakeDirectory : IBillingDirectory

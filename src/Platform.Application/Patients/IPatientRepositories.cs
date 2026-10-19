@@ -52,7 +52,11 @@ public sealed record PatientRow(
     string? CreatedByName,
     DateTimeOffset? ModifiedAtUtc,
     string? ModifiedByName,
-    uint RowVersion);
+    uint RowVersion,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null,
+    string? SecondPhone = null);
 
 /// <summary>Write side of the patient file plus the projections its queries need. Every read is bounded to the current tenant.</summary>
 public interface IPatientRepository : IRepository<Patient>
@@ -76,11 +80,12 @@ public interface IPatientRepository : IRepository<Patient>
     Task<IReadOnlyList<Guid>> MergedFamilyAsync(Guid survivorId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Active files that may be similar (BR-01): the same normalised mobile, or a stored name key that contains at
-    /// least two of <paramref name="nameTokens"/> as whole tokens (one token: the whole key). A coarse pre-filter; the
-    /// handler decides the match with <see cref="PatientNameNormalizer.KeysMatch"/>.
+    /// Active files that may be similar (BR-01): one of <paramref name="phones"/> (normalised) stored as the mobile or the
+    /// second phone (change request 2026-10-19, C3), or a stored name key that contains at least two of
+    /// <paramref name="nameTokens"/> as whole tokens (one token: the whole key). A coarse pre-filter; the handler decides
+    /// the match with <see cref="PatientNameNormalizer.KeysMatch"/>.
     /// </summary>
-    Task<IReadOnlyList<PatientRow>> FindSimilarCandidatesAsync(IReadOnlyList<string> nameTokens, string? mobile, int limit, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PatientRow>> FindSimilarCandidatesAsync(IReadOnlyList<string> nameTokens, IReadOnlyList<string> phones, int limit, CancellationToken cancellationToken);
 }
 
 /// <summary>Write side of patient documents plus their register.</summary>

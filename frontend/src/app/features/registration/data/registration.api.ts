@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, firstValueFrom } from 'rxjs';
 
-import { BILLING_API, type BillingTreasuryItem, type PaymentCreated, type PaymentReceiptDocument, type RecordPaymentRequest } from '../../../core/api/billing.contracts';
+import { BILLING_API, type BillingTreasuryItem, type PaymentCreated, type PaymentReceiptDocument, type RecordPaymentRequest, type VisitAccountView } from '../../../core/api/billing.contracts';
 import { CATALOGUE_A_API, type ServiceLookupItem } from '../../../core/api/catalogue-a.contracts';
 import { CATALOGUE_B_API, type DiagnosisListItem, type DoctorListItem, type ReasonKind, type ReasonListItem } from '../../../core/api/catalogue-b.contracts';
 import { emptyPage, type Paged } from '../../../core/api/paging';
@@ -29,7 +29,9 @@ import {
   type VisitRegisteredResponse,
   type VisitSearchFilter,
 } from '../../../core/api/registration.contracts';
-import { SAMPLES_API, type SampleListItem } from '../../../core/api/samples.contracts';
+import { RESULTS_API, type ResultCaseView } from '../../../core/api/results.contracts';
+import { SAMPLES_API, type SampleDetail, type SampleListItem, type ScanSampleRequest } from '../../../core/api/samples.contracts';
+import { classifySearch } from './registration-format';
 
 /** The default the page uses when the parameters cannot be read (a role without the view): print nothing automatically. */
 export const FALLBACK_SETTINGS: RegistrationPageSettings = {
@@ -198,6 +200,71 @@ export class RegistrationApi {
     const params = new HttpParams({ fromObject: { visitId, page: 1, pageSize: 100 } });
     return tolerantPage(this.http.get<Paged<SampleListItem>>(SAMPLES_API.samples, { params }), signal);
   }
+
+  // ---- accession details (CP-10b, change request 2026-10-19 LIS-CR-003 P-C9) --------------------------------------
+
+  /**
+   * The visit whose accession is exactly `accession` (any day, any branch): the register's accession filter is a
+   * contains-match, so the answer is narrowed here; null when there is none.
+   */
+  async findByAccession(accession: string, signal?: AbortSignal): Promise<VisitListItem | null> {
+    const wanted = accession.trim().toUpperCase();
+    if (wanted === '') {
+      return null;
+    }
+
+    const found = await this.search({ ...EMPTY_VISIT_FILTER, accession: wanted, page: 1, pageSize: 10 }, signal);
+    return found.items.find((item) => item.accession.toUpperCase() === wanted) ?? null;
+  }
+
+  /** The visits a desk search text matches (accession, patient number, mobile or name as CP-10 classifies it), any day. */
+  searchVisits(text: string, signal?: AbortSignal): Promise<Paged<VisitListItem>> {
+    const search = classifySearch(text);
+    if (search === null) {
+      return Promise.resolve(emptyPage<VisitListItem>());
+    }
+
+    return this.search({ ...EMPTY_VISIT_FILTER, [search.target]: search.value, page: 1, pageSize: 20 }, signal);
+  }
+
+  /** Billing's account of the visit (balance, posted payments and refunds); null when Billing refuses or is absent. */
+  visitAccount(visitId: string, signal?: AbortSignal): Promise<VisitAccountView | null> {
+    return tolerantOne(this.http.get<VisitAccountView>(`${BILLING_API.visits}/${encodeURIComponent(visitId)}/account`), signal);
+  }
+
+  /** The result case of the visit (status per report unit and per result); null when Results refuses or has nothing. */
+  resultCase(visitId: string, signal?: AbortSignal): Promise<ResultCaseView | null> {
+    return tolerantOne(this.http.get<ResultCaseView>(RESULTS_API.results, { params: new HttpParams({ fromObject: { visitId } }) }), signal);
+  }
+
+  /** Collects one sample by its number — the phlebotomy scan of CP-14 (`samples.create`); the server refuses anything not Ordered. */
+  collectSample(sampleNumber: string): Promise<SampleDetail> {
+    const request: ScanSampleRequest = { sampleNumber, mode: 'Collect' };
+    return firstValueFrom(this.http.post<SampleDetail>(SAMPLES_API.scan, request));
+  }
+}
+
+/** Every filter of the register off: a lookup by one key across all days and branches. */
+const EMPTY_VISIT_FILTER: VisitSearchFilter = {
+  accession: null,
+  patientNo: null,
+  name: null,
+  mobile: null,
+  from: null,
+  to: null,
+  branchId: null,
+  payerId: null,
+  status: null,
+  patientId: null,
+  page: 1,
+  pageSize: 20,
+};
+
+function tolerantOne<T>(request: Observable<T>, signal?: AbortSignal): Promise<T | null> {
+  return firstValueFrom(request)
+    .then((value): T | null => value)
+    .catch((): T | null => null)
+    .then(abortable(signal));
 }
 
 function searchParams(filter: VisitSearchFilter, paged: boolean): HttpParams {

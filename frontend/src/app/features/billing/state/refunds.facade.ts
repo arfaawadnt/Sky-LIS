@@ -5,7 +5,7 @@ import type { PageRequest } from '../../../core/api/paging';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { mutation } from '../../../core/state/mutation';
 import { BillingApi, type DownloadedFile } from '../data/billing.api';
-import type { MovementInput } from '../ui/movement-form.component';
+import { type MovementInput, methodCodeOf } from '../ui/movement-form.component';
 import { CashDeskFacade, reloadWhenSettled } from './cash-desk.facade';
 import type { VisitLookup } from './payments.facade';
 
@@ -44,6 +44,7 @@ export class RefundsFacade {
         visitId: input.visitId,
         amount: input.amount,
         method: input.method,
+        ...methodCodeOf(input),
         reference: input.reference,
         reasonId: input.reasonId,
         note: input.note,

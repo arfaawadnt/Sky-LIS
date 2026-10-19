@@ -44,7 +44,15 @@ public static class BillingCodes
 
     public const string ExportTooLarge = "BIL-050";
 
+    /// <summary>Payment method definitions (change request 2026-10-19, P-C10): code shape, the last active cash method, an unknown or inactive code on a movement, kind and sequence shape.</summary>
+    public const string MethodCodeInvalid = "BIL-051";
+    public const string LastActiveCashMethod = "BIL-052";
+    public const string MethodUnknownOrInactive = "BIL-053";
+    public const string MethodSequenceInvalid = "BIL-054";
+    public const string MethodKindInvalid = "BIL-055";
+
     public const string ClosingOverlaps = "BIL-120";
+    public const string MethodCodeExists = "BIL-121";
 
     public const string VisitNotFound = "BIL-404";
     public const string PaymentNotFound = "BIL-405";
@@ -52,4 +60,5 @@ public static class BillingCodes
     public const string RefundNotFound = "BIL-407";
     public const string ClosingNotFound = "BIL-408";
     public const string TreasuryNotFound = "BIL-409";
+    public const string MethodNotFound = "BIL-410";
 }

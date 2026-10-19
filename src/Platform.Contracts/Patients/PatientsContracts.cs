@@ -27,7 +27,11 @@ public sealed record RegisterPatientRequest(
     string? City,
     string? Address,
     string? Comments,
-    bool? IsVip);
+    bool? IsVip,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null,
+    string? SecondPhone = null);
 
 /// <summary>
 /// T2: the same fields; <paramref name="IsVip"/> <see langword="null"/> keeps the flag; <paramref name="RowVersion"/> (from the detail) refuses a stale edit with CONCURRENCY-409.
@@ -52,7 +56,27 @@ public sealed record UpdatePatientRequest(
     string? Comments,
     bool? IsVip,
     uint? RowVersion,
-    Guid? VisitId = null);
+    Guid? VisitId = null,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null,
+    string? SecondPhone = null);
+
+/// <summary>
+/// The picked city, district and area of a file (change request 2026-10-19, A2): ids and bilingual names from the platform's
+/// location hierarchy; a level not set is <see langword="null"/>; the whole record is <see langword="null"/> when no level is set.
+/// The free-text <c>City</c> of the file carries the picked city's English name as well.
+/// </summary>
+public sealed record PatientLocation(
+    Guid? CityId,
+    string? CityNameEn,
+    string? CityNameAr,
+    Guid? DistrictId,
+    string? DistrictNameEn,
+    string? DistrictNameAr,
+    Guid? AreaId,
+    string? AreaNameEn,
+    string? AreaNameAr);
 
 /// <summary>
 /// The demographics lock of a file for the current user (<c>GET /patients/{id}/demographics-lock?visitId=</c>, change request
@@ -98,7 +122,9 @@ public sealed record PatientListItem(
     DateOnly RegisteredOn,
     int VisitCount,
     DateTimeOffset? LastVisitAtUtc,
-    bool IdentityMasked = false);
+    bool IdentityMasked = false,
+    string? SecondPhone = null,
+    PatientLocation? Location = null);
 
 public sealed record PatientMergeView(Guid SurvivorId, string SurvivorNumber, DateTimeOffset MergedAtUtc, Guid MergedByUserId, string? MergedByName, string Reason);
 
@@ -135,7 +161,9 @@ public sealed record PatientDetail(
     string? CreatedByName,
     DateTimeOffset? ModifiedAtUtc,
     string? ModifiedByName,
-    uint RowVersion);
+    uint RowVersion,
+    string? SecondPhone = null,
+    PatientLocation? Location = null);
 
 /// <summary>
 /// A similar existing file (BR-01, REG-002). Match: Exact (name and mobile), Mobile (same mobile), Name (similar name).
@@ -156,7 +184,8 @@ public sealed record SimilarPatient(
     string? Mobile,
     string? NationalId,
     string Match,
-    bool IdentityMasked = false);
+    bool IdentityMasked = false,
+    string? SecondPhone = null);
 
 /// <summary>The candidates (at most 10) and whether the tenant shows the warning (<c>similarNameWarning</c>).</summary>
 public sealed record SimilarPatientsResponse(bool WarningEnabled, IReadOnlyList<SimilarPatient> Candidates);

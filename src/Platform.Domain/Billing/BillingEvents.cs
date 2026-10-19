@@ -49,3 +49,14 @@ public sealed record CashClosingClosed(
     Guid ClosedByUserId,
     string? Comment,
     DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+// Payment method definitions (change request 2026-10-19, P-C10): the set-up list of the cash desks.
+
+public sealed record PaymentMethodDefined(Guid MethodId, string Code, string Kind, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+/// <summary>Names, kind, reference rule or order changed; the field changes carry before / after.</summary>
+public sealed record PaymentMethodUpdated(Guid MethodId, string Code, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+public sealed record PaymentMethodDeactivated(Guid MethodId, string Code, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+public sealed record PaymentMethodReactivated(Guid MethodId, string Code, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);

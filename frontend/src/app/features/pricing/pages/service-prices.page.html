@@ -1,0 +1,125 @@
+<div class="service-prices">
+  <app-page-header [title]="i18n.t('pricing.servicePrices.title')" [subtitle]="i18n.t('pricing.servicePrices.subtitle')">
+    <button pageActions type="button" class="btn ghost" (click)="facade.reload()" [disabled]="facade.serviceId() === null"><app-icon name="refresh" [size]="15" />{{ i18n.t('pricing.refresh') }}</button>
+  </app-page-header>
+
+  <app-section-card [title]="i18n.t('pricing.servicePrices.service')">
+    <div class="picker-row">
+      <app-service-picker
+        [search]="searchService"
+        [label]="i18n.t('pricing.servicePrices.pick')"
+        [placeholder]="i18n.t('pricing.servicePrices.pickPlaceholder')"
+        (picked)="onPicked($event)"
+      />
+      @if (facade.current(); as view) {
+        <div class="chosen" role="status">
+          <span class="mono code">{{ view.code }}</span>
+          <span class="name">{{ i18n.lang() === 'ar' ? view.nameAr : view.nameEn }}</span>
+          <app-badge tone="info">{{ typeLabel(view.type) }}</app-badge>
+          <app-badge [status]="view.isActive ? 'Active' : 'Inactive'" />
+          <button type="button" class="btn ghost sm" (click)="clear()">{{ i18n.t('pricing.servicePrices.change') }}</button>
+        </div>
+      }
+    </div>
+    @if (facade.view.error()) {
+      <p class="problem" role="alert">{{ i18n.t('pricing.servicePrices.loadError') }}</p>
+    }
+  </app-section-card>
+
+  @if (facade.serviceId() === null) {
+    <app-empty-state [title]="i18n.t('pricing.servicePrices.emptyTitle')" [message]="i18n.t('pricing.servicePrices.emptyHint')" icon="coins" />
+  } @else if (facade.current(); as view) {
+    <app-section-card [padded]="false" [title]="i18n.t('pricing.servicePrices.baseLists')">
+      @if (facade.setBasePrice.problem(); as problem) {
+        <p class="problem list-problem" role="alert">{{ problemText(problem.code) }}</p>
+      }
+      <app-data-table
+        [columns]="baseColumns"
+        [rows]="view.basePrices"
+        [loading]="facade.view.isLoading()"
+        [interactive]="false"
+        [compact]="true"
+        [emptyTitle]="i18n.t('pricing.servicePrices.noBasePrices')"
+        [emptyMessage]="i18n.t('pricing.servicePrices.noBasePricesHint')"
+        [caption]="i18n.t('pricing.servicePrices.baseLists')"
+      >
+        <ng-template appCell="listCode" [appCellOf]="view.basePrices" let-row>
+          <a class="link mono" [routerLink]="['/pricing/base-price-lists', row.listId]">{{ row.listCode }}</a>
+        </ng-template>
+        <ng-template appCell="status" [appCellOf]="view.basePrices" let-row>
+          <span class="badges">
+            <app-badge [status]="row.listActive ? 'Active' : 'Inactive'" />
+            @if (!row.lineActive) {
+              <app-badge tone="warn">{{ i18n.t('pricing.servicePrices.lineInactive') }}</app-badge>
+            }
+          </span>
+        </ng-template>
+        <ng-template appCell="price" [appCellOf]="view.basePrices" let-row>
+          @if (canEdit()) {
+            <span class="price-cell">
+              <input
+                type="number"
+                class="inp sm price"
+                min="0"
+                step="0.01"
+                max="99999999.99"
+                [value]="draftPrice(row)"
+                [class.invalid]="isDirty(row) && isInvalid(row)"
+                [attr.aria-invalid]="isDirty(row) && isInvalid(row)"
+                [attr.aria-label]="i18n.tf('pricing.servicePrices.priceIn', { list: row.listCode })"
+                [disabled]="savingListId() === row.listId"
+                (input)="onPrice(row, $event)"
+                (keydown)="onPriceKeydown(row, $event)"
+              />
+              @if (isDirty(row)) {
+                <button type="button" class="row-btn" (click)="savePrice(row)" [disabled]="facade.setBasePrice.pending()" [attr.aria-label]="i18n.t('pricing.servicePrices.savePrice')" [title]="i18n.t('pricing.servicePrices.savePrice')">
+                  <app-icon name="check" [size]="15" />
+                </button>
+                <button type="button" class="row-btn" (click)="discard(row)" [attr.aria-label]="i18n.t('pricing.cancel')" [title]="i18n.t('pricing.cancel')">
+                  <app-icon name="x" [size]="15" />
+                </button>
+              }
+            </span>
+          } @else {
+            <span class="mono">{{ amount(row.price) }}</span>
+          }
+        </ng-template>
+      </app-data-table>
+    </app-section-card>
+
+    <app-section-card [padded]="false" [title]="i18n.t('pricing.servicePrices.contracts')">
+      <app-data-table
+        [columns]="contractColumns"
+        [rows]="view.contractPrices"
+        [loading]="facade.view.isLoading()"
+        [interactive]="false"
+        [compact]="true"
+        [emptyTitle]="i18n.t('pricing.servicePrices.noContractPrices')"
+        [emptyMessage]="i18n.t('pricing.servicePrices.noContractPricesHint')"
+        [caption]="i18n.t('pricing.servicePrices.contracts')"
+      >
+        <ng-template appCell="tier" [appCellOf]="view.contractPrices" let-row>
+          @if (contractPricingOffered) {
+            <a class="link" [routerLink]="['/pricing/contract-pricing', row.tierId]">{{ i18n.lang() === 'ar' ? row.tierNameAr : row.tierNameEn }}</a>
+          } @else {
+            {{ i18n.lang() === 'ar' ? row.tierNameAr : row.tierNameEn }}
+          }
+        </ng-template>
+        <ng-template appCell="flags" [appCellOf]="view.contractPrices" let-row>
+          <span class="badges">
+            @if (row.isExcluded) {
+              <app-badge tone="violet">{{ i18n.t('pricing.grid.excluded') }}</app-badge>
+            } @else if (row.sourceListCode) {
+              <span class="muted small mono">{{ row.sourceListCode }}</span>
+            }
+            @if (!row.tierActive || !row.payerActive) {
+              <app-badge tone="warn">{{ i18n.t('pricing.inactive') }}</app-badge>
+            } @else if (!row.inEffect) {
+              <app-badge tone="warn">{{ i18n.t('pricing.servicePrices.outOfEffect') }}</app-badge>
+            }
+          </span>
+        </ng-template>
+      </app-data-table>
+    </app-section-card>
+  }
+</div>

@@ -12,6 +12,7 @@ public sealed class Payment : Entity, ITenantScoped
 {
     public const int MaxNumberLength = 20;
     public const int MaxReferenceLength = 64;
+    public const int MaxMethodCodeLength = PaymentMethodDefinition.MaxCodeLength;
     public const int MaxReasonLength = 500;
     public const string NumberKind = "receipt";
     public const string NumberPrefix = "RCT";
@@ -22,13 +23,14 @@ public sealed class Payment : Entity, ITenantScoped
         DeviceId = string.Empty;
     }
 
-    internal Payment(Guid visitId, string receiptNumber, decimal amount, PaymentMethod method, string? reference, CashierStation station, string deviceId, Guid? batchId, DateTimeOffset nowUtc)
+    internal Payment(Guid visitId, string receiptNumber, decimal amount, PaymentMethodUse method, string? reference, CashierStation station, string deviceId, Guid? batchId, DateTimeOffset nowUtc)
         : base(Guid.CreateVersion7())
     {
         VisitId = visitId;
         ReceiptNumber = receiptNumber;
         Amount = amount;
-        Method = method;
+        Method = method.Kind;
+        MethodCode = method.Code;
         Reference = reference;
         TreasuryId = station.TreasuryId;
         DeviceId = deviceId;
@@ -51,7 +53,10 @@ public sealed class Payment : Entity, ITenantScoped
 
     public PaymentMethod Method { get; private set; }
 
-    /// <summary>Card slip, POS or transfer number; mandatory for every method except cash (BIL-003).</summary>
+    /// <summary>The code of the laboratory's payment method definition at posting time (change request 2026-10-19); null on legacy rows and on requests without a code, shown as the kind.</summary>
+    public string? MethodCode { get; private set; }
+
+    /// <summary>Card slip, POS or transfer number; mandatory when the method requires it: every kind except cash without a definition (BIL-003).</summary>
     public string? Reference { get; private set; }
 
     public Guid TreasuryId { get; private set; }

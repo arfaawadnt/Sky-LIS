@@ -124,13 +124,13 @@ public sealed class PatientsModuleTests(DatabaseFixture fixture)
         using var scope = fixture.AppScope(tenant, Guid.CreateVersion7());
         var repository = scope.ServiceProvider.GetRequiredService<IPatientRepository>();
 
-        var latin = await repository.FindSimilarCandidatesAsync(["mohamed", "ahmed"], "01009999999", 200, CancellationToken.None);
+        var latin = await repository.FindSimilarCandidatesAsync(["mohamed", "ahmed"], ["01009999999"], 200, CancellationToken.None);
         Assert.Equal(new[] { exact, byMobile, byName }.Order(), latin.Select(row => row.Id).Order());
 
-        var arabic = await repository.FindSimilarCandidatesAsync(["محمد", "احمد"], null, 200, CancellationToken.None);
+        var arabic = await repository.FindSimilarCandidatesAsync(["محمد", "احمد"], [], 200, CancellationToken.None);
         Assert.Equal([byName], arabic.Select(row => row.Id));
 
-        Assert.Empty(await repository.FindSimilarCandidatesAsync([], null, 200, CancellationToken.None));
+        Assert.Empty(await repository.FindSimilarCandidatesAsync([], [], 200, CancellationToken.None));
     }
 
     [DatabaseFact]

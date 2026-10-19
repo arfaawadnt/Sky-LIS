@@ -109,3 +109,20 @@ public sealed record CodeSystemImportResult(int Inserted, int Updated, int Uncha
 public sealed record RuleTemplateListItem(Guid Id, string Name, string? ClinicalGroupName, string Formula, string? Description, bool IsActive);
 
 public sealed record RuleTemplateRequest(string Name, string? ClinicalGroupName, string Formula, string? Description);
+
+// Location hierarchy under a governorate (change request 2026-10-19, A2 — SA-11b "Locations"): cities, districts, areas.
+
+/// <summary>A city, district or area row of the Locations drawer; <paramref name="ParentId"/> is the governorate, the city or the district.</summary>
+public sealed record LocationListItem(Guid Id, Guid ParentId, string NameEn, string NameAr, bool IsActive);
+
+/// <summary>Create and rename a city, district or area; the parent is fixed once created.</summary>
+public sealed record LocationRequest(string NameEn, string NameAr);
+
+/// <summary>Active cities of a governorate (<c>GET /api/v1/public/cities?governorateId=</c>; every governorate when unfiltered).</summary>
+public sealed record PublicCity(Guid Id, Guid GovernorateId, string NameEn, string NameAr);
+
+/// <summary>Active districts of a city (<c>GET /api/v1/public/districts?cityId=</c>).</summary>
+public sealed record PublicDistrict(Guid Id, Guid CityId, string NameEn, string NameAr);
+
+/// <summary>Active areas of a district (<c>GET /api/v1/public/areas?districtId=</c>).</summary>
+public sealed record PublicArea(Guid Id, Guid DistrictId, string NameEn, string NameAr);

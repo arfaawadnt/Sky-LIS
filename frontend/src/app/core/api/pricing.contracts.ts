@@ -46,6 +46,10 @@ export interface PayerListItem {
   readonly type: PayerType;
   readonly webPortalEnabled: boolean;
   readonly webUsername: string | null;
+  readonly phone1: string | null;
+  readonly phone2: string | null;
+  readonly whatsApp: string | null;
+  readonly email: string | null;
   readonly isActive: boolean;
   readonly isDefault: boolean;
   readonly tiers: readonly ContractTierItem[];
@@ -58,6 +62,11 @@ export interface PayerRequest {
   readonly type: PayerType;
   readonly webPortalEnabled: boolean;
   readonly webUsername: string | null;
+  /** Office contacts (CR 2026-10-19 C19): phones and WhatsApp as typed (≤ 32: digits, spaces, + - ( )), e-mail ≤ 254. */
+  readonly phone1: string | null;
+  readonly phone2: string | null;
+  readonly whatsApp: string | null;
+  readonly email: string | null;
 }
 
 export interface ContractTierRequest {
@@ -303,6 +312,115 @@ export interface ContractPricingReviewDocument {
   readonly printedAtUtc: string;
 }
 
+// ---- price list tools (CR 2026-10-19 C21): Excel import and bulk adjust ----
+
+/** One parsed sheet row: the sheet row number, the code cell and the price cell (null when empty or not a number). */
+export interface ImportPriceRowRequest {
+  readonly row: number;
+  readonly serviceCode: string | null;
+  readonly price: number | null;
+}
+
+export interface ImportPriceLinesRequest {
+  readonly rows: readonly ImportPriceRowRequest[];
+  readonly dryRun: boolean;
+}
+
+/** PRC-041 no code, PRC-015 unknown code, PRC-006 price missing or invalid, PRC-016 code repeated. */
+export interface ImportRowError {
+  readonly row: number;
+  readonly serviceCode: string | null;
+  readonly code: string;
+  readonly message: string;
+}
+
+/** With any error nothing is applied; `applied` is true only after a real (non dry-run) import without errors. */
+export interface ImportPriceLinesResult {
+  readonly accepted: number;
+  readonly added: number;
+  readonly changed: number;
+  readonly applied: boolean;
+  readonly errors: readonly ImportRowError[];
+}
+
+export type PriceAdjustMode = 'Amount' | 'Percent';
+
+export type PriceRounding = 'None' | 'Whole' | 'Nearest5' | 'Nearest10';
+
+export const PRICE_ROUNDINGS: readonly PriceRounding[] = ['None', 'Whole', 'Nearest5', 'Nearest10'];
+
+/** Percent adjustments go from −100 to +1 000 (PriceMath), amounts within ±maxAmount; two decimals. */
+export const ADJUST_LIMITS = { minPercent: -100, maxPercent: 1000 } as const;
+
+export interface AdjustBasePriceListRequest {
+  readonly mode: PriceAdjustMode;
+  readonly value: number;
+  readonly rounding: PriceRounding;
+  /** null = every line of the list. */
+  readonly serviceIds: readonly string[] | null;
+  readonly preview: boolean;
+}
+
+export interface PriceAdjustmentRow {
+  readonly serviceId: string;
+  readonly code: string | null;
+  readonly nameEn: string | null;
+  readonly nameAr: string | null;
+  readonly oldPrice: number;
+  readonly newPrice: number;
+  /** A negative result was held at 0. */
+  readonly clamped: boolean;
+}
+
+export interface AdjustBasePriceListResult {
+  readonly rows: readonly PriceAdjustmentRow[];
+  readonly changed: number;
+  readonly clamped: number;
+  readonly applied: boolean;
+}
+
+// ---- service prices (CR 2026-10-19 C22) ----
+
+export interface ServiceBasePriceItem {
+  readonly listId: string;
+  readonly listCode: string;
+  readonly listNameEn: string;
+  readonly listNameAr: string;
+  readonly year: number;
+  readonly listActive: boolean;
+  readonly price: number;
+  readonly lineActive: boolean;
+}
+
+export interface ServiceContractPriceItem {
+  readonly tierId: string;
+  readonly payerId: string;
+  readonly payerNameEn: string;
+  readonly payerNameAr: string;
+  readonly tierNameEn: string;
+  readonly tierNameAr: string;
+  readonly listPrice: number;
+  readonly patientPrice: number;
+  readonly payerPrice: number;
+  readonly isExcluded: boolean;
+  readonly sourceListCode: string | null;
+  readonly tierActive: boolean;
+  readonly payerActive: boolean;
+  readonly inEffect: boolean;
+}
+
+export interface ServicePricesView {
+  readonly serviceId: string;
+  readonly code: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly type: string;
+  readonly isActive: boolean;
+  readonly currency: string;
+  readonly basePrices: readonly ServiceBasePriceItem[];
+  readonly contractPrices: readonly ServiceContractPriceItem[];
+}
+
 // ---- price quote (CP-12, BR-06; the page is Registration's) ----
 
 export interface PriceQuoteLine {
@@ -364,6 +482,7 @@ export const PRICING_API = {
   tierOptions: '/api/v1/pricing/payers/tiers',
   basePriceLists: '/api/v1/pricing/base-price-lists',
   contractPricing: '/api/v1/pricing/contract-pricing',
+  servicePrices: '/api/v1/pricing/service-prices',
   quote: '/api/v1/pricing/quote',
   catalogueServices: '/api/v1/catalogue/lookups/services',
 } as const;

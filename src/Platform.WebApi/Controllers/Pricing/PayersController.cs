@@ -30,7 +30,7 @@ public sealed class PayersController(ISender sender) : ControllerBase
     public async Task<ActionResult<CreatedResource>> Create([FromBody] CreatePayerRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var created = await sender.Send(new CreatePayerCommand(request.NameEn, request.NameAr, request.SearchKey, request.Type, request.WebPortalEnabled, request.WebUsername), cancellationToken);
+        var created = await sender.Send(new CreatePayerCommand(request.NameEn, request.NameAr, request.SearchKey, request.Type, request.WebPortalEnabled, request.WebUsername, request.Phone1, request.Phone2, request.WhatsApp, request.Email), cancellationToken);
         return Created($"/api/v1/pricing/payers/{created.Id}", created);
     }
 
@@ -38,7 +38,7 @@ public sealed class PayersController(ISender sender) : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePayerRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        await sender.Send(new UpdatePayerCommand(id, request.NameEn, request.NameAr, request.SearchKey, request.Type, request.WebPortalEnabled, request.WebUsername), cancellationToken);
+        await sender.Send(new UpdatePayerCommand(id, request.NameEn, request.NameAr, request.SearchKey, request.Type, request.WebPortalEnabled, request.WebUsername, request.Phone1, request.Phone2, request.WhatsApp, request.Email), cancellationToken);
         return NoContent();
     }
 

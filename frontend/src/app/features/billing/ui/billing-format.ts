@@ -5,6 +5,9 @@
  * read the same in both languages on paper.
  */
 
+import type { PaymentMethod } from '../../../core/api/billing.contracts';
+import { localizedPick } from '../../../shared/forms/localized-text';
+
 const moneyFormats = new Map<string, Intl.NumberFormat>();
 const dateFormats = new Map<string, Intl.DateTimeFormat>();
 
@@ -107,4 +110,33 @@ export function roundMoney(value: number): number {
 /** True when the value has at most two decimals (BIL-002). */
 export function hasTwoDecimals(value: number): boolean {
   return Math.abs(roundMoney(value) - value) < 1e-9;
+}
+
+/** A movement's method as the lists and documents name it (change request 2026-10-19, CP-30b). */
+export interface MovementMethod {
+  readonly method: PaymentMethod;
+  readonly methodCode?: string | null;
+  readonly methodNameEn?: string | null;
+  readonly methodNameAr?: string | null;
+}
+
+/**
+ * The method's name: the laboratory's definition (localized) when the movement carries a code the definition still
+ * answers for, otherwise the kind (`billing.method.<Kind>`: legacy rows, or a definition deleted from the database).
+ */
+export function movementMethodName(t: (key: string) => string, lang: string, movement: MovementMethod): string {
+  const en = movement.methodNameEn ?? '';
+  const ar = movement.methodNameAr ?? '';
+  if (en === '' && ar === '') {
+    return t(`billing.method.${movement.method}`);
+  }
+
+  return localizedPick({ en, ar }, lang);
+}
+
+/** The name followed by the code when the movement carries one (`Wallet · WALLET`), for documents and detail rows. */
+export function movementMethodLabel(t: (key: string) => string, lang: string, movement: MovementMethod): string {
+  const name = movementMethodName(t, lang, movement);
+  const code = movement.methodCode ?? '';
+  return code === '' ? name : `${name} · ${code}`;
 }

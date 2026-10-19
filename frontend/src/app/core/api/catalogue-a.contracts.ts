@@ -226,6 +226,7 @@ export interface ServiceSequenceRow {
   readonly nameEn: string;
   readonly nameAr: string;
   readonly type: ServiceType;
+  readonly clinicalGroupId: string | null;
   readonly clinicalGroupNameEn: string | null;
   readonly clinicalGroupNameAr: string | null;
   readonly sequence: number;

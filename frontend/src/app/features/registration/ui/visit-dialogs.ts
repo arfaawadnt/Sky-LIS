@@ -104,6 +104,8 @@ export class CancelServicesDialogComponent {
   readonly accession = input('');
   readonly pending = input(false);
   readonly problem = input<string | null>(null);
+  /** Line ids ticked when the dialog opens (Accession details opens it from a row, CP-10b); the user may still change the set. */
+  readonly preselect = input<readonly string[]>([]);
   readonly submitted = output<{ visitId: string; request: CancelLinesRequest }>();
 
   protected readonly selected = signal<ReadonlySet<string>>(new Set());
@@ -130,7 +132,7 @@ export class CancelServicesDialogComponent {
       const isOpen = this.open();
       untracked(() => {
         if (isOpen) {
-          this.selected.set(new Set());
+          this.selected.set(new Set(this.preselect()));
           this.reasonId.set('');
           this.note.set('');
         }

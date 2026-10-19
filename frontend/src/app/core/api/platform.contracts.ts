@@ -518,6 +518,8 @@ export const PLATFORM_API = {
   codeSystems: '/api/v1/platform/library/code-systems',
   ruleTemplates: '/api/v1/platform/library/rule-templates',
   sessions: '/api/v1/platform/sessions',
+  /** SA-08b client login logs (LIS-CR-003 §2): the paged history and its CSV (`…/export`). */
+  loginLogs: '/api/v1/platform/login-logs',
   dashboard: '/api/v1/platform/dashboard',
   /** The laboratory's own wallet (CP-66). */
   myWallet: '/api/v1/wallet',
@@ -543,3 +545,83 @@ export const PLATFORM_PERMISSIONS = {
 
 /** The largest code file SA-17 accepts. */
 export const CODE_IMPORT_MAX_BYTES = 20 * 1024 * 1024;
+
+// ── Client login logs (SA-08b, change request LIS-CR-003 §2) ───────────────────────────────────
+
+export type LoginLogDevice = 'Computer' | 'Mobile' | 'Tablet' | 'Unknown';
+export type LoginLogStatus = 'Active' | 'SignedOut' | 'Revoked' | 'Expired';
+
+export const LOGIN_LOG_DEVICES: readonly LoginLogDevice[] = ['Computer', 'Mobile', 'Tablet', 'Unknown'];
+export const LOGIN_LOG_STATUSES: readonly LoginLogStatus[] = ['Active', 'SignedOut', 'Revoked', 'Expired'];
+
+/**
+ * One browser session of a client user (a rotation family): login and logout in UTC, the device read from the user
+ * agent, the duration in minutes (logout − login, or last activity − login while active) and how it ended.
+ */
+export interface ClientLoginLogItem {
+  readonly familyId: string;
+  readonly tenantId: string;
+  readonly clientNameEn: string | null;
+  readonly clientNameAr: string | null;
+  readonly userId: string;
+  readonly username: string;
+  readonly displayName: string;
+  readonly loginAtUtc: string;
+  readonly logoutAtUtc: string | null;
+  readonly lastSeenAtUtc: string;
+  readonly ipAddress: string | null;
+  readonly device: LoginLogDevice;
+  readonly os: string;
+  readonly browser: string;
+  readonly durationMinutes: number;
+  readonly status: LoginLogStatus;
+  readonly revocationReason: string | null;
+}
+
+/** The filter of the history (query parameters of `GET /api/v1/platform/login-logs`); instants are ISO UTC. */
+export interface ClientLoginLogFilter extends SortRequest {
+  readonly tenantId: string | null;
+  readonly search: string | null;
+  readonly loginFromUtc: string | null;
+  readonly loginToUtc: string | null;
+  readonly logoutFromUtc: string | null;
+  readonly logoutToUtc: string | null;
+  readonly device: LoginLogDevice | null;
+  readonly minMinutes: number | null;
+  readonly maxMinutes: number | null;
+  readonly status: LoginLogStatus | null;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+// ── Location hierarchy under a governorate (SA-11b "Locations", change request LIS-CR-003 §3) ───
+
+/** The three levels under a governorate: `cities` of a governorate, `districts` of a city, `areas` of a district. */
+export type LocationLevel = 'cities' | 'districts' | 'areas';
+
+export const LOCATION_LEVELS: readonly LocationLevel[] = ['cities', 'districts', 'areas'];
+
+/** A city, district or area row of the Locations drawer; `parentId` is the governorate, the city or the district. */
+export interface LocationListItem {
+  readonly id: string;
+  readonly parentId: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly isActive: boolean;
+}
+
+/** Create and rename a city, district or area; the parent is fixed once created. */
+export interface LocationRequest {
+  readonly nameEn: string;
+  readonly nameAr: string;
+}
+
+/**
+ * Where each level lives: the collection of a parent (`GET/POST <parent collection>/{parentId}/<level>`) and the item
+ * (`PUT <items>/{id}`, `POST <items>/{id}/deactivate|reactivate`).
+ */
+export const PLATFORM_LOCATIONS_API: Readonly<Record<LocationLevel, { readonly parents: string; readonly items: string }>> = {
+  cities: { parents: '/api/v1/platform/governorates', items: '/api/v1/platform/cities' },
+  districts: { parents: '/api/v1/platform/cities', items: '/api/v1/platform/districts' },
+  areas: { parents: '/api/v1/platform/districts', items: '/api/v1/platform/areas' },
+};

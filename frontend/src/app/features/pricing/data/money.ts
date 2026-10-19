@@ -36,3 +36,11 @@ export function formatAmount(value: number, lang: string): string {
 export function formatFactor(value: number, lang: string): string {
   return new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', { minimumFractionDigits: 0, maximumFractionDigits: 4 }).format(value);
 }
+
+/** The server's bulk adjustment (PriceMath.Adjust, C21): + amount or × (1 + percent / 100), rounded, a negative result held at 0. */
+export function adjustPrice(price: number, mode: 'Amount' | 'Percent', value: number, rounding: 'None' | 'Whole' | 'Nearest5' | 'Nearest10'): { price: number; clamped: boolean } {
+  const raw = mode === 'Amount' ? price + value : price * (1 + value / 100);
+  const step = rounding === 'Whole' ? 1 : rounding === 'Nearest5' ? 5 : rounding === 'Nearest10' ? 10 : 0;
+  const rounded = step > 0 ? roundToStep(raw, step) : round2(raw);
+  return rounded < 0 ? { price: 0, clamped: true } : { price: rounded, clamped: false };
+}

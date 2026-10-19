@@ -5,6 +5,7 @@ import { ContractPricingFacade } from './state/contract-pricing.facade';
 import { PayersFacade } from './state/payers.facade';
 import { PriceListEditorFacade } from './state/price-list-editor.facade';
 import { ServiceNamesStore } from './state/service-names.store';
+import { ServicePricesFacade } from './state/service-prices.facade';
 
 /** Unsaved prices ask before the editor is left (the page owns the dialog). */
 const leaveEditor: CanDeactivateFn<PriceListEditorPage> = (page) => page.canLeave();
@@ -26,6 +27,12 @@ export const PRICING_ROUTES: Routes = [
     providers: [PriceListEditorFacade, ServiceNamesStore],
     canDeactivate: [leaveEditor],
     loadComponent: () => import('./pages/price-list-editor.page').then((m) => m.PriceListEditorPage),
+  },
+  {
+    // CP-33b Service prices (CR 2026-10-19 C22): `?serviceId=` carries the chosen service
+    path: 'service-prices',
+    providers: [ServicePricesFacade],
+    loadComponent: () => import('./pages/service-prices.page').then((m) => m.ServicePricesPage),
   },
   {
     path: 'contract-pricing',

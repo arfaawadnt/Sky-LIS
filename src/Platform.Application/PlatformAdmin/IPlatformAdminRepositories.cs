@@ -191,3 +191,39 @@ public interface IPortalAddressOptions
 {
     string PortalDomain { get; }
 }
+
+// Location hierarchy under a governorate (change request 2026-10-19, A2): one repository per level, each listing its
+// rows per parent (small lists, never paged: the Locations drawer shows a column per level).
+
+public interface ICityRepository : IRepository<City>
+{
+    Task<bool> NameExistsAsync(Guid governorateId, string nameEn, Guid? exceptId, CancellationToken cancellationToken);
+
+    /// <summary>GEO-112: an active district belongs to the city.</summary>
+    Task<bool> HasActiveDistrictsAsync(Guid cityId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<LocationListItem>> ListAsync(Guid governorateId, string? search, bool? isActive, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PublicCity>> ListPublicAsync(Guid? governorateId, CancellationToken cancellationToken);
+}
+
+public interface IDistrictRepository : IRepository<District>
+{
+    Task<bool> NameExistsAsync(Guid cityId, string nameEn, Guid? exceptId, CancellationToken cancellationToken);
+
+    /// <summary>GEO-112: an active area belongs to the district.</summary>
+    Task<bool> HasActiveAreasAsync(Guid districtId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<LocationListItem>> ListAsync(Guid cityId, string? search, bool? isActive, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PublicDistrict>> ListPublicAsync(Guid? cityId, CancellationToken cancellationToken);
+}
+
+public interface IAreaRepository : IRepository<Area>
+{
+    Task<bool> NameExistsAsync(Guid districtId, string nameEn, Guid? exceptId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<LocationListItem>> ListAsync(Guid districtId, string? search, bool? isActive, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PublicArea>> ListPublicAsync(Guid? districtId, CancellationToken cancellationToken);
+}

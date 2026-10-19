@@ -76,14 +76,14 @@ public sealed class PatientQueryRulesTests
     {
         var key = PatientNameNormalizer.Normalize("mohamed  ahmed");
 
-        Assert.Equal(SimilarMatch.Exact, FindSimilarPatientsHandler.Classify(key, "01001234567", Row("Mohamed Ahmed Ali", null, "01001234567")));
-        Assert.Equal(SimilarMatch.Mobile, FindSimilarPatientsHandler.Classify(key, "01001234567", Row("Sara Ali", null, "01001234567")));
-        Assert.Equal(SimilarMatch.Name, FindSimilarPatientsHandler.Classify(key, "01001234567", Row("Ahmed Mohamed", null, "01112223333")));
-        Assert.Null(FindSimilarPatientsHandler.Classify(key, "01001234567", Row("Mohamed Ali", null, "01112223333")));
+        Assert.Equal(SimilarMatch.Exact, FindSimilarPatientsHandler.Classify(key, ["01001234567"], Row("Mohamed Ahmed Ali", null, "01001234567")));
+        Assert.Equal(SimilarMatch.Mobile, FindSimilarPatientsHandler.Classify(key, ["01001234567"], Row("Sara Ali", null, "01001234567")));
+        Assert.Equal(SimilarMatch.Name, FindSimilarPatientsHandler.Classify(key, ["01001234567"], Row("Ahmed Mohamed", null, "01112223333")));
+        Assert.Null(FindSimilarPatientsHandler.Classify(key, ["01001234567"], Row("Mohamed Ali", null, "01112223333")));
 
         var arabicKey = PatientNameNormalizer.Normalize("محمد احمد");
-        Assert.Equal(SimilarMatch.Exact, FindSimilarPatientsHandler.Classify(arabicKey, "01112223333", Row("Mohamed Ahmed", "محمد أحمد", "01112223333")));
-        Assert.Null(FindSimilarPatientsHandler.Classify(PatientNameNormalizer.Normalize("Dr. Mohammed"), null, Row("Mohammed Ahmed", null, null)));
+        Assert.Equal(SimilarMatch.Exact, FindSimilarPatientsHandler.Classify(arabicKey, ["01112223333"], Row("Mohamed Ahmed", "محمد أحمد", "01112223333")));
+        Assert.Null(FindSimilarPatientsHandler.Classify(PatientNameNormalizer.Normalize("Dr. Mohammed"), [], Row("Mohammed Ahmed", null, null)));
     }
 
     [Fact]

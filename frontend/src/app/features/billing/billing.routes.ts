@@ -44,6 +44,11 @@ export const BILLING_ROUTES: Routes = [
         providers: [CashClosingFacade],
         loadComponent: () => import('./pages/cash-closing.page').then((m) => m.CashClosingPage),
       },
+      {
+        // CP-30b set-up list (change request 2026-10-19): nav entry under Setup, billing.view; writes need billing.manage
+        path: 'payment-methods',
+        loadComponent: () => import('./pages/payment-methods.page').then((m) => m.PaymentMethodsPage),
+      },
     ],
   },
 ];

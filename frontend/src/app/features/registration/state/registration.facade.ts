@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, resource, signal } from '@angular/core';
 
-import type { PaymentMethod } from '../../../core/api/billing.contracts';
+import type { PaymentMethod, PaymentMethodOption } from '../../../core/api/billing.contracts';
 import type { PatientSummary } from '../../../core/api/patients.contracts';
 import type { TierOption } from '../../../core/api/pricing.contracts';
 import type {
@@ -17,6 +17,7 @@ import type {
 import { AuthStore } from '../../../core/auth/auth.store';
 import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { mutation } from '../../../core/state/mutation';
+import { RegistrationPaymentMethodsApi } from '../data/payment-methods.api';
 import { RegistrationApi } from '../data/registration.api';
 import { discountAmount, discountPercent, round2, utcOffsetMinutes } from '../data/registration-format';
 
@@ -47,6 +48,7 @@ export interface DiscountState {
 }
 
 export interface PaymentState {
+  /** The kind (the money semantics); with definitions (CP-30b, `selectMethod`) it follows the chosen one. */
   readonly method: PaymentMethod;
   /** null = the amount due. */
   readonly amount: number | null;
@@ -70,6 +72,7 @@ const EMPTY_PAYMENT: PaymentState = { method: 'Cash', amount: null, reference: '
 @Injectable()
 export class RegistrationFacade {
   private readonly api = inject(RegistrationApi);
+  private readonly paymentMethods = inject(RegistrationPaymentMethodsApi);
   private readonly auth = inject(AuthStore);
   private readonly device = inject(DeviceIdentityService);
 
@@ -89,6 +92,12 @@ export class RegistrationFacade {
   readonly treasuries = resource({
     params: () => (this.visitId() === null ? { deviceId: this.device.deviceId() } : undefined),
     loader: ({ params, abortSignal }) => this.api.myTreasuries(params.deviceId, abortSignal),
+  });
+
+  /** The laboratory's active payment methods (CP-30b, change request 2026-10-19), for new visits like the treasuries. */
+  readonly methods = resource({
+    params: () => (this.visitId() === null ? { deviceId: this.device.deviceId() } : undefined),
+    loader: ({ abortSignal }) => this.paymentMethods.options(abortSignal),
   });
 
   readonly visit = resource({
@@ -179,6 +188,25 @@ export class RegistrationFacade {
   /** True once a treasury is approved for this user on this device in the session branch (BR-27); without one the visit is saved unpaid. */
   readonly hasTreasury = computed(() => (this.treasuries.value() ?? []).length > 0);
 
+  /** The definitions the panel offers in pick-list order; empty = the four kinds with the legacy rule. */
+  readonly methodOptions = computed<readonly PaymentMethodOption[]>(() => this.methods.value() ?? []);
+
+  /** The chosen definition's code (CP-30b); '' = the first offered one. */
+  readonly methodCode = signal('');
+
+  /** The chosen definition (the first one until the cashier picks another), or null without definitions. */
+  readonly selectedMethod = computed<PaymentMethodOption | null>(() => {
+    const options = this.methodOptions();
+    const code = this.methodCode();
+    return options.find((option) => option.code === code) ?? options[0] ?? null;
+  });
+
+  /** BIL-003 as the panel knows it: the definition's rule, or "every kind but cash" without definitions (BR-26). */
+  readonly referenceRequired = computed(() => {
+    const selected = this.selectedMethod();
+    return selected === null ? this.payment().method !== 'Cash' : selected.requiresReference;
+  });
+
   /** The amount the payment panel records (the due amount unless typed), never negative; nothing when no treasury is approved (the page says so). */
   readonly paymentAmount = computed(() => {
     if (!this.hasTreasury()) {
@@ -236,7 +264,7 @@ export class RegistrationFacade {
         blockers.push('paymentTreasury');
       }
 
-      if (payment.method !== 'Cash' && payment.reference.trim() === '') {
+      if (this.referenceRequired() && payment.reference.trim() === '') {
         blockers.push('paymentReference');
       }
 
@@ -276,11 +304,13 @@ export class RegistrationFacade {
 
   readonly pay = mutation((visitId: string) => {
     const payment = this.payment();
+    const selected = this.selectedMethod();
     return this.api.pay({
       visitId,
       amount: this.paymentAmount(),
-      method: payment.method,
-      reference: payment.method === 'Cash' ? null : blank(payment.reference),
+      method: selected?.kind ?? payment.method,
+      ...(selected === null ? {} : { methodCode: selected.code }),
+      reference: this.referenceRequired() ? blank(payment.reference) : null,
       treasuryId: payment.treasuryId,
       deviceId: this.device.deviceId(),
     });
@@ -344,6 +374,12 @@ export class RegistrationFacade {
     this.payment.update((payment) => ({ ...payment, ...change }));
   }
 
+  /** The cashier picks one of the laboratory's methods (CP-30b): its kind becomes the payment's kind. */
+  selectMethod(option: PaymentMethodOption): void {
+    this.methodCode.set(option.code);
+    this.payment.update((payment) => ({ ...payment, method: option.kind }));
+  }
+
   /** Adds typed services that are not on the draft yet; returns the codes that were already there. */
   addServices(services: readonly Omit<DraftLine, 'reserved'>[]): readonly string[] {
     const present = new Set(this.lines().map((line) => line.serviceId));
@@ -380,6 +416,7 @@ export class RegistrationFacade {
     this.diagnoses.reload();
     this.discountReasons.reload();
     this.treasuries.reload();
+    this.methods.reload();
     this.visit.reload();
     this.check.reload();
   }
@@ -393,6 +430,7 @@ export class RegistrationFacade {
     this.answers.set({});
     this.discount.set(EMPTY_DISCOUNT);
     this.payment.update((payment) => ({ ...EMPTY_PAYMENT, treasuryId: payment.treasuryId }));
+    this.methodCode.set('');
     this.register.reset();
     this.addLines.reset();
     this.pay.reset();

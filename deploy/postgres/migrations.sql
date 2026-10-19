@@ -6200,5 +6200,328 @@ BEGIN
     VALUES ('20261013211359_MembershipResultsDensity', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.refunds DROP CONSTRAINT ck_refunds_reference_for_non_cash;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.payments DROP CONSTRAINT ck_payments_reference_for_non_cash;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.refunds ADD method_code character varying(20);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.payments ADD method_code character varying(20);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.payers ADD email character varying(254);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.payers ADD phone1 character varying(32);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.payers ADD phone2 character varying(32);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.payers ADD whatsapp character varying(32);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.patients ADD area_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.patients ADD city_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.patients ADD district_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.patients ADD second_phone character varying(16);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    CREATE TABLE saas.cities (
+        id uuid NOT NULL,
+        governorate_id uuid NOT NULL,
+        name_en character varying(100) NOT NULL,
+        name_ar character varying(100) NOT NULL,
+        is_active boolean NOT NULL,
+        created_at_utc timestamp with time zone NOT NULL,
+        created_by_user_id uuid,
+        created_by_display_name character varying(200),
+        modified_at_utc timestamp with time zone,
+        modified_by_user_id uuid,
+        modified_by_display_name character varying(200),
+        CONSTRAINT pk_cities PRIMARY KEY (id),
+        CONSTRAINT fk_cities_governorate_governorate_id FOREIGN KEY (governorate_id) REFERENCES saas.governorates (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    CREATE TABLE app.payment_methods (
+        id uuid NOT NULL,
+        tenant_id uuid NOT NULL,
+        code character varying(20) NOT NULL,
+        name_en character varying(100) NOT NULL,
+        name_ar character varying(100) NOT NULL,
+        kind character varying(40) NOT NULL,
+        requires_reference boolean NOT NULL,
+        is_active boolean NOT NULL,
+        sequence integer NOT NULL,
+        created_at_utc timestamp with time zone NOT NULL,
+        created_by_user_id uuid,
+        created_by_display_name character varying(200),
+        modified_at_utc timestamp with time zone,
+        modified_by_user_id uuid,
+        modified_by_display_name character varying(200),
+        CONSTRAINT pk_payment_methods PRIMARY KEY (tenant_id, id),
+        CONSTRAINT ck_payment_methods_kind_domain CHECK ("kind" IN ('Cash', 'Card', 'Pos', 'Transfer')),
+        CONSTRAINT ck_payment_methods_sequence CHECK (sequence >= 0 AND sequence <= 9999)
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    CREATE TABLE saas.districts (
+        id uuid NOT NULL,
+        city_id uuid NOT NULL,
+        name_en character varying(100) NOT NULL,
+        name_ar character varying(100) NOT NULL,
+        is_active boolean NOT NULL,
+        created_at_utc timestamp with time zone NOT NULL,
+        created_by_user_id uuid,
+        created_by_display_name character varying(200),
+        modified_at_utc timestamp with time zone,
+        modified_by_user_id uuid,
+        modified_by_display_name character varying(200),
+        CONSTRAINT pk_districts PRIMARY KEY (id),
+        CONSTRAINT fk_districts_cities_city_id FOREIGN KEY (city_id) REFERENCES saas.cities (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    CREATE TABLE saas.areas (
+        id uuid NOT NULL,
+        district_id uuid NOT NULL,
+        name_en character varying(100) NOT NULL,
+        name_ar character varying(100) NOT NULL,
+        is_active boolean NOT NULL,
+        created_at_utc timestamp with time zone NOT NULL,
+        created_by_user_id uuid,
+        created_by_display_name character varying(200),
+        modified_at_utc timestamp with time zone,
+        modified_by_user_id uuid,
+        modified_by_display_name character varying(200),
+        CONSTRAINT pk_areas PRIMARY KEY (id),
+        CONSTRAINT fk_areas_district_district_id FOREIGN KEY (district_id) REFERENCES saas.districts (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.refunds ADD CONSTRAINT ck_refunds_reference_for_non_cash CHECK (method = 'Cash' OR method_code IS NOT NULL OR reference IS NOT NULL);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.payments ADD CONSTRAINT ck_payments_reference_for_non_cash CHECK (method = 'Cash' OR method_code IS NOT NULL OR reference IS NOT NULL);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    CREATE INDEX ix_patients_tenant_id_second_phone ON app.patients (tenant_id, second_phone);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    CREATE INDEX ix_areas_district_id ON saas.areas (district_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    CREATE INDEX ix_cities_governorate_id ON saas.cities (governorate_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    CREATE INDEX ix_districts_city_id ON saas.districts (city_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    CREATE UNIQUE INDEX ix_payment_methods_tenant_id_code ON app.payment_methods (tenant_id, code);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    CREATE INDEX ix_payment_methods_tenant_id_is_active_sequence ON app.payment_methods (tenant_id, is_active, sequence);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    ALTER TABLE app.payment_methods ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE app.payment_methods FORCE ROW LEVEL SECURITY;
+    CREATE POLICY tenant_isolation ON app.payment_methods
+        USING (
+            tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid
+            OR current_setting('app.bypass_rls', true) = 'on'
+        )
+        WITH CHECK (
+            tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid
+            OR current_setting('app.bypass_rls', true) = 'on'
+        );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    -- ---------------------------------------------------------------------------------------------------------------------
+    -- 2026-10-19 Payment methods (change request LIS-CR-003, P-C10): the set-up list app.payment_methods, method_code on
+    -- payments and refunds. Appended to the PrototypeGaps migration after EF created the table and the columns. Idempotent.
+    -- ---------------------------------------------------------------------------------------------------------------------
+
+    -- (1) Every existing client starts with the four default methods (CASH, CARD, POS, TRANSFER); the platform tenant takes
+    --     none and a tenant that already defined a code keeps its own row (ON CONFLICT DO NOTHING on (tenant_id, code)).
+    INSERT INTO app.payment_methods (tenant_id, id, code, name_en, name_ar, kind, requires_reference, is_active, sequence, created_at_utc)
+    SELECT t.id, gen_random_uuid(), d.code, d.name_en, d.name_ar, d.kind, d.requires_reference, true, d.sequence, now()
+    FROM saas.tenants t
+    CROSS JOIN (VALUES
+        ('CASH', 'Cash', 'نقدي', 'Cash', false, 1),
+        ('CARD', 'Card', 'بطاقة', 'Card', true, 2),
+        ('POS', 'POS', 'نقطة بيع', 'Pos', true, 3),
+        ('TRANSFER', 'Bank transfer', 'تحويل بنكي', 'Transfer', true, 4)) AS d (code, name_en, name_ar, kind, requires_reference, sequence)
+    WHERE t.id <> '00000000-0000-0000-0000-000000000001'
+    ON CONFLICT (tenant_id, code) DO NOTHING;
+
+    -- (2) The payment guard keeps method_code immutable like the other posting facts (a payment changes only by its void).
+    CREATE OR REPLACE FUNCTION app.billing_guard_payment() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    BEGIN
+        IF TG_OP = 'DELETE' THEN
+            RAISE EXCEPTION 'payments are never deleted (receipt %)', OLD.receipt_number;
+        END IF;
+
+        IF OLD.status = 'Voided' THEN
+            RAISE EXCEPTION 'a voided payment is frozen (receipt %)', OLD.receipt_number;
+        END IF;
+
+        IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
+           OR NEW.id IS DISTINCT FROM OLD.id
+           OR NEW.visit_id IS DISTINCT FROM OLD.visit_id
+           OR NEW.receipt_number IS DISTINCT FROM OLD.receipt_number
+           OR NEW.amount IS DISTINCT FROM OLD.amount
+           OR NEW.method IS DISTINCT FROM OLD.method
+           OR NEW.method_code IS DISTINCT FROM OLD.method_code
+           OR NEW.reference IS DISTINCT FROM OLD.reference
+           OR NEW.treasury_id IS DISTINCT FROM OLD.treasury_id
+           OR NEW.device_id IS DISTINCT FROM OLD.device_id
+           OR NEW.cashier_user_id IS DISTINCT FROM OLD.cashier_user_id
+           OR NEW.branch_id IS DISTINCT FROM OLD.branch_id
+           OR NEW.batch_id IS DISTINCT FROM OLD.batch_id
+           OR NEW.paid_at_utc IS DISTINCT FROM OLD.paid_at_utc THEN
+            RAISE EXCEPTION 'a payment changes only by its void (receipt %)', OLD.receipt_number;
+        END IF;
+
+        RETURN NEW;
+    END
+    $fn$;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    -- 5. Change request 2026-10-19 (LIS-CR-003 A2, migration PrototypeGaps): the location hierarchy under a governorate.
+    --    Grants for the runtime role on the three new saas tables (no deletes: rows are deactivated) and the per-parent
+    --    unique English names (case-insensitive, like ux_governorates_country_name). No seed rows: the business owner
+    --    enters the cities of each governorate (intake LIS-INT-PLT-001 §17). Idempotent.
+    GRANT SELECT, INSERT, UPDATE ON saas.cities, saas.districts, saas.areas TO lis_app;
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_cities_governorate_name ON saas.cities (governorate_id, lower(name_en));
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_districts_city_name ON saas.districts (city_id, lower(name_en));
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_areas_district_name ON saas.areas (district_id, lower(name_en));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261019131901_PrototypeGaps') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261019131901_PrototypeGaps', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

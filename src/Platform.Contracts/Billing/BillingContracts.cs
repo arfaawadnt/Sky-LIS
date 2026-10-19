@@ -6,16 +6,36 @@ namespace Platform.Contracts.Billing;
 
 // ---- requests -------------------------------------------------------------------------------------------------
 
-/// <summary>T1 (CP-23; BR-26 from the registration page). The device id is the browser's identity (BR-27).</summary>
-public sealed record RecordPaymentRequest(Guid VisitId, decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId);
+/// <summary>
+/// T1 (CP-23; BR-26 from the registration page). The device id is the browser's identity (BR-27). <paramref name="MethodCode"/>
+/// (change request 2026-10-19) names the laboratory's payment method definition: when present its kind and reference rule
+/// apply; without it <paramref name="Method"/> is the kind and every kind but cash needs a reference.
+/// </summary>
+public sealed record RecordPaymentRequest(Guid VisitId, decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId, string? MethodCode = null);
 
 public sealed record VoidPaymentRequest(string Reason);
 
 /// <summary>T3 (CP-24): <paramref name="ReasonId"/> is a catalogue reason of kind Refund.</summary>
-public sealed record RecordRefundRequest(Guid VisitId, decimal Amount, string Method, string? Reference, Guid ReasonId, string? Note, Guid TreasuryId, string DeviceId);
+public sealed record RecordRefundRequest(Guid VisitId, decimal Amount, string Method, string? Reference, Guid ReasonId, string? Note, Guid TreasuryId, string DeviceId, string? MethodCode = null);
 
 /// <summary>T4 (CP-27): the amount is distributed across the members in accession order.</summary>
-public sealed record PayBatchRequest(decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId);
+public sealed record PayBatchRequest(decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId, string? MethodCode = null);
+
+// ---- payment method definitions (set-up list CP-30b, change request 2026-10-19) -----------------------------------
+
+/// <summary><paramref name="Kind"/> is Cash | Card | Pos | Transfer; <paramref name="Sequence"/> orders the pick lists (default: after the last).</summary>
+public sealed record PaymentMethodRequest(string Code, string NameEn, string NameAr, string Kind, bool RequiresReference, int? Sequence);
+
+/// <summary>Everything but the code, which never changes.</summary>
+public sealed record UpdatePaymentMethodRequest(string NameEn, string NameAr, string Kind, bool RequiresReference, int Sequence);
+
+public sealed record PaymentMethodListItem(Guid Id, string Code, string NameEn, string NameAr, string Kind, bool RequiresReference, bool IsActive, int Sequence);
+
+/// <summary>An active method as the cash desk and the registration page offer it, in sequence order.</summary>
+public sealed record PaymentMethodOption(Guid Id, string Code, string NameEn, string NameAr, string Kind, bool RequiresReference);
+
+/// <summary>The defaults endpoint: how many of the four default methods were added (0 when all existed).</summary>
+public sealed record PaymentMethodDefaultsResult(int Created);
 
 /// <summary>T5 (CP-30): <paramref name="CashierUserId"/> null = every cashier; the period is half-open.</summary>
 public sealed record CloseCashDrawerRequest(Guid TreasuryId, Guid? CashierUserId, DateTimeOffset PeriodFromUtc, DateTimeOffset PeriodToUtc, decimal? CountedCash, string? Note);
@@ -56,7 +76,10 @@ public sealed record PaymentListItem(
     bool IsFrozen,
     string? VoidReason,
     string? VoidedByName,
-    DateTimeOffset? VoidedAtUtc);
+    DateTimeOffset? VoidedAtUtc,
+    string? MethodCode = null,
+    string? MethodNameEn = null,
+    string? MethodNameAr = null);
 
 public sealed record RefundListItem(
     Guid Id,
@@ -78,7 +101,10 @@ public sealed record RefundListItem(
     string CashierName,
     Guid BranchId,
     string DeviceId,
-    DateTimeOffset RefundedAtUtc);
+    DateTimeOffset RefundedAtUtc,
+    string? MethodCode = null,
+    string? MethodNameEn = null,
+    string? MethodNameAr = null);
 
 public sealed record CashClosingTotalsView(
     decimal CashPayments,
@@ -241,11 +267,14 @@ public sealed record PaymentReceiptDocument(
     DateTimeOffset? VoidedAtUtc,
     string Currency,
     string PrintedBy,
-    DateTimeOffset PrintedAtUtc);
+    DateTimeOffset PrintedAtUtc,
+    string? MethodCode = null,
+    string? MethodNameEn = null,
+    string? MethodNameAr = null);
 
 public sealed record InvoiceLine(Guid LineId, Guid ServiceId, string? ServiceCode, string? ServiceNameEn, string? ServiceNameAr, string Status, decimal ListPrice, decimal Discount, decimal PatientShare, decimal PayerShare);
 
-public sealed record InvoiceMovement(string Number, DateTimeOffset AtUtc, string Method, decimal Amount);
+public sealed record InvoiceMovement(string Number, DateTimeOffset AtUtc, string Method, decimal Amount, string? MethodCode = null, string? MethodNameEn = null, string? MethodNameAr = null);
 
 public sealed record InvoiceDocument(
     DocumentLetterhead Letterhead,
@@ -291,7 +320,10 @@ public sealed record RefundReceiptDocument(
     string CashierName,
     string Currency,
     string PrintedBy,
-    DateTimeOffset PrintedAtUtc);
+    DateTimeOffset PrintedAtUtc,
+    string? MethodCode = null,
+    string? MethodNameEn = null,
+    string? MethodNameAr = null);
 
 public sealed record CashClosingSheetDocument(
     DocumentLetterhead Letterhead,

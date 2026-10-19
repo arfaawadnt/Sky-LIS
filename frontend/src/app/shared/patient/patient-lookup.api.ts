@@ -4,8 +4,11 @@ import { firstValueFrom } from 'rxjs';
 
 import { emptyPage, type Paged } from '../../core/api/paging';
 import {
+  type AreaOption,
+  type CityOption,
   type ConditionOption,
   type CountryOption,
+  type DistrictOption,
   type CreatedPatient,
   type GovernorateOption,
   PATIENTS_API,
@@ -20,6 +23,13 @@ import {
 
 const DEFAULT_SETTINGS: PatientFormSettings = { mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true };
 
+/** What the similar-patient lookup (BR-01) is asked with: the typed name, mobile and (C3) second phone; blanks are not sent. */
+export interface SimilarQuery {
+  readonly name: string;
+  readonly mobile: string;
+  readonly secondPhone?: string;
+}
+
 /**
  * The calls a patient search/create form needs: search, similar candidates (BR-01), form settings, register, and the
  * reference lists of other modules read tolerantly (an absent or failing list is an empty one, so the form degrades to
@@ -32,6 +42,9 @@ export class PatientLookupApi {
   private countriesCache: Promise<readonly CountryOption[]> | null = null;
   private governoratesCache: Promise<readonly GovernorateOption[]> | null = null;
   private conditionsCache: Promise<readonly ConditionOption[]> | null = null;
+  private readonly citiesCache = new Map<string, Promise<readonly CityOption[]>>();
+  private readonly districtsCache = new Map<string, Promise<readonly DistrictOption[]>>();
+  private readonly areasCache = new Map<string, Promise<readonly AreaOption[]>>();
 
   /** Active files matching a number, name, mobile or national id, newest first. */
   search(q: string, pageSize: number, signal?: AbortSignal): Promise<Paged<PatientListItem>> {
@@ -39,14 +52,19 @@ export class PatientLookupApi {
     return firstValueFrom(this.http.get<Paged<PatientListItem>>(PATIENTS_API.patients, { params }), { defaultValue: emptyPage<PatientListItem>() }).then(abortable(signal));
   }
 
-  similar(name: string, mobile: string, signal?: AbortSignal): Promise<SimilarPatientsResponse> {
+  similar(query: SimilarQuery, signal?: AbortSignal): Promise<SimilarPatientsResponse> {
     const fromObject: Record<string, string> = {};
-    if (name.trim() !== '') {
-      fromObject['name'] = name.trim();
+    if (query.name.trim() !== '') {
+      fromObject['name'] = query.name.trim();
     }
 
-    if (mobile.trim() !== '') {
-      fromObject['mobile'] = mobile.trim();
+    if (query.mobile.trim() !== '') {
+      fromObject['mobile'] = query.mobile.trim();
+    }
+
+    const secondPhone = query.secondPhone?.trim() ?? '';
+    if (secondPhone !== '') {
+      fromObject['secondPhone'] = secondPhone;
     }
 
     if (Object.keys(fromObject).length === 0) {
@@ -98,6 +116,19 @@ export class PatientLookupApi {
     return this.conditionsCache;
   }
 
+  /** The active cities of a governorate (A2; empty when the platform lists none, so the form keeps its free-text city). */
+  cities(governorateId: string): Promise<readonly CityOption[]> {
+    return cached(this.citiesCache, governorateId, () => this.list(PATIENTS_API.cities, toCity, { governorateId }));
+  }
+
+  districts(cityId: string): Promise<readonly DistrictOption[]> {
+    return cached(this.districtsCache, cityId, () => this.list(PATIENTS_API.districts, toDistrict, { cityId }));
+  }
+
+  areas(districtId: string): Promise<readonly AreaOption[]> {
+    return cached(this.areasCache, districtId, () => this.list(PATIENTS_API.areas, toArea, { districtId }));
+  }
+
   private list<T>(url: string, map: (value: Record<string, unknown>) => T | null, extra: Record<string, string | number | boolean> = {}): Promise<readonly T[]> {
     const params = new HttpParams({ fromObject: { ...extra, page: 1, pageSize: 200 } });
     return firstValueFrom(this.http.get<unknown>(url, { params }), { defaultValue: [] })
@@ -130,6 +161,44 @@ function toGovernorate(value: Record<string, unknown>): GovernorateOption | null
   }
 
   return { id, nameEn, nameAr: text(value['nameAr']) ?? nameEn, countryId: text(value['countryId']) };
+}
+
+function toCity(value: Record<string, unknown>): CityOption | null {
+  const id = text(value['id']);
+  const governorateId = text(value['governorateId']);
+  const nameEn = text(value['nameEn']);
+  return id === null || governorateId === null || nameEn === null ? null : { id, governorateId, nameEn, nameAr: text(value['nameAr']) ?? nameEn };
+}
+
+function toDistrict(value: Record<string, unknown>): DistrictOption | null {
+  const id = text(value['id']);
+  const cityId = text(value['cityId']);
+  const nameEn = text(value['nameEn']);
+  return id === null || cityId === null || nameEn === null ? null : { id, cityId, nameEn, nameAr: text(value['nameAr']) ?? nameEn };
+}
+
+function toArea(value: Record<string, unknown>): AreaOption | null {
+  const id = text(value['id']);
+  const districtId = text(value['districtId']);
+  const nameEn = text(value['nameEn']);
+  return id === null || districtId === null || nameEn === null ? null : { id, districtId, nameEn, nameAr: text(value['nameAr']) ?? nameEn };
+}
+
+/** One request per parent for the session; a failed one is forgotten so the next form asks again. */
+function cached<T>(cache: Map<string, Promise<readonly T[]>>, key: string, load: () => Promise<readonly T[]>): Promise<readonly T[]> {
+  let pending = cache.get(key);
+  if (pending === undefined) {
+    pending = load().then((items) => {
+      if (items.length === 0) {
+        cache.delete(key);   // "no cities yet" is re-asked: the platform may add some while the session runs
+      }
+
+      return items;
+    });
+    cache.set(key, pending);
+  }
+
+  return pending;
 }
 
 function toCondition(value: Record<string, unknown>): ConditionOption | null {

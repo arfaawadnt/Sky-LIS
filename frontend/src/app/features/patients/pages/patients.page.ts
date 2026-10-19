@@ -85,6 +85,8 @@ export class PatientsPage {
       { key: 'gender', header: 'patients.column.gender', width: '90px', value: (row) => this.i18n.t(`patients.gender.${row.gender}`) },
       { key: 'age', header: 'patients.column.age', width: '110px', value: (row) => this.ageText(row) },
       { key: 'mobile', header: 'patients.column.mobile', mono: true, width: '140px' },
+      // C3: the second phone (LIS-CR-003 §3)
+      { key: 'secondPhone', header: 'patients.column.secondPhone', mono: true, secondary: true, width: '140px', value: (row) => row.secondPhone ?? '' },
       { key: 'nationalId', header: 'patients.column.nationalId', mono: true, secondary: true },
       { key: 'condition', header: 'patients.column.condition', secondary: true, value: (row) => this.conditionName(row.patientConditionId) },
       // CP-11 "visit count, last visit" (UAT A-09), counted by Registration

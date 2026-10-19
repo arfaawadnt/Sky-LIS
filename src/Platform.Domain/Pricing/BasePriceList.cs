@@ -157,6 +157,46 @@ public sealed class BasePriceList : AggregateRoot, ITenantScoped
         return new PriceLineChanges(added, changed);
     }
 
+    /// <summary>
+    /// L7 Bulk adjust, preview (<c>pricing.edit</c>, CR 2026-10-19 C21): every line, or the lines of <paramref name="scope"/>, priced
+    /// + amount or × (1 + percent / 100) and rounded as asked (<see cref="PriceMath.Adjust"/>); a negative result becomes 0 and is
+    /// reported. Pure: nothing changes until <see cref="ApplyAdjustment"/>. A scope id the list does not hold is refused (PRC-045).
+    /// </summary>
+    public IReadOnlyList<PriceAdjustment> PreviewAdjustment(PriceAdjustMode mode, decimal value, PriceRounding rounding, IReadOnlySet<Guid>? scope)
+    {
+        PriceMath.RequireAdjustment(mode, value);
+        if (scope is not null)
+        {
+            var held = _lines.Select(line => line.ServiceId).ToHashSet();
+            Require(scope.All(held.Contains), PricingCodes.AdjustScopeUnknown, "A selected service is not on the list.", DomainFault.Validation);
+        }
+
+        return _lines
+            .Where(line => scope is null || scope.Contains(line.ServiceId))
+            .Select(line =>
+            {
+                var adjusted = PriceMath.Adjust(line.Price, mode, value, rounding);
+                return new PriceAdjustment(line.ServiceId, line.Price, adjusted.Price, line.IsActive, adjusted.Clamped);
+            })
+            .ToList();
+    }
+
+    /// <summary>L7 Bulk adjust, apply: the rows of a preview whose price changed, through <see cref="UpsertLines"/> (one event per chunk of <see cref="MaxLinesPerUpsert"/>).</summary>
+    public PriceLineChanges ApplyAdjustment(IReadOnlyList<PriceAdjustment> rows, DateTimeOffset nowUtc)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        var inputs = rows.Where(row => row.Changed).Select(row => new PriceLineInput(row.ServiceId, row.NewPrice, row.IsActive)).ToList();
+        var (added, changed) = (0, 0);
+        foreach (var chunk in inputs.Chunk(MaxLinesPerUpsert))
+        {
+            var outcome = UpsertLines(chunk, nowUtc);
+            added += outcome.Added;
+            changed += outcome.Changed;
+        }
+
+        return new PriceLineChanges(added, changed);
+    }
+
     /// <summary>L5 Activate (<c>pricing.manage</c>). Idempotent.</summary>
     public void Activate(DateTimeOffset nowUtc)
     {
@@ -239,3 +279,9 @@ public sealed class PriceLine : Entity, ITenantScoped
 
 /// <summary>A list as Apply sees it: whether it is active and the price of every active line.</summary>
 public sealed record PriceListSnapshot(Guid ListId, string Code, bool IsActive, IReadOnlyDictionary<Guid, decimal> Prices);
+
+/// <summary>One line of a bulk adjustment (C21): the price before and after, the line's active flag and whether a negative result was clamped to 0.</summary>
+public sealed record PriceAdjustment(Guid ServiceId, decimal OldPrice, decimal NewPrice, bool IsActive, bool Clamped)
+{
+    public bool Changed => OldPrice != NewPrice;
+}

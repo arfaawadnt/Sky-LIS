@@ -66,6 +66,8 @@
           <dl class="kv">
             <dt>{{ i18n.t('patients.field.mobile') }}</dt>
             <dd class="mono" dir="ltr">{{ patient.mobile ?? '—' }}</dd>
+            <dt>{{ i18n.t('patients.field.secondPhone') }}</dt>
+            <dd class="mono" dir="ltr">{{ patient.secondPhone ?? '—' }}</dd>
             <dt>{{ i18n.t('patients.field.nationalId') }}</dt>
             <dd class="mono">{{ patient.nationalId ?? '—' }}</dd>
             <dt>{{ i18n.t('patients.field.nationality') }}</dt>
@@ -75,7 +77,15 @@
             <dt>{{ i18n.t('patients.field.governorate') }}</dt>
             <dd>{{ governorateName(patient.governorateId) ?? '—' }}</dd>
             <dt>{{ i18n.t('patients.field.city') }}</dt>
-            <dd>{{ patient.city ?? '—' }}</dd>
+            <dd>{{ locationName(patient, 'city') ?? patient.city ?? '—' }}</dd>
+            @if (locationName(patient, 'district'); as district) {
+              <dt>{{ i18n.t('patients.field.district') }}</dt>
+              <dd>{{ district }}</dd>
+            }
+            @if (locationName(patient, 'area'); as area) {
+              <dt>{{ i18n.t('patients.field.area') }}</dt>
+              <dd>{{ area }}</dd>
+            }
             <dt>{{ i18n.t('patients.field.address') }}</dt>
             <dd>{{ patient.address ?? '—' }}</dd>
             <dt>{{ i18n.t('patients.field.comments') }}</dt>

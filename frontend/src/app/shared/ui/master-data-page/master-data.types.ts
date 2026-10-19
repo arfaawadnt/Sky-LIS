@@ -61,6 +61,8 @@ export interface FieldSchema {
   readonly full?: boolean;
   /** Default value of a new record. */
   readonly defaultValue?: unknown;
+  /** i18n key of a heading rendered above this field, spanning the form (the start of a block such as "Contact"). */
+  readonly section?: string;
 }
 
 /** An extra per-row action (beyond edit and activate/deactivate), rendered as an icon button in the actions cell. */

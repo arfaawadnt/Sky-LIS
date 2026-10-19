@@ -36,9 +36,9 @@ Modules in the code (backend `src/Platform.*/<Module>`, frontend `frontend/src/a
 | Area | Modules |
 | --- | --- |
 | Platform foundation | Identity and sign-in (credential envelope, ES256 tokens, refresh sessions, OTP recovery), tenancy and row-level security, roles and permissions, branch of the session, audit trail (hash-chained), outbox, notifications, tenant settings |
-| Platform administration | Clients (tenants) and subscription, plans, wallets, countries, platform parameters, notification templates, admin dashboard |
-| Laboratory set-up | Organization (branches, roles, users), Catalogue (clinical groups, services, tests, sample types, units, comments, doctors, antibiotics, organisms and the other lists), Pricing (payers, contracts, base price lists), Treasury and treasury access requests |
-| Laboratory operations | Patients, Registration (visits, accessions, tubes), Samples, Billing (payments, refunds, cash closing), Results (worklist, review, verification, print lists), Integration (analysers, site agents) |
+| Platform administration | Clients (tenants) and subscription, plans, wallets, countries, governorates with their cities / districts / areas, platform parameters, notification templates, sessions and client login logs, admin dashboard |
+| Laboratory set-up | Organization (branches, roles, users), Catalogue (clinical groups, services, tests, sample types, units, comments, doctors, antibiotics, organisms and the other lists), Pricing (payers with contacts, contracts, base price lists with Excel import / bulk adjust / print, service prices), payment methods, Treasury and treasury access requests |
+| Laboratory operations | Patients, Registration (visits, accessions, tubes, accession details), Samples, Billing (payments, refunds, cash closing), Results (worklist, review, verification, print lists), Integration (analysers, site agents) |
 
 ## Technology
 
@@ -234,7 +234,49 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+Change request LIS-CR-003 (2026-10-19, `docs/build/CR-2026-10-19_Prototype-Gaps.md`): the *Not built* / *Partial* items of the
+client v3 / admin v4.1 prototype difference, migration `PrototypeGaps`.
+
+- **Client login logs (Super Admin, SA-08b).** Administration › *Client login logs* lists the client users' browser sessions —
+  one row per session family with client, user, login and logout (UTC), IP address, device, OS, browser, duration and status
+  (Active / Signed out / Revoked with its reason / Expired) — with filters (client, user, login and logout windows, device,
+  duration bounds, status), server sorting and paging, and a CSV export (`GET /api/v1/platform/login-logs[/export]`,
+  `platform.view`). No new data: the facts were already kept by the session store.
+- **Accession details (client, CP-10b).** Reception › *Accession details* (`/registration/accession?accession=` or `?visitId=`)
+  shows one visit in one place: a search strip (accession, patient number, mobile or name), a sticky header with the patient
+  drawer, flags, status, branch, payer and doctor, previous / next accession, and cards for the ordered tests (with *Cancel*),
+  samples (*Label*, *Collect*), results (status per unit, *Enter / Open results*), payments (account figures, receipts, *Take
+  payment*, *Refund*, *Receipt*) and documents. Reached from the visits register (*Details*) and from the registration success
+  panel. Every card asks only with its module's permission; a refusal leaves the card empty.
+- **Menu change (C11).** Treasuries, Treasury access and Payments leave the sidebar (still in scope and guarded, reached from the
+  pages that need them): the registration page's *no treasury* warning links to Treasury access, Treasury access and Treasuries link
+  to each other, the accession page's Payments card links to the payments register, and the dashboard quick action *Payments* stays.
+- **Service sequence reordering (client, CP-42b).** On Setup › Service sequence the rows move by drag and drop, ↑ / ↓ buttons,
+  Alt+↑ / Alt+↓ or a typed position; a clinical-group filter stands beside the type filter; the visible rows keep the set of numbers
+  they already occupy, so a reorder inside a filter never touches the rows outside it; *Save order* / *Discard* with a dirty strip,
+  F10 saves, leaving the page asks first. The server refuses one number for two listed services (`CAT-033`).
+- **Locations (Super Admin, SA-11b).** On Governorates a *Locations* action opens the governorate's cities, districts and areas —
+  three linked columns with search, add, rename and activate / deactivate (`tenancy.manage`; tables `saas.cities`, `saas.districts`,
+  `saas.areas`, endpoints under `/api/v1/platform/governorates/{id}/cities` … and the public lookups `/api/v1/public/cities|districts|areas`).
+  No rows are seeded: the business owner enters the cities of each governorate.
+- **Patient form: pick lists and a second phone (C3 / A2).** When the governorate has cities, the city, district and area are picked
+  from the platform's lists (free text stays otherwise); a second phone sits beside the mobile and feeds the similar-patient check.
+  The file, the register, the picker and the CSV export show them (`app.patients.city_id/district_id/area_id/second_phone`).
+- **Payment methods (client set-up, CP-30b).** Setup › *Payment methods*: the laboratory defines its own methods (code, names, kind,
+  "requires transaction reference", order), seeded with Cash, Card, POS and Bank transfer for every laboratory (existing ones by the
+  migration, new ones on provisioning); deactivate instead of delete, at least one active cash method (`BIL-052`); CSV export.
+  The cash desk and the registration payment panel offer the methods by name and ask for a reference only when the chosen method
+  requires it; receipts, invoices and the payment / refund registers name the method. API: `/api/v1/billing/payment-methods`
+  (`options`, `export`, `defaults`, update, deactivate / reactivate); payments, refunds and batch payments accept an optional
+  `methodCode` (`app.payments.method_code`, `app.refunds.method_code`).
+- **Payer contacts (C19).** Payers carry two phones, WhatsApp and e-mail (payers page *Contact* block and CSV export); a malformed value
+  is refused (`PRC-017` / `PRC-018`).
+- **Price list tools (C21).** The base price list editor gains *Download Excel* (the lines with an empty "New price" column), *Upload
+  Excel* (every row checked first, then imported all-or-nothing, `POST …/base-price-lists/{id}/import`), *Bulk adjust* (percentage or
+  amount with rounding, previewed then applied, negative results held at 0, `POST …/{id}/adjust`) and *Print*.
+- **Service prices (client, C22).** Finance › *Service prices*: every price of one catalogue service across the base price lists
+  (editable inline) and the contract tiers (`GET /api/v1/pricing/service-prices/{serviceId}`, `pricing.view`).
+- **Dependencies.** The SPA takes `exceljs` 4.4.0 (loaded on demand for the Excel tools).
 
 ### v0.14.1 — 2026-10-14
 

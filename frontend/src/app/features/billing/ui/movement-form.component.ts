@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, output, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { type AbstractControl, FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors, type ValidatorFn, Validators } from '@angular/forms';
 
-import { PAYMENT_METHODS, type BillingReasonOption, type BillingTreasuryItem, type PaymentMethod } from '../../../core/api/billing.contracts';
+import { PAYMENT_METHODS, type BillingReasonOption, type BillingTreasuryItem, type PaymentMethod, type PaymentMethodOption } from '../../../core/api/billing.contracts';
 import type { ProblemDetails } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
@@ -11,11 +11,16 @@ import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.direc
 import { FormFieldComponent } from '../../../shared/ui/form-field/form-field.component';
 import { formatMoney, hasTwoDecimals, roundMoney } from './billing-format';
 
-/** What a cashier submits: a payment (CP-23, CP-27) or a refund (CP-24, with reason and note). */
+/**
+ * What a cashier submits: a payment (CP-23, CP-27) or a refund (CP-24, with reason and note). `method` is the kind the
+ * money semantics follow; `methodCode` names the laboratory's definition (CP-30b) when one was chosen, null on a form
+ * without definitions (the server then applies the legacy rule: every kind but cash needs a reference).
+ */
 export interface MovementInput {
   readonly treasuryId: string;
   readonly amount: number;
   readonly method: PaymentMethod;
+  readonly methodCode?: string | null;
   readonly reference: string | null;
   readonly reasonId: string | null;
   readonly note: string | null;
@@ -23,20 +28,24 @@ export interface MovementInput {
 
 export type MovementMode = 'payment' | 'refund';
 
-/** The reference is mandatory for every method except cash (BR-26, BIL-003); re-run when the method changes. */
-const referenceForNonCash: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
-  const method = control.parent?.get('method')?.value as PaymentMethod | undefined;
-  const value = typeof control.value === 'string' ? control.value.trim() : '';
-  return method !== undefined && method !== 'Cash' && value === '' ? { required: true } : null;
-};
+/** The `methodCode` of a request: present only when a definition was chosen, so a form on the four kinds keeps the legacy shape. */
+export function methodCodeOf(input: Pick<MovementInput, 'methodCode'>): { readonly methodCode?: string } {
+  return typeof input.methodCode === 'string' && input.methodCode !== '' ? { methodCode: input.methodCode } : {};
+}
 
 const twoDecimals: ValidatorFn = (control: AbstractControl): ValidationErrors | null =>
   typeof control.value === 'number' && !hasTwoDecimals(control.value) ? { pattern: true } : null;
 
+const isKind = (value: string): value is PaymentMethod => (PAYMENT_METHODS as readonly string[]).includes(value);
+
 /**
  * The money form of the cash desk (dumb component): treasury approved for this device (BR-27), amount defaulting to
- * what is due and capped by it (BR-26 / BR-14), method, reference for non-cash; in refund mode a catalogue reason
- * (mandatory) and a note. Ctrl+S submits. The server decides; the form only prevents obvious refusals.
+ * what is due and capped by it (BR-26 / BR-14), method, reference when the method requires it; in refund mode a
+ * catalogue reason (mandatory) and a note. Ctrl+S submits. The server decides; the form only prevents obvious refusals.
+ *
+ * The method select offers the laboratory's active definitions (`methods`, CP-30b: code + localized name, in pick-list
+ * order) and asks for the transaction reference only when the chosen one requires it (BIL-003). Without definitions
+ * (none yet, or the read failed) it falls back to the four kinds with the legacy rule "every kind but cash".
  */
 @Component({
   selector: 'app-billing-movement-form',
@@ -58,16 +67,24 @@ const twoDecimals: ValidatorFn = (control: AbstractControl): ValidationErrors | 
         </app-form-field>
 
         <app-form-field [label]="i18n.t('billing.field.method')">
-          <select formControlName="method" (change)="onMethodChange()">
-            @for (method of methods; track method) {
-              <option [value]="method">{{ i18n.t('billing.method.' + method) }}</option>
+          <select formControlName="methodKey" (change)="onMethodChange()">
+            @if (methods().length > 0) {
+              @for (option of methods(); track option.id) {
+                <option [value]="option.code">{{ optionName(option) }}</option>
+              }
+            } @else {
+              @for (kind of kinds; track kind) {
+                <option [value]="kind">{{ i18n.t('billing.method.' + kind) }}</option>
+              }
             }
           </select>
         </app-form-field>
 
-        <app-form-field [label]="i18n.t('billing.field.reference')" [hint]="i18n.t('billing.pay.referenceHint')">
-          <input type="text" formControlName="reference" maxlength="64" autocomplete="off" />
-        </app-form-field>
+        @if (referenceRequired()) {
+          <app-form-field [label]="i18n.t('billing.field.reference')" [hint]="i18n.t('billing.pay.referenceHint')">
+            <input type="text" formControlName="reference" maxlength="64" autocomplete="off" />
+          </app-form-field>
+        }
 
         @if (mode() === 'refund') {
           <app-form-field class="full" [label]="i18n.t('billing.field.reason')">
@@ -107,10 +124,12 @@ const twoDecimals: ValidatorFn = (control: AbstractControl): ValidationErrors | 
 })
 export class MovementFormComponent {
   protected readonly i18n = inject(I18nService);
-  protected readonly methods = PAYMENT_METHODS;
+  protected readonly kinds = PAYMENT_METHODS;
 
   readonly mode = input<MovementMode>('payment');
   readonly treasuries = input.required<readonly BillingTreasuryItem[]>();
+  /** The laboratory's active payment methods in pick-list order (CP-30b); empty = the four kinds. */
+  readonly methods = input<readonly PaymentMethodOption[]>([]);
   /** The treasury in use, shared with the page so it survives between visits. */
   readonly treasuryId = model('');
   /** The amount the form proposes (remaining or refundable); also the cap. */
@@ -124,11 +143,23 @@ export class MovementFormComponent {
 
   readonly submitted = output<MovementInput>();
 
+  /** The chosen option's code, or the kind when the form runs on kinds; mirrors the `methodKey` control for the computeds. */
+  private readonly methodKey = signal<string>('Cash');
+
+  /** The chosen definition, when the form runs on definitions. */
+  protected readonly selected = computed<PaymentMethodOption | null>(() => this.methods().find((option) => option.code === this.methodKey()) ?? null);
+
+  /** The definition's rule, or "every kind but cash" on a form without definitions (BR-26, BIL-003). */
+  protected readonly referenceRequired = computed(() => {
+    const selected = this.selected();
+    return selected === null ? this.methods().length === 0 && this.methodKey() !== 'Cash' : selected.requiresReference;
+  });
+
   protected readonly form = new FormGroup({
     treasuryId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     amount: new FormControl<number | null>(null, { validators: [Validators.required, Validators.min(0.01), twoDecimals, (control) => this.capValidator(control)] }),
-    method: new FormControl<PaymentMethod>('Cash', { nonNullable: true, validators: [Validators.required] }),
-    reference: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64), referenceForNonCash] }),
+    methodKey: new FormControl<string>('Cash', { nonNullable: true, validators: [Validators.required] }),
+    reference: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64), (control) => this.referenceValidator(control)] }),
     reasonId: new FormControl('', { nonNullable: true }),
     note: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] }),
   });
@@ -161,6 +192,18 @@ export class MovementFormComponent {
         this.form.controls.reasonId.updateValueAndValidity();
       });
     });
+
+    // The definitions arrive (or change) after the form exists: a key they do not offer falls back to the first one.
+    effect(() => {
+      const options = this.methods();
+      untracked(() => {
+        const key = this.form.controls.methodKey.value;
+        const known = options.length > 0 ? options.some((option) => option.code === key) : isKind(key);
+        if (!known) {
+          this.setMethodKey(this.defaultKey());
+        }
+      });
+    });
   }
 
   /**
@@ -170,11 +213,16 @@ export class MovementFormComponent {
    */
   reset(): void {
     const due = roundMoney(Math.max(this.dueAmount(), 0));
-    this.form.reset({ treasuryId: this.treasuryId(), amount: due > 0 ? due : null, method: 'Cash', reference: '', reasonId: '', note: '' });
+    this.form.reset({ treasuryId: this.treasuryId(), amount: due > 0 ? due : null, methodKey: this.defaultKey(), reference: '', reasonId: '', note: '' });
+    this.methodKey.set(this.form.controls.methodKey.value);
   }
 
   protected name(treasury: BillingTreasuryItem): string {
     return localizedPick({ en: treasury.nameEn, ar: treasury.nameAr }, this.i18n.lang());
+  }
+
+  protected optionName(option: PaymentMethodOption): string {
+    return localizedPick({ en: option.nameEn, ar: option.nameAr }, this.i18n.lang());
   }
 
   protected reasonName(reason: BillingReasonOption): string {
@@ -182,6 +230,7 @@ export class MovementFormComponent {
   }
 
   protected onMethodChange(): void {
+    this.methodKey.set(this.form.controls.methodKey.value);
     this.form.controls.reference.updateValueAndValidity();
   }
 
@@ -190,6 +239,7 @@ export class MovementFormComponent {
   }
 
   protected submit(): void {
+    this.methodKey.set(this.form.controls.methodKey.value);
     this.form.controls.reference.updateValueAndValidity();
     if (!markAllTouched(this.form) || this.pending() || this.disabled()) {
       return;
@@ -197,16 +247,36 @@ export class MovementFormComponent {
 
     const value = this.form.getRawValue();
     this.treasuryId.set(value.treasuryId);
-    const reference = value.reference.trim();
+    const selected = this.selected();
+    const method: PaymentMethod = selected?.kind ?? (isKind(value.methodKey) ? value.methodKey : 'Cash');
+    const reference = this.referenceRequired() ? value.reference.trim() : '';   // the input shows only when required
     const note = value.note.trim();
     this.submitted.emit({
       treasuryId: value.treasuryId,
       amount: roundMoney(value.amount ?? 0),
-      method: value.method,
+      method,
+      methodCode: selected?.code ?? null,
       reference: reference === '' ? null : reference,
       reasonId: this.mode() === 'refund' && value.reasonId !== '' ? value.reasonId : null,
       note: this.mode() === 'refund' && note !== '' ? note : null,
     });
+  }
+
+  /** The first definition's code, or Cash on a form without definitions. */
+  private defaultKey(): string {
+    return this.methods()[0]?.code ?? 'Cash';
+  }
+
+  private setMethodKey(key: string): void {
+    this.form.controls.methodKey.setValue(key);
+    this.methodKey.set(key);
+    this.form.controls.reference.updateValueAndValidity();
+  }
+
+  /** BIL-003 as the form knows it: required when the chosen definition (or the legacy rule) says so. */
+  private referenceValidator(control: AbstractControl): ValidationErrors | null {
+    const value = typeof control.value === 'string' ? control.value.trim() : '';
+    return this.referenceRequired() && value === '' ? { required: true } : null;
   }
 
   /** Runs from the control's construction on, before the inputs are bound: an empty value never reads the input. */

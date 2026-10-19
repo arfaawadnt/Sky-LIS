@@ -14,7 +14,7 @@ namespace Platform.Application.Billing.Commands;
 
 /// <summary>T1 Record payment (CP-23; BR-26: the registration page calls it right after saving the visit).</summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Create)]
-public sealed record RecordPaymentCommand(Guid VisitId, decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId) : ICommand<PaymentCreated>;
+public sealed record RecordPaymentCommand(Guid VisitId, decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId, string? MethodCode = null) : ICommand<PaymentCreated>;
 
 public sealed class RecordPaymentValidator : AbstractValidator<RecordPaymentCommand>
 {
@@ -22,6 +22,7 @@ public sealed class RecordPaymentValidator : AbstractValidator<RecordPaymentComm
     {
         RuleFor(command => command.VisitId).NotEmpty();
         RuleFor(command => command.Method).NotEmpty().IsEnumName(typeof(PaymentMethod), caseSensitive: false);
+        RuleFor(command => command.MethodCode).MaximumLength(Payment.MaxMethodCodeLength);
         RuleFor(command => command.Reference).MaximumLength(Payment.MaxReferenceLength);
         RuleFor(command => command.TreasuryId).NotEmpty();
         RuleFor(command => command.DeviceId).NotEmpty().MaximumLength(CashierStation.MaxDeviceIdLength);
@@ -31,6 +32,7 @@ public sealed class RecordPaymentValidator : AbstractValidator<RecordPaymentComm
 public sealed class RecordPaymentHandler(
     IBillableVisitLookup visits,
     ITreasuryStationLookup stations,
+    IPaymentMethodRepository methods,
     IVisitAccountRepository accounts,
     IReferenceNumbers numbers,
     IUnitOfWork unitOfWork,
@@ -45,7 +47,7 @@ public sealed class RecordPaymentHandler(
         var branch = BranchScope.Require(user);
         var visit = await visits.GetAsync(command.VisitId, cancellationToken) ?? throw BillingNotFound.Visit();
         var station = await BillingStations.ResolveAsync(stations, command.TreasuryId, actor, command.DeviceId, branch, cancellationToken);
-        var method = BillingNames.Method(command.Method);
+        var method = await BillingMethods.ResolveAsync(methods, command.Method, command.MethodCode, cancellationToken);
 
         var existing = await accounts.GetForUpdateAsync(visit.VisitId, cancellationToken);
         var account = existing ?? VisitAccount.Open(visit.VisitId);
@@ -94,7 +96,7 @@ public sealed class VoidPaymentHandler(IVisitAccountRepository accounts, ICashCl
 
 /// <summary>T4 Pay all (CP-27): the amount is distributed across the members in accession order (one receipt per member).</summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Create)]
-public sealed record PayBatchCommand(Guid BatchId, decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId) : ICommand<BatchPaymentResult>;
+public sealed record PayBatchCommand(Guid BatchId, decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId, string? MethodCode = null) : ICommand<BatchPaymentResult>;
 
 public sealed class PayBatchValidator : AbstractValidator<PayBatchCommand>
 {
@@ -102,6 +104,7 @@ public sealed class PayBatchValidator : AbstractValidator<PayBatchCommand>
     {
         RuleFor(command => command.BatchId).NotEmpty();
         RuleFor(command => command.Method).NotEmpty().IsEnumName(typeof(PaymentMethod), caseSensitive: false);
+        RuleFor(command => command.MethodCode).MaximumLength(Payment.MaxMethodCodeLength);
         RuleFor(command => command.Reference).MaximumLength(Payment.MaxReferenceLength);
         RuleFor(command => command.TreasuryId).NotEmpty();
         RuleFor(command => command.DeviceId).NotEmpty().MaximumLength(CashierStation.MaxDeviceIdLength);
@@ -111,6 +114,7 @@ public sealed class PayBatchValidator : AbstractValidator<PayBatchCommand>
 public sealed class PayBatchHandler(
     IBillableVisitLookup visits,
     ITreasuryStationLookup stations,
+    IPaymentMethodRepository methods,
     IVisitAccountRepository accounts,
     IReferenceNumbers numbers,
     IUnitOfWork unitOfWork,
@@ -125,7 +129,7 @@ public sealed class PayBatchHandler(
         var branch = BranchScope.Require(user);
         var batch = await visits.GetBatchAsync(command.BatchId, cancellationToken) ?? throw BillingNotFound.Batch();
         var station = await BillingStations.ResolveAsync(stations, command.TreasuryId, actor, command.DeviceId, branch, cancellationToken);
-        var method = BillingNames.Method(command.Method);
+        var method = await BillingMethods.ResolveAsync(methods, command.Method, command.MethodCode, cancellationToken);
 
         var members = await visits.BatchMembersAsync(batch.BatchId, cancellationToken);
         var existing = await accounts.GetManyForUpdateAsync(members.Select(member => member.VisitId).ToList(), cancellationToken);

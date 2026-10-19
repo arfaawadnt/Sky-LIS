@@ -57,11 +57,22 @@ public static class PlatformAdminCodes
 
     /// <summary>The manager's mobile does not match the country (the laboratory's own mobile is <see cref="MobileInvalidForCountry"/>), so a form can mark the field (validation 2026-10-11, C-03).</summary>
     public const string ManagerMobileInvalidForCountry = "GEO-014";
+    /// <summary>A city, district or area is created or reactivated only under an active parent (change request 2026-10-19, A2).</summary>
+    public const string LocationParentInactive = "GEO-015";
     public const string IsoCodeExists = "GEO-100";
     public const string GovernorateExists = "GEO-101";
+    public const string CityExists = "GEO-102";
+    public const string DistrictExists = "GEO-103";
+    public const string AreaExists = "GEO-104";
     public const string CountryInUse = "GEO-110";
+
+    /// <summary>A city or district with active children is not deactivated; deactivate the children first.</summary>
+    public const string LocationHasActiveChildren = "GEO-112";
     public const string CountryNotFound = "GEO-404";
     public const string GovernorateNotFound = "GEO-405";
+    public const string CityNotFound = "GEO-406";
+    public const string DistrictNotFound = "GEO-407";
+    public const string AreaNotFound = "GEO-408";
 
     // Notification templates (SA-20)
     public const string TemplateCodeInvalid = "NTF-001";

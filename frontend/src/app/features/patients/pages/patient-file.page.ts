@@ -6,6 +6,7 @@ import {
   PATIENT_DOCUMENT_RULES,
   PATIENTS_PERMISSIONS,
   type MergePatientsRequest,
+  type PatientDetail,
   type PatientDocumentItem,
   type PatientVisitItem,
   type RegisterPatientRequest,
@@ -292,6 +293,17 @@ export class PatientFilePage {
 
   protected governorateName(id: string | null): string | null {
     return id === null ? null : this.optionName((this.facade.governorates.value() ?? []).find((governorate) => governorate.id === id));
+  }
+
+  /** A2: the picked city / district / area in the page language, from the names the detail carries; null when that level is not set. */
+  protected locationName(patient: PatientDetail, level: 'city' | 'district' | 'area'): string | null {
+    const location = patient.location ?? null;
+    if (location === null) {
+      return null;
+    }
+
+    const names = level === 'city' ? [location.cityNameEn, location.cityNameAr] : level === 'district' ? [location.districtNameEn, location.districtNameAr] : [location.areaNameEn, location.areaNameAr];
+    return this.optionName(names[0] === null || names[0] === undefined ? null : { nameEn: names[0], nameAr: names[1] ?? names[0] });
   }
 
   protected typeLabel(contentType: string): string {

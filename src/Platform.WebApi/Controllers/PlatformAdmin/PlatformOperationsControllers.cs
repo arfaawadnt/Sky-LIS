@@ -102,4 +102,20 @@ public sealed class PublicReferenceController(ISender sender) : ControllerBase
     [EnableRateLimiting(RateLimiting.CredentialChallenge)]
     public async Task<ActionResult<IReadOnlyList<PublicGovernorate>>> Governorates([FromQuery] Guid? countryId, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new ListPublicGovernoratesQuery(countryId), cancellationToken));
+
+    /// <summary>Active cities of a governorate (change request 2026-10-19 A2; the patient form's pick list).</summary>
+    [HttpGet("cities")]
+    [EnableRateLimiting(RateLimiting.CredentialChallenge)]
+    public async Task<ActionResult<IReadOnlyList<PublicCity>>> Cities([FromQuery] Guid? governorateId, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListPublicCitiesQuery(governorateId), cancellationToken));
+
+    [HttpGet("districts")]
+    [EnableRateLimiting(RateLimiting.CredentialChallenge)]
+    public async Task<ActionResult<IReadOnlyList<PublicDistrict>>> Districts([FromQuery] Guid? cityId, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListPublicDistrictsQuery(cityId), cancellationToken));
+
+    [HttpGet("areas")]
+    [EnableRateLimiting(RateLimiting.CredentialChallenge)]
+    public async Task<ActionResult<IReadOnlyList<PublicArea>>> Areas([FromQuery] Guid? districtId, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListPublicAreasQuery(districtId), cancellationToken));
 }

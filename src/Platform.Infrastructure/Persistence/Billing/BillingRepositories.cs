@@ -161,6 +161,7 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
         join treasury in Context.Treasuries.AsNoTracking() on payment.TreasuryId equals treasury.Id
         join cashier in Context.PlatformUsers.AsNoTracking() on payment.CashierUserId equals cashier.Id
         from voider in Context.PlatformUsers.AsNoTracking().Where(user => user.Id == payment.VoidedByUserId).DefaultIfEmpty()
+        from definition in Context.Set<PaymentMethodDefinition>().AsNoTracking().Where(candidate => candidate.Code == payment.MethodCode).DefaultIfEmpty()
         select new PaymentRow
         {
             Id = payment.Id,
@@ -168,6 +169,9 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
             VisitId = payment.VisitId,
             Amount = payment.Amount,
             Method = payment.Method,
+            MethodCode = payment.MethodCode,
+            MethodNameEn = definition == null ? null : definition.Name.En,
+            MethodNameAr = definition == null ? null : definition.Name.Ar,
             Reference = payment.Reference,
             TreasuryId = payment.TreasuryId,
             TreasuryCode = treasury.Code,
@@ -194,6 +198,7 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
         from refund in refunds
         join treasury in Context.Treasuries.AsNoTracking() on refund.TreasuryId equals treasury.Id
         join cashier in Context.PlatformUsers.AsNoTracking() on refund.CashierUserId equals cashier.Id
+        from definition in Context.Set<PaymentMethodDefinition>().AsNoTracking().Where(candidate => candidate.Code == refund.MethodCode).DefaultIfEmpty()
         select new RefundRow
         {
             Id = refund.Id,
@@ -201,6 +206,9 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
             VisitId = refund.VisitId,
             Amount = refund.Amount,
             Method = refund.Method,
+            MethodCode = refund.MethodCode,
+            MethodNameEn = definition == null ? null : definition.Name.En,
+            MethodNameAr = definition == null ? null : definition.Name.Ar,
             Reference = refund.Reference,
             ReasonId = refund.ReasonId,
             Note = refund.Note,
@@ -217,11 +225,13 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
 
     private static PaymentListItem ToItem(PaymentRow row) => new(
         row.Id, row.ReceiptNumber, row.VisitId, null, row.Amount, row.Method.ToString(), row.Reference, row.TreasuryId, row.TreasuryCode, row.TreasuryNameEn, row.TreasuryNameAr,
-        row.CashierUserId, row.CashierName, row.BranchId, row.DeviceId, row.BatchId, row.PaidAtUtc, row.Status.ToString(), row.IsFrozen, row.VoidReason, row.VoidedByName, row.VoidedAtUtc);
+        row.CashierUserId, row.CashierName, row.BranchId, row.DeviceId, row.BatchId, row.PaidAtUtc, row.Status.ToString(), row.IsFrozen, row.VoidReason, row.VoidedByName, row.VoidedAtUtc,
+        row.MethodCode, row.MethodNameEn, row.MethodNameAr);
 
     private static RefundListItem ToItem(RefundRow row) => new(
         row.Id, row.Number, row.VisitId, null, row.Amount, row.Method.ToString(), row.Reference, row.ReasonId, null, null, row.Note, row.TreasuryId, row.TreasuryCode,
-        row.TreasuryNameEn, row.TreasuryNameAr, row.CashierUserId, row.CashierName, row.BranchId, row.DeviceId, row.RefundedAtUtc);
+        row.TreasuryNameEn, row.TreasuryNameAr, row.CashierUserId, row.CashierName, row.BranchId, row.DeviceId, row.RefundedAtUtc,
+        row.MethodCode, row.MethodNameEn, row.MethodNameAr);
 
     private sealed class PaymentRow
     {
@@ -234,6 +244,12 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
         public decimal Amount { get; init; }
 
         public PaymentMethod Method { get; init; }
+
+        public string? MethodCode { get; init; }
+
+        public string? MethodNameEn { get; init; }
+
+        public string? MethodNameAr { get; init; }
 
         public string? Reference { get; init; }
 
@@ -279,6 +295,12 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
         public decimal Amount { get; init; }
 
         public PaymentMethod Method { get; init; }
+
+        public string? MethodCode { get; init; }
+
+        public string? MethodNameEn { get; init; }
+
+        public string? MethodNameAr { get; init; }
 
         public string? Reference { get; init; }
 

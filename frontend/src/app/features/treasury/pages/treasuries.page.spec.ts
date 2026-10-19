@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 
 import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
 import { TREASURY_API, TREASURY_PERMISSIONS, type TreasuryListItem } from '../../../core/api/treasury.contracts';
@@ -34,6 +35,7 @@ describe('TreasuriesPage (CP-28)', () => {
       imports: [TreasuriesPage],
       providers: [
         provideZonelessChangeDetection(),
+        provideRouter([]),   // the C11 links (RouterLink) need a router
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: PermissionsService, useValue: { can: (key: string) => allowed(key) } satisfies Pick<PermissionsService, 'can'> },

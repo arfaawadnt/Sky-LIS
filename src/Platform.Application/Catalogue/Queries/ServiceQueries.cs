@@ -64,9 +64,9 @@ public sealed class GetServiceHandler(IServiceRepository services) : IQueryHandl
         ?? throw new DomainException(ServiceCodes.NotFound, "Service not found.", DomainFault.NotFound);
 }
 
-/// <summary>CP-42: every service (filtered) in sequence order, for the inline editor.</summary>
+/// <summary>CP-42: every service (filtered by search, type and clinical group) in sequence order, for the reorder page.</summary>
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
-public sealed record ListServiceSequenceQuery(string? Search, string? Type) : IQuery<IReadOnlyList<ServiceSequenceRow>>;
+public sealed record ListServiceSequenceQuery(string? Search, string? Type, Guid? ClinicalGroupId = null) : IQuery<IReadOnlyList<ServiceSequenceRow>>;
 
 public sealed class ListServiceSequenceValidator : AbstractValidator<ListServiceSequenceQuery>
 {
@@ -80,7 +80,7 @@ public sealed class ListServiceSequenceValidator : AbstractValidator<ListService
 public sealed class ListServiceSequenceHandler(IServiceRepository services) : IQueryHandler<ListServiceSequenceQuery, IReadOnlyList<ServiceSequenceRow>>
 {
     public Task<IReadOnlyList<ServiceSequenceRow>> Handle(ListServiceSequenceQuery query, CancellationToken cancellationToken) =>
-        services.SequenceRowsAsync(query.Search, CatalogueAEnums.ServiceTypeOrNull(query.Type), cancellationToken);
+        services.SequenceRowsAsync(query.Search, CatalogueAEnums.ServiceTypeOrNull(query.Type), query.ClinicalGroupId, cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]

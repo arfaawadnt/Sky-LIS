@@ -7,7 +7,7 @@
 | Workflows / rules | WF-02 (walk-in), WF-03 (home visit), WF-04 (batch and lab-to-lab, registration steps), WF-09 (transfer and cancellation steps), WF-10 (price query side); BR-01, BR-02, BR-05, BR-06, BR-12, BR-13, BR-15, BR-24, BR-26 |
 | Domain reference | LDM synthesis `docs/knowledge/ldm/LDM_Business_Knowledge.md` §2.1 (identifiers), §2.2 (tube generation), §2.3 (Reserved), §2.4 (Rank/Relative), §3.4 (duration, frequency check, test days), §3.8 (panels, test rules, shortcuts, diagnosis), §4.1–§4.9 (registration family), §7.2 (Query, Money Transfer, Delete Patient), §13 (weaknesses) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), MODULES.md and the LDM synthesis. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.2 — 2026-10-12 (validation LIS-VR-002 open points: test-level duplicates Q23, labels Q13, VIP on the worklist Q12; v0.5.0: VIP on the opened result case Q12, Latin digits on the job order and counted wording Q13, mobile search with the trunk 0) |
+| Version | 1.3 — 2026-10-19 (change request LIS-CR-003 P-C9: Accession details page CP-10b and the C11 menu links, §18); 1.2 — 2026-10-12 (validation LIS-VR-002 open points: test-level duplicates Q23, labels Q13, VIP on the worklist Q12; v0.5.0: VIP on the opened result case Q12, Latin digits on the job order and counted wording Q13, mobile search with the trunk 0) |
 | Implemented in | `src/Platform.Domain/Registration`, `src/Platform.Contracts/Registration`, `src/Platform.Application/Registration` (commands, queries, `OrderPlanner`, read ports, policies), `src/Platform.Infrastructure/Persistence/Registration` (+ `Registration.migration.sql`), `src/Platform.WebApi/Controllers/Registration`, `frontend/src/app/features/registration`, `frontend/src/app/core/api/registration.contracts.ts`, `frontend/public/i18n/registration.{en,ar}.json` |
 | Codes | `REG-001`…`REG-099` validation and privilege refusals, `REG-100`…`REG-199` conflicts, `REG-201`…`REG-299` advisory warnings (never thrown), `REG-404`/`405`/`406` not found |
 
@@ -442,3 +442,58 @@ server decides (PAT-032 → 403, shown in the drawer); on success the drawer clo
 reloads so the name and mobile columns follow. The rule, the code and the read port are specified in LIS-INT-PAT-001 §17;
 Registration adds no table and no endpoint. The lock is judged on the row's visit (a visit without live results is judged
 patient-wide); editing from the patient file (CP-11) judges every visit of the patient.
+
+## 18. Change request 2026-10-19 (LIS-CR-003, package P-C9) — Accession details page (CP-10b) and the C11 menu links
+
+Source: `docs/build/CR-2026-10-19_Prototype-Gaps.md` §5; prototype v3 difference C9 and C11. Frontend only: Registration adds no
+table, no endpoint and no code; every read already existed and is called through `RegistrationApi` (the feature never imports
+another feature).
+
+**What changes.** A new client page **Accession details** at `/registration/accession` (`?accession=` or `?visitId=`; nav entry
+client · reception · `registration.view`) shows one visit with the actions reception needs in one place:
+
+- *Search strip* — one box (accession, patient number, mobile or name, classified as CP-10 does) run on Enter or the button, never
+  while typing. Exactly one match — or, among several, the one whose accession is exactly the text — opens; several show a
+  compact list to pick from; none says so. `GET /api/v1/registration/visits` (all days, all branches, page size 20); the
+  register's accession filter is a contains-match, so an exact lookup (previous / next, `?accession=`) narrows the answer client-side.
+- *Sticky header* — accession, patient (the CP-10 patient drawer, `patients.edit`, PAT-032 lock judged on this visit), sex and age,
+  VIP / urgent / biohazard / collected-outside flags, status, branch, registered at and by, payer and tier, doctor, treatment number,
+  batch; *previous / next accession* (number ± 1, looked up before it opens: a missing one only says so); *Edit registration*
+  (`registration.edit`) → `/registration/visits/{id}`.
+- *Ordered tests* — every line (package members under their package), code, name, type, sample number and tube type, line status
+  (cancelled rows highlighted and kept with reason, user and time), list price, patient and payer shares, expected result, the result
+  status of the line (from the Results module, see below), *Cancel* on a live top-level line (`registration.cancel`; the existing cancel
+  dialog opens with the row preselected, BR-15).
+- *Samples* (`samples.view`) — `GET /api/v1/samples?visitId=`: number, unit, type and condition, status, collected / received times,
+  rejection reason; *Label* (the registration label of the tube) and *Collect* while the sample is Ordered (`samples.create`, a confirm,
+  then `POST /api/v1/samples/scan` with mode `Collect` — the phlebotomy scan of CP-14). With auto-collect on (Release 1) the button
+  rarely shows.
+- *Results* (`results.view`) — `GET /api/v1/results?visitId=`: the status of every report unit the user may see, its result count,
+  panic / delta / printed marks, the count of units and results hidden by the user's result rights; *Enter results* (`results.create`)
+  / *Open results* → `/results/by-accession?accession=`.
+- *Payments* (`billing.view`) — `GET /api/v1/billing/visits/{id}/account`: patient share, paid, refunded, remaining, refundable and the
+  balance status; posted payments and refunds (receipt number, method and reference, amount, cashier and treasury, time; voided
+  payments struck through); *Take payment* (`billing.create`) → `/billing/payments?visitId=`, *Refund* (`billing.approve`) →
+  `/billing/refunds?visitId=`, *Receipt* prints a payment's receipt through the existing receipt document, *All payments* → the
+  payments register (C11). When Billing refuses the account, the visit's own balance (`VisitDetail.balance`) gives the figures.
+- *Documents* — labels, job order (print and on screen).
+- Keyboard: Enter in the search box runs it, Esc closes the match list and the dialogs.
+
+Entry points: the visits register (CP-10) row action *Details*; the registration success panel's *Accession details* button
+(`?visitId=`). C11 links: the registration page's *no treasury* warning links to `/treasury/access`; the Treasury access page shows a
+*Treasuries* button for `treasury.manage`; the Treasuries page links back to *Treasury access*.
+
+**Rules kept.** VIP identity stays masked for users without See-VIP (the server masks `VisitDetail.patient`; the page shows the
+masked label and offers no patient drawer). Every button is affordance (`*appCan`); the server decides. Each card's read is asked
+only with the permission its module checks and read tolerantly: a refusal or an absent module is an empty card, never a broken page.
+A line's result status is the earliest stage among its live results (a profile is Complete only when every test is); a package shows
+the earliest of its members; Cancelled results never hide a live one.
+
+**Open questions and assumptions.**
+
+- Q31 — *Collect* from the desk: assumed allowed for any user holding `samples.create` (the same right as the CP-14 scan). If the
+  business wants collection confined to the phlebotomy page, the button is removed (one line).
+- Q32 — Previous / next by accession number ± 1 crosses branches and days; a visit the user may not open (another branch without the
+  right) answers the server's refusal. Assumed acceptable, as on the results page.
+- Q33 — The search opens a single match at once, including a single name match. Assumed wanted (the desk types an accession most of
+  the time); the list can be forced by widening the text.

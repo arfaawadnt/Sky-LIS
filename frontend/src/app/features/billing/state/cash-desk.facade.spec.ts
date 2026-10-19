@@ -88,4 +88,21 @@ describe('CashDeskFacade (BR-27, UAT D-08)', () => {
     await tick();
     expect(desk.approved().map((item) => item.code)).toEqual(['MAIN']);
   });
+
+  it("reads the laboratory's payment methods for the movement forms, falls back to no options on a refusal and re-reads them on refresh (CP-30b)", async () => {
+    await tick();
+    expect(desk.methodOptions()).toEqual([]);
+    backend.expectOne(BILLING_API.paymentMethodOptions).flush([{ id: 'pm-cash', code: 'CASH', nameEn: 'Cash', nameAr: 'نقدي', kind: 'Cash', requiresReference: false }]);
+    await tick();
+    expect(desk.methodOptions().map((option) => option.code)).toEqual(['CASH']);
+
+    desk.refresh();
+    await tick();
+    backend.expectOne(BILLING_API.paymentMethodOptions).flush({ type: 'about:blank', title: 'Forbidden', status: 403, code: 'AUTH-403' }, { status: 403, statusText: 'Forbidden' });
+    await tick();
+    expect(desk.methodOptions()).toEqual([]);   // the forms run on the four kinds until a read succeeds
+
+    backend.match(() => true).forEach((request) => request.flush([]));
+    backend.verify();
+  });
 });

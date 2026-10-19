@@ -20,13 +20,14 @@ public sealed class Refund : Entity, ITenantScoped
         DeviceId = string.Empty;
     }
 
-    internal Refund(Guid visitId, string number, decimal amount, PaymentMethod method, string? reference, Guid reasonId, string? note, CashierStation station, string deviceId, DateTimeOffset nowUtc)
+    internal Refund(Guid visitId, string number, decimal amount, PaymentMethodUse method, string? reference, Guid reasonId, string? note, CashierStation station, string deviceId, DateTimeOffset nowUtc)
         : base(Guid.CreateVersion7())
     {
         VisitId = visitId;
         Number = number;
         Amount = amount;
-        Method = method;
+        Method = method.Kind;
+        MethodCode = method.Code;
         Reference = reference;
         ReasonId = reasonId;
         Note = note;
@@ -47,6 +48,9 @@ public sealed class Refund : Entity, ITenantScoped
     public decimal Amount { get; private set; }
 
     public PaymentMethod Method { get; private set; }
+
+    /// <summary>The code of the payment method definition at posting time (change request 2026-10-19); null on legacy rows.</summary>
+    public string? MethodCode { get; private set; }
 
     public string? Reference { get; private set; }
 

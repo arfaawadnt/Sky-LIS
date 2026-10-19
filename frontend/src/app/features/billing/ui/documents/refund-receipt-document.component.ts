@@ -5,7 +5,7 @@ import { I18nService } from '../../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../../shared/forms/localized-text';
 import { Code128Component } from '../../../../shared/print/code128.component';
 import { DocumentFrameComponent } from '../../../../shared/print/document-frame.component';
-import { formatPrintDateTime, formatPrintMoney } from '../billing-format';
+import { formatPrintDateTime, formatPrintMoney, movementMethodLabel } from '../billing-format';
 import { branchOf } from './receipt-document.component';
 
 /** The refund receipt (A5, CP-24; LDM §10.8 "for patient signature"): amount, method, reason and the signature boxes. */
@@ -33,7 +33,7 @@ import { branchOf } from './receipt-document.component';
             <th scope="row">{{ i18n.t('billing.field.patient') }}</th>
             <td>{{ doc().patientName ?? '—' }} @if (doc().patientNumber; as number) {<span class="muted mono">({{ number }})</span>}</td>
           </tr>
-          <tr><th scope="row">{{ i18n.t('billing.field.method') }}</th><td>{{ i18n.t('billing.method.' + doc().method) }}</td></tr>
+          <tr><th scope="row">{{ i18n.t('billing.field.method') }}</th><td>{{ method() }}</td></tr>
           @if (doc().reference; as reference) {
             <tr><th scope="row">{{ i18n.t('billing.field.reference') }}</th><td class="mono">{{ reference }}</td></tr>
           }
@@ -65,6 +65,9 @@ export class RefundReceiptDocumentComponent {
   protected readonly branch = computed(() => branchOf(this.doc().letterhead.branchNameEn, this.doc().letterhead.branchNameAr, this.i18n.lang()));
 
   protected readonly treasury = computed(() => localizedPick({ en: this.doc().treasuryNameEn, ar: this.doc().treasuryNameAr }, this.i18n.lang()));
+
+  /** The laboratory's method name with its code (CP-30b), or the kind on a legacy refund. */
+  protected readonly method = computed(() => movementMethodLabel((key) => this.i18n.t(key), this.i18n.lang(), this.doc()));
 
   protected readonly reason = computed(() => {
     const name = localizedPick({ en: this.doc().reasonNameEn ?? '', ar: this.doc().reasonNameAr ?? '' }, this.i18n.lang());

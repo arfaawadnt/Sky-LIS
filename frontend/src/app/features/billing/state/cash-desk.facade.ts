@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, linkedSignal, resource, type ResourceRef } from '@angular/core';
 
-import type { BillingTreasuryItem } from '../../../core/api/billing.contracts';
+import type { BillingTreasuryItem, PaymentMethodOption } from '../../../core/api/billing.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { BillingApi } from '../data/billing.api';
@@ -42,7 +42,19 @@ export class CashDeskFacade {
     loader: ({ abortSignal }) => this.api.autoPrintReceipt(abortSignal),
   });
 
+  /**
+   * The laboratory's active payment methods in pick-list order (CP-30b, change request 2026-10-19): the movement form
+   * offers them and asks for a reference only when the chosen one requires it. Keyed by the signed-in user like the
+   * treasuries. An empty answer (no definitions yet, or a refused read) leaves the form on the four kinds.
+   */
+  readonly methods = resource({
+    params: () => ({ userId: this.auth.currentUser()?.id ?? '' }),
+    loader: ({ abortSignal }) => this.api.paymentMethodOptions(abortSignal),
+  });
+
   readonly approved = computed<readonly BillingTreasuryItem[]>(() => (this.treasuries.hasValue() ? this.treasuries.value() : []));
+
+  readonly methodOptions = computed<readonly PaymentMethodOption[]>(() => (this.methods.hasValue() ? this.methods.value() : []));
 
   /** No approved treasury on this device: the pages point the cashier to the treasury-access request (CP-29). */
   readonly hasStation = computed(() => this.approved().length > 0);
@@ -60,6 +72,7 @@ export class CashDeskFacade {
   refresh(): void {
     reloadWhenSettled(this.treasuries);
     reloadWhenSettled(this.autoPrintReceipt);
+    reloadWhenSettled(this.methods);
   }
 
   /** Prints only when the laboratory asked for it; an unknown answer (still loading, refused, failed) does not print (UAT A-05). */

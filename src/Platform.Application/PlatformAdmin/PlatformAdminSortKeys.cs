@@ -17,4 +17,7 @@ public static class PlatformAdminSortKeys
     public static readonly SortKeys PcrKits = new("name", "analyserModel");
     public static readonly SortKeys CodeSystems = new("name", "version");
     public static readonly SortKeys RuleTemplates = new("name", "clinicalGroupName");
+
+    /// <summary>SA-08b client login logs (LIS-CR-003 §2): login, logout, client (English name; <c>clientAr</c> the Arabic one), user, duration, status.</summary>
+    public static readonly SortKeys ClientLoginLogs = new("login", "logout", "client", "clientAr", "user", "duration", "status");
 }

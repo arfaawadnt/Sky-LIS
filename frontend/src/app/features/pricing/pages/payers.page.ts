@@ -34,6 +34,12 @@ import { PayersFacade } from '../state/payers.facade';
 
 /** Contract pricing (CP-34) belongs to Release 2: its row and tier actions show only when the release is in scope (UAT R1-03). */
 const CONTRACT_PRICING_RELEASE: Release = 'R2';
+
+/** A phone or WhatsApp number as the server accepts it (PRC-017): digits, spaces, `+ - ( )`, at least one digit. */
+export const CONTACT_NUMBER = /^(?=.*\d)[\d\s+\-()]+$/;
+
+/** The basic e-mail shape the server checks (PRC-018): one `@`, a dotted domain, no spaces. */
+export const EMAIL = /^[^\s@]+@[^\s@.][^\s@]*\.[^\s@.]+$/;
 @Component({
   selector: 'app-payers-page',
   imports: [
@@ -99,6 +105,11 @@ export class PayersPage {
       },
       { name: 'webPortalEnabled', kind: 'boolean', defaultValue: false },
       { name: 'webUsername', kind: 'text', maxLength: 64, hint: 'pricing.payers.hint.webUsername' },
+      // office contacts (CR 2026-10-19 C19): the server cleans and validates (PRC-017 / PRC-018); the patterns mirror its rules
+      { name: 'phone1', kind: 'text', maxLength: 32, section: 'pricing.payers.section.contact', pattern: CONTACT_NUMBER, patternMessage: 'pricing.payers.hint.contactNumber' },
+      { name: 'phone2', kind: 'text', maxLength: 32, pattern: CONTACT_NUMBER, patternMessage: 'pricing.payers.hint.contactNumber' },
+      { name: 'whatsApp', kind: 'text', maxLength: 32, pattern: CONTACT_NUMBER, patternMessage: 'pricing.payers.hint.contactNumber' },
+      { name: 'email', kind: 'text', maxLength: 254, pattern: EMAIL, patternMessage: 'pricing.payers.hint.email' },
     ],
     adapter: {
       list: (filter, page, signal) => {
@@ -162,6 +173,10 @@ export class PayersPage {
         t('pricing.payers.column.tiers'),
         t('pricing.csv.webPortal'),
         t('pricing.csv.webUsername'),
+        t('pricing.payers.field.phone1'),
+        t('pricing.payers.field.phone2'),
+        t('pricing.payers.field.whatsApp'),
+        t('pricing.payers.field.email'),
         t('pricing.csv.default'),
         t('pricing.csv.active'),
       ];
@@ -173,6 +188,10 @@ export class PayersPage {
         payer.tiers.map((tier) => this.tierName(tier) + (tier.isActive ? '' : ` (${t('pricing.csv.inactive')})`)).join(' | '),
         yesNo(payer.webPortalEnabled),
         payer.webUsername,
+        payer.phone1,
+        payer.phone2,
+        payer.whatsApp,
+        payer.email,
         yesNo(payer.isDefault),
         yesNo(payer.isActive),
       ]);
@@ -301,12 +320,16 @@ const PAYER_TYPE_TEXT: Readonly<Record<PayerType, { en: string; ar: string }>> =
   Lab: { en: 'Laboratory', ar: 'معمل' },
 };
 
-/** Form value of the drawer → the request (the username is dropped while the portal is off). */
+/** Form value of the drawer → the request (the username is dropped while the portal is off; blank contacts become null). */
 export function toPayerRequest(value: FormValue): PayerRequest {
   const name = (value['name'] ?? {}) as { en?: string; ar?: string };
   const portal = value['webPortalEnabled'] === true;
   const username = typeof value['webUsername'] === 'string' ? value['webUsername'].trim() : '';
   const type = PAYER_TYPES.find((candidate) => candidate === value['type']) ?? 'Credit';
+  const contact = (typed: unknown): string | null => {
+    const trimmed = typeof typed === 'string' ? typed.trim() : '';
+    return trimmed === '' ? null : trimmed;
+  };
   return {
     nameEn: (name.en ?? '').trim(),
     nameAr: (name.ar ?? '').trim(),
@@ -314,5 +337,9 @@ export function toPayerRequest(value: FormValue): PayerRequest {
     type,
     webPortalEnabled: portal,
     webUsername: portal && username !== '' ? username : null,
+    phone1: contact(value['phone1']),
+    phone2: contact(value['phone2']),
+    whatsApp: contact(value['whatsApp']),
+    email: contact(value['email']),
   };
 }

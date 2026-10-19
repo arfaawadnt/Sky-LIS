@@ -1,0 +1,57 @@
+.service-prices {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.picker-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-3) var(--sp-4);
+}
+
+.chosen {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 36px;
+}
+
+.chosen .code {
+  font-weight: 600;
+}
+
+.problem,
+.list-problem {
+  margin: var(--sp-3) 0 0;
+}
+
+.list-problem {
+  margin: var(--sp-3) var(--sp-4) 0;
+}
+
+.badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.price-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-1);
+}
+
+.price {
+  width: 130px;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.price.invalid {
+  border-color: var(--bad);
+  background: var(--bad-soft);
+}

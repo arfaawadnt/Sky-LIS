@@ -111,6 +111,9 @@ public sealed class CatalogueAFlowTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal(HttpStatusCode.NoContent, swapped.StatusCode);
         var clash = await client.PutAsJsonAsync($"{Root}/services/sequence", new SaveServiceSequenceRequest([new ServiceSequenceChange(package, 1)]));
         Assert.Equal(("CAT-105", HttpStatusCode.Conflict), (await AuthClient.CodeOf(clash), clash.StatusCode));
+        // change request 2026-10-19 (P-C18): one number for two listed services is refused before anything is read, nothing changes
+        var repeated = await client.PutAsJsonAsync($"{Root}/services/sequence", new SaveServiceSequenceRequest([new ServiceSequenceChange(gluService, 7), new ServiceSequenceChange(profile, 7)]));
+        Assert.Equal(("CAT-033", HttpStatusCode.UnprocessableEntity), (await AuthClient.CodeOf(repeated), repeated.StatusCode));
         var sequence = (await client.GetFromJsonAsync<List<ServiceSequenceRow>>($"{Root}/services/sequence"))!;
         Assert.Equal(["DIAB", "GLU", "CHECKUP"], sequence.Select(row => row.Code).ToArray());
 
@@ -118,6 +121,19 @@ public sealed class CatalogueAFlowTests(ApiFactory factory) : IClassFixture<ApiF
         var additional = await CreateAsync(client, "services", new CreateServiceRequest("HOME", "Additional", "Home visit", 900, "Home visit", "زيارة منزلية", null, null, null, null, null, null, null, null, null, "Any", 0, 0, false, true, false, null, null));
         var additionals = (await client.GetFromJsonAsync<Paged<ServiceListItem>>($"{Root}/services?type=additional"))!;
         Assert.Equal(additional, Assert.Single(additionals.Items).Id);
+
+        // CP-42b: the sequence rows carry the clinical group id and filter by it; the additional service (no group) stays outside
+        var ofGroup = (await client.GetFromJsonAsync<List<ServiceSequenceRow>>($"{Root}/services/sequence?clinicalGroupId={groupId}"))!;
+        Assert.Equal(["DIAB", "GLU", "CHECKUP"], ofGroup.Select(row => row.Code).ToArray());
+        Assert.All(ofGroup, row => Assert.Equal(groupId, row.ClinicalGroupId));
+        var everyRow = (await client.GetFromJsonAsync<List<ServiceSequenceRow>>($"{Root}/services/sequence"))!;
+        Assert.Equal(4, everyRow.Count);
+        Assert.Null(everyRow.Single(row => row.Code == "HOME").ClinicalGroupId);
+        Assert.Empty((await client.GetFromJsonAsync<List<ServiceSequenceRow>>($"{Root}/services/sequence?clinicalGroupId={Guid.CreateVersion7()}"))!);
+        // a reorder inside the filtered subset sends the subset's own numbers (1, 2, 3) and leaves the row outside it untouched
+        var subset = await client.PutAsJsonAsync($"{Root}/services/sequence", new SaveServiceSequenceRequest([new ServiceSequenceChange(package, 1), new ServiceSequenceChange(profile, 2), new ServiceSequenceChange(gluService, 3)]));
+        Assert.Equal(HttpStatusCode.NoContent, subset.StatusCode);
+        Assert.Equal(["CHECKUP", "DIAB", "GLU", "HOME"], (await client.GetFromJsonAsync<List<ServiceSequenceRow>>($"{Root}/services/sequence"))!.Select(row => row.Code).ToArray());
 
         // lookups for other modules, exports, deactivation
         var lookup = (await client.GetFromJsonAsync<Paged<ServiceLookupItem>>($"{Root}/lookups/services?search=chec&pageSize=50"))!;

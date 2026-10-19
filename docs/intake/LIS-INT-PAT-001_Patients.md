@@ -4,7 +4,7 @@
 | --- | --- |
 | Module | `patients` (+ `files` for documents) — Sky LIS Client Portal page **CP-11 Patients**; the patient-file rules of **CP-06 Registration**; workflow **WF-02** steps 1–2; business rules **BR-01** (immutable identifiers), **BR-08** (condition selects the range), **BR-15** (nothing is erased); requirements **REG-001**, **REG-002**, **REG-003** |
 | Status | Derived by the development team (build slot `pat`, wave 1) from the Business SRS (LIS-SRS-001), the requirements specification (LIS-RS-001) and the LDM synthesis. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.2 — 2026-10-12 (validation LIS-VR-002: VIP rule on the results worklist, Q8; mobile with the trunk 0, Q14; v0.5.0: VIP on the opened result case Q8, default mobile country and trunk-0 search Q14) |
+| Version | 1.3 — 2026-10-19 (change request LIS-CR-003 P-A2: location hierarchy on the file and a second phone, §18; previous: 1.2 — 2026-10-12, validation LIS-VR-002 Q8 / Q14, v0.5.0 Q8 / Q14) |
 | Implemented in | `src/Platform.Infrastructure/Persistence/Patients/Patients.migration.sql` (guards appended to the wave migration), `src/Platform.Domain/Patients`, `src/Platform.Contracts/Patients`, `src/Platform.Application/Patients`, `src/Platform.Application/Abstractions/Files/IFileStore.cs`, `src/Platform.Infrastructure/Persistence/Patients`, `src/Platform.Infrastructure/Services/Files/LocalFileStore.cs`, `src/Platform.WebApi/Controllers/Patients`, `frontend/src/app/features/patients`, `frontend/src/app/core/api/patients.contracts.ts`, `frontend/public/i18n/patients.{en,ar}.json` |
 
 ## 1. Purpose and policy basis
@@ -335,3 +335,56 @@ Scenario S-LOCK-affordance: the lock query reports the status, the right and the
 
 Assumptions (for the business owner): a visit whose results are all cancelled or not yet ordered is judged patient-wide;
 the lock does not apply to T1 (a new file has no results) nor to the merge (T3, its own right).
+
+## 18. Change request 2026-10-19 — location hierarchy on the file and a second phone (LIS-CR-003 §3, package P-A2, items A2 / C3)
+
+Source: `docs/build/CR-2026-10-19_Prototype-Gaps.md` §3 (prototype difference items A2 and C3). Built in slot `pat`; the
+columns arrive with the wave migration `PrototypeGaps` (every column nullable: a 0.14.0 file keeps working unchanged).
+
+**What changes.**
+
+| Item | Decision |
+| --- | --- |
+| Location (A2) | `Patient` gains `CityId?`, `DistrictId?`, `AreaId?` (`app.patients.city_id / district_id / area_id`, no FK across schemas, like `GovernorateId`). They reference the platform's hierarchy `saas.cities → saas.districts → saas.areas` under the governorate (intake LIS-INT-PLT-001 §17). |
+| Chain rule | The handler of T1 / T2 validates the chain through the read port `IPatientLocations` (adapter `PatientLocations` over the three `saas` tables, ≤ 500 ids per query) before the aggregate: the city must belong to the chosen governorate (`PAT-014`), the district to the city (`PAT-015`), the area to the district (`PAT-016`); a level without its parent is refused with the same codes. An inactive row is accepted (the pick lists hide it; a file that holds it stays valid). One refusal creates nothing. |
+| Free-text city | `City` stays for laboratories whose governorate lists no cities. When a city is picked the handler stores the city's **English name** in `City` as well (`PatientLocationChain.ResolveAsync`), so the register, the export, labels and reports that read `City` keep working. A file edited without a picked city keeps the typed text. |
+| Second phone (C3) | `Patient.SecondPhone` (`app.patients.second_phone`, ≤ 32 raw, ≤ 16 digits after cleaning), cleaned like the mobile (`CleanSecondPhone` → `PAT-017` when malformed), optional, **no uniqueness and no country-length check**; indexed `(tenant_id, second_phone)` for the similar search. |
+| Similar search (BR-01) | `FindSimilarPatientsQuery(Name, Mobile, SecondPhone?)`: a candidate matches on the second phone as on the mobile (`Match = Mobile`), on either stored number; the typed second phone is cleaned the same way. |
+| Shapes | `RegisterPatientRequest` / `UpdatePatientRequest` gain `CityId?`, `DistrictId?`, `AreaId?`, `SecondPhone?` (optional, so 0.14.0 clients keep working). `PatientDetail` and `PatientListItem` carry `SecondPhone` and `Location` (`PatientLocation`: the three ids with both names, null when none is set); `SimilarPatient` carries `SecondPhone`; VIP masking blanks the second phone like the mobile (validation A-03). The CSV export (CP-11, `patients.export`) gains the columns *Second phone*, *District*, *Area* (the *City* column keeps the stored text). |
+| Public pick lists | The form reads `GET /api/v1/public/cities?governorateId=`, `…/districts?cityId=`, `…/areas?districtId=` (anonymous, active rows, id + names; owned by PlatformAdmin). |
+| Patient form (`shared/patient/patient-form.component`) | After the governorate: when it has active cities the city / district / area **selects** replace the free-text city (one level feeds the next; a changed level clears the levels under it so nothing outside the chain is sent; a picked city is sent with `city = null` and the server names it); otherwise the free-text city stays. The Egyptian national-id fill still sets the governorate only (and clears the chain when it changes it). The second phone sits after the mobile with the same country hint (trunk-0 storage like the mobile, validation A-09) and feeds the similar-patient lookup. Refusal codes `PAT-014…017` land on their field. |
+| Pages | Patient file (CP-11): second phone after the mobile; district and area after the city (the city shows the picked name, else the text). Register: column *Second phone*. Patient picker and similar list (CP-06, BR-01): the second phone beside the mobile. Search registrations' patient drawer (CP-10) renders the same form, so it gains both. |
+| Audit | Ordinary demographics: `PatientRegistered` / `PatientUpdated` and the field history in `audit.field_changes` (the three ids and the phone are columns of the aggregate). |
+| Not changed | The client (tenant) address of the subscription wizard and SA-04 stays free text (LIS-CR-003 §3); the laboratory's own branches and the payer address are untouched. |
+
+**New codes.** `PAT-014` city not in governorate, `PAT-015` district not in city, `PAT-016` area not in district (all 400, validation),
+`PAT-017` second phone malformed (400).
+
+**Endpoints.** No new patient endpoint: `POST /api/v1/patients`, `PUT /api/v1/patients/{id}`, `GET /api/v1/patients`,
+`GET /api/v1/patients/{id}`, `GET /api/v1/patients/similar` (new query parameter `secondPhone`) and `GET /api/v1/patients/export`
+carry the new fields. The public lookups above belong to the PlatformAdmin module.
+
+**Tests.** `Platform.Domain.UnitTests/Patients/PatientContactTests.cs` (second phone cleaning and refusal, location ids on the
+demographics), `Platform.Application.UnitTests/Patients/PatientLocationChainTests.cs` (the chain rule and the city name),
+`Platform.WebApi.FunctionalTests/PatientContactsFlowTests.cs` (a file carries both through detail, register, similar and export; a
+broken chain or a malformed second phone is refused with its code and nothing is created), `patient-form.component.spec.ts`
+(selects versus free text, chain clearing, fill from the file, second phone cleaning and lookup), `patient-lookup.api.spec.ts`.
+
+Scenarios:
+
+```gherkin
+Scenario S-LOC-chain: a clerk picks Cairo → Nasr City → 7th district → Area 1 → saved; the file shows the three names and City = "Nasr City"
+Scenario S-LOC-broken: the request names a district of another city → PAT-015 (400), nothing created
+Scenario S-LOC-freetext: the governorate lists no cities → the form keeps the free-text city and saves it as typed
+Scenario S-LOC-change: the clerk changes the governorate → city, district and area are cleared before the save
+Scenario S-PHONE-second: a second phone "1 011 222 333" with Egypt as country → stored "01011222333"; the similar search on it finds the file (Match = Mobile)
+Scenario S-PHONE-bad: a second phone "abc" → PAT-017 (400)
+```
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| Q15 | Should a laboratory be able to add cities itself? | No: the hierarchy is platform reference data edited from SA-11b only; a laboratory whose governorate lists no cities keeps the free text. |
+| Q16 | Must the second phone be unique or belong to the laboratory's country? | No uniqueness and no country check (LIS-CR-003 §3 C3): it may be a landline or a relative's number; the form shows the same country hint as the mobile and stores a national number with its trunk 0 like the mobile. |
+| Q17 | What happens to the stored free-text city when a city is later picked? | It is replaced by the picked city's English name; the previous text stays in the field history (`audit.field_changes`). |
+| Q18 | Is a file whose city, district or area was deactivated later still valid? | Yes: deactivation hides the row from the pick lists only; the file keeps its ids and names and can be edited without touching them (the chain rule checks parentage, not activity). The form shows the stored level only while its row is in the active list; a hidden one is kept and re-sent unchanged. |
+| Q19 | Does the client (tenant) address move to the hierarchy too? | Not in this change: it stays free text in the subscription wizard and SA-04 (LIS-CR-003 §3). |

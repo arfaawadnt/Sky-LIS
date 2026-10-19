@@ -1,8 +1,82 @@
+.filters-set {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.filters-set:disabled {
+  opacity: 0.6;
+}
+
 .seq {
-  width: 7rem;
+  width: 6rem;
 }
 
 .seq.changed {
   border-color: var(--blue);
   background: var(--blue-soft);
+}
+
+.move-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.move-cell .icon-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.handle {
+  cursor: grab;
+}
+
+.handle:active {
+  cursor: grabbing;
+}
+
+.hint {
+  font-size: var(--fs-sm);
+  margin-bottom: 0;
+}
+
+.dirty-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: 8px 12px;
+  border: 1px solid var(--blue);
+  border-radius: var(--r-sm);
+  background: var(--blue-soft);
+  font-size: var(--fs-sm);
+}
+
+.dirty-actions {
+  display: inline-flex;
+  gap: var(--sp-2);
+}
+
+/* the rows belong to the table component: the drop side, the dragged row and the rows that will change */
+:host ::ng-deep tr.drop-before td {
+  box-shadow: inset 0 3px 0 0 var(--blue);
+}
+
+:host ::ng-deep tr.drop-after td {
+  box-shadow: inset 0 -3px 0 0 var(--blue);
+}
+
+:host ::ng-deep tr.dragging td {
+  opacity: 0.45;
+}
+
+:host ::ng-deep tr.moved td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--blue);
 }

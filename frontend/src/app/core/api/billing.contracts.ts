@@ -24,6 +24,8 @@ export interface RecordPaymentRequest {
   readonly reference: string | null;
   readonly treasuryId: string;
   readonly deviceId: string;
+  /** The laboratory's payment method definition (CP-30b); its kind and reference rule apply when present. */
+  readonly methodCode?: string | null;
 }
 
 export interface VoidPaymentRequest {
@@ -39,6 +41,7 @@ export interface RecordRefundRequest {
   readonly note: string | null;
   readonly treasuryId: string;
   readonly deviceId: string;
+  readonly methodCode?: string | null;
 }
 
 export interface PayBatchRequest {
@@ -47,6 +50,7 @@ export interface PayBatchRequest {
   readonly reference: string | null;
   readonly treasuryId: string;
   readonly deviceId: string;
+  readonly methodCode?: string | null;
 }
 
 export interface CloseCashDrawerRequest {
@@ -114,6 +118,10 @@ export interface PaymentListItem {
   readonly voidReason: string | null;
   readonly voidedByName: string | null;
   readonly voidedAtUtc: string | null;
+  /** The definition's code and names at posting time (CP-30b); null on legacy rows, shown as the kind. */
+  readonly methodCode?: string | null;
+  readonly methodNameEn?: string | null;
+  readonly methodNameAr?: string | null;
 }
 
 export interface RefundListItem {
@@ -137,6 +145,9 @@ export interface RefundListItem {
   readonly branchId: string;
   readonly deviceId: string;
   readonly refundedAtUtc: string;
+  readonly methodCode?: string | null;
+  readonly methodNameEn?: string | null;
+  readonly methodNameAr?: string | null;
 }
 
 export interface CashClosingTotals {
@@ -327,6 +338,9 @@ export interface PaymentReceiptDocument {
   readonly currency: string;
   readonly printedBy: string;
   readonly printedAtUtc: string;
+  readonly methodCode?: string | null;
+  readonly methodNameEn?: string | null;
+  readonly methodNameAr?: string | null;
 }
 
 export interface InvoiceLine {
@@ -347,6 +361,9 @@ export interface InvoiceMovement {
   readonly atUtc: string;
   readonly method: PaymentMethod;
   readonly amount: number;
+  readonly methodCode?: string | null;
+  readonly methodNameEn?: string | null;
+  readonly methodNameAr?: string | null;
 }
 
 export interface InvoiceDocument {
@@ -395,6 +412,9 @@ export interface RefundReceiptDocument {
   readonly currency: string;
   readonly printedBy: string;
   readonly printedAtUtc: string;
+  readonly methodCode?: string | null;
+  readonly methodNameEn?: string | null;
+  readonly methodNameAr?: string | null;
 }
 
 export interface CashClosingSheetDocument {
@@ -550,6 +570,8 @@ export const BILLING_API = {
   printSettings: '/api/v1/billing/print-settings',
   collectionsReport: '/api/v1/billing/collections-report',
   refundReasons: '/api/v1/catalogue/reasons',
+  paymentMethods: '/api/v1/billing/payment-methods',
+  paymentMethodOptions: '/api/v1/billing/payment-methods/options',
 } as const;
 
 /** Permission keys of the module (PermissionCatalog.Billing). `approve` records refunds until the CP-37 special right lands. */
@@ -559,5 +581,65 @@ export const BILLING_PERMISSIONS = {
   refund: 'billing.approve',
   void: 'billing.cancel',
   close: 'billing.manage',
+  manage: 'billing.manage',
   export: 'billing.export',
 } as const;
+
+// ---- payment method definitions (set-up list CP-30b, change request 2026-10-19 P-C10) ------------------------------
+
+/** An active method as the cash desk and the registration page offer it, in sequence order. */
+export interface PaymentMethodOption {
+  readonly id: string;
+  readonly code: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly kind: PaymentMethod;
+  readonly requiresReference: boolean;
+}
+
+export interface PaymentMethodListItem {
+  readonly id: string;
+  readonly code: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly kind: PaymentMethod;
+  readonly requiresReference: boolean;
+  readonly isActive: boolean;
+  readonly sequence: number;
+}
+
+/** Create: the code is upper-cased by the server and never changes; `sequence` null = after the last option. */
+export interface PaymentMethodRequest {
+  readonly code: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly kind: PaymentMethod;
+  readonly requiresReference: boolean;
+  readonly sequence: number | null;
+}
+
+export interface UpdatePaymentMethodRequest {
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly kind: PaymentMethod;
+  readonly requiresReference: boolean;
+  readonly sequence: number;
+}
+
+/** How many of the four defaults (CASH, CARD, POS, TRANSFER) the call added; 0 when all existed. */
+export interface PaymentMethodDefaultsResult {
+  readonly created: number;
+}
+
+export interface PaymentMethodFilter {
+  readonly search?: string;
+  readonly isActive?: boolean | null;
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: string | null;
+  readonly direction?: 'asc' | 'desc' | null;
+}
+
+export interface CreatedResource {
+  readonly id: string;
+}

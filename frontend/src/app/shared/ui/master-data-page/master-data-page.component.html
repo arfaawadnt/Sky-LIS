@@ -70,6 +70,9 @@
       }
       <div class="form-grid">
         @for (field of config().fields; track field.name) {
+          @if (field.section) {
+            <h3 class="form-section full">{{ i18n.t(field.section) }}</h3>
+          }
           <div class="cell" [class.full]="isFull(field)">
             @switch (field.kind) {
               @case ('localizedText') {

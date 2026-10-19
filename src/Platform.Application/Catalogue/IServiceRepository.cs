@@ -32,7 +32,7 @@ public interface IServiceRepository : IRepository<Service>
 
     Task<ServiceDetail?> GetDetailAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<ServiceSequenceRow>> SequenceRowsAsync(string? search, ServiceType? type, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ServiceSequenceRow>> SequenceRowsAsync(string? search, ServiceType? type, Guid? clinicalGroupId, CancellationToken cancellationToken);
 
     /// <summary>Active services for pickers, by code, short name, names, aliases or shortcut number.</summary>
     Task<Paged<ServiceLookupItem>> LookupAsync(string? search, ServiceType? type, bool? orderable, PageRequest page, CancellationToken cancellationToken);

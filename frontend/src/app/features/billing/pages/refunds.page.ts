@@ -24,7 +24,7 @@ import { BillingPrinter } from '../state/billing-printer';
 import { CashDeskFacade } from '../state/cash-desk.facade';
 import { RefundsFacade } from '../state/refunds.facade';
 import { AccountSummaryComponent } from '../ui/account-summary.component';
-import { formatDateTime, formatMoney } from '../ui/billing-format';
+import { type MovementMethod, formatDateTime, formatMoney, movementMethodLabel } from '../ui/billing-format';
 import { dayEndIso, dayStartIso, problemOf } from '../ui/billing-view';
 import { MovementFormComponent, type MovementInput } from '../ui/movement-form.component';
 import { saveFile } from '../ui/save-file';
@@ -178,6 +178,11 @@ export class RefundsPage {
 
   protected methodLabel(method: PaymentMethod): string {
     return this.i18n.t(`billing.method.${method}`);
+  }
+
+  /** The laboratory's method name with its code (CP-30b), or the kind on a legacy row. */
+  protected movementMethod(movement: MovementMethod): string {
+    return movementMethodLabel((key) => this.i18n.t(key), this.i18n.lang(), movement);
   }
 
   protected reasonName(row: RefundListItem): string {

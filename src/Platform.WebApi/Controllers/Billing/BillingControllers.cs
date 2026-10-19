@@ -51,7 +51,7 @@ public sealed class BillingPaymentsController(ISender sender) : ControllerBase
     public async Task<ActionResult<PaymentCreated>> Record([FromBody] RecordPaymentRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var created = await sender.Send(new RecordPaymentCommand(request.VisitId, request.Amount, request.Method, request.Reference, request.TreasuryId, request.DeviceId), cancellationToken);
+        var created = await sender.Send(new RecordPaymentCommand(request.VisitId, request.Amount, request.Method, request.Reference, request.TreasuryId, request.DeviceId, request.MethodCode), cancellationToken);
         return Created($"/api/v1/billing/payments/{created.Id}", created);
     }
 
@@ -108,7 +108,7 @@ public sealed class BillingRefundsController(ISender sender) : ControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
         var created = await sender.Send(
-            new RecordRefundCommand(request.VisitId, request.Amount, request.Method, request.Reference, request.ReasonId, request.Note, request.TreasuryId, request.DeviceId),
+            new RecordRefundCommand(request.VisitId, request.Amount, request.Method, request.Reference, request.ReasonId, request.Note, request.TreasuryId, request.DeviceId, request.MethodCode),
             cancellationToken);
         return Created($"/api/v1/billing/refunds/{created.Id}", created);
     }
@@ -153,7 +153,7 @@ public sealed class BillingBatchesController(ISender sender) : ControllerBase
     public async Task<ActionResult<BatchPaymentResult>> PayAll(Guid batchId, [FromBody] PayBatchRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return Ok(await sender.Send(new PayBatchCommand(batchId, request.Amount, request.Method, request.Reference, request.TreasuryId, request.DeviceId), cancellationToken));
+        return Ok(await sender.Send(new PayBatchCommand(batchId, request.Amount, request.Method, request.Reference, request.TreasuryId, request.DeviceId, request.MethodCode), cancellationToken));
     }
 }
 

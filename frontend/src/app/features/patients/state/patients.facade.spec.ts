@@ -147,11 +147,11 @@ describe('PatientsFacade (01 §6.3)', () => {
   it('asks for similar files while typing and warns only when the tenant enabled the warning', async () => {
     await initialLoad();
 
-    facade.onTyped({ name: 'm', mobile: '' });
+    facade.onTyped({ name: 'm', mobile: '', secondPhone: '' });
     await runEffects();
     backend.expectNone((r) => r.url.endsWith('/similar'));
 
-    facade.onTyped({ name: 'mohamed ahmed', mobile: '01001234567' });
+    facade.onTyped({ name: 'mohamed ahmed', mobile: '01001234567', secondPhone: '' });
     await runEffects();
     const similar = backend.expectOne((r) => r.url === `${PATIENTS_API.patients}/similar`);
     expect(similar.request.params.get('name')).toBe('mohamed ahmed');
@@ -160,7 +160,7 @@ describe('PatientsFacade (01 §6.3)', () => {
     await runEffects();
     expect(facade.candidates()).toEqual([candidate]);
 
-    facade.onTyped({ name: 'mohamed ali', mobile: '' });
+    facade.onTyped({ name: 'mohamed ali', mobile: '', secondPhone: '' });
     await runEffects();
     backend.expectOne((r) => r.url === `${PATIENTS_API.patients}/similar`).flush({ warningEnabled: false, candidates: [candidate] });
     await runEffects();

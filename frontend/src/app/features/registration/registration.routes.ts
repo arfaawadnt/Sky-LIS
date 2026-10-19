@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 
+import { AccessionFacade } from './state/accession.facade';
 import { PriceQueryFacade } from './state/price-query.facade';
 import { RegistrationFacade } from './state/registration.facade';
 import { VisitsFacade } from './state/visits.facade';
@@ -15,6 +16,7 @@ import { VisitsFacade } from './state/visits.facade';
  * - `/registration/visits/:visitId` — a saved visit (add or release services, details, discount)
  * - `/registration/visits/:visitId/job-order` — the job order on screen (the link Samples and the search register use)
  * - `/registration/price-query` — CP-12
+ * - `/registration/accession` — Accession details (CP-10b, `?accession=` or `?visitId=`; change request 2026-10-19 P-C9)
  */
 export const REGISTRATION_ROUTES: Routes = [
   {
@@ -47,5 +49,10 @@ export const REGISTRATION_ROUTES: Routes = [
     path: 'price-query',
     providers: [PriceQueryFacade],
     loadComponent: () => import('./pages/price-query.page').then((m) => m.PriceQueryPage),
+  },
+  {
+    path: 'accession',
+    providers: [AccessionFacade],
+    loadComponent: () => import('./pages/accession-details.page').then((m) => m.AccessionDetailsPage),
   },
 ];

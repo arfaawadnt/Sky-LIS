@@ -581,3 +581,123 @@ internal sealed class RuleTemplateRepository(AppDbContext context) : Repository<
 }
 
 internal sealed class SubscriptionRequestRepository(AppDbContext context) : Repository<SubscriptionRequest>(context), ISubscriptionRequestRepository;
+
+// Location hierarchy under a governorate (change request 2026-10-19, A2): small per-parent lists, never paged
+// (capped); the public lookups answer active rows only, ordered by English name.
+
+internal sealed class CityRepository(AppDbContext context) : Repository<City>(context), ICityRepository
+{
+    public Task<bool> NameExistsAsync(Guid governorateId, string nameEn, Guid? exceptId, CancellationToken cancellationToken)
+    {
+        var value = LocationQueries.NameKey(nameEn);
+        return Set.AnyAsync(city => city.GovernorateId == governorateId && city.Name.En.ToLower() == value && (exceptId == null || city.Id != exceptId), cancellationToken);
+    }
+
+    public Task<bool> HasActiveDistrictsAsync(Guid cityId, CancellationToken cancellationToken) =>
+        Context.Set<District>().AnyAsync(district => district.CityId == cityId && district.IsActive, cancellationToken);
+
+    public async Task<IReadOnlyList<LocationListItem>> ListAsync(Guid governorateId, string? search, bool? isActive, CancellationToken cancellationToken)
+    {
+        var query = Set.AsNoTracking().Where(city => city.GovernorateId == governorateId);
+        if (search is { Length: > 0 })
+        {
+            var pattern = Like.Contains(search);
+            query = query.Where(city => EF.Functions.ILike(city.Name.En, pattern, Like.Escape) || EF.Functions.ILike(city.Name.Ar, pattern, Like.Escape));
+        }
+
+        if (isActive is { } active)
+        {
+            query = query.Where(city => city.IsActive == active);
+        }
+
+        return await query.OrderBy(city => city.Name.En).ThenBy(city => city.Id).Take(LocationQueries.MaxRows)
+            .Select(city => new LocationListItem(city.Id, city.GovernorateId, city.Name.En, city.Name.Ar, city.IsActive))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<PublicCity>> ListPublicAsync(Guid? governorateId, CancellationToken cancellationToken) =>
+        await Set.AsNoTracking().Where(city => (governorateId == null || city.GovernorateId == governorateId) && city.IsActive)
+            .OrderBy(city => city.Name.En).ThenBy(city => city.Id).Take(LocationQueries.MaxRows)
+            .Select(city => new PublicCity(city.Id, city.GovernorateId, city.Name.En, city.Name.Ar))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+}
+
+internal sealed class DistrictRepository(AppDbContext context) : Repository<District>(context), IDistrictRepository
+{
+    public Task<bool> NameExistsAsync(Guid cityId, string nameEn, Guid? exceptId, CancellationToken cancellationToken)
+    {
+        var value = LocationQueries.NameKey(nameEn);
+        return Set.AnyAsync(district => district.CityId == cityId && district.Name.En.ToLower() == value && (exceptId == null || district.Id != exceptId), cancellationToken);
+    }
+
+    public Task<bool> HasActiveAreasAsync(Guid districtId, CancellationToken cancellationToken) =>
+        Context.Set<Area>().AnyAsync(area => area.DistrictId == districtId && area.IsActive, cancellationToken);
+
+    public async Task<IReadOnlyList<LocationListItem>> ListAsync(Guid cityId, string? search, bool? isActive, CancellationToken cancellationToken)
+    {
+        var query = Set.AsNoTracking().Where(district => district.CityId == cityId);
+        if (search is { Length: > 0 })
+        {
+            var pattern = Like.Contains(search);
+            query = query.Where(district => EF.Functions.ILike(district.Name.En, pattern, Like.Escape) || EF.Functions.ILike(district.Name.Ar, pattern, Like.Escape));
+        }
+
+        if (isActive is { } active)
+        {
+            query = query.Where(district => district.IsActive == active);
+        }
+
+        return await query.OrderBy(district => district.Name.En).ThenBy(district => district.Id).Take(LocationQueries.MaxRows)
+            .Select(district => new LocationListItem(district.Id, district.CityId, district.Name.En, district.Name.Ar, district.IsActive))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<PublicDistrict>> ListPublicAsync(Guid? cityId, CancellationToken cancellationToken) =>
+        await Set.AsNoTracking().Where(district => (cityId == null || district.CityId == cityId) && district.IsActive)
+            .OrderBy(district => district.Name.En).ThenBy(district => district.Id).Take(LocationQueries.MaxRows)
+            .Select(district => new PublicDistrict(district.Id, district.CityId, district.Name.En, district.Name.Ar))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+}
+
+internal sealed class AreaRepository(AppDbContext context) : Repository<Area>(context), IAreaRepository
+{
+    public Task<bool> NameExistsAsync(Guid districtId, string nameEn, Guid? exceptId, CancellationToken cancellationToken)
+    {
+        var value = LocationQueries.NameKey(nameEn);
+        return Set.AnyAsync(area => area.DistrictId == districtId && area.Name.En.ToLower() == value && (exceptId == null || area.Id != exceptId), cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<LocationListItem>> ListAsync(Guid districtId, string? search, bool? isActive, CancellationToken cancellationToken)
+    {
+        var query = Set.AsNoTracking().Where(area => area.DistrictId == districtId);
+        if (search is { Length: > 0 })
+        {
+            var pattern = Like.Contains(search);
+            query = query.Where(area => EF.Functions.ILike(area.Name.En, pattern, Like.Escape) || EF.Functions.ILike(area.Name.Ar, pattern, Like.Escape));
+        }
+
+        if (isActive is { } active)
+        {
+            query = query.Where(area => area.IsActive == active);
+        }
+
+        return await query.OrderBy(area => area.Name.En).ThenBy(area => area.Id).Take(LocationQueries.MaxRows)
+            .Select(area => new LocationListItem(area.Id, area.DistrictId, area.Name.En, area.Name.Ar, area.IsActive))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<PublicArea>> ListPublicAsync(Guid? districtId, CancellationToken cancellationToken) =>
+        await Set.AsNoTracking().Where(area => (districtId == null || area.DistrictId == districtId) && area.IsActive)
+            .OrderBy(area => area.Name.En).ThenBy(area => area.Id).Take(LocationQueries.MaxRows)
+            .Select(area => new PublicArea(area.Id, area.DistrictId, area.Name.En, area.Name.Ar))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+}
+
+/// <summary>What the three location repositories share.</summary>
+internal static class LocationQueries
+{
+    /// <summary>A level under one parent is a short list; the cap keeps a runaway import from flooding the drawer or the patient form.</summary>
+    public const int MaxRows = 1000;
+
+    public static string NameKey(string? nameEn) => (nameEn ?? string.Empty).Trim().ToLower(System.Globalization.CultureInfo.InvariantCulture);
+}

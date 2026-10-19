@@ -129,6 +129,11 @@ pages → new modules → go-live). Generated from `docs/plan/src/plan.data.js` 
 (A decisions, B pilot prerequisites, C hardening, D acceptance evidence, E Release 2) with stable ids `A-nn`…`E-nn`; hand-written
 HTML (no build step), PDF via the same `pdf.ps1`. Update it with the UAT scripts and the runbook.
 
+`docs/plan/Sky-LIS_Development-Status_and_Proposed-Changes.html` (+ `.pdf`, LIS-DS-001) presents the application as built and installed
+(modules, Release-1 pages, foundations, change requests, gates, installation state) and the item-by-item difference of the client v3 /
+admin v4.1 prototypes (`docs/knowledge/sky-lis/SkyLIS_Prototypes_v3-v4.1_Difference.md`) with decisions D-1…D-4 and candidate changes
+by size; hand-written HTML, PDF via `pdf.ps1`. Bump its version and date when the status or the comparison changes.
+
 ### Validation
 
 `docs/validation/<date>/` holds a validation campaign: `Sky-LIS_Validation_Report.html` (+ `.pdf`, LIS-VR-001; hand-written,
@@ -443,6 +448,29 @@ QMS source is never read or copied (section 1); everything here is written from 
   `Lis:Jobs:WalletCharge:{Enabled,PollInterval}`, default on / 1 h; `ApiFactory` turns it off) charges each due Active client's plan fee once
   per period (row-version guarded, no migration) through `WalletCharger`; `POST /api/v1/platform/wallets/charge-run` = SA-05 "Run charges now".
   SMS usage metering is not built (no per-SMS price: business decision Q12).
+- Change request LIS-CR-003 (2026-10-19, `docs/build/CR-2026-10-19_Prototype-Gaps.md`; migration `PrototypeGaps`; six packages built in
+  slots and integrated): **A1** client login logs — `ClientLoginLogReader` groups `identity.refresh_sessions` per family, `UserAgentParser`
+  (pure), `GET /api/v1/platform/login-logs[/export]` [platform.view], SPA `/admin/login-logs` (times in UTC, `features/platform/ui/utc-time.ts`,
+  hand-formatted so ICU adds no comma); **A2** locations — `City`/`District`/`Area` in `Domain/PlatformAdmin/Locations.cs` → `saas.cities|districts|areas`
+  (no tenant, grants + per-parent unique English names in `PlatformAdmin.migration.sql`), `GEO-015/102–104/112/406–408`, endpoints under
+  `/api/v1/platform/governorates/{id}/cities` … and public lookups `/api/v1/public/cities|districts|areas`, SPA drawer on Governorates
+  (`features/platform/ui/locations-drawer`); **C3** `Patient.CityId/DistrictId/AreaId/SecondPhone` (chain validated through the public lookups;
+  a picked city also fills `City`), form selects in `shared/patient` keyed on dedicated `computed` signals (a broad `params()` read re-runs
+  `resource` on every keystroke); **C9** `/registration/accession` (`AccessionFacade`: detail + tolerant card reads of samples, Billing account and
+  result case, each asked only with its module's permission; `tolerantOne/tolerantPage` + `abortable` in `registration.api.ts`); **C11**
+  `NavEntry.menu: false` on Treasuries, Treasury access and Payments (links from the pages that need them); **C10** `PaymentMethodDefinition`
+  (`app.payment_methods`, RLS, `BIL-051…055`, `BIL-121`, `BIL-410`; defaults seeded by the migration for existing tenants and by
+  `SeedPaymentMethodsPolicy` on `TenantProvisioned`; `POST …/defaults` idempotent), `Payment/Refund.MethodCode` + `PaymentMethodUse` (the definition's
+  kind and reference rule win over the request's kind; the CHECKs `ck_payments/refunds_reference_for_non_cash` admit a non-cash row without
+  reference only with a method code), `/api/v1/billing/payment-methods` (+ `options` [billing.view], `export`), SPA `/billing/payment-methods`,
+  cash desk and registration payment block send `method` + `methodCode` (`features/registration/data/payment-methods.api.ts`, tolerant);
+  **C18** `ListServiceSequenceQuery.ClinicalGroupId`, `CAT-033` (one number for two listed services), reorder helpers `features/catalogue/ui-a/sequence-order.ts`
+  (visible rows keep their own set of numbers), `canDeactivate` on the page; **C19** `PayerContacts` (`PRC-017/018`); **C21** `ImportPriceLinesCommand`
+  (all-or-nothing, `dryRun`) and `AdjustBasePriceListCommand` (`PriceMath.Adjust`, `PriceAdjustMode`/`PriceRounding`, negative → 0, `PRC-046` above the
+  maximum), Excel in the SPA through `exceljs` (always `await import('exceljs')`; `allowedCommonJsDependencies`), `ui/documents/price-list-document`;
+  **C22** `GET /api/v1/pricing/service-prices/{serviceId}` and SPA `/pricing/service-prices`. Specs of resources keyed on another resource need two
+  `TestBed.tick()` rounds (the dependants load on the tick after the first resolves: `accession.facade.spec.ts`). Slot databases that pre-date a
+  migration must be reset (`scripts/new-slot-database.sh <slot> --reset`).
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

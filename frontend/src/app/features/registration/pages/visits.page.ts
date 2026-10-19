@@ -163,6 +163,11 @@ export class VisitsPage {
     void this.router.navigate(['/registration/visits', row.id]);
   }
 
+  /** CP-10 "details": the accession page (CP-10b) on this visit. */
+  protected details(row: VisitListItem): void {
+    void this.router.navigate(['/registration/accession'], { queryParams: { accession: row.accession } });
+  }
+
   /** CP-10 "patient": the file in a drawer; the edit is judged on this visit's results (PAT-032). */
   protected openPatient(row: VisitListItem): void {
     this.facade.openPatient({ patientId: row.patientId, visitId: row.id });

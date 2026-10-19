@@ -1,8 +1,20 @@
 <div class="editor" appSaveShortcut (appSaveShortcut)="save()">
   <app-page-header [title]="title()" [subtitle]="i18n.t('pricing.editor.subtitle')" [breadcrumb]="crumbs()">
     <button pageActions type="button" class="btn ghost" (click)="facade.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('pricing.refresh') }}</button>
+    <button pageActions type="button" class="btn ghost" (click)="print()" [disabled]="detail() === null || !facade.lines.hasValue() || printing()">
+      <app-icon name="printer" [size]="15" />{{ i18n.t('pricing.tools.print') }}
+    </button>
     <button pageActions type="button" class="btn" *appCan="permissions.export" (click)="exportCsv()" [disabled]="!facade.lines.hasValue()">
       <app-icon name="arrow-down" [size]="15" />{{ i18n.t('pricing.exportCsv') }}
+    </button>
+    <button pageActions type="button" class="btn" *appCan="permissions.export" (click)="downloadExcel()" [disabled]="detail() === null || !facade.lines.hasValue() || downloading()">
+      <app-icon name="arrow-down" [size]="15" />{{ i18n.t(downloading() ? 'pricing.tools.downloading' : 'pricing.tools.downloadExcel') }}
+    </button>
+    <button pageActions type="button" class="btn" *appCan="permissions.edit" (click)="openImport()" [disabled]="detail() === null">
+      <app-icon name="arrow-up" [size]="15" />{{ i18n.t('pricing.tools.uploadExcel') }}
+    </button>
+    <button pageActions type="button" class="btn" *appCan="permissions.edit" (click)="openAdjust()" [disabled]="detail() === null || !facade.lines.hasValue()">
+      <app-icon name="zap" [size]="15" />{{ i18n.t('pricing.tools.bulkAdjust') }}
     </button>
     <button pageActions type="button" class="btn" *appCan="permissions.create" (click)="openCopy()" [disabled]="detail() === null">
       <app-icon name="clipboard" [size]="15" />{{ i18n.t('pricing.lists.action.copy') }}
@@ -161,3 +173,25 @@
 </div>
 
 <app-copy-list-dialog [(open)]="copyOpen" [source]="detail()" [takenCodes]="copyTaken()" [pending]="facade.copy.pending()" [problem]="facade.copy.problem()" (confirmCopy)="runCopy($event)" />
+
+<app-import-prices-dialog
+  [(open)]="importOpen"
+  [listCode]="detail()?.code ?? ''"
+  [pending]="facade.importLines.pending()"
+  [result]="importResult()"
+  [problem]="facade.importLines.problem()"
+  (check)="checkImport($event)"
+  (apply)="applyImport($event)"
+/>
+
+<app-adjust-prices-dialog
+  [(open)]="adjustOpen"
+  [pending]="facade.adjust.pending()"
+  [result]="adjustResult()"
+  [problem]="facade.adjust.problem()"
+  [lineCount]="facade.lines.hasValue() ? facade.lines.value().length : 0"
+  [filteredIds]="filteredIds()"
+  [filterActive]="filterActive()"
+  (preview)="previewAdjust($event)"
+  (apply)="applyAdjust($event)"
+/>

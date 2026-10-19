@@ -35,7 +35,11 @@ function cell(value: CsvCell): string {
 
 /** Hands the CSV to the browser as a download (no server round trip; the data is what the page shows). */
 export function downloadCsv(fileName: string, content: string, doc: Document = document): void {
-  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(fileName, new Blob([content], { type: 'text/csv;charset=utf-8' }), doc);
+}
+
+/** Hands any generated file (CSV, the Excel workbook of C21) to the browser as a download through a temporary object URL. */
+export function downloadBlob(fileName: string, blob: Blob, doc: Document = document): void {
   const url = URL.createObjectURL(blob);
   try {
     const link = doc.createElement('a');

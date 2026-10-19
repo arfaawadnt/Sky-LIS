@@ -111,7 +111,7 @@ public sealed record ServiceDetail(
     bool IsActive,
     IReadOnlyList<ServiceMemberView> Members);
 
-public sealed record ServiceSequenceRow(Guid Id, string Code, string NameEn, string NameAr, string Type, string? ClinicalGroupNameEn, string? ClinicalGroupNameAr, int Sequence, bool IsActive);
+public sealed record ServiceSequenceRow(Guid Id, string Code, string NameEn, string NameAr, string Type, Guid? ClinicalGroupId, string? ClinicalGroupNameEn, string? ClinicalGroupNameAr, int Sequence, bool IsActive);
 
 /// <summary>Lookup row for every module's service picker (active services only).</summary>
 public sealed record ServiceLookupItem(

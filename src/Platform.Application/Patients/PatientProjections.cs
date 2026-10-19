@@ -48,7 +48,8 @@ public static class PatientProjections
 
     /// <param name="visits">The file's visit figures from Registration (CP-11; UAT A-09); none when absent.</param>
     /// <param name="canSeeVip">The See-VIP special right; without it a VIP row is masked (<see cref="IsIdentityMasked"/>).</param>
-    public static PatientListItem ToListItem(PatientRow row, DateOnly today, bool includeConfidential, PatientVisitFigures? visits = null, bool canSeeVip = true)
+    /// <param name="location">The names of the file's city, district and area (change request 2026-10-19, A2), when any is set.</param>
+    public static PatientListItem ToListItem(PatientRow row, DateOnly today, bool includeConfidential, PatientVisitFigures? visits = null, bool canSeeVip = true, PatientLocation? location = null)
     {
         ArgumentNullException.ThrowIfNull(row);
         var figures = visits ?? PatientVisitFigures.None;
@@ -73,10 +74,12 @@ public static class PatientProjections
             row.RegisteredOn,
             figures.VisitCount,
             figures.LastVisitAtUtc,
-            masked);
+            masked,
+            masked ? null : row.SecondPhone,
+            location);
     }
 
-    public static PatientDetail ToDetail(PatientRow row, DateOnly today, bool includeConfidential, string? mergedByName, IReadOnlyList<MergedPatientReference> mergedFiles)
+    public static PatientDetail ToDetail(PatientRow row, DateOnly today, bool includeConfidential, string? mergedByName, IReadOnlyList<MergedPatientReference> mergedFiles, PatientLocation? location = null)
     {
         ArgumentNullException.ThrowIfNull(row);
         var merge = row is { Status: PatientStatus.Merged, MergedIntoPatientId: { } survivorId, MergedAtUtc: { } mergedAt, MergedByUserId: { } mergedBy }
@@ -114,7 +117,9 @@ public static class PatientProjections
             row.CreatedByName,
             row.ModifiedAtUtc,
             row.ModifiedByName,
-            row.RowVersion);
+            row.RowVersion,
+            row.SecondPhone,
+            location);
     }
 
     /// <param name="canSeeVip">The See-VIP special right; without it a VIP candidate is listed masked (<see cref="IsIdentityMasked"/>, validation R-06).</param>
@@ -135,7 +140,8 @@ public static class PatientProjections
             masked ? null : row.Mobile,
             masked ? null : row.NationalId,
             match.ToString(),
-            masked);
+            masked,
+            masked ? null : row.SecondPhone);
     }
 
     public static PatientSummary ToSummary(PatientRow row, DateOnly today, Guid? survivorId)

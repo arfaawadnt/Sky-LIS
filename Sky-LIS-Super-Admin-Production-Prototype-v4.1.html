@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sky LIS — Super Admin Portal | Production Prototype v4.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<style>
+  :root{
+    --primary:#1676d2;
+    --primary-700:#0d5fae;
+    --primary-050:#eef7ff;
+    --sky:#0ea5e9;
+    --ink:#1f2937;
+    --muted:#64748b;
+    --border:#d9e1e8;
+    --border-soft:#e9eef3;
+    --surface:#ffffff;
+    --page:#f5f7fa;
+    --sidebar:#10283f;
+    --sidebar-hover:#183a57;
+    --sidebar-active:#1e4b70;
+    --success:#16855b;
+    --success-bg:#eaf7f1;
+    --danger:#c73a43;
+    --danger-bg:#fff0f1;
+    --warning:#a86d0b;
+    --warning-bg:#fff8e8;
+    --shadow:0 8px 28px rgba(20,48,72,.12);
+    --radius:8px;
+    --font: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--font);color:var(--ink);background:var(--page);font-size:14px}
+  button,input,select,textarea{font:inherit}
+  button{cursor:pointer}
+  .hidden{display:none!important}
+  .muted{color:var(--muted)}
+  .req{color:var(--danger);margin-left:2px}
+  .icon{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 18px}
+  .svg-icon{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+  /* login */
+  #loginPage{min-height:100vh;display:grid;grid-template-columns:minmax(420px,1.1fr) minmax(420px,.9fr);background:#fff}
+  .login-visual{position:relative;overflow:hidden;background:#0d2b45;color:white;padding:64px;display:flex;flex-direction:column;justify-content:space-between}
+  .login-visual:after{content:"";position:absolute;width:520px;height:520px;border:1px solid rgba(255,255,255,.09);border-radius:50%;right:-130px;top:120px;box-shadow:0 0 0 90px rgba(255,255,255,.025),0 0 0 180px rgba(255,255,255,.018)}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;font-size:19px;letter-spacing:.1px;position:relative;z-index:1}
+  .brand-mark{width:36px;height:36px;border-radius:9px;background:#fff;color:var(--primary);display:grid;place-items:center;font-size:18px;font-weight:800;box-shadow:inset 0 -5px 0 rgba(14,165,233,.18)}
+  .hero-copy{position:relative;z-index:1;max-width:560px;margin-bottom:80px}
+  .hero-copy h1{font-size:42px;line-height:1.12;margin:0 0 18px;letter-spacing:-.8px}
+  .hero-copy p{font-size:17px;line-height:1.7;color:#cfe1f1;margin:0}
+  .login-foot{position:relative;z-index:1;color:#9fb8cc;font-size:12px}
+  .login-panel{display:flex;align-items:center;justify-content:center;padding:60px}
+  .login-card{width:100%;max-width:420px}
+  .login-card h2{font-size:28px;margin:0 0 8px}
+  .login-card .subtitle{color:var(--muted);margin-bottom:30px}
+  .field{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
+  .field label{font-weight:600;font-size:13px;color:#344252}
+  .k-input,.k-select,.k-textarea{width:100%;height:38px;border:1px solid #b9c5d0;border-radius:4px;background:#fff;padding:0 11px;outline:none;transition:border .15s,box-shadow .15s}
+  .k-textarea{height:82px;padding:9px 11px;resize:vertical}
+  .k-input:hover,.k-select:hover,.k-textarea:hover{border-color:#8797a6}
+  .k-input:focus,.k-select:focus,.k-textarea:focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(22,118,210,.13)}
+  .password-wrap{position:relative}
+  .password-wrap .k-input{padding-right:42px}
+  .eye-btn{position:absolute;right:4px;top:3px;width:32px;height:32px;border:0;background:transparent;color:#5d6b78;border-radius:4px}
+  .eye-btn:hover{background:#eef2f5}
+  .login-actions{display:flex;align-items:center;justify-content:space-between;margin:10px 0 22px}
+  .remember{display:flex;align-items:center;gap:8px;color:#465666}
+  .remember input{accent-color:var(--primary)}
+  .link-btn{background:none;border:0;color:var(--primary);padding:0;font-weight:600}
+  .btn{height:38px;border-radius:4px;border:1px solid transparent;padding:0 15px;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:600;white-space:nowrap}
+  .btn-primary{background:var(--primary);color:white;border-color:var(--primary)}
+  .btn-primary:hover{background:var(--primary-700)}
+  .btn-secondary{background:white;color:#324252;border-color:#c8d1da}
+  .btn-secondary:hover{background:#f5f7f9}
+  .btn-danger{background:white;color:var(--danger);border-color:#e3b4b8}
+  .btn-icon{width:34px;height:34px;padding:0;background:white;color:#405160;border:1px solid #ccd5dd}
+  .btn-icon:hover{background:#f0f4f7}
+  .login-submit{width:100%;height:42px}
+  .demo-note{margin-top:18px;padding:12px 14px;background:#f7fafc;border:1px solid var(--border-soft);border-radius:6px;color:#607080;font-size:12px;line-height:1.55}
+
+  /* app shell */
+  #app{height:100vh;display:grid;grid-template-columns:256px 1fr;grid-template-rows:58px 1fr;grid-template-areas:"side top" "side main";overflow:hidden}
+  .sidebar{grid-area:side;background:var(--sidebar);color:#d7e3ec;display:flex;flex-direction:column;overflow:hidden}
+  .sidebar-brand{height:58px;display:flex;align-items:center;gap:10px;padding:0 18px;border-bottom:1px solid rgba(255,255,255,.08);color:white;font-size:17px;font-weight:700}
+  .sidebar-brand .brand-mark{width:31px;height:31px;border-radius:7px;font-size:16px}
+  .sidebar-scroll{overflow:auto;padding:12px 8px 24px}
+  .nav-label{padding:15px 12px 7px;color:#7fa0b9;text-transform:uppercase;font-size:10px;letter-spacing:1.05px;font-weight:700}
+  .nav-item{height:38px;border-radius:5px;color:#cfdae3;display:flex;align-items:center;gap:10px;padding:0 11px;margin:2px 0;cursor:pointer;user-select:none}
+  .nav-item:hover{background:var(--sidebar-hover);color:white}
+  .nav-item.active{background:var(--sidebar-active);color:white;box-shadow:inset 3px 0 0 #56b8f4}
+  .nav-item .text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar{grid-area:top;background:white;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;z-index:5}
+  .top-left{display:flex;align-items:center;gap:12px}
+  .top-title{font-weight:650;color:#344354}
+  .top-actions{display:flex;align-items:center;gap:8px}
+  .top-icon{width:36px;height:36px;border:0;background:transparent;border-radius:50%;display:grid;place-items:center;color:#536474}
+  .top-icon:hover{background:#f0f4f7}
+  .avatar{width:34px;height:34px;border-radius:50%;background:#dcefff;color:#0e67b6;display:grid;place-items:center;font-weight:750;border:1px solid #c7e2f8}
+  .profile{display:flex;align-items:center;gap:9px;margin-left:4px;cursor:pointer;padding:4px 7px;border-radius:6px}
+  .profile:hover{background:#f2f5f7}
+  .profile .name{font-weight:600;font-size:13px}
+  .profile .role{font-size:11px;color:var(--muted)}
+  .main{grid-area:main;overflow:auto;padding:22px 24px 42px}
+  .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:18px}
+  .page-title h1{margin:0 0 5px;font-size:24px;letter-spacing:-.25px;font-weight:650}
+  .breadcrumb{font-size:12px;color:#7b8996}
+  .page-actions{display:flex;gap:8px;align-items:center}
+
+  /* cards/dashboard */
+  .kpi-grid{display:grid;grid-template-columns:repeat(5,minmax(160px,1fr));gap:14px;margin-bottom:16px}
+  .card{background:white;border:1px solid var(--border-soft);border-radius:var(--radius);box-shadow:0 1px 2px rgba(31,48,62,.03)}
+  .kpi{padding:17px 18px;display:flex;align-items:center;justify-content:space-between;min-height:94px}
+  .kpi .label{font-size:12px;color:var(--muted);margin-bottom:7px}
+  .kpi .value{font-size:25px;font-weight:680;color:#223242;letter-spacing:-.4px}
+  .kpi .hint{font-size:10px;color:#8794a0;margin-top:3px}
+  .kpi-icon{width:40px;height:40px;border-radius:9px;background:#eef7ff;color:var(--primary);display:grid;place-items:center}
+  .dash-grid{display:grid;grid-template-columns:1fr 1.35fr;gap:16px;margin-bottom:16px}
+  .card-head{height:54px;border-bottom:1px solid var(--border-soft);padding:0 17px;display:flex;align-items:center;justify-content:space-between}
+  .card-title{font-weight:650;color:#2d3d4d}
+  .card-body{padding:18px}
+  .donut-wrap{display:flex;align-items:center;justify-content:center;gap:36px;min-height:245px}
+  .donut{width:165px;height:165px;border-radius:50%;background:conic-gradient(var(--primary) 0 77%, #dbe5ed 77% 100%);position:relative}
+  .donut:after{content:"";position:absolute;inset:27px;background:white;border-radius:50%}
+  .donut-center{position:absolute;inset:0;z-index:2;display:grid;place-items:center;text-align:center}
+  .donut-center strong{font-size:25px;display:block}
+  .donut-center span{font-size:11px;color:var(--muted)}
+  .legend{display:flex;flex-direction:column;gap:14px}
+  .legend-row{display:grid;grid-template-columns:10px 1fr auto;gap:8px;align-items:center;min-width:150px}
+  .dot{width:9px;height:9px;border-radius:2px}
+  .dot.active{background:var(--primary)}
+  .dot.inactive{background:#dbe5ed}
+  .bar-chart{height:245px;display:flex;align-items:flex-end;gap:12px;padding:12px 8px 25px;border-bottom:1px solid #ccd7e0;position:relative}
+  .bar-chart:before,.bar-chart:after{content:"";position:absolute;left:0;right:0;border-top:1px dashed #e2e8ee}
+  .bar-chart:before{top:33%}.bar-chart:after{top:66%}
+  .bar-col{height:100%;flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px;z-index:1}
+  .bar{width:58%;min-width:20px;max-width:42px;background:#55a7e5;border-radius:3px 3px 0 0;transition:.2s}
+  .bar:hover{background:var(--primary)}
+  .bar-value{font-size:10px;font-weight:650;color:#516170}
+  .bar-label{font-size:10px;color:#687888;position:absolute;bottom:5px}
+  .recent-list{padding:0 16px}
+  .recent-row{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;padding:12px 2px;border-bottom:1px solid var(--border-soft)}
+  .recent-row:last-child{border-bottom:0}
+  .lab-avatar{width:34px;height:34px;border-radius:5px;background:#eef3f7;display:grid;place-items:center;font-weight:700;color:#517089}
+  .recent-name{font-weight:600;font-size:13px}
+  .recent-meta{font-size:11px;color:var(--muted);margin-top:2px}
+
+  /* grid */
+  .grid-card{overflow:hidden}
+  .toolbar{padding:12px;border-bottom:1px solid var(--border-soft);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .search-wrap{position:relative;min-width:270px;flex:0 1 360px}
+  .search-wrap .k-input{padding-left:34px}
+  .search-icon{position:absolute;left:10px;top:10px;color:#768695}
+  .toolbar .k-select{width:165px}
+  .toolbar-spacer{flex:1}
+  .k-grid-wrap{overflow:auto}
+  table.k-grid{border-collapse:collapse;width:100%;min-width:880px}
+  .k-grid th{height:42px;background:#f7f9fb;border-bottom:1px solid #d7e0e8;text-align:left;padding:0 13px;font-size:12px;color:#465565;font-weight:650;white-space:nowrap;position:relative}
+  .k-grid th.sortable{cursor:pointer}
+  .k-grid th.sortable:hover{background:#eef3f7}
+  .k-grid td{height:48px;border-bottom:1px solid var(--border-soft);padding:7px 13px;color:#344352;vertical-align:middle}
+  .k-grid tbody tr:hover{background:#f8fbfd}
+  .k-grid .actions{width:108px;text-align:right}
+  .row-actions{display:flex;justify-content:flex-end;gap:4px}
+  .row-btn{width:30px;height:30px;border:0;background:transparent;border-radius:4px;color:#596b7b;display:grid;place-items:center}
+  .row-btn:hover{background:#eaf1f6;color:var(--primary)}
+  .row-btn.danger:hover{background:var(--danger-bg);color:var(--danger)}
+  .status{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:650}
+  .status:before{content:"";width:6px;height:6px;border-radius:50%}
+  .status.active{background:var(--success-bg);color:var(--success)}
+  .status.active:before{background:var(--success)}
+  .status.inactive{background:#f1f3f5;color:#6c7883}
+  .status.inactive:before{background:#8e9aa5}
+  .tag{display:inline-flex;padding:3px 7px;border:1px solid #d8e2ea;background:#f6f9fb;border-radius:11px;font-size:11px;margin:1px 2px 1px 0}
+  .grid-footer{height:48px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border-soft);color:#667786;font-size:12px}
+  .pager{display:flex;gap:3px;align-items:center}
+  .page-btn{width:30px;height:30px;border:1px solid transparent;background:transparent;border-radius:4px;color:#526272}
+  .page-btn:hover{background:#eef3f7}
+  .page-btn.active{background:var(--primary);color:white}
+  .empty{padding:55px 20px;text-align:center;color:var(--muted)}
+  .inline-number{width:86px;height:31px;border:1px solid #bcc8d2;border-radius:4px;padding:0 8px}
+  .inline-number:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(22,118,210,.12)}
+
+  /* modal material-like */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(13,30,44,.42);display:flex;align-items:center;justify-content:center;padding:24px;z-index:50}
+  .modal{width:min(760px,96vw);max-height:90vh;background:white;border-radius:8px;box-shadow:0 18px 56px rgba(8,24,38,.28);display:flex;flex-direction:column;animation:pop .13s ease-out}
+  .modal.wide{width:min(980px,96vw)}
+  @keyframes pop{from{opacity:.65;transform:scale(.985)}to{opacity:1;transform:scale(1)}}
+  .modal-head{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--border-soft)}
+  .modal-head h3{margin:0;font-size:18px;font-weight:650}
+  .modal-close{width:34px;height:34px;border:0;background:transparent;border-radius:50%;font-size:21px;color:#637280}
+  .modal-close:hover{background:#eef2f5}
+  .modal-body{padding:20px;overflow:auto}
+  .modal-foot{min-height:60px;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 20px;border-top:1px solid var(--border-soft)}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px}
+  .form-grid .span-2{grid-column:span 2}
+  .section-title{font-size:13px;font-weight:700;color:#2e4355;margin:15px 0 12px;padding-bottom:8px;border-bottom:1px solid #e3e9ee}
+  .toggle-row{height:38px;display:flex;align-items:center;justify-content:space-between;border:1px solid #d7e0e7;padding:0 10px;border-radius:4px;background:#fbfcfd}
+  .switch{width:34px;height:19px;border-radius:12px;background:#aab6c1;position:relative;cursor:pointer;transition:.18s}
+  .switch:after{content:"";position:absolute;width:15px;height:15px;border-radius:50%;background:white;left:2px;top:2px;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:.18s}
+  .switch.on{background:var(--primary)}
+  .switch.on:after{left:17px}
+  .module-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .module-card{border:1px solid #dce4ea;border-radius:5px;padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:9px;align-items:center}
+  .module-card strong{font-size:12px}
+  .module-card p{margin:3px 0 0;color:#788795;font-size:10px;line-height:1.35}
+  .multi-box{min-height:38px;border:1px solid #b9c5d0;border-radius:4px;padding:4px 30px 4px 5px;display:flex;gap:3px;flex-wrap:wrap;align-items:center;position:relative;background:white}
+  .multi-box:after{content:"⌄";position:absolute;right:10px;top:7px;color:#627181}
+  .multi-box .chip{background:#eaf4fc;border:1px solid #c5e1f5;color:#2e678f;border-radius:3px;padding:3px 6px;font-size:11px}
+  .help{font-size:10px;color:#7a8996;margin-top:4px;line-height:1.4}
+  .tabs{display:flex;border-bottom:1px solid #dce4ea;margin:-2px 0 16px}
+  .tab{padding:10px 15px;border-bottom:2px solid transparent;color:#5f6f7c;font-weight:600;font-size:12px;cursor:pointer}
+  .tab.active{color:var(--primary);border-color:var(--primary)}
+  .config-box{border:1px solid #dce4ea;background:#fafcfd;border-radius:5px;padding:13px;margin-top:6px}
+  .validation{display:none;color:var(--danger);font-size:10px;margin-top:-3px;margin-bottom:7px}
+  .field.invalid .k-input,.field.invalid .k-select{border-color:var(--danger)}
+  .field.invalid .validation{display:block}
+
+  /* profile menu, toast */
+  .menu-pop{position:fixed;right:20px;top:54px;width:190px;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:var(--shadow);z-index:40;padding:5px}
+  .menu-item{height:36px;display:flex;align-items:center;gap:9px;padding:0 9px;border-radius:4px;cursor:pointer}
+  .menu-item:hover{background:#f1f5f7}
+  .menu-item.danger{color:var(--danger)}
+  .toast-wrap{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:70}
+  .toast{min-width:280px;max-width:400px;background:#203549;color:white;border-radius:5px;padding:12px 14px;box-shadow:var(--shadow);display:flex;gap:9px;align-items:flex-start;animation:slide .16s ease-out}
+  @keyframes slide{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+  .toast.success{border-left:4px solid #34c087}.toast.error{border-left:4px solid #e15761}
+  .toast strong{display:block;font-size:12px;margin-bottom:2px}.toast span{font-size:11px;color:#d4e0e8}
+
+  /* compact screen notes */
+  .info-strip{background:#eff7fd;border:1px solid #cfe5f5;color:#365d79;padding:10px 12px;border-radius:5px;margin-bottom:14px;font-size:12px;line-height:1.5}
+  .warning-strip{background:var(--warning-bg);border:1px solid #f0dfb2;color:#725319;padding:10px 12px;border-radius:5px;margin-bottom:14px;font-size:12px}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .mini-stat{display:flex;gap:8px;align-items:center}
+  .mini-stat strong{font-size:14px}
+  .mini-stat span{font-size:11px;color:var(--muted)}
+  .checkbox-row{display:flex;align-items:center;gap:7px;min-height:38px}
+  .checkbox-row input{accent-color:var(--primary)}
+
+  @media(max-width:1100px){
+    #app{grid-template-columns:220px 1fr}
+    .kpi-grid{grid-template-columns:repeat(3,1fr)}
+    .dash-grid{grid-template-columns:1fr}
+  }
+  @media(max-width:760px){
+    #loginPage{grid-template-columns:1fr}.login-visual{display:none}.login-panel{padding:32px 22px}
+    #app{grid-template-columns:64px 1fr}.sidebar-brand .brand-name,.nav-item .text,.nav-label{display:none}
+    .sidebar-brand{padding:0;justify-content:center}.nav-item{justify-content:center;padding:0}
+    .main{padding:16px}.kpi-grid{grid-template-columns:1fr 1fr}.form-grid,.module-list,.split{grid-template-columns:1fr}
+    .form-grid .span-2{grid-column:span 1}.profile .who{display:none}.page-head{align-items:center}.page-title h1{font-size:20px}
+  }
+  /* Production prototype v2 */
+  :root{--footer-h:34px}
+  .fa-fw{width:1.25em;text-align:center}
+  .nt-logo{display:block;max-width:100%;object-fit:contain}
+  .login-brand-logo{width:175px;max-height:58px;object-fit:contain;object-position:left center;background:#fff;border-radius:8px;padding:8px 10px}
+  .login-product{display:flex;align-items:center;gap:12px;margin-top:16px;font-size:18px;font-weight:700}
+  .product-mark{width:38px;height:38px;border-radius:9px;background:rgba(255,255,255,.12);display:grid;place-items:center}
+  #app{grid-template-columns:264px 1fr;grid-template-rows:58px 1fr var(--footer-h);grid-template-areas:"side top" "side main" "side foot";transition:grid-template-columns .2s ease}
+  #app.nav-collapsed{grid-template-columns:72px 1fr}
+  #app.nav-collapsed .brand-name,#app.nav-collapsed .nav-item .text,#app.nav-collapsed .nav-label{display:none}
+  #app.nav-collapsed .sidebar-brand{justify-content:center;padding:0 8px}
+  #app.nav-collapsed .sidebar-brand-logo{display:none}
+  #app.nav-collapsed .sidebar-mini-mark{display:grid}
+  #app.nav-collapsed .nav-item{justify-content:center;padding:0;gap:0}
+  #app.nav-collapsed .nav-item .icon{font-size:16px}
+  .sidebar-brand{cursor:pointer;min-width:0}
+  .sidebar-brand-logo{height:28px;width:76px;object-fit:contain;background:white;border-radius:4px;padding:3px 5px}
+  .sidebar-mini-mark{display:none;width:34px;height:34px;border-radius:8px;background:white;color:var(--primary);place-items:center;font-weight:800}
+  .sidebar-brand .brand-name{white-space:nowrap;overflow:hidden}
+  .nav-item .icon{font-size:14px}
+  .nav-item{position:relative}
+  #app.nav-collapsed .nav-item:hover:after{content:attr(data-title);position:absolute;left:62px;top:4px;background:#172b3d;color:white;padding:7px 10px;border-radius:5px;white-space:nowrap;z-index:100;box-shadow:var(--shadow);font-size:12px}
+  .app-footer{grid-area:foot;background:#fff;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;color:#748391;font-size:11px}
+  .app-footer strong{color:#4a5a68;font-weight:600}
+  .home-screen{min-height:calc(100% - 10px);display:grid;place-items:center}
+  .home-logo-card{width:min(560px,80vw);height:260px;display:grid;place-items:center;background:#fff;border:1px solid var(--border-soft);border-radius:12px;box-shadow:0 6px 22px rgba(20,48,72,.06)}
+  .home-logo-card img{max-width:360px;max-height:150px;width:70%;object-fit:contain}
+  .dashboard-filter{display:flex;align-items:center;gap:8px}
+  .dashboard-filter label{font-size:12px;font-weight:600;color:#516170}
+  .dashboard-filter .k-select{width:170px}
+  .modal{width:min(960px,96vw);max-height:92vh}
+  .modal.wide{width:min(1180px,97vw)}
+  .modal-body{padding:24px 26px}
+  .modal-head,.modal-foot{padding-left:26px;padding-right:26px}
+  .modal-head{min-height:62px;height:auto}
+  .modal-foot{min-height:66px}
+  .module-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .module-card{min-height:68px;align-items:center}
+  .module-card.readonly{background:#f7f9fb}
+  .module-card.readonly .switch{opacity:.7;cursor:not-allowed}
+  .module-group-title{grid-column:1/-1;color:#526272;text-transform:uppercase;font-size:10px;letter-spacing:.8px;font-weight:700;margin:7px 0 -2px}
+  .service-member-toolbar{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:12px}
+  .service-members-empty{padding:28px 18px;text-align:center;border:1px dashed #ccd7df;border-radius:6px;color:#71808d;background:#fbfcfd}
+  .member-kind{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#637381;margin-bottom:8px}
+  .k-grid .drag-handle{color:#9aa7b2;margin-right:5px}
+  .footer-version{font-variant-numeric:tabular-nums}
+  @media(max-width:1100px){.module-list{grid-template-columns:1fr 1fr}}
+  @media(max-width:760px){#app,#app.nav-collapsed{grid-template-columns:64px 1fr;grid-template-rows:58px 1fr var(--footer-h)}.app-footer{padding:0 10px}.app-footer .footer-version{display:none}.module-list{grid-template-columns:1fr}.modal,.modal.wide{width:98vw}.modal-body{padding:18px}.sidebar-brand-logo,.brand-name,.nav-item .text,.nav-label{display:none}.sidebar-mini-mark{display:grid}}
+
+/* v3 extensions */
+.modal.wide{width:min(1380px,97vw)}
+.range-grid{min-width:1160px!important}.range-grid input[type=number]{width:76px}.range-grid textarea{min-width:150px;height:64px}
+.age-parts{display:flex;gap:4px}.age-parts label{font-size:10px;color:var(--muted)}.age-parts input{display:block;width:64px!important}
+.geo-columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.geo-panel{background:white;border:1px solid var(--border);border-radius:6px;padding:12px}.geo-panel h4{margin:0 0 12px}.geo-panel select{height:140px;padding:5px}.geo-panel .btn{margin-top:8px;padding:0 9px}.geo-panel input{margin-top:8px}
+.inline-tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.inline-tools .k-input{width:220px}.drag-row{cursor:grab}.drag-row.dragging{opacity:.45}.drag-row.drop-target{outline:2px solid var(--primary);outline-offset:-2px}.reorder-btn{border:1px solid var(--border);background:white;border-radius:4px;padding:4px 7px}.reorder-btn:disabled{opacity:.35;cursor:default}
+.log-filters{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;padding:18px}.log-filters .field{margin:0}.log-filters label{font-size:12px}.logs-grid{min-width:1700px!important}.logs-grid td{white-space:nowrap}.session-active{color:var(--success);font-weight:600}.configuration-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.configuration-head h4{margin:0}.option-editor{padding:14px;background:#eef7ff;border:1px solid #cfe5f5;margin:12px 0;border-radius:6px}.option-editor .form-grid{grid-template-columns:2fr 1fr 1fr 1fr}.row-actions .btn{height:30px;padding:0 8px}.age-inclusive{display:flex;align-items:center;gap:4px;font-size:11px;margin-top:5px}.modal-head,.modal-foot{flex-shrink:0}
+@media(max-width:900px){.geo-columns{grid-template-columns:1fr}.log-filters{grid-template-columns:1fr 1fr}.option-editor .form-grid{grid-template-columns:1fr 1fr}}
+
+
+.profile-membership-list{margin:0;padding:10px 12px 10px 30px;border:1px solid var(--border);border-radius:4px;background:#fafcfd}.profile-membership-list li{padding:5px 0}.catalog-concept{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.catalog-concept strong{color:var(--primary)}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<section id="loginPage">
+  <div class="login-visual">
+    <div>
+      <img class="login-brand-logo" src="https://docs.nationaltechnology.net/public/SharedDocResources/Logos/NT1087dee606b49bffb73577e0cf284.png" alt="National Technology">
+      <div class="login-product"><span class="product-mark"><i class="fa-solid fa-flask-vial"></i></span><span>Sky LIS</span></div>
+    </div>
+    <div class="hero-copy">
+      <h1>Laboratory operations, simplified in the cloud.</h1>
+      <p>Central administration for a subscription-based laboratory information system — clients, users, roles and global laboratory master data in one place.</p>
+    </div>
+    <div class="login-foot">© 2026 National Technology • Sky LIS Super Admin Portal</div>
+  </div>
+  <div class="login-panel">
+    <div class="login-card">
+      <h2>Welcome back</h2>
+      <div class="subtitle">Sign in to the Sky LIS Super Admin Portal</div>
+      <div class="field" id="loginUserField">
+        <label>Username<span class="req">*</span></label>
+        <input id="loginUser" class="k-input" value="admin" autocomplete="username">
+        <div class="validation">Username is required</div>
+      </div>
+      <div class="field" id="loginPassField">
+        <label>Password<span class="req">*</span></label>
+        <div class="password-wrap">
+          <input id="loginPass" class="k-input" type="password" value="Sky@2026" autocomplete="current-password">
+          <button class="eye-btn" id="togglePass" title="Show password"><i class="fa-regular fa-eye"></i></button>
+        </div>
+        <div class="validation">Password is required</div>
+      </div>
+      <button class="btn btn-primary login-submit" id="loginBtn"><i class="fa-solid fa-arrow-right-to-bracket"></i> Login</button>
+      <div class="demo-note"><strong>Prototype access:</strong> demo credentials are prefilled. Login intentionally contains only the username/password flow requested for production.</div>
+    </div>
+  </div>
+</section>
+
+<!-- App -->
+<section id="app" class="hidden">
+  <aside class="sidebar">
+    <div class="sidebar-brand" id="brandHome" title="Go to Home">
+      <img class="sidebar-brand-logo" src="https://docs.nationaltechnology.net/public/SharedDocResources/Logos/NT1087dee606b49bffb73577e0cf284.png" alt="National Technology">
+      <div class="sidebar-mini-mark">S</div>
+      <span class="brand-name">Sky LIS</span>
+    </div>
+    <div class="sidebar-scroll">
+      <div class="nav-label">Overview</div>
+      <div class="nav-item" data-screen="home" data-title="Home"><span class="icon"><i class="fa-solid fa-house fa-fw"></i></span><span class="text">Home</span></div>
+      <div class="nav-item" data-screen="dashboard" data-title="Dashboard"><span class="icon"><i class="fa-solid fa-chart-line fa-fw"></i></span><span class="text">Dashboard</span></div>
+
+      <div class="nav-label">Administration</div>
+      <div class="nav-item" data-screen="roles" data-title="Roles"><span class="icon"><i class="fa-solid fa-shield-halved fa-fw"></i></span><span class="text">Roles</span></div>
+      <div class="nav-item" data-screen="users" data-title="Admin Users"><span class="icon"><i class="fa-solid fa-users-gear fa-fw"></i></span><span class="text">Admin Users</span></div>
+      <div class="nav-item" data-screen="clients" data-title="Clients"><span class="icon"><i class="fa-solid fa-building fa-fw"></i></span><span class="text">Clients</span></div>
+
+      <div class="nav-item" data-screen="loginLogs" data-title="Client Login Logs"><span class="icon"><i class="fa-solid fa-clock-rotate-left fa-fw"></i></span><span class="text">Client Login Logs</span></div>
+      <div class="nav-label">Master Data</div>
+      <div class="nav-item" data-screen="countries" data-title="Countries"><span class="icon"><i class="fa-solid fa-earth-africa fa-fw"></i></span><span class="text">Countries</span></div>
+      <div class="nav-item" data-screen="governorates" data-title="Governorates"><span class="icon"><i class="fa-solid fa-location-dot fa-fw"></i></span><span class="text">Governorates</span></div>
+      <div class="nav-item" data-screen="clinicalGroups" data-title="Clinical Groups"><span class="icon"><i class="fa-solid fa-layer-group fa-fw"></i></span><span class="text">Clinical Groups</span></div>
+      <div class="nav-item" data-screen="services" data-title="Profile/Panel"><span class="icon"><i class="fa-solid fa-list-check fa-fw"></i></span><span class="text">Profile/Panel</span></div>
+      <div class="nav-item" data-screen="tests" data-title="Tests"><span class="icon"><i class="fa-solid fa-vials fa-fw"></i></span><span class="text">Tests</span></div>
+      <div class="nav-item" data-screen="serviceSequence" data-title="Global Sequence"><span class="icon"><i class="fa-solid fa-arrow-down-1-9 fa-fw"></i></span><span class="text">Global Sequence</span></div>
+      <div class="nav-item" data-screen="sampleTypes" data-title="Sample Types"><span class="icon"><i class="fa-solid fa-vial fa-fw"></i></span><span class="text">Sample Types</span></div>
+      <div class="nav-item" data-screen="units" data-title="Units of Measurement"><span class="icon"><i class="fa-solid fa-ruler-combined fa-fw"></i></span><span class="text">Units of Measurement</span></div>
+      <div class="nav-item" data-screen="drugTypes" data-title="Drug Types"><span class="icon"><i class="fa-solid fa-capsules fa-fw"></i></span><span class="text">Drug Types</span></div>
+      <div class="nav-item" data-screen="commercialNames" data-title="Antibiotic Commercial Names"><span class="icon"><i class="fa-solid fa-prescription-bottle-medical fa-fw"></i></span><span class="text">Antibiotic Commercial Names</span></div>
+      <div class="nav-item" data-screen="antibiotics" data-title="Antibiotics"><span class="icon"><i class="fa-solid fa-pills fa-fw"></i></span><span class="text">Antibiotics</span></div>
+      <div class="nav-item" data-screen="organisms" data-title="Organisms"><span class="icon"><i class="fa-solid fa-bacteria fa-fw"></i></span><span class="text">Organisms</span></div>
+      <div class="nav-item" data-screen="preparations" data-title="Preparations"><span class="icon"><i class="fa-solid fa-clipboard-question fa-fw"></i></span><span class="text">Preparations</span></div>
+      <div class="nav-item" data-screen="comments" data-title="Comments"><span class="icon"><i class="fa-solid fa-comment-dots fa-fw"></i></span><span class="text">Comments</span></div>
+    </div>
+  </aside>
+
+  <header class="topbar">
+    <div class="top-left">
+      <button class="top-icon" id="sidebarToggle" title="Collapse navigation"><i class="fa-solid fa-bars"></i></button>
+      <span class="top-title" id="topTitle">Home</span>
+    </div>
+    <div class="top-actions">
+      <button class="top-icon" title="Notifications"><i class="fa-regular fa-bell"></i></button>
+      <div class="profile" id="profileBtn">
+        <div class="avatar">SA</div>
+        <div class="who"><div class="name">System Admin</div><div class="role">Super Admin</div></div>
+        <span class="muted"><i class="fa-solid fa-chevron-down" style="font-size:10px"></i></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="main" id="mainContent"></main>
+  <footer class="app-footer"><span>© 2026 <strong>National Technology</strong>. All rights reserved.</span><span class="footer-version">Sky LIS • Super Admin Portal • Prototype v4.1</span></footer>
+</section>
+
+<div id="profileMenu" class="menu-pop hidden">
+  <div class="menu-item" onclick="toast('Profile','Profile view would open here.','success')"><i class="fa-regular fa-user fa-fw"></i><span>View Profile</span></div>
+  <div class="menu-item"><i class="fa-solid fa-gear fa-fw"></i><span>Account settings</span></div>
+  <div class="menu-item danger" id="logoutBtn"><i class="fa-solid fa-arrow-right-from-bracket fa-fw"></i><span>Logout</span></div>
+</div>
+
+<div id="modalBackdrop" class="modal-backdrop hidden"></div>
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+const icons = {
+  edit:'<i class="fa-regular fa-pen-to-square"></i>',
+  trash:'<i class="fa-regular fa-trash-can"></i>',
+  more:'<i class="fa-solid fa-ellipsis"></i>',
+  search:'<i class="fa-solid fa-magnifying-glass"></i>',
+  plus:'<i class="fa-solid fa-plus"></i>',
+  refresh:'<i class="fa-solid fa-arrows-rotate"></i>',
+  export:'<i class="fa-regular fa-file-excel"></i>'
+};
+
+const modules = [
+  ['Overview','Dashboard','Platform KPIs and operational analytics'],
+  ['Administration','Roles','Role definitions and screen access'],
+  ['Administration','Admin Users','Internal Super Admin users'],
+  ['Administration','Clients','Client lifecycle and status'],
+  ['Administration','Client Login Logs','Client user session history'],
+  ['Master Data','Countries','Countries and mobile validation'],
+  ['Master Data','Governorates','Governorates and districts'],
+  ['Master Data','Clinical Groups','Laboratory clinical classifications'],
+  ['Master Data','Profile/Panel','Profiles and panels catalog'],
+  ['Master Data','Tests','Laboratory test catalog'],
+  ['Master Data','Global Sequence','Global test display order'],
+  ['Master Data','Sample Types','Sample type definitions'],
+  ['Master Data','Units of Measurement','Units used by laboratory tests'],
+  ['Master Data','Drug Types','Microbiology drug classifications'],
+  ['Master Data','Antibiotic Commercial Names','Commercial antibiotic names'],
+  ['Master Data','Antibiotics','Antibiotic master data'],
+  ['Master Data','Organisms','Microbiology organisms'],
+  ['Master Data','Preparations','Patient preparation questions'],
+  ['Master Data','Comments','Reusable laboratory comments']
+];
+
+const db = {
+  roles:[
+    {id:1,name:'Super Admin',description:'Full system access',users:3,status:'Active',access:modules.map(m=>m[1])},
+    {id:2,name:'Operations Admin',description:'Client and master data operations',users:6,status:'Active',access:['Dashboard','Clients','Countries','Governorates','Clinical Groups','Profile/Panel','Tests','Global Sequence','Sample Types','Units of Measurement']},
+    {id:3,name:'Master Data Reviewer',description:'Read and review laboratory masters',users:2,status:'Active',access:['Dashboard','Clinical Groups','Profile/Panel','Tests','Global Sequence','Sample Types','Units of Measurement','Drug Types','Antibiotic Commercial Names','Antibiotics','Organisms','Preparations','Comments']},
+    {id:4,name:'Support',description:'Client support access',users:4,status:'Inactive',access:['Dashboard','Clients']}
+  ],
+  users:[
+    {id:1,fullName:'Ahmed Nasser',username:'a.nasser',mobile:'+20 100 555 0191',email:'ahmed.nasser@skylis.demo',role:'Super Admin',status:'Active'},
+    {id:2,fullName:'Mariam Adel',username:'m.adel',mobile:'+20 111 272 4401',email:'mariam.adel@skylis.demo',role:'Operations Admin',status:'Active'},
+    {id:3,fullName:'Omar Khaled',username:'o.khaled',mobile:'+966 50 883 1220',email:'omar.k@skylis.demo',role:'Master Data Reviewer',status:'Active'},
+    {id:4,fullName:'Sara Mostafa',username:'s.mostafa',mobile:'+20 122 340 9911',email:'sara.m@skylis.demo',role:'Support',status:'Inactive'}
+  ],
+  clients:[
+    {id:1,name:'Al Noor Laboratories',country:'Egypt',governorate:'Cairo',manager:'Karim Hassan',mobile:'+20 100 444 2350',created:'01 Sep 2026',source:'Subscription',status:'Active'},
+    {id:2,name:'MedLine Lab',country:'Saudi Arabia',governorate:'Riyadh',manager:'Noura Saleh',mobile:'+966 55 202 7431',created:'30 Aug 2026',source:'Manual',status:'Active'},
+    {id:3,name:'Prime Diagnostics',country:'Egypt',governorate:'Alexandria',manager:'Fady Nabil',mobile:'+20 111 982 2201',created:'28 Aug 2026',source:'Subscription',status:'Active'},
+    {id:4,name:'LifeCheck Labs',country:'Jordan',governorate:'Amman',manager:'Rami Saad',mobile:'+962 79 302 1188',created:'25 Aug 2026',source:'Subscription',status:'Inactive'},
+    {id:5,name:'Delta Lab',country:'Egypt',governorate:'Dakahlia',manager:'Mona Ali',mobile:'+20 109 641 7750',created:'22 Aug 2026',source:'Manual',status:'Active'}
+  ],
+  countries:[
+    {id:1,name:'Egypt',code:'EG',dial:'+20',currency:'Egyptian Pound',currencyCode:'EGP',language:'Arabic / English',timezone:'UTC+02:00',mobileLength:'10',status:'Active'},
+    {id:2,name:'Saudi Arabia',code:'SA',dial:'+966',currency:'Saudi Riyal',currencyCode:'SAR',language:'Arabic / English',timezone:'UTC+03:00',mobileLength:'9',status:'Active'},
+    {id:3,name:'Jordan',code:'JO',dial:'+962',currency:'Jordanian Dinar',currencyCode:'JOD',language:'Arabic / English',timezone:'UTC+03:00',mobileLength:'9',status:'Active'},
+    {id:4,name:'UAE',code:'AE',dial:'+971',currency:'UAE Dirham',currencyCode:'AED',language:'Arabic / English',timezone:'UTC+04:00',mobileLength:'9',status:'Inactive'}
+  ],
+  governorates:[
+    {id:1,name:'Cairo',country:'Egypt',district:'Nasr City',remarks:'',status:'Active'},
+    {id:2,name:'Alexandria',country:'Egypt',district:'Smouha',remarks:'',status:'Active'},
+    {id:3,name:'Riyadh',country:'Saudi Arabia',district:'Al Olaya',remarks:'',status:'Active'},
+    {id:4,name:'Amman',country:'Jordan',district:'Abdoun',remarks:'',status:'Active'}
+  ],
+  clinicalGroups:[
+    {id:1,name:'Hematology',code:'100',reportName:'Hematology',status:'Active'},
+    {id:2,name:'Clinical Chemistry',code:'200',reportName:'Clinical Chemistry',status:'Active'},
+    {id:3,name:'Microbiology',code:'300',reportName:'Microbiology',status:'Active'},
+    {id:4,name:'Immunology',code:'400',reportName:'Immunology',status:'Active'}
+  ],
+  services:[
+    {id:1,name:'Complete Blood Count',loinc:'57021-8',short:'CBC',group:'Hematology',type:'Test',tests:'Hemoglobin',members:[{id:1,name:'Hemoglobin',loinc:'718-7',order:1}],print:'No',status:'Active'},
+    {id:2,name:'Liver Function Tests',loinc:'24325-3',short:'LFT',group:'Clinical Chemistry',type:'Package',tests:'Complete Blood Count, Urine Culture',members:[{id:1,name:'Complete Blood Count',loinc:'57021-8',order:1},{id:3,name:'Urine Culture',loinc:'630-4',order:2}],print:'No',status:'Active'},
+    {id:3,name:'Urine Culture',loinc:'630-4',short:'UCULT',group:'Microbiology',type:'Test',tests:'Urine Culture',members:[{id:4,name:'Urine Culture',loinc:'630-4',order:1}],print:'Yes',status:'Active'},
+    {id:4,name:'Thyroid Profile',loinc:'24348-5',short:'THY',group:'Immunology',type:'Package',tests:'Complete Blood Count',members:[{id:1,name:'Complete Blood Count',loinc:'57021-8',order:1}],print:'No',status:'Inactive'}
+  ],
+  tests:[
+    {id:1,name:'Hemoglobin',loinc:'718-7',group:'Hematology',type:'Numeric/Non Numeric',sample:'EDTA Blood',unit:'g/dL',gender:'All',status:'Active'},
+    {id:2,name:'ALT',loinc:'1742-6',group:'Clinical Chemistry',type:'Numeric/Non Numeric',sample:'Serum',unit:'U/L',gender:'All',status:'Active'},
+    {id:3,name:'Blood Group',loinc:'883-9',group:'Hematology',type:'Optional List',sample:'EDTA Blood',unit:'—',gender:'All',status:'Active'},
+    {id:4,name:'Urine Culture',loinc:'630-4',group:'Microbiology',type:'Culture',sample:'Urine',unit:'—',gender:'All',status:'Active'}
+  ],
+  serviceSequence:[
+    {id:1,sequence:1,code:'CBC',name:'Complete Blood Count',type:'Test',status:'Active'},
+    {id:2,sequence:2,code:'LFT',name:'Liver Function Tests',type:'Package',status:'Active'},
+    {id:3,sequence:3,code:'UCULT',name:'Urine Culture',type:'Test',status:'Active'},
+    {id:4,sequence:4,code:'THY',name:'Thyroid Profile',type:'Package',status:'Inactive'}
+  ],
+  sampleTypes:[
+    {id:1,name:'Serum',short:'SER',code:'10',description:'Serum sample',status:'Active'},
+    {id:2,name:'EDTA Blood',short:'EDTA',code:'20',description:'Whole blood on EDTA',status:'Active'},
+    {id:3,name:'Urine',short:'URN',code:'30',description:'Urine sample',status:'Active'},
+    {id:4,name:'Swab',short:'SWB',code:'40',description:'Microbiology swab',status:'Inactive'}
+  ],
+  units:[
+    {id:1,name:'mg/dL',status:'Active'},{id:2,name:'g/dL',status:'Active'},{id:3,name:'U/L',status:'Active'},
+    {id:4,name:'mmol/L',status:'Active'},{id:5,name:'cells/µL',status:'Inactive'}
+  ],
+  drugTypes:[
+    {id:1,name:'Penicillin',status:'Active'},{id:2,name:'Cephalosporin',status:'Active'},{id:3,name:'Macrolide',status:'Active'},{id:4,name:'Fluoroquinolone',status:'Active'}
+  ],
+  commercialNames:[
+    {id:1,name:'Augmentin',drugType:'Penicillin',status:'Active'},{id:2,name:'Zithromax',drugType:'Macrolide',status:'Active'},
+    {id:3,name:'Rocephin',drugType:'Cephalosporin',status:'Active'},{id:4,name:'Cipro',drugType:'Fluoroquinolone',status:'Inactive'}
+  ],
+  antibiotics:[
+    {id:1,code:'AB001',name:'Amoxicillin/Clavulanate',abbr:'AMC',commercial:'Augmentin',status:'Active'},
+    {id:2,code:'AB002',name:'Azithromycin',abbr:'AZM',commercial:'Zithromax',status:'Active'},
+    {id:3,code:'AB003',name:'Ceftriaxone',abbr:'CRO',commercial:'Rocephin',status:'Active'}
+  ],
+  organisms:[
+    {id:1,code:'ORG001',name:'Escherichia coli',status:'Active'},{id:2,code:'ORG002',name:'Staphylococcus aureus',status:'Active'},
+    {id:3,code:'ORG003',name:'Klebsiella pneumoniae',status:'Active'},{id:4,code:'ORG004',name:'Pseudomonas aeruginosa',status:'Inactive'}
+  ],
+  preparations:[
+    {id:1,code:'PREP01',question:'Have you been fasting for 8 hours?',type:'Yes/No',tests:'Glucose, Lipid Profile',gender:'All',status:'Active'},
+    {id:2,code:'PREP02',question:'Date of last menstrual period?',type:'Text',tests:'Hormonal tests',gender:'Female',status:'Active'},
+    {id:3,code:'PREP03',question:'Select collection time',type:'Option List',tests:'Cortisol',gender:'All',status:'Active'}
+  ],
+  comments:[
+    {id:1,short:'FASTING',comment:'Fasting sample is required.',status:'Active'},
+    {id:2,short:'RECOLLECT',comment:'Please recollect a fresh sample.',status:'Active'},
+    {id:3,short:'HEMOLYZED',comment:'Sample is hemolyzed; interpret with caution.',status:'Inactive'}
+  ]
+};
+
+const screens = {
+  roles:{
+    title:'Roles', breadcrumb:'Administration / Roles', add:'Add Role', singular:'Role', data:'roles',wide:true,
+    columns:[['name','Role Name'],['description','Description'],['users','No. of Users'],['access','Screen Access'],['status','Status']],
+    fields:[
+      {key:'name',label:'Role Name',type:'text',required:true,help:'Unique role name.'},
+      {key:'description',label:'Role Description',type:'textarea'},
+      {key:'status',label:'Status',type:'toggle'},
+      {key:'access',label:'Screen Privileges',type:'modules',required:true,span:2}
+    ]
+  },
+  users:{
+    title:'Admin Users',breadcrumb:'Administration / Admin Users',add:'Add User',singular:'Admin User',data:'users',wide:true,
+    columns:[['fullName','Full Name'],['username','User Name'],['mobile','Mobile'],['email','Email'],['role','Role'],['status','Status']],
+    fields:[
+      {key:'fullName',label:'Full Name',type:'text',required:true},
+      {key:'username',label:'User Name',type:'text',required:true,help:'4–30 characters; letters, numbers, dots and underscores.'},
+      {key:'countryCode',label:'Country Code',type:'select',required:true,options:['+20 Egypt','+966 Saudi Arabia','+962 Jordan','+971 UAE']},
+      {key:'mobile',label:'Mobile Number',type:'text',required:true},
+      {key:'email',label:'Email',type:'email'},
+      {key:'role',label:'Role',type:'select',required:true,options:['Super Admin','Operations Admin','Master Data Reviewer','Support']},
+      {key:'password',label:'Password',type:'password',required:true},
+      {key:'confirmPassword',label:'Confirm Password',type:'password',required:true},
+      {key:'status',label:'Status',type:'toggle'},
+      {key:'access',label:'Privileges inherited from Role',type:'rolemodules',span:2,help:'Privileges are controlled by the selected role and cannot be overridden for an individual user.'}
+    ]
+  },
+  clients:{
+    title:'Clients',breadcrumb:'Administration / Clients',add:'Add Client',singular:'Client',data:'clients',
+    columns:[['name','Client Name'],['country','Country'],['governorate','Governorate'],['manager','Manager'],['mobile','Mobile'],['created','Created'],['source','Source'],['status','Status']],
+    fields:[
+      {key:'name',label:'Client Name',type:'text',required:true},
+      {key:'country',label:'Country',type:'select',required:true,options:['Egypt','Saudi Arabia','Jordan','UAE']},
+      {key:'governorate',label:'Governorate',type:'select',required:true,options:['Cairo','Alexandria','Riyadh','Amman']},
+      {key:'address',label:'Address',type:'text',required:true,span:2},
+      {key:'mobile',label:'Phone Number (Mobile)',type:'text',required:true,help:'Country code follows selected country.'},
+      {key:'license',label:'Medical License Number',type:'text'},
+      {key:'manager',label:'Manager Name',type:'text',required:true},
+      {key:'managerMobile',label:'Manager Mobile Number',type:'text',required:true},
+      {key:'email',label:'Email Address',type:'email'},
+      {key:'status',label:'Status',type:'toggle'}
+    ],
+    note:'Subscribed clients and manually created clients are managed in the same grid. Password reset and activation are available from row actions.'
+  },
+  countries:{
+    title:'Countries',breadcrumb:'Master Data / Countries',add:'Add Country',singular:'Country',data:'countries',
+    columns:[['name','Country Name'],['code','Code'],['dial','Dial Code'],['currency','Currency'],['language','Language'],['timezone','Time Zone'],['mobileLength','Mobile Length'],['status','Status']],
+    fields:[
+      {key:'name',label:'Country Name',type:'text',required:true},
+      {key:'code',label:'Country Code',type:'text',required:true},
+      {key:'dial',label:'Dial Code',type:'text',required:true,help:'Must begin with + and contain numbers only.'},
+      {key:'currency',label:'Currency',type:'select',required:true,options:['Egyptian Pound','Saudi Riyal','Jordanian Dinar','UAE Dirham','US Dollar']},
+      {key:'currencyCode',label:'Currency Code',type:'text',required:true,help:'3-letter currency code.'},
+      {key:'language',label:'Language',type:'select',required:true,options:['Arabic','English','Arabic / English','French']},
+      {key:'timezone',label:'Time Zone',type:'select',required:true,options:['UTC+02:00','UTC+03:00','UTC+04:00']},
+      {key:'mobileLength',label:'Mobile Number Length',type:'number',required:true},
+      {key:'flag',label:'Flag',type:'file',help:'JPG, JPEG, SVG or PNG.'},
+      {key:'status',label:'Status',type:'toggle'},
+      {key:'remarks',label:'Remarks',type:'textarea',span:2}
+    ]
+  },
+  governorates:{
+    title:'Governorates',breadcrumb:'Master Data / Governorates',add:'Add Governorate',singular:'Governorate',data:'governorates',
+    columns:[['name','Governorate Name'],['country','Country'],['district','District'],['remarks','Remarks'],['status','Status']],
+    fields:[
+      {key:'name',label:'Governorate Name',type:'text',required:true},
+      {key:'country',label:'Country',type:'select',required:true,options:['Egypt','Saudi Arabia','Jordan','UAE']},
+      {key:'district',label:'District',type:'text',required:true},
+      {key:'status',label:'Status',type:'toggle'},
+      {key:'remarks',label:'Remarks',type:'textarea',span:2}
+    ]
+  },
+  clinicalGroups:{
+    title:'Clinical Groups',breadcrumb:'Master Data / Clinical Groups',add:'Add Clinical Group',singular:'Clinical Group',data:'clinicalGroups',
+    columns:[['name','Clinical Group Name'],['code','Code'],['reportName','Report Name'],['status','Status']],
+    fields:[
+      {key:'name',label:'Clinical Group Name',type:'text',required:true},
+      {key:'code',label:'Code',type:'number',required:true},
+      {key:'reportName',label:'Report Name',type:'text',required:true},
+      {key:'status',label:'Status',type:'toggle'}
+    ]
+  },
+  services:{
+    title:'Profile/Panel',breadcrumb:'Master Data / Profile/Panel',add:'Add Profile/Panel',singular:'Profile/Panel',data:'services',wide:true,
+    columns:[['name','Profile/Panel Name'],['loinc','LOINC Code'],['short','Short Name'],['group','Clinical Group'],['type','Profile/Panel Type'],['tests','Tests'],['print','Print Alone'],['status','Status']],
+    fields:[
+      {key:'name',label:'Profile/Panel Name',type:'text',required:true},
+      {key:'loinc',label:'LOINC Code',type:'text',required:true},
+      {key:'header',label:'Profile/Panel Header',type:'text'},
+      {key:'group',label:'Clinical Group',type:'select',required:true,options:['Hematology','Clinical Chemistry','Microbiology','Immunology']},
+      {key:'type',label:'Profile/Panel Type',type:'select',required:true,options:['Test','Package']},
+      {key:'short',label:'Short Name',type:'text',required:true},
+      {key:'aliases',label:'Alias Name',type:'multi',required:true,values:['CBC','Full Blood Count']},
+      {key:'reportName',label:'Report Name',type:'text',required:true},
+      {key:'print',label:'Print Alone Profile/Panel',type:'toggle'},
+      {key:'status',label:'Status',type:'toggle'},
+      {key:'tests',label:'Tests',type:'testgrid',required:true,span:2}
+    ],
+    note:'The SRS requires at least one test per service and an editable display order for selected tests.'
+  },
+  tests:{
+    title:'Tests',breadcrumb:'Master Data / Tests',add:'Add Test',singular:'Test',data:'tests',wide:true,
+    columns:[['name','Test Name'],['loinc','LOINC Code'],['group','Clinical Group'],['type','Test Type'],['sample','Sample Type'],['unit','Unit'],['gender','Gender'],['status','Status']],
+    fields:[
+      {key:'name',label:'Test Name',type:'text',required:true},
+      {key:'loinc',label:'LOINC Code',type:'text',required:true},
+      {key:'group',label:'Clinical Group',type:'select',required:true,options:['Hematology','Clinical Chemistry','Microbiology','Immunology']},
+      {key:'type',label:'Test Type',type:'select',required:true,options:['Numeric/Non Numeric','Optional List','Formula','Formatted Text','Culture']},
+      {key:'sample',label:'Sample Type',type:'select',required:true,options:['Serum','EDTA Blood','Urine','Swab']},
+      {key:'unit',label:'Unit of Measurement',type:'select',required:true,options:['mg/dL','g/dL','U/L','mmol/L','cells/µL','—']},
+      {key:'reportName',label:'Report Name',type:'text',required:true},
+      {key:'gender',label:'Gender',type:'select',required:true,options:['All','Male','Female']},
+      {key:'parent',label:'Parent Profile/Panel',type:'multi',values:['Complete Blood Count']},
+      {key:'status',label:'Status',type:'toggle'},
+      {key:'description',label:'Description',type:'textarea',span:2},
+      {key:'configuration',label:'Test Configuration',type:'testconfig',span:2}
+    ],
+    note:'Configure multiple age-specific reference ranges for Numeric/Non Numeric tests, or maintain ordered values for Optional List tests.'
+  },
+  serviceSequence:{
+    title:'Global Sequence',breadcrumb:'Master Data / Global Sequence',add:null,singular:'Sequence',data:'serviceSequence',
+    columns:[['sequence','Sequence'],['code','Profile/Panel Code'],['name','Profile/Panel Name'],['type','Profile/Panel Type'],['status','Status']],
+    inlineSequence:true,
+    note:'Sequence is edited directly in the grid. Values must be unique and greater than zero.'
+  },
+  sampleTypes:{
+    title:'Sample Types',breadcrumb:'Master Data / Sample Types',add:'Add Sample Type',singular:'Sample Type',data:'sampleTypes',
+    columns:[['name','Sample Type Name'],['short','Short Name'],['code','Code'],['description','Description'],['status','Status']],
+    fields:[
+      {key:'name',label:'Sample Type Name',type:'text',required:true},{key:'short',label:'Short Name',type:'text',required:true,help:'Maximum 20 characters.'},
+      {key:'code',label:'Code',type:'text',required:true,help:'Maximum 20 characters.'},{key:'status',label:'Status',type:'toggle'},
+      {key:'description',label:'Description',type:'textarea',span:2}
+    ]
+  },
+  units:{
+    title:'Units of Measurement',breadcrumb:'Master Data / Units of Measurement',add:'Add Unit',singular:'Unit of Measurement',data:'units',
+    columns:[['name','Unit of Measurement'],['status','Status']],
+    fields:[{key:'name',label:'Unit of Measurement',type:'text',required:true,help:'Maximum 50 characters.'},{key:'status',label:'Status',type:'toggle'}]
+  },
+  drugTypes:{
+    title:'Drug Types',breadcrumb:'Master Data / Drug Types',add:'Add Drug Type',singular:'Drug Type',data:'drugTypes',
+    columns:[['name','Drug Type'],['status','Status']],
+    fields:[{key:'name',label:'Drug Type',type:'text',required:true},{key:'status',label:'Status',type:'toggle'}]
+  },
+  commercialNames:{
+    title:'Antibiotic Commercial Names',breadcrumb:'Master Data / Antibiotic Commercial Names',add:'Add Commercial Name',singular:'Commercial Name',data:'commercialNames',
+    columns:[['name','Commercial Name'],['drugType','Drug Type'],['status','Status']],
+    fields:[
+      {key:'name',label:'Commercial Name',type:'text',required:true},
+      {key:'drugType',label:'Drug Type',type:'multi',required:true,values:['Penicillin','Cephalosporin']},
+      {key:'status',label:'Status',type:'toggle'}
+    ]
+  },
+  antibiotics:{
+    title:'Antibiotics',breadcrumb:'Master Data / Antibiotics',add:'Add Antibiotic',singular:'Antibiotic',data:'antibiotics',
+    columns:[['code','Code'],['name','Antibiotic Name'],['abbr','Abbreviation'],['commercial','Commercial Name'],['status','Status']],
+    fields:[
+      {key:'code',label:'Code',type:'text',required:true,help:'Maximum 20 characters.'},
+      {key:'name',label:'Antibiotic Name',type:'text',required:true},
+      {key:'abbr',label:'Abbreviation',type:'text',required:true},
+      {key:'commercial',label:'Commercial Name',type:'multi',required:true,values:['Augmentin','Zithromax']},
+      {key:'status',label:'Status',type:'toggle'}
+    ]
+  },
+  organisms:{
+    title:'Organisms',breadcrumb:'Master Data / Organisms',add:'Add Organism',singular:'Organism',data:'organisms',
+    columns:[['code','Code'],['name','Organism'],['status','Status']],
+    fields:[{key:'code',label:'Code',type:'text',required:true,help:'Maximum 20 characters.'},{key:'name',label:'Organism',type:'text',required:true},{key:'status',label:'Status',type:'toggle'}]
+  },
+  preparations:{
+    title:'Preparations',breadcrumb:'Master Data / Preparations',add:'Add Preparation',singular:'Preparation',data:'preparations',wide:true,
+    columns:[['code','Code'],['question','Question'],['type','Question Type'],['tests','Tests'],['gender','Gender'],['status','Status']],
+    fields:[
+      {key:'code',label:'Code',type:'text',required:true,help:'Maximum 20 characters.'},
+      {key:'question',label:'Question',type:'text',required:true},
+      {key:'type',label:'Question Type',type:'select',required:true,options:['Text','Yes/No','Option List']},
+      {key:'tests',label:'Tests',type:'multi',values:['Glucose','Lipid Profile'],help:'Empty means applicable to all tests.'},
+      {key:'gender',label:'Gender',type:'select',required:true,options:['All','Male','Female']},
+      {key:'status',label:'Status',type:'toggle'},
+      {key:'options',label:'Options',type:'optiongrid',span:2,help:'Required only for Option List; at least two options.'}
+    ]
+  },
+  comments:{
+    title:'Comments',breadcrumb:'Master Data / Comments',add:'Add Comment',singular:'Comment',data:'comments',
+    columns:[['short','Short Name'],['comment','Comment'],['status','Status']],
+    fields:[{key:'short',label:'Short Name',type:'text',required:true,help:'Maximum 50 characters.'},{key:'comment',label:'Comment',type:'textarea',required:true,span:2},{key:'status',label:'Status',type:'toggle'}]
+  }
+};
+
+let currentScreen='home';
+let editId=null;
+let sortState={key:null,asc:true};
+let dashboardPeriod='7';
+let serviceMemberDraft=[];
+const dashboardMetrics={
+  '7':{label:'Last 7 days',patients:'6,842',tests:'31,406',registrations:'8,921',bars:[92,78,65,58,44,36,27]},
+  '30':{label:'Last 30 days',patients:'27,914',tests:'127,820',registrations:'36,440',bars:[86,81,72,61,48,43,34]},
+  'month':{label:'This month',patients:'1,932',tests:'9,108',registrations:'2,604',bars:[76,69,60,54,41,32,24]},
+  '90':{label:'Last 90 days',patients:'84,506',tests:'386,024',registrations:'108,775',bars:[95,88,79,70,60,49,41]}
+};
+
+function statusBadge(v){
+  const c=String(v).toLowerCase()==='active'?'active':'inactive';
+  return `<span class="status ${c}">${v}</span>`;
+}
+function renderValue(v,key){
+  if(key==='arabicName')return `<span dir="rtl" lang="ar">${escapeHtml(v||'—')}</span>`;
+  if(key==='status') return statusBadge(v);
+  if(Array.isArray(v)) return key==='access'?`<span class="tag">${v.length} screen${v.length===1?'':'s'}</span>`:v.map(x=>`<span class="tag">${escapeHtml(x)}</span>`).join('');
+  return (v===undefined || v===null || v==='') ? '<span class="muted">—</span>' : escapeHtml(v);
+}
+function homePage(){
+  return `<div class="home-screen"><div class="home-logo-card"><img src="https://docs.nationaltechnology.net/public/SharedDocResources/Logos/NT1087dee606b49bffb73577e0cf284.png" alt="National Technology"></div></div>`;
+}
+function dashboard(){
+  const m=dashboardMetrics[dashboardPeriod];
+  return `
+  <div class="page-head">
+    <div class="page-title"><h1>Dashboard</h1><div class="breadcrumb">Super Admin / Dashboard</div></div>
+    <div class="page-actions dashboard-filter">
+      <label for="dashboardPeriod">Operational period</label>
+      <select id="dashboardPeriod" class="k-select" onchange="changeDashboardPeriod(this.value)">
+        <option value="7" ${dashboardPeriod==='7'?'selected':''}>Last 7 days</option>
+        <option value="30" ${dashboardPeriod==='30'?'selected':''}>Last 30 days</option>
+        <option value="month" ${dashboardPeriod==='month'?'selected':''}>This month</option>
+        <option value="90" ${dashboardPeriod==='90'?'selected':''}>Last 90 days</option>
+      </select>
+      <button class="btn btn-secondary" onclick="renderCurrent()">${icons.refresh} Refresh</button>
+    </div>
+  </div>
+  <div class="kpi-grid">
+    ${kpi('Clients','128','All clients','fa-building')}
+    ${kpi('Admin Users','15','All admin users','fa-users-gear')}
+    ${kpi('Served Patients',m.patients,m.label,'fa-hospital-user')}
+    ${kpi('Tests',m.tests,m.label,'fa-vials')}
+    ${kpi('Registrations',m.registrations,m.label,'fa-clipboard-list')}
+  </div>
+  <div class="dash-grid">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Clients Overview</div><span class="muted" style="font-size:11px">All clients • Active vs Inactive</span></div>
+      <div class="card-body donut-wrap">
+        <div class="donut"><div class="donut-center"><div><strong>128</strong><span>Total Clients</span></div></div></div>
+        <div class="legend">
+          <div class="legend-row"><span class="dot active"></span><span>Active</span><strong>99</strong></div>
+          <div class="legend-row"><span class="dot inactive"></span><span>Inactive</span><strong>29</strong></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">Registrations Overview</div><span class="muted" style="font-size:11px">Top labs • ${m.label}</span></div>
+      <div class="card-body">${barChart(m.bars)}</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div class="card-title">Recent Clients</div><button class="link-btn" onclick="navigate('clients')">View all clients</button></div>
+    <div class="recent-list">
+      ${db.clients.slice(0,4).map(c=>`<div class="recent-row"><div class="lab-avatar">${c.name.split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><div class="recent-name">${c.name}</div><div class="recent-meta">${c.country} • Created ${c.created}</div></div>${statusBadge(c.status)}</div>`).join('')}
+    </div>
+  </div>`;
+}
+function changeDashboardPeriod(v){dashboardPeriod=v;renderCurrent()}
+function kpi(label,value,hint,iconClass){return `<div class="card kpi"><div><div class="label">${label}</div><div class="value">${value}</div><div class="hint">${hint}</div></div><div class="kpi-icon"><i class="fa-solid ${iconClass}"></i></div></div>`}
+function barChart(values){
+  const names=['Al Noor','MedLine','Prime','Delta','LifeCheck','Cura','BioLab'];
+  return `<div class="bar-chart">${names.map((n,i)=>`<div class="bar-col"><div class="bar-value">${values[i]}</div><div class="bar" style="height:${values[i]}%"></div><div class="bar-label">${n}</div></div>`).join('')}</div>`;
+}
+
+function screenPage(key){
+  if(key==='serviceSequence')syncSequence();
+  const s=screens[key], rows=getFilteredRows(s);
+  return `
+    <div class="page-head">
+      <div class="page-title"><h1>${s.title}</h1><div class="breadcrumb">${s.breadcrumb}</div></div>
+      <div class="page-actions">${s.add?`<button class="btn btn-primary" onclick="openEditor('${key}')">${icons.plus} ${s.add}</button>`:''}</div>
+    </div>
+    ${s.note?`<div class="info-strip">${s.note}</div>`:''}
+    <div class="card grid-card">
+      <div class="toolbar">
+        <div class="search-wrap"><span class="search-icon">${icons.search}</span><input class="k-input" id="gridSearch" placeholder="Search ${s.title.toLowerCase()}..." oninput="renderGridOnly()"></div>
+        ${key!=='serviceSequence'?`<select class="k-select" id="statusFilter" onchange="renderGridOnly()"><option>All Statuses</option><option>Active</option><option>Inactive</option></select>`:''}
+        ${filterFor(key)}
+        <div class="toolbar-spacer"></div>
+        <button class="btn btn-secondary" onclick="exportGrid()">${icons.export} Export CSV</button>
+      </div>
+      <div id="gridOnly">${gridHtml(key,rows)}</div>
+    </div>`;
+}
+function filterFor(key){
+  if(key==='serviceSequence')return `<select class="k-select" id="groupFilter" aria-label="Clinical Group" onchange="renderGridOnly()"><option value="">All Clinical Groups</option>${db.clinicalGroups.map(g=>`<option>${escapeHtml(g.name)}</option>`).join('')}</select>`;
+  if(key==='tests') return `<select class="k-select" id="extraFilter" onchange="renderGridOnly()"><option>All Test Types</option><option>Numeric/Non Numeric</option><option>Optional List</option><option>Formatted Text</option><option>Formula</option><option>Culture</option></select>`;
+  if(key==='services') return `<select class="k-select" id="extraFilter" onchange="renderGridOnly()"><option>All Types</option><option>Profile</option><option>Panel</option></select>`;
+  if(key==='preparations') return `<select class="k-select" id="extraFilter" onchange="renderGridOnly()"><option>All Question Types</option><option>Text</option><option>Yes/No</option><option>Option List</option></select>`;
+  return '';
+}
+function getFilteredRows(s){
+  let rows=[...db[s.data]];
+  const q=(document.getElementById('gridSearch')?.value||'').trim().toLowerCase();
+  const st=document.getElementById('statusFilter')?.value;
+  const extra=document.getElementById('extraFilter')?.value;
+  if(q) rows=rows.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q)));
+  if(st && st!=='All Statuses') rows=rows.filter(r=>r.status===st);
+  if(extra && !extra.startsWith('All ')){
+    if(s.data==='tests') rows=rows.filter(r=>r.type===extra);
+    if(s.data==='services') rows=rows.filter(r=>r.type===extra);
+    if(s.data==='preparations') rows=rows.filter(r=>r.type===extra);
+  }
+  if(s.data==='serviceSequence'){const group=document.getElementById('groupFilter')?.value; if(group)rows=rows.filter(r=>r.group===group); rows.sort((a,b)=>a.sequence-b.sequence);}
+  if(sortState.key && s.data!=='serviceSequence') rows.sort((a,b)=>{
+    let x=a[sortState.key], y=b[sortState.key];
+    if(typeof x==='number'&&typeof y==='number') return sortState.asc?x-y:y-x;
+    return sortState.asc?String(x??'').localeCompare(String(y??'')):String(y??'').localeCompare(String(x??''));
+  });
+  return rows;
+}
+function gridHtml(key,rows){
+  if(key==='serviceSequence')return sequenceGrid(rows);
+  const s=screens[key];
+  return `<div class="k-grid-wrap"><table class="k-grid">
+    <thead><tr>${s.columns.map(([k,l])=>`<th class="sortable" onclick="sortBy('${k}')">${l}${sortState.key===k?(sortState.asc?' ↑':' ↓'):''}</th>`).join('')}<th class="actions">Actions</th></tr></thead>
+    <tbody>${rows.length?rows.map(r=>`<tr>${s.columns.map(([k])=>`<td>${key==='serviceSequence'&&k==='sequence'?`<input class="inline-number" type="number" min="1" value="${r[k]}" onchange="updateSequence(${r.id},this.value)">`:renderValue(r[k],k)}</td>`).join('')}
+    <td class="actions"><div class="row-actions">
+      ${key==='serviceSequence'?'':`<button class="row-btn" title="Edit" onclick="openEditor('${key}',${r.id})">${icons.edit}</button>`}
+      ${key==='clients'?`<button class="row-btn" title="Reset password" onclick="toast('Password reset','Reset instruction generated for ${r.name}.','success')">${icons.more}</button>`:''}
+      ${key==='serviceSequence'?'':`<button class="row-btn danger" title="Delete" onclick="confirmDelete('${key}',${r.id})">${icons.trash}</button>`}
+    </div></td></tr>`).join(''):`<tr><td colspan="${s.columns.length+1}"><div class="empty">No records match the current filters.</div></td></tr>`}</tbody>
+  </table></div>
+  <div class="grid-footer"><span>Showing ${rows.length} of ${db[s.data].length} records</span><span>All matching records</span></div>`;
+}
+function renderGridOnly(){
+  const s=screens[currentScreen]; if(!s) return; if(currentScreen==='loginLogs'){renderLogs();return}
+  document.getElementById('gridOnly').innerHTML=gridHtml(currentScreen,getFilteredRows(s));
+}
+function sortBy(key){sortState={key,asc:sortState.key===key?!sortState.asc:true};renderGridOnly()}
+function openEditor(key,id=null){
+  syncCatalogRelationships();
+  const s=screens[key]; editId=id;
+  const row=id?db[s.data].find(r=>r.id===id):{};
+  if(key==='tests') testDraft=structuredClone(row.configuration||{ranges:[],options:[],formula:''});
+  if(key==='governorates'){geoDraft=structuredClone(row.cities||[]);geoCity=-1;geoDistrict=-1;}
+  if(key==='services') serviceMemberDraft=(row.members||[]).map(x=>({...x}));
+  const modal=document.getElementById('modalBackdrop');
+  modal.innerHTML=`<div class="modal ${s.wide?'wide':''}">
+    <div class="modal-head"><h3>${id?'Edit':'Add'} ${s.singular}</h3><button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-body">
+      
+      <div class="form-grid">${s.fields.map(f=>fieldHtml(f,row,key)).join('')}</div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveEditor('${key}')"><i class="fa-solid fa-check"></i> ${id?'Save Changes':'Add '+s.singular}</button></div>
+  </div>`;
+  modal.classList.remove('hidden');
+  if(key==='clients') bindClientAddress(row);
+  if(key==='governorates') renderGeo();
+  if(key==='tests') setTimeout(()=>bindTestType(),0);
+  if(key==='preparations') setTimeout(()=>bindQuestionType(),0);
+  if(key==='users') setTimeout(()=>bindRolePrivileges(),0);
+  if(key==='services') setTimeout(()=>bindServiceType(),0);
+}
+function fieldHtml(f,row,key){
+  const v=row[f.key]??f.value??'';
+  const dynamicSources={group:'clinicalGroups',country:'countries',sample:'sampleTypes',unit:'units',drugType:'drugTypes'};
+  if(f.type==='select'&&dynamicSources[f.key]) f={...f,options:[...db[dynamicSources[f.key]].map(x=>x.name),...(f.key==='unit'?['—']:[])]};
+  const req=f.required?'<span class="req">*</span>':'';
+  let control='';
+  if(f.type==='text'||f.type==='email'||f.type==='number'||f.type==='password'){
+    control=`<input class="k-input editor-field" data-key="${f.key}" ${f.key==='arabicName'?'dir="rtl" lang="ar"':''} type="${f.type==='email'?'email':f.type==='number'?'number':f.type==='password'?'password':'text'}" value="${escapeHtml(v)}">`;
+  } else if(f.type==='textarea'){
+    control=`<textarea class="k-textarea editor-field" data-key="${f.key}">${escapeHtml(v)}</textarea>`;
+  } else if(f.type==='select'){
+    const options=(key==='users'&&f.key==='role')?db.roles.filter(r=>r.status==='Active'||r.name===v).map(r=>r.name):f.options;
+    control=`<select class="k-select editor-field" data-key="${f.key}"><option value="">Select...</option>${options.map(o=>`<option ${String(v)===o?'selected':''}>${o}</option>`).join('')}</select>`;
+  } else if(f.type==='toggle'){
+    const on=(v||'Active')!=='Inactive' && v!=='No';
+    control=`<div class="toggle-row"><span>${on?'Active':'Inactive'}</span><div class="switch editor-switch ${on?'on':''}" data-key="${f.key}" onclick="toggleSwitch(this)"></div></div>`;
+  } else if(f.type==='readonly'){
+    control=`<input class="k-input" value="${escapeHtml(v)}" readonly style="background:#f4f6f8;color:#7b8791">`;
+  } else if(f.type==='file'){
+    control=`<input class="k-input editor-field" data-key="${f.key}" type="file" accept=".jpg,.jpeg,.png,.svg">`;
+  } else if(f.type==='multi'){
+    const vals=(row[f.key]?String(row[f.key]).split(','):f.values||[]).filter(Boolean);
+    control=`<div class="multi-box editor-multi" data-key="${f.key}">${vals.map(x=>`<span class="chip">${x.trim()}</span>`).join('')}</div>`;
+  } else if(f.type==='modules'){
+    control=permissionCards(row.access||[],false);
+  } else if(f.type==='rolemodules'){
+    const role=db.roles.find(r=>r.name===row.role);
+    control=`<div id="rolePrivilegeBox">${permissionCards(role?.access||[],true)}</div>`;
+  } else if(f.type==='profilelist'){
+    const profiles=db.services.filter(p=>p.type==='Profile'&&(p.members||[]).some(m=>m.id===row.id));
+    control=profiles.length?`<ul class="profile-membership-list">${profiles.map(p=>`<li>${escapeHtml(p.name)} ${p.status==='Inactive'?'<span class="tag">Inactive</span>':''}</li>`).join('')}</ul>`:'<div class="muted">Not included in any profile.</div>';
+  } else if(f.type==='testgrid'){
+    control=`<div id="serviceMembers" class="config-box">${serviceMembersHtml(row.type||'Profile')}</div>`;
+  } else if(f.type==='hierarchy'){
+    control='<div id="geoEditor" class="config-box"></div>';
+  } else if(f.type==='testconfig'){
+    control=`<div id="testConfig" class="config-box"></div>`;
+  } else if(f.type==='optiongrid'){
+    control=`<div id="prepOptions" class="config-box"><div class="warning-strip" style="margin:0">Options are displayed only when Question Type = Option List.</div></div>`;
+  }
+  return `<div class="field ${f.span===2?'span-2':''}" data-required="${f.required?'1':'0'}"><label>${f.label}${req}</label>${control}${f.help?`<div class="help">${f.help}</div>`:''}<div class="validation">${f.label} is required</div></div>`;
+}
+
+function permissionCards(access,readonly=false){
+  let lastGroup='';
+  return `<div class="module-list editor-modules">${modules.map(([group,name,desc])=>{
+    const groupTitle=group!==lastGroup?`<div class="module-group-title">${group}</div>`:''; lastGroup=group;
+    const on=access.includes(name);
+    return `${groupTitle}<div class="module-card ${readonly?'readonly':''}" data-module="${escapeHtml(name)}"><div><strong>${name}</strong><p>${desc}</p></div><div class="switch ${on?'on':''}" ${readonly?'':'onclick="toggleSwitch(this)"'}></div></div>`;
+  }).join('')}</div>`;
+}
+function bindRolePrivileges(){
+  const roleSelect=document.querySelector('#modalBackdrop .editor-field[data-key="role"]');
+  if(!roleSelect)return;
+  const render=()=>{
+    const role=db.roles.find(r=>r.name===roleSelect.value);
+    const box=document.getElementById('rolePrivilegeBox');
+    if(box)box.innerHTML=permissionCards(role?.access||[],true);
+  };
+  roleSelect.addEventListener('change',render);render();
+}
+function collectRoleAccess(){
+  return [...document.querySelectorAll('#modalBackdrop .editor-modules .module-card')].filter(c=>c.querySelector('.switch.on')&&!c.classList.contains('readonly')).map(c=>c.dataset.module);
+}
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function toggleSwitch(el){
+  el.classList.toggle('on');
+  const label=el.previousElementSibling;if(label && label.tagName==='SPAN') label.textContent=el.classList.contains('on')?'Active':'Inactive';
+}
+function bindTestType(){
+  const el=document.querySelector('.editor-field[data-key="type"]');
+  if(el){el.addEventListener('change',renderTestConfig);renderTestConfig.call(el)}
+}
+function miniInput(label,val){return `<div class="field"><label>${label}</label><input class="k-input" value="${val}"></div>`}
+function bindQuestionType(){
+  const el=document.querySelector('.editor-field[data-key="type"]');
+  if(el){el.addEventListener('change',renderPrepOptions);renderPrepOptions.call(el)}
+}
+function renderPrepOptions(){
+  const box=document.getElementById('prepOptions');if(!box)return;
+  if(this.value==='Option List') box.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:10px"><input class="k-input" placeholder="Enter option"><button class="btn btn-secondary">Add Option</button></div><table class="k-grid" style="min-width:0"><tbody><tr><td>Morning</td><td class="actions"><button class="row-btn danger">${icons.trash}</button></td></tr><tr><td>Evening</td><td class="actions"><button class="row-btn danger">${icons.trash}</button></td></tr></tbody></table>`;
+  else box.innerHTML=`<div class="warning-strip" style="margin:0">Options are not required for ${this.value||'this'} question type.</div>`;
+}
+function recomputeRoleCounts(){db.roles.forEach(r=>r.users=db.users.filter(u=>u.role===r.name).length)}
+function saveEditor(key){
+  const s=screens[key];
+  let valid=true, obj={};
+  document.querySelectorAll('#modalBackdrop .field[data-required="1"]').forEach(w=>{
+    const c=w.querySelector('.editor-field');
+    if(c && !c.value.trim()){w.classList.add('invalid');valid=false}else w.classList.remove('invalid');
+  });
+  if(!valid){toast('Validation','Please complete all mandatory fields.','error');return}
+  document.querySelectorAll('#modalBackdrop .editor-field').forEach(c=>{if(c.type!=='file')obj[c.dataset.key]=c.value});
+  document.querySelectorAll('#modalBackdrop .editor-switch').forEach(sw=>obj[sw.dataset.key]=sw.classList.contains('on')?'Active':'Inactive');
+  if(key==='roles'){
+    obj.access=collectRoleAccess();
+    if(obj.status!=='Inactive'&&!obj.access.length){toast('Validation','At least one screen privilege must be enabled for an active role.','error');return}
+  }
+  if(key==='services'){
+    if(!validateComposition(obj))return;
+    obj.members=serviceMemberDraft.map(x=>({...x})); obj.tests=serviceMemberDraft.map(x=>x.name).join(', ');
+  }
+  if(key==='tests'){if(!validateTestDraft(obj.type))return; obj.configuration=structuredClone(testDraft);}
+  if(key==='governorates'){obj.cities=structuredClone(geoDraft); obj.hierarchy=geoSummary(geoDraft);}
+  const wasEditing=!!editId;
+  if(editId){
+    const idx=db[s.data].findIndex(r=>r.id===editId); db[s.data][idx]={...db[s.data][idx],...obj};
+  }else{
+    obj.id=Math.max(0,...db[s.data].map(r=>r.id))+1;
+    if(!obj.status)obj.status='Active';
+    if(key==='roles')obj.users=0;
+    if(key==='clients'){obj.created='02 Sep 2026';obj.source='Manual'}
+    db[s.data].unshift(obj);
+  }
+  if(key==='users')recomputeRoleCounts();
+  syncCatalogRelationships();
+  syncSequence();
+  closeModal();renderCurrent();toast(`${s.singular} saved`,`${s.singular} was ${wasEditing?'updated':'added'} successfully.`,'success');
+}
+function confirmDelete(key,id){
+  if(!canDeleteCatalogItem(key,id))return;
+  const s=screens[key], row=db[s.data].find(x=>x.id===id);
+  if(key==='roles'&&row.users>0){toast('Role cannot be deleted',`Unassign ${row.users} user${row.users===1?'':'s'} from this role first.`,'error');return}
+  if(key==='users'&&id===1){toast('User cannot be deleted','The main Super Admin user is protected.','error');return}
+  if(key==='governorates'&&row.cities?.length){toast('Governorate has locations','Remove dependent areas, districts and cities first.','error');return}
+  const name=escapeHtml(row.name||row.fullName||row.short||row.code||s.singular);
+  const modal=document.getElementById('modalBackdrop');
+  modal.innerHTML=`<div class="modal" style="width:min(620px,94vw)"><div class="modal-head"><h3>Delete ${s.singular}</h3><button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div><div class="modal-body"><div class="warning-strip">This action requires confirmation.</div><p>Are you sure you want to delete <strong>${name}</strong>?</p><p class="muted" style="font-size:12px">Deletion must be blocked when the record is referenced by dependent data.</p></div><div class="modal-foot"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-danger" onclick="deleteRow('${key}',${id})">${icons.trash} Delete</button></div></div>`;
+  modal.classList.remove('hidden');
+}
+function deleteRow(key,id){
+  if(!canDeleteCatalogItem(key,id))return;
+  const s=screens[key];db[s.data]=db[s.data].filter(x=>x.id!==id);if(key==='users')recomputeRoleCounts();syncCatalogRelationships();syncSequence();closeModal();renderCurrent();toast(`${s.singular} deleted`,'Record removed from the prototype data.','success');
+}
+function closeModal(){document.getElementById('modalBackdrop').classList.add('hidden');document.getElementById('modalBackdrop').innerHTML='';editId=null}
+function toast(title,msg,type='success'){
+  const box=document.getElementById('toasts'),t=document.createElement('div');t.className=`toast ${type}`;t.innerHTML=`<div><i class="fa-solid ${type==='success'?'fa-circle-check':'fa-circle-exclamation'}"></i></div><div><strong>${title}</strong><span>${msg}</span></div>`;box.appendChild(t);while(box.children.length>3)box.firstElementChild.remove();setTimeout(()=>t.remove(),3500);
+}
+function navigate(key){
+  currentScreen=key;sortState={key:null,asc:true};
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.screen===key));
+  document.getElementById('topTitle').textContent=key==='home'?'Home':key==='dashboard'?'Dashboard':screens[key].title;
+  renderCurrent();
+}
+function renderCurrent(){syncCatalogRelationships();document.getElementById('mainContent').innerHTML='';document.getElementById('mainContent').innerHTML=currentScreen==='home'?homePage():currentScreen==='dashboard'?dashboard():currentScreen==='loginLogs'?logsPage():screenPage(currentScreen)}
+document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>navigate(n.dataset.screen)));
+
+document.getElementById('togglePass').addEventListener('click',e=>{e.preventDefault();const p=document.getElementById('loginPass');p.type=p.type==='password'?'text':'password'});
+document.getElementById('loginBtn').addEventListener('click',()=>{
+  const u=document.getElementById('loginUser'),p=document.getElementById('loginPass');
+  document.getElementById('loginUserField').classList.toggle('invalid',!u.value.trim());
+  document.getElementById('loginPassField').classList.toggle('invalid',!p.value.trim());
+  if(!u.value.trim()||!p.value.trim())return;
+  document.getElementById('loginPage').classList.add('hidden');document.getElementById('app').classList.remove('hidden');navigate('home');
+});
+document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginBtn').click()});
+document.getElementById('sidebarToggle').addEventListener('click',()=>document.getElementById('app').classList.toggle('nav-collapsed'));
+document.getElementById('brandHome').addEventListener('click',()=>navigate('home'));
+document.getElementById('profileBtn').addEventListener('click',e=>{e.stopPropagation();document.getElementById('profileMenu').classList.toggle('hidden')});
+document.addEventListener('click',()=>document.getElementById('profileMenu').classList.add('hidden'));
+document.getElementById('profileMenu').addEventListener('click',e=>e.stopPropagation());
+document.getElementById('logoutBtn').addEventListener('click',()=>{document.getElementById('app').classList.add('hidden');document.getElementById('app').classList.remove('nav-collapsed');document.getElementById('loginPage').classList.remove('hidden');document.getElementById('profileMenu').classList.add('hidden');currentScreen='home'});
+document.getElementById('modalBackdrop').addEventListener('click',e=>{if(e.target.id==='modalBackdrop')closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+
+// v3 uses isolated editor drafts; Cancel never modifies saved records.
+let testDraft={ranges:[],options:[],formula:''}, geoDraft=[], geoCity=-1, geoDistrict=-1, optionEdit=-1;
+const arabicSeeds={clinicalGroups:['أمراض الدم','الكيمياء الإكلينيكية','الأحياء الدقيقة','المناعة'],services:['صورة دم كاملة','وظائف الكبد','مزرعة بول','وظائف الغدة الدرقية'],tests:['الهيموجلوبين','إنزيم الكبد ALT','فصيلة الدم','مزرعة بول']};
+for(const key of ['clinicalGroups','services','tests']){
+  screens[key].fields.splice(1,0,{key:'arabicName',label:key==='services'?'Profile/Panel Arabic Name':key==='tests'?'Test Arabic Name':'Arabic Name',type:'text'});
+  screens[key].columns.splice(1,0,['arabicName','Arabic Name']);
+  db[key].forEach((r,i)=>{r.arabicName=arabicSeeds[key][i]||'';if(key!=='clinicalGroups')r.reportName=r.name;});
+}
+screens.governorates.wide=true;
+screens.governorates.columns=[['country','Country'],['name','Governorate'],['hierarchy','Location Setup'],['remarks','Remarks'],['status','Status']];
+screens.governorates.fields=screens.governorates.fields.filter(f=>f.key!=='district');
+screens.governorates.fields.push({key:'cities',label:'Country → Governorate → City → District → Area',type:'hierarchy',span:2});
+screens.governorates.note='Select a governorate to manage its cities, districts and areas. Each level belongs to the selected parent; remove children before deleting a parent.';
+const citySeeds=['Cairo','Alexandria','Riyadh','Amman'],areaSeeds=['Seventh District','Sidi Gaber','Al Olaya North','North Abdoun'];
+db.governorates.forEach((g,i)=>{g.cities=[{name:citySeeds[i],districts:[{name:g.district,areas:[areaSeeds[i]]}]}];g.hierarchy=geoSummary(g.cities);delete g.district;});
+db.drugTypes=['Eye Drop','IM Injection','Capsule','Tablet','Oral Suspension','IV Injection','Ointment','Cream'].map((name,i)=>({id:i+1,name,status:'Active'}));
+db.commercialNames.forEach((r,i)=>r.drugType=['Tablet','Capsule','IM Injection','Tablet'][i]);
+Object.assign(screens.commercialNames.fields.find(f=>f.key==='drugType'),{type:'select',options:db.drugTypes.map(x=>x.name)});
+screens.drugTypes.note='Dosage forms and administration types used in the drug catalog.';
+db.tests[0].configuration={ranges:[{fromDays:0,fromMonths:0,fromYears:18,fromInclusive:true,toDays:0,toMonths:0,toYears:120,toInclusive:true,low:'12',high:'16',criticalLow:'6',criticalHigh:'22',comment:''}],options:[],formula:''};
+db.tests[1].configuration={ranges:[{fromDays:0,fromMonths:0,fromYears:0,fromInclusive:true,toDays:0,toMonths:0,toYears:120,toInclusive:true,low:'7',high:'56',criticalLow:'',criticalHigh:'',comment:''}],options:[],formula:''};
+db.tests[2].configuration={ranges:[],options:['A+','A−','B+','B−','AB+','AB−','O+','O−'].map((value,i)=>({value,normal:false,critical:false,color:'None',sequence:i+1})),formula:''};
+screens.serviceSequence.columns.splice(3,0,['group','Clinical Group']);
+screens.serviceSequence.note='Drag a row onto another row, use the arrow buttons, or enter a new position. With a Clinical Group or search filter, reordering changes only the visible services’ positions; other services retain their positions.';
+screens.loginLogs={title:'Client Login Logs',breadcrumb:'Administration / Client Login Logs',data:'loginLogs',columns:[['login','Login Date / Time (UTC)'],['client','Client Name'],['username','User Name'],['ip','IP Address'],['country','Country'],['area','Area'],['device','Device'],['os','OS'],['browser','Browser'],['logout','Logout Date / Time (UTC)'],['duration','Duration (min)'],['session','Session']]};
+db.loginLogs=[
+ {id:1,login:'2026-09-23T08:15:00Z',client:'Al Noor Laboratories',username:'karim.hassan',ip:'192.0.2.10',country:'Egypt',area:'Nasr City',device:'Computer',os:'Windows 11',browser:'Chrome 140',logout:'2026-09-23T09:45:00Z'},
+ {id:2,login:'2026-09-23T08:30:00Z',client:'MedLine Lab',username:'noura.saleh',ip:'198.51.100.24',country:'Saudi Arabia',area:'Al Olaya',device:'Mobile',os:'iOS 19',browser:'Safari 19',logout:null},
+ {id:3,login:'2026-09-22T11:00:00Z',client:'Prime Diagnostics',username:'fady.nabil',ip:'203.0.113.8',country:'Egypt',area:'Smouha',device:'Computer',os:'macOS 15',browser:'Safari 18',logout:'2026-09-22T12:12:00Z'},
+ {id:4,login:'2026-09-22T07:20:00Z',client:'LifeCheck Labs',username:'rami.saad',ip:'192.0.2.42',country:'Jordan',area:'Abdoun',device:'Mobile',os:'Android 15',browser:'Chrome 140',logout:'2026-09-22T07:45:00Z'},
+ {id:5,login:'2026-09-21T09:10:00Z',client:'Delta Lab',username:'mona.ali',ip:'198.51.100.63',country:'Egypt',area:'Mansoura',device:'Computer',os:'Windows 10',browser:'Edge 140',logout:'2026-09-21T13:10:00Z'},
+ {id:6,login:'2026-09-23T09:00:00Z',client:'Al Noor Laboratories',username:'lab.operator',ip:'203.0.113.19',country:'Egypt',area:'Nasr City',device:'Computer',os:'Ubuntu 24.04',browser:'Firefox 142',logout:null},
+ {id:7,login:'2026-09-20T06:00:00Z',client:'MedLine Lab',username:'noura.saleh',ip:'198.51.100.24',country:'Saudi Arabia',area:'Al Olaya',device:'Mobile',os:'iOS 19',browser:'Safari 19',logout:'2026-09-20T06:18:00Z'},
+ {id:8,login:'2026-09-19T12:00:00Z',client:'Prime Diagnostics',username:'lab.reception',ip:'203.0.113.9',country:'Egypt',area:'Smouha',device:'Computer',os:'Windows 11',browser:'Chrome 140',logout:'2026-09-19T14:05:00Z'}
+].map(r=>({...r,duration:r.logout?(Date.parse(r.logout)-Date.parse(r.login))/60000:null,session:r.logout?'Completed':'Active'}));
+
+function geoSummary(cities){return `${cities.length} cities · ${cities.reduce((n,c)=>n+c.districts.length,0)} districts · ${cities.reduce((n,c)=>n+c.districts.reduce((m,d)=>m+d.areas.length,0),0)} areas`;}
+function geoList(level){if(level==='city')return geoDraft;if(level==='district')return geoDraft[geoCity]?.districts;return geoDraft[geoCity]?.districts[geoDistrict]?.areas;}
+function renderGeo(){
+  if(!document.getElementById('geoEditor'))return;
+  if(geoCity<0||geoCity>=geoDraft.length)geoCity=geoDraft.length?0:-1;
+  const districts=geoDraft[geoCity]?.districts||[];
+  if(geoDistrict<0||geoDistrict>=districts.length)geoDistrict=districts.length?0:-1;
+  document.getElementById('geoEditor').innerHTML=`<p class="muted" style="margin-top:0">Select a city, then a district to manage its areas. Names are unique within their parent.</p><div class="geo-columns">${['city','district','area'].map((level,i)=>{
+    const list=geoList(level)||[],selected=level==='city'?geoCity:level==='district'?geoDistrict:-1,allowed=i===0||(i===1?geoCity>=0:geoDistrict>=0);
+    return `<section class="geo-panel"><h4>${['Cities','Districts','Areas'][i]}</h4><select class="k-select" size="5" id="geo-${level}" aria-label="${level}" onchange="selectGeo('${level}',this.value)">${list.map((x,j)=>`<option value="${j}" ${j===selected?'selected':''}>${escapeHtml(x.name||x)}</option>`).join('')}</select><input class="k-input" id="geo-name-${level}" aria-label="${level} name" placeholder="${level[0].toUpperCase()+level.slice(1)} name" ${allowed?'':'disabled'}><div class="inline-tools"><button class="btn btn-secondary" type="button" onclick="addGeo('${level}')" ${allowed?'':'disabled'}>Add</button><button class="btn btn-secondary" type="button" onclick="renameGeo('${level}')">Rename</button><button class="btn btn-danger" type="button" onclick="removeGeo('${level}')">Delete</button></div></section>`;
+  }).join('')}</div>`;
+}
+function selectGeo(level,value){if(level==='city'){geoCity=Number(value);geoDistrict=-1;renderGeo();}else if(level==='district'){geoDistrict=Number(value);renderGeo();}const list=geoList(level),item=list?.[Number(value)];document.getElementById('geo-name-'+level).value=item?.name||item||'';}
+function geoSelected(level){const value=document.getElementById('geo-'+level).value;return value===''?-1:Number(value);}
+function geoName(level,except=-1){const name=document.getElementById('geo-name-'+level).value.trim();if(!name){toast('Name required','Enter a '+level+' name.','error');return null;}if(geoList(level)?.some((x,i)=>i!==except&&(x.name||x).toLocaleLowerCase()===name.toLocaleLowerCase())){toast('Duplicate name','Use a unique name within this parent.','error');return null;}return name;}
+function addGeo(level){const list=geoList(level);if(!list)return;const name=geoName(level);if(!name)return;list.push(level==='city'?{name,districts:[]}:level==='district'?{name,areas:[]}:name);if(level==='city'){geoCity=list.length-1;geoDistrict=-1;}if(level==='district')geoDistrict=list.length-1;renderGeo();}
+function renameGeo(level){const i=geoSelected(level),list=geoList(level);if(i<0||!list){toast('Select a location','Select the '+level+' to rename.','error');return;}const name=geoName(level,i);if(!name)return;if(level==='area')list[i]=name;else list[i].name=name;renderGeo();}
+function removeGeo(level){const i=geoSelected(level),list=geoList(level);if(i<0||!list){toast('Select a location','Select the '+level+' to delete.','error');return;}const item=list[i];if(item.districts?.length||item.areas?.length){toast('Location has children','Remove the dependent locations first.','error');return;}list.splice(i,1);renderGeo();}
+
+function renderTestConfig(){
+  const box=document.getElementById('testConfig');if(!box)return;
+  const type=document.querySelector('#modalBackdrop .editor-field[data-key="type"]').value;
+  if(type==='Numeric/Non Numeric')renderRanges();
+  else if(type==='Optional List'){optionEdit=-1;renderOptions();}
+  else if(type==='Formula')box.innerHTML=`<div class="field"><label for="testFormula">Formula Expression</label><textarea id="testFormula" class="k-textarea" oninput="testDraft.formula=this.value">${escapeHtml(testDraft.formula||'')}</textarea><div class="help">Formula text is saved with this prototype. Calculation is performed by the future LIS engine.</div></div>`;
+  else box.innerHTML=`<div class="info-strip" style="margin:0">${escapeHtml(type||'Select a test type')} ${type?'uses the main Test Information fields.':''}</div>`;
+}
+function addRange(){testDraft.ranges.push({fromDays:0,fromMonths:0,fromYears:0,fromInclusive:true,toDays:0,toMonths:0,toYears:120,toInclusive:true,low:'',high:'',criticalLow:'',criticalHigh:'',comment:''});renderRanges();}
+function rangeNumber(i,key,label){return `<input class="k-input" type="number" step="any" aria-label="Row ${i+1} ${label}" value="${escapeHtml(testDraft.ranges[i][key])}" oninput="testDraft.ranges[${i}].${key}=this.value">`;}
+function ageInputs(r,i,prefix){return `<div class="age-parts">${['Days','Months','Years'].map(part=>`<label>${part}<input class="k-input" type="number" min="0" step="1" aria-label="Row ${i+1} Age ${prefix} ${part}" value="${r[prefix+part]??0}" oninput="testDraft.ranges[${i}].${prefix+part}=this.value"></label>`).join('')}</div><label class="age-inclusive"><input type="checkbox" ${r[prefix+'Inclusive']?'checked':''} onchange="testDraft.ranges[${i}].${prefix}Inclusive=this.checked"> Inclusive</label>`;}
+function renderRanges(){document.getElementById('testConfig').innerHTML=`<div class="configuration-head"><h4>Reference Ranges</h4><button type="button" class="btn btn-secondary" onclick="addRange()">+ Add Range</button></div><div class="help" style="margin-bottom:10px">Age boundaries combine years, months and days. Numeric limits are optional when a non numeric comment is supplied.</div><div class="k-grid-wrap"><table class="k-grid range-grid"><thead><tr><th>#</th><th>Age From</th><th>Age To</th><th>Range Low</th><th>Range High</th><th>Critical Low</th><th>Critical High</th><th>Non Numeric Comments</th><th>Actions</th></tr></thead><tbody>${testDraft.ranges.map((r,i)=>`<tr><td>${i+1}</td><td>${ageInputs(r,i,'from')}</td><td>${ageInputs(r,i,'to')}</td>${[['low','Range low'],['high','Range high'],['criticalLow','Critical low'],['criticalHigh','Critical high']].map(([k,l])=>`<td>${rangeNumber(i,k,l)}</td>`).join('')}<td><textarea class="k-textarea" aria-label="Row ${i+1} non numeric comments" oninput="testDraft.ranges[${i}].comment=this.value">${escapeHtml(r.comment)}</textarea></td><td><button class="btn btn-danger" type="button" onclick="testDraft.ranges.splice(${i},1);renderRanges()">Delete</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">No reference ranges. Add a range to configure this test.</td></tr>'}</tbody></table></div>`;}
+function renderOptions(){
+ document.getElementById('testConfig').innerHTML=`<div class="configuration-head"><h4>Optional List Values</h4><button class="btn btn-secondary" type="button" onclick="editOption(-1)">+ Add Value</button></div><div id="optionEditor"></div><div class="k-grid-wrap"><table class="k-grid" style="min-width:680px"><thead><tr><th>Sequence</th><th>Value</th><th>Normal</th><th>Critical</th><th>Color</th><th>Arrange</th><th>Actions</th></tr></thead><tbody>${testDraft.options.map((o,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(o.value)}</td><td>${o.normal?'Yes':'No'}</td><td>${o.critical?'Yes':'No'}</td><td>${escapeHtml(o.color)}</td><td><button type="button" class="reorder-btn" title="Move up" ${i===0?'disabled':''} onclick="moveOption(${i},-1)">↑</button> <button type="button" class="reorder-btn" title="Move down" ${i===testDraft.options.length-1?'disabled':''} onclick="moveOption(${i},1)">↓</button></td><td><div class="row-actions"><button class="btn btn-secondary" type="button" onclick="editOption(${i})">Edit</button><button class="btn btn-danger" type="button" onclick="deleteOption(${i})">Delete</button></div></td></tr>`).join('')||'<tr><td colspan="7" class="empty">No values. Add the first value above.</td></tr>'}</tbody></table></div>`;
+}
+function editOption(i){optionEdit=i;const o=testDraft.options[i]||{value:'',normal:false,critical:false,color:'None'};document.getElementById('optionEditor').innerHTML=`<div class="option-editor"><div class="form-grid"><div class="field"><label for="optionValue">Value *</label><input id="optionValue" class="k-input" value="${escapeHtml(o.value)}"></div><label class="checkbox-row"><input id="optionNormal" type="checkbox" onchange="if(this.checked)document.getElementById('optionCritical').checked=false" ${o.normal?'checked':''}> Normal</label><label class="checkbox-row"><input id="optionCritical" type="checkbox" onchange="if(this.checked)document.getElementById('optionNormal').checked=false" ${o.critical?'checked':''}> Critical</label><div class="field"><label for="optionColor">Color</label><select id="optionColor" class="k-select">${['None','Green','Red','Orange','Blue'].map(c=>`<option ${o.color===c?'selected':''}>${c}</option>`).join('')}</select></div></div><div class="inline-tools"><button class="btn btn-primary" type="button" onclick="saveOption()">${i<0?'Add Value':'Update Value'}</button><button class="btn btn-secondary" type="button" onclick="optionEdit=-1;renderOptions()">Cancel Value</button></div></div>`;document.getElementById('optionValue').focus();}
+function saveOption(){if(document.getElementById('optionNormal').checked&&document.getElementById('optionCritical').checked){toast('Invalid classification','An optional value cannot be both Normal and Critical.','error');return;}const value=document.getElementById('optionValue').value.trim();if(!value||testDraft.options.some((o,i)=>i!==optionEdit&&o.value.toLowerCase()===value.toLowerCase())){toast('Invalid value','Enter a non-empty, unique value.','error');return;}const o={value,normal:document.getElementById('optionNormal').checked,critical:document.getElementById('optionCritical').checked,color:document.getElementById('optionColor').value};if(optionEdit<0)testDraft.options.push(o);else testDraft.options[optionEdit]=o;resequenceOptions();optionEdit=-1;renderOptions();}
+function resequenceOptions(){testDraft.options.forEach((o,i)=>o.sequence=i+1);}
+function moveOption(i,d){if(document.getElementById('optionValue')){toast('Finish editing','Save or cancel the value before arranging.','error');return;}const j=i+d;if(j<0||j>=testDraft.options.length)return;[testDraft.options[i],testDraft.options[j]]=[testDraft.options[j],testDraft.options[i]];resequenceOptions();renderOptions();}
+function deleteOption(i){if(document.getElementById('optionValue')){toast('Finish editing','Save or cancel the value before deleting.','error');return;}testDraft.options.splice(i,1);resequenceOptions();renderOptions();}
+function validateTestDraft(type){
+ const fail=msg=>{toast('Test configuration',msg,'error');return false;};
+ if(type==='Optional List'){if(testDraft.options.some(o=>o.normal&&o.critical))return fail('An optional value cannot be both Normal and Critical.');if(document.getElementById('optionValue'))return fail('Add/update or cancel the unfinished value first.');if(!testDraft.options.length)return fail('Add at least one optional value.');}
+ if(type==='Formula'&&!testDraft.formula.trim())return fail('Enter a formula expression.');
+ if(type!=='Numeric/Non Numeric')return true;
+ if(!testDraft.ranges.length)return fail('Add at least one reference range.');
+ for(let i=0;i<testDraft.ranges.length;i++){
+   const r=testDraft.ranges[i],label='Range '+(i+1)+': ';
+   for(const side of ['from','to'])for(const part of ['Days','Months','Years']){const n=Number(r[side+part]);if(r[side+part]===''||!Number.isInteger(n)||n<0)return fail(label+'age values must be non-negative whole numbers.');}
+   // Calendar-style component comparison avoids inventing a clinical days-per-year conversion.
+   const compare=['Years','Months','Days'].map(p=>Number(r['from'+p])-Number(r['to'+p])).find(n=>n!==0)||0;
+   if(compare>0||compare===0&&(!r.fromInclusive||!r.toInclusive))return fail(label+'Age From must precede Age To; equal boundaries must both be inclusive.');
+   if(Number(r.fromMonths)>11||Number(r.toMonths)>11||Number(r.fromDays)>30||Number(r.toDays)>30)return fail(label+'use months 0–11 and days 0–30; carry larger values into the next unit.');
+   for(const key of ['low','high','criticalLow','criticalHigh'])if(r[key]!==''&&!Number.isFinite(Number(r[key])))return fail(label+'enter finite numeric limits.');
+   for(const [lo,hi] of [['low','high'],['criticalLow','criticalHigh']]){if((r[lo]==='')!==(r[hi]===''))return fail(label+'complete both limits of each numeric pair.');if(r[lo]!==''&&Number(r[lo])>Number(r[hi]))return fail(label+'low must not exceed high.');}
+   if(r.low===''&&!r.comment.trim())return fail(label+'enter a normal range or a non numeric comment.');
+ }
+ return true;
+}
+
+function syncSequence(){const old=new Map(db.serviceSequence.map(r=>[r.id,r.sequence]));db.serviceSequence=db.tests.map(r=>({id:r.id,sequence:old.get(r.id)??100000+r.id,loinc:r.loinc,name:r.name,group:r.group,status:r.status})).sort((a,b)=>a.sequence-b.sequence);db.serviceSequence.forEach((r,i)=>r.sequence=i+1);}
+function sequenceGrid(rows){return `<div class="k-grid-wrap"><table class="k-grid"><thead><tr><th>Arrange</th>${screens.serviceSequence.columns.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>`<tr class="drag-row" draggable="true" data-sequence-id="${r.id}" ondragstart="startSequenceDrag(event,${r.id})" ondragover="event.preventDefault();this.classList.add('drop-target')" ondragleave="this.classList.remove('drop-target')" ondragend="endSequenceDrag()" ondrop="dropSequence(event,${r.id})"><td><span aria-hidden="true">⠿</span> <button class="reorder-btn" title="Move up" ${i===0?'disabled':''} onclick="moveSequence(${r.id},-1)">↑</button> <button class="reorder-btn" title="Move down" ${i===rows.length-1?'disabled':''} onclick="moveSequence(${r.id},1)">↓</button></td>${screens.serviceSequence.columns.map(([k])=>`<td>${k==='sequence'?`<input class="inline-number" aria-label="Position of ${escapeHtml(r.name)}" type="number" min="1" max="${db.serviceSequence.length}" value="${r.sequence}" onchange="updateSequence(${r.id},this.value)">`:renderValue(r[k],k)}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="6" class="empty">No tests match the filters.</td></tr>'}</tbody></table></div><div class="grid-footer">Showing ${rows.length} of ${db.serviceSequence.length} tests <span>Order saved for this session</span></div>`;}
+function reorderSequence(sourceId,targetId){const visible=getFilteredRows(screens.serviceSequence),from=visible.findIndex(r=>r.id===sourceId),to=visible.findIndex(r=>r.id===targetId);if(from<0||to<0||from===to)return;const slots=visible.map(r=>r.sequence).sort((a,b)=>a-b);visible.splice(to,0,visible.splice(from,1)[0]);visible.forEach((r,i)=>r.sequence=slots[i]);db.serviceSequence.sort((a,b)=>a.sequence-b.sequence);renderGridOnly();}
+function moveSequence(id,d){const rows=getFilteredRows(screens.serviceSequence),i=rows.findIndex(r=>r.id===id);if(rows[i+d])reorderSequence(id,rows[i+d].id);}
+function updateSequence(id,val){const n=Number(val),rows=getFilteredRows(screens.serviceSequence),target=rows.find(r=>r.sequence===n);if(!Number.isInteger(n)||!target){toast('Invalid position','Enter a whole-number position belonging to a visible test.','error');renderGridOnly();return;}reorderSequence(id,target.id);}
+function startSequenceDrag(e,id){e.dataTransfer.setData('text/plain',String(id));e.dataTransfer.effectAllowed='move';e.currentTarget.classList.add('dragging');}
+function endSequenceDrag(){document.querySelectorAll('.dragging,.drop-target').forEach(el=>el.classList.remove('dragging','drop-target'));}
+function dropSequence(e,id){e.preventDefault();const source=Number(e.dataTransfer.getData('text/plain'));endSequenceDrag();reorderSequence(source,id);}
+
+const logFilterFields=[['loginFrom','Login From (UTC)','datetime-local'],['loginTo','Login To (UTC)','datetime-local'],['client','Client Name','text'],['username','User Name','text'],['ip','IP Address','text'],['country','Country','select'],['area','Area','text'],['device','Computer / Mobile','select'],['os','OS','text'],['browser','Browser','text'],['logoutFrom','Logout From (UTC)','datetime-local'],['logoutTo','Logout To (UTC)','datetime-local'],['minDuration','Min Duration (min)','number'],['maxDuration','Max Duration (min)','number'],['session','Session Status','select']];
+function logsPage(){return `<div class="page-head"><div class="page-title"><h1>Client Login Logs</h1><div class="breadcrumb">Administration / Client Login Logs</div></div><button class="btn btn-secondary" onclick="exportGrid()">Export CSV</button></div><div class="info-strip">Sample client sessions for prototype review. All date/time filters use UTC. Completed duration is calculated from login to logout; active sessions have no final duration. Real session capture requires the production backend.</div><div class="card"><div class="log-filters">${logFilterFields.map(([key,label,type])=>`<div class="field"><label for="log-${key}">${label}</label>${type==='select'?`<select id="log-${key}" class="k-select" onchange="renderLogs()"><option value="">All</option>${[...new Set(db.loginLogs.map(r=>r[key]))].sort().map(v=>`<option>${escapeHtml(v)}</option>`).join('')}</select>`:`<input id="log-${key}" class="k-input" type="${type}" ${type==='number'?'min="0" step="any"':''} oninput="renderLogs()">`}</div>`).join('')}<div class="field" style="justify-content:flex-end"><button class="btn btn-secondary" onclick="clearLogFilters()">Clear Filters</button></div></div><div id="logFilterError" role="alert" class="warning-strip hidden" style="margin:0 18px 12px"></div><div id="logResults">${logsGrid(db.loginLogs)}</div></div>`;}
+function logFilters(){return Object.fromEntries(logFilterFields.map(([k])=>[k,document.getElementById('log-'+k)?.value.trim()||'']));}
+function filteredLogs(){const f=logFilters();return db.loginLogs.filter(r=>{
+ for(const key of ['client','username','ip','area','os','browser'])if(f[key]&&!r[key].toLowerCase().includes(f[key].toLowerCase()))return false;
+ for(const key of ['country','device','session'])if(f[key]&&r[key]!==f[key])return false;
+ for(const key of ['login','logout']){if(f[key+'From']&&(!r[key]||Date.parse(r[key])<Date.parse(f[key+'From']+'Z')))return false;if(f[key+'To']&&(!r[key]||Date.parse(r[key])>Date.parse(f[key+'To']+'Z')+59999))return false;}
+ if(f.minDuration!==''&&(r.duration===null||r.duration<Number(f.minDuration)))return false;
+ if(f.maxDuration!==''&&(r.duration===null||r.duration>Number(f.maxDuration)))return false;
+ return true;
+ });}
+function logFilterError(){const f=logFilters();for(const key of ['login','logout'])if(f[key+'From']&&f[key+'To']&&f[key+'From']>f[key+'To'])return 'The '+key+' From date must precede the To date.';if(f.minDuration!==''&&Number(f.minDuration)<0||f.maxDuration!==''&&Number(f.maxDuration)<0)return 'Duration must not be negative.';if(f.minDuration!==''&&f.maxDuration!==''&&Number(f.minDuration)>Number(f.maxDuration))return 'Minimum duration must not exceed maximum duration.';return '';}
+function renderLogs(){const error=logFilterError(),box=document.getElementById('logFilterError');box.textContent=error;box.classList.toggle('hidden',!error);document.getElementById('logResults').innerHTML=logsGrid(error?[]:filteredLogs());}
+function clearLogFilters(){logFilterFields.forEach(([k])=>document.getElementById('log-'+k).value='');renderLogs();}
+function logsGrid(rows){return `<div class="k-grid-wrap"><table class="k-grid logs-grid"><thead><tr>${screens.loginLogs.columns.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${screens.loginLogs.columns.map(([k])=>`<td>${r[k]===null?'—':k==='login'||k==='logout'?escapeHtml(r[k].replace('T',' ').replace('Z','')):k==='session'?`<span class="${r.session==='Active'?'session-active':''}">${r.session}</span>`:escapeHtml(r[k])}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="12" class="empty">No sessions match these filters.</td></tr>'}</tbody></table></div><div class="grid-footer"><span>Showing ${rows.length} of ${db.loginLogs.length} sessions</span><span>Duration in minutes • UTC</span></div>`;}
+function exportGrid(){if(currentScreen==='loginLogs'&&logFilterError()){toast('Invalid filters',logFilterError(),'error');return;}const s=screens[currentScreen],rows=currentScreen==='loginLogs'?filteredLogs():getFilteredRows(s),cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replace(/"/g,'""')+'"';const csv='\uFEFF'+[s.columns.map(([,l])=>cell(l)).join(','),...rows.map(r=>s.columns.map(([k])=>cell(Array.isArray(r[k])?r[k].join('; '):r[k])).join(','))].join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='Sky-LIS-'+currentScreen+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+
+
+// v3.1: Client addresses follow the existing master-data hierarchy.
+screens.clients.wide=true;
+screens.clients.fields.splice(screens.clients.fields.findIndex(f=>f.key==='governorate')+1,0,
+  ...['city','district','area'].map(key=>({key,label:key[0].toUpperCase()+key.slice(1),type:'select',options:[]})));
+function bindClientAddress(row){
+  const keys=['country','governorate','city','district','area'];
+  const controls=Object.fromEntries(keys.map(k=>[k,document.querySelector('#modalBackdrop .editor-field[data-key="'+k+'"]')]));
+  function optionsFor(key){
+    const governorate=db.governorates.find(g=>g.country===controls.country.value&&g.name===controls.governorate.value);
+    const city=governorate?.cities?.find(c=>c.name===controls.city.value);
+    const district=city?.districts?.find(d=>d.name===controls.district.value);
+    if(key==='governorate')return db.governorates.filter(g=>g.country===controls.country.value).map(g=>g.name);
+    if(key==='city')return (governorate?.cities||[]).map(c=>c.name);
+    if(key==='district')return (city?.districts||[]).map(d=>d.name);
+    return district?.areas||[];
+  }
+  function populate(key,value='',preserve=false){
+    const choices=optionsFor(key),control=controls[key];
+    // Keep saved legacy locations visible until the user changes their parent.
+    if(preserve&&value&&!choices.includes(value))choices.push(value);
+    control.innerHTML='<option value="">Select '+key+'...</option>'+choices.map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>').join('');
+    control.value=choices.includes(value)?value:'';
+    control.disabled=!choices.length;
+    control.title=choices.length?'':'No '+key+' records configured for the selected parent.';
+  }
+  keys.slice(1).forEach(key=>populate(key,row[key]||'',true));
+  keys.slice(0,-1).forEach((key,i)=>controls[key].addEventListener('change',()=>keys.slice(i+1).forEach(child=>populate(child))));
+}
+
+
+// v4 catalog: Test → Profile → Panel. Memberships use stable record IDs.
+screens.tests.fields=screens.tests.fields.filter(f=>f.key!=='parent');
+screens.tests.fields.splice(2,0,
+ {key:'short',label:'Short Name',type:'text',required:true},
+ {key:'aliases',label:'Alias Name',type:'text',help:'Enter one or more aliases, separated by commas.'});
+screens.tests.fields.splice(screens.tests.fields.findIndex(f=>f.key==='status'),0,
+ {key:'profiles',label:'Exist in profiles',type:'profilelist',span:2,help:'Updated automatically from profile membership. Manage included tests in Profile/Panel setup.'});
+screens.tests.columns.splice(2,0,['short','Short Name'],['aliases','Alias Name']);
+screens.tests.columns.splice(screens.tests.columns.length-1,0,['profiles','Exist in profiles']);
+screens.tests.note='Tests are the base catalog unit. A profile contains tests; a panel contains profiles. Profile membership is shown automatically for each test.';
+const testNames=[['HGB','Hb, Haemoglobin'],['ALT','SGPT, Alanine aminotransferase'],['ABO','ABO/Rh, Blood typing'],['UCULT','Urine C&S']];
+db.tests.forEach((t,i)=>{t.short=testNames[i][0];t.aliases=testNames[i][1];delete t.parent;});
+Object.assign(screens.services,{title:'Profile/Panel',breadcrumb:'Master Data / Profile/Panel',add:'Add Profile/Panel',singular:'Profile/Panel',note:'<span class="catalog-concept"><strong>Test</strong> → <strong>Profile</strong> (group of tests) → <strong>Panel</strong> (group of profiles)</span>'});
+screens.services.columns=[['name','Profile/Panel Name'],['arabicName','Arabic Name'],['loinc','LOINC Code'],['short','Short Name'],['group','Clinical Group'],['type','Type'],['tests','Included Tests / Profiles'],['print','Print Alone'],['status','Status']];
+for(const f of screens.services.fields){
+ if(f.key==='name')f.label='Profile/Panel Name';
+ if(f.key==='header')f.label='Header';
+ if(f.key==='type')Object.assign(f,{label:'Type',options:['Profile','Panel'],value:'Profile'});
+ if(f.key==='print')Object.assign(f,{label:'Print Alone',type:'select',options:['Yes','No'],value:'No'});
+ if(f.key==='aliases')Object.assign(f,{type:'text',required:false,help:'Enter one or more aliases, separated by commas.'});
+ if(f.key==='tests')f.label='Included Tests / Profiles';
+}
+Object.assign(db.services[0],{name:'Hematology Profile',arabicName:'ملف أمراض الدم',short:'HEM',type:'Profile',aliases:'Blood Profile',members:[{id:1,order:1},{id:3,order:2}]});
+Object.assign(db.services[1],{name:'Routine Screening Panel',arabicName:'باقة الفحص الروتيني',short:'ROUTINE',type:'Panel',aliases:'Routine Checkup',members:[{id:1,order:1},{id:3,order:2}]});
+Object.assign(db.services[2],{name:'Urine Culture Profile',arabicName:'ملف مزرعة البول',short:'UCP',type:'Profile',aliases:'Urine Microbiology',members:[{id:4,order:1}]});
+Object.assign(db.services[3],{name:'Chemistry Profile',arabicName:'ملف الكيمياء',short:'CHEM',group:'Clinical Chemistry',type:'Profile',aliases:'Chemistry Tests',members:[{id:2,order:1}]});
+db.services.forEach(p=>{p.reportName=p.name;p.header=p.name;p.loinc='';});
+// A grouping may have a LOINC code when one is assigned; avoid invented group codes.
+screens.services.fields.find(f=>f.key==='loinc').required=false;
+screens.serviceSequence.note='Drag rows, use the arrow buttons, or enter a new position to arrange tests. When filtered, only the visible items change position.';
+screens.serviceSequence.columns=[['sequence','Sequence'],['loinc','Test LOINC'],['name','Test Name'],['group','Clinical Group'],['status','Status']];
+// Put the base unit before its groupings in navigation and role privileges.
+const testNav=document.querySelector('[data-screen="tests"]'),profileNav=document.querySelector('[data-screen="services"]');
+profileNav.before(testNav);
+const testModule=modules.findIndex(m=>m[1]==='Tests'),profileModule=modules.findIndex(m=>m[1]==='Profile/Panel');
+if(testModule>profileModule)modules.splice(profileModule,0,modules.splice(testModule,1)[0]);
+
+function syncCatalogRelationships(){
+ if(!db.services||!db.tests)return;
+ for(const p of db.services){
+  const source=p.type==='Panel'?db.services:db.tests;
+  p.members=(p.members||[]).map(m=>{const item=source.find(x=>x.id===m.id);return {...m,name:item?.name||m.name||'Unavailable item',loinc:item?.loinc||''};});
+  p.tests=[...p.members].sort((a,b)=>a.order-b.order).map(m=>m.name).join(', ');
+ }
+ for(const t of db.tests)t.profiles=db.services.filter(p=>p.type==='Profile'&&p.members.some(m=>m.id===t.id)).map(p=>p.name);
+}
+function memberType(){return document.querySelector('#modalBackdrop .editor-field[data-key="type"]')?.value||'Profile';}
+function memberSource(type){return type==='Panel'?db.services.filter(p=>p.type==='Profile'&&p.id!==editId):db.tests;}
+function bindServiceType(){
+ const select=document.querySelector('#modalBackdrop .editor-field[data-key="type"]');if(!select)return;
+ let previous=select.value||'Profile';const drafts={[previous]:serviceMemberDraft.map(m=>({...m}))};
+ select.addEventListener('change',()=>{
+  const saved=db.services.find(p=>p.id===editId);
+  if(saved?.type==='Profile'&&select.value==='Panel'&&db.services.some(p=>p.type==='Panel'&&p.members.some(m=>m.id===editId))){toast('Profile is in use','Remove this profile from its panels before changing its type.','error');select.value=previous;return;}
+  drafts[previous]=serviceMemberDraft.map(m=>({...m}));previous=select.value;
+  serviceMemberDraft=(drafts[previous]||[]).map(m=>({...m}));renderServiceMembers(previous);
+ });
+ renderServiceMembers(previous);
+}
+function serviceMembersHtml(type){
+ const panel=type==='Panel',label=panel?'Profile':'Test';
+ const options=memberSource(type).filter(x=>x.status==='Active'&&!serviceMemberDraft.some(m=>m.id===x.id));
+ const rows=serviceMemberDraft.map((m,i)=>`<tr><td>${escapeHtml(m.name)}</td><td>${escapeHtml(m.loinc||'—')}</td><td><input class="inline-number service-order" type="number" min="1" step="1" aria-label="Order for ${escapeHtml(m.name)}" value="${m.order}" onchange="updateServiceMemberOrder(${i},this.value)"></td><td class="actions"><button type="button" class="row-btn danger" title="Remove ${escapeHtml(m.name)}" onclick="removeServiceMember(${i})">${icons.trash}</button></td></tr>`).join('');
+ return `<div class="member-kind">${panel?'Panel contains profiles. Each profile contains tests.':'Profile contains tests.'}</div><div class="service-member-toolbar"><select id="serviceMemberSelect" class="k-select" aria-label="Select ${label}"><option value="">Select ${label}...</option>${options.map(x=>`<option value="${x.id}">${escapeHtml(x.name)}${x.short?' • '+escapeHtml(x.short):''}</option>`).join('')}</select><button class="btn btn-secondary" type="button" onclick="addServiceMember()">${icons.plus} Add ${label}</button></div>${rows?`<div class="k-grid-wrap"><table class="k-grid" style="min-width:0"><thead><tr><th>${label} Name</th><th>LOINC Code</th><th style="width:120px">Order</th><th class="actions">Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="service-members-empty">No ${label.toLowerCase()} added yet. Add at least one to save.</div>`}`;
+}
+function renderServiceMembers(type){const box=document.getElementById('serviceMembers');if(box)box.innerHTML=serviceMembersHtml(type);}
+function addServiceMember(){
+ const type=memberType(),id=Number(document.getElementById('serviceMemberSelect')?.value);
+ const item=memberSource(type).find(x=>x.id===id&&x.status==='Active');
+ if(!item){toast('Select an item',type==='Panel'?'Select an active profile.':'Select an active test.','error');return;}
+ if(serviceMemberDraft.some(m=>m.id===id)){toast('Duplicate item','This item is already included.','error');return;}
+ serviceMemberDraft.push({id:item.id,name:item.name,loinc:item.loinc||'',order:Math.max(0,...serviceMemberDraft.map(m=>m.order))+1});renderServiceMembers(type);
+}
+function removeServiceMember(i){serviceMemberDraft.splice(i,1);serviceMemberDraft.sort((a,b)=>a.order-b.order).forEach((m,j)=>m.order=j+1);renderServiceMembers(memberType());}
+function updateServiceMemberOrder(i,value){const n=Number(value);if(!Number.isInteger(n)||n<1||serviceMemberDraft.some((m,j)=>j!==i&&m.order===n)){toast('Invalid order','Order must be a unique positive whole number.','error');renderServiceMembers(memberType());return;}serviceMemberDraft[i].order=n;serviceMemberDraft.sort((a,b)=>a.order-b.order);renderServiceMembers(memberType());}
+function validateComposition(obj){
+ const fail=message=>{toast('Profile/Panel validation',message,'error');return false;};
+ if(!['Profile','Panel'].includes(obj.type))return fail('Choose Profile or Panel.');
+ if(!serviceMemberDraft.length)return fail(obj.type==='Profile'?'Add at least one test to the profile.':'Add at least one profile to the panel.');
+ const saved=db.services.find(p=>p.id===editId);
+ if(saved?.type==='Profile'&&obj.type==='Panel'&&db.services.some(p=>p.type==='Panel'&&p.members.some(m=>m.id===editId)))return fail('Remove this profile from its panels before changing its type.');
+ const ids=new Set(),orders=new Set(),source=memberSource(obj.type);
+ for(const m of serviceMemberDraft){
+  const item=source.find(x=>x.id===m.id);
+  if(!item)return fail(obj.type==='Profile'?'Profiles can contain tests only.':'Panels can contain profiles only.');
+  if(item.status!=='Active'&&!(saved?.type===obj.type&&saved.members.some(x=>x.id===m.id)))return fail('New members must be active.');
+  if(ids.has(m.id)||orders.has(m.order)||!Number.isInteger(m.order)||m.order<1)return fail('Members must be unique with positive, unique whole-number orders.');
+  ids.add(m.id);orders.add(m.order);
+ }
+ serviceMemberDraft.sort((a,b)=>a.order-b.order);return true;
+}
+function canDeleteCatalogItem(key,id){
+ const parents=key==='tests'?db.services.filter(p=>p.type==='Profile'&&p.members.some(m=>m.id===id)):key==='services'?db.services.filter(p=>p.type==='Panel'&&p.members.some(m=>m.id===id)):[];
+ if(!parents.length)return true;
+ toast('Item is in use','Remove it from '+parents.map(p=>escapeHtml(p.name)).join(', ')+' before deleting.','error');return false;
+}
+syncCatalogRelationships();syncSequence();
+
+</script>
+</body>
+</html>

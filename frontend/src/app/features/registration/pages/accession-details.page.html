@@ -1,0 +1,63 @@
+<app-page-header [title]="i18n.t('registration.accession.title')" [subtitle]="i18n.t('registration.accession.subtitle')">
+  <a pageActions class="btn ghost" routerLink="/registration/visits"><app-icon name="grid" [size]="15" />{{ i18n.t('registration.visits.title') }}</a>
+  <button pageActions type="button" class="btn ghost" (click)="facade.refresh()"><app-icon name="refresh" [size]="15" />{{ i18n.t('registration.refresh') }}</button>
+</app-page-header>
+
+<app-reg-accession-search
+  [text]="facade.searchText()"
+  [searching]="facade.searching()"
+  [matches]="facade.matches()"
+  [listOpen]="facade.listOpen()"
+  (run)="onSearch($event)"
+  (pick)="pickMatch($event)"
+  (closeList)="facade.closeList()"
+/>
+
+@if (facade.detail.isLoading()) {
+  <p class="muted" role="status">{{ i18n.t('registration.loading') }}</p>
+} @else if (notFound()) {
+  <app-empty-state [title]="i18n.tf('registration.accession.notFound', { accession: accession() ?? '' })" [message]="i18n.t('registration.accession.hint')" icon="search" />
+} @else if (facade.detail.error()) {
+  <p class="problem" role="alert">{{ i18n.t('registration.visitLoadError') }}</p>
+} @else if (visit(); as v) {
+  <app-reg-accession-header [visit]="v" [neighbours]="neighbours()" (move)="move($event)" (patient)="openPatient()" (edit)="edit()" />
+
+  <app-reg-accession-lines [lines]="v.lines" [tubes]="v.tubes" [resultStatus]="facade.lineResults()" (cancelLine)="openCancel($event)" />
+
+  <div class="pair">
+    <app-reg-accession-samples
+      *appCan="samplesView"
+      [samples]="samples()"
+      [loading]="facade.samples.isLoading()"
+      [collecting]="collecting()"
+      (collect)="collect($event)"
+      (label)="label($event)"
+      (labelAll)="printLabels()"
+    />
+    <app-reg-accession-results *appCan="resultsView" [view]="results()" [loading]="facade.results.isLoading()" [accession]="v.accession" />
+  </div>
+
+  <app-reg-accession-payments *appCan="billingView" [visitId]="v.id" [account]="account()" [balance]="v.balance" [loading]="facade.account.isLoading()" (receipt)="receipt($event)" />
+
+  <app-section-card [title]="i18n.t('registration.accession.documents.title')">
+    <div class="documents">
+      <button type="button" class="btn" (click)="printLabels()"><app-icon name="barcode" [size]="15" />{{ i18n.t('registration.labels.title') }}</button>
+      <button type="button" class="btn" (click)="printJobOrder()"><app-icon name="printer" [size]="15" />{{ i18n.t('registration.jobOrder.print') }}</button>
+      <a class="btn" [routerLink]="['/registration/visits', v.id, 'job-order']"><app-icon name="eye" [size]="15" />{{ i18n.t('registration.jobOrder.open') }}</a>
+    </div>
+  </app-section-card>
+} @else {
+  <app-empty-state [title]="i18n.t('registration.accession.emptyTitle')" [message]="i18n.t('registration.accession.hint')" icon="search" />
+}
+
+<app-reg-cancel-services-dialog
+  [(open)]="cancelOpen"
+  [visitId]="visit()?.id ?? null"
+  [accession]="visit()?.accession ?? ''"
+  [preselect]="cancelLines()"
+  [pending]="facade.cancel.pending()"
+  [problem]="cancelProblem()"
+  (submitted)="cancelServices($event)"
+/>
+
+<app-reg-patient-drawer [target]="patientTarget()" (closed)="patientTarget.set(null)" (saved)="onPatientSaved()" />

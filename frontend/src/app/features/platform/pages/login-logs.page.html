@@ -1,0 +1,94 @@
+<app-page-header [title]="i18n.t('platform.loginLogs.title')" [subtitle]="i18n.t('platform.loginLogs.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="exportCsv()" [disabled]="facade.export.pending()"><app-icon name="printer" [size]="15" />{{ facade.export.pending() ? i18n.t('platform.loginLogs.exporting') : i18n.t('platform.exportCsv') }}</button>
+</app-page-header>
+
+<app-section-card [title]="i18n.t('platform.loginLogs.filters')" [subtitle]="i18n.t('platform.loginLogs.utcHint')">
+  <form id="platform-login-logs-filter" [formGroup]="form" (ngSubmit)="apply()" novalidate>
+    @if (criteriaProblem(); as problem) {
+      <p class="problem" role="alert">{{ problem }}</p>
+    }
+    <div class="form-grid">
+      <app-form-field [label]="i18n.t('platform.loginLogs.field.client')">
+        <select formControlName="tenantId">
+          <option value="">{{ i18n.t('platform.loginLogs.allClients') }}</option>
+          @for (client of facade.clientOptions(); track client.id) {
+            <option [value]="client.id">{{ optionName(client) }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('platform.loginLogs.field.user')" [hint]="i18n.t('platform.loginLogs.hint.user')">
+        <input type="search" formControlName="search" maxlength="100" autocomplete="off" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('platform.loginLogs.field.loginFrom')">
+        <input type="datetime-local" formControlName="loginFrom" dir="ltr" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('platform.loginLogs.field.loginTo')">
+        <input type="datetime-local" formControlName="loginTo" dir="ltr" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('platform.loginLogs.field.logoutFrom')">
+        <input type="datetime-local" formControlName="logoutFrom" dir="ltr" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('platform.loginLogs.field.logoutTo')">
+        <input type="datetime-local" formControlName="logoutTo" dir="ltr" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('platform.loginLogs.field.device')">
+        <select formControlName="device">
+          <option value="">{{ i18n.t('platform.all') }}</option>
+          @for (device of devices; track device) {
+            <option [value]="device">{{ i18n.t('platform.loginLogs.device.' + device) }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('platform.loginLogs.field.status')">
+        <select formControlName="status">
+          <option value="">{{ i18n.t('platform.all') }}</option>
+          @for (status of statuses; track status) {
+            <option [value]="status">{{ i18n.t('platform.loginLogs.status.' + status) }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field [label]="i18n.t('platform.loginLogs.field.minMinutes')">
+        <input type="number" formControlName="minMinutes" min="0" step="1" inputmode="numeric" dir="ltr" />
+      </app-form-field>
+      <app-form-field [label]="i18n.t('platform.loginLogs.field.maxMinutes')">
+        <input type="number" formControlName="maxMinutes" min="0" step="1" inputmode="numeric" dir="ltr" />
+      </app-form-field>
+    </div>
+    <div class="row-gap">
+      <button type="submit" class="btn primary"><app-icon name="search" [size]="15" />{{ i18n.t('platform.loginLogs.apply') }}</button>
+      <button type="button" class="btn" (click)="reset()">{{ i18n.t('platform.loginLogs.reset') }}</button>
+    </div>
+  </form>
+</app-section-card>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <span toolbarFilters class="small muted">{{ count() }}</span>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.logs.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('platform.refresh') }}</button>
+  </app-toolbar>
+
+  @if (facade.logs.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('platform.loginLogs.loadError') }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="facade.rows()" [rowId]="rowId" [loading]="facade.logs.isLoading()" [interactive]="false"
+                  [emptyTitle]="i18n.t('platform.loginLogs.empty')" [emptyMessage]="i18n.t('platform.loginLogs.emptyHint')" [caption]="i18n.t('platform.loginLogs.title')"
+                  [sort]="facade.sort()" [serverSort]="true" (sortChange)="facade.setSort($event)">
+    <ng-template appCell="user" [appCellOf]="facade.rows()" let-row>
+      <strong>{{ row.displayName }}</strong>
+      <div class="small muted mono">{{ row.username }}</div>
+    </ng-template>
+    <ng-template appCell="device" [appCellOf]="facade.rows()" let-row>
+      {{ i18n.t('platform.loginLogs.device.' + row.device) }}
+      <div class="small muted">{{ row.os }} · {{ row.browser }}</div>
+    </ng-template>
+    <ng-template appCell="status" [appCellOf]="facade.rows()" let-row>
+      <app-badge [tone]="tone(row.status)">{{ i18n.t('platform.loginLogs.status.' + row.status) }}</app-badge>
+      @if (row.revocationReason) {
+        <div class="small muted">{{ i18n.t('platform.loginLogs.reason.' + row.revocationReason) }}</div>
+      }
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="facade.totalCount()" (pageChange)="facade.setPage($event)" />
+</app-section-card>

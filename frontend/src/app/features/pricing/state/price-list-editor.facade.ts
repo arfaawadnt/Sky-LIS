@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, resource, signal } from '@angular/core';
 
-import { PRICE_LIMITS, type PriceLineItem, type PriceLineRequest, type ServiceLabel } from '../../../core/api/pricing.contracts';
+import { type AdjustBasePriceListRequest, type ImportPriceRowRequest, PRICE_LIMITS, type PriceLineItem, type PriceLineRequest, type ServiceLabel } from '../../../core/api/pricing.contracts';
 import { mutation } from '../../../core/state/mutation';
 import { hasScale } from '../data/money';
 import { PricingApi } from '../data/pricing.api';
@@ -102,6 +102,27 @@ export class PriceListEditorFacade {
   readonly apply = mutation((listId: string) => this.api.applyBasePriceList(listId), { then: () => this.detail.reload() });
 
   readonly copy = mutation((input: { listId: string; request: Parameters<PricingApi['copyBasePriceList']>[1] }) => this.api.copyBasePriceList(input.listId, input.request));
+
+  /**
+   * L8 Upload Excel (CR 2026-10-19 C21): the parsed rows checked (`dryRun`) or applied all-or-nothing; the grid is re-read
+   * only when the server applied them. Saving through the import never re-prices a contract (BR-07), like `save`.
+   */
+  readonly importLines = mutation((input: { listId: string; rows: readonly ImportPriceRowRequest[]; dryRun: boolean }) => this.api.importPriceLines(input.listId, input.rows, input.dryRun), {
+    then: (result) => {
+      if (result.applied) {
+        this.reload();
+      }
+    },
+  });
+
+  /** L7 Bulk adjust (C21): a preview computes without writing; an apply upserts the changed rows and the grid is re-read. */
+  readonly adjust = mutation((input: { listId: string; request: AdjustBasePriceListRequest }) => this.api.adjustBasePriceList(input.listId, input.request), {
+    then: (result) => {
+      if (result.applied) {
+        this.reload();
+      }
+    },
+  });
 
   /**
    * Opens a list; the same list is re-read, because the facade outlives the page (route provider, UAT D-14). Another

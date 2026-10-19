@@ -217,5 +217,14 @@
   "nationalId.field.governorate": "المحافظة",
   "nationalId.birthDiffers": "الرقم القومي يحدد تاريخ الميلاد {date}، والتاريخ المُدخل مختلف.",
   "nationalId.genderDiffers": "الرقم القومي لمريض من جنس «{gender}»، والجنس المختار مختلف.",
-  "nationalId.titleDiffers": "الرقم القومي لمريض من جنس «{gender}»؛ راجع اللقب."
+  "nationalId.titleDiffers": "الرقم القومي لمريض من جنس «{gender}»؛ راجع اللقب.",
+  "field.secondPhone": "هاتف ثانٍ",
+  "hint.secondPhone": "اختياري: رقم آخر يمكن الوصول إلى المريض عليه.",
+  "field.district": "الحي",
+  "field.area": "المنطقة",
+  "column.secondPhone": "هاتف ثانٍ",
+  "error.PAT-014": "المدينة لا تتبع المحافظة المختارة.",
+  "error.PAT-015": "الحي لا يتبع المدينة المختارة.",
+  "error.PAT-016": "المنطقة لا تتبع الحي المختار.",
+  "error.PAT-017": "راجع الهاتف الثاني: أرقام فقط، حتى 16 رقمًا."
 }

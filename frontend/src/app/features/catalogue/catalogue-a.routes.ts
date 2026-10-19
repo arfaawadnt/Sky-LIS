@@ -1,10 +1,14 @@
-import { Routes } from '@angular/router';
+import type { CanDeactivateFn, Routes } from '@angular/router';
 
+import type { ServiceSequencePage } from './pages-a/service-sequence.page';
 import { CatalogueAOptions } from './state-a/catalogue-a-options';
 import { ServicesListFacade, TestsListFacade } from './state-a/catalogue-lists.facade';
 import { ServiceEditorFacade } from './state-a/service-editor.facade';
 import { ServiceSequenceFacade } from './state-a/service-sequence.facade';
 import { TestEditorFacade } from './state-a/test-editor.facade';
+
+/** An unsaved service order asks before the sequence page is left (the page owns the dialog, CP-42b). */
+const leaveSequence: CanDeactivateFn<ServiceSequencePage> = (page) => page.canLeave();
 
 /**
  * Catalogue A (CP-39…CP-45, CP-55): clinical groups, sample types, units, patient conditions, services, tests,
@@ -32,6 +36,11 @@ export const CATALOGUE_A_ROUTES: Routes = [
       { path: ':id', providers: [TestEditorFacade, CatalogueAOptions], loadComponent: () => import('./pages-a/test-editor.page').then((m) => m.TestEditorPage) },
     ],
   },
-  { path: 'service-sequence', providers: [ServiceSequenceFacade], loadComponent: () => import('./pages-a/service-sequence.page').then((m) => m.ServiceSequencePage) },
+  {
+    path: 'service-sequence',
+    providers: [ServiceSequenceFacade, CatalogueAOptions],
+    canDeactivate: [leaveSequence],
+    loadComponent: () => import('./pages-a/service-sequence.page').then((m) => m.ServiceSequencePage),
+  },
   { path: 'additional-services', loadComponent: () => import('./pages-a/additional-services.page').then((m) => m.AdditionalServicesPage) },
 ];

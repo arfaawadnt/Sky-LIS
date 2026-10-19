@@ -36,7 +36,7 @@
               <span class="mono number">{{ row.number }}</span>
               <span class="name">{{ row.fullName || i18n.t('patients.vipMasked') }}@if (row.nameAr) { · <span dir="rtl" lang="ar">{{ row.nameAr }}</span>}</span>
               <span class="small muted">{{ i18n.t('patients.gender.' + row.gender) }} · {{ ageText(row) }}</span>
-              <span class="small mono muted" dir="ltr">{{ row.mobile ?? '' }}</span>
+              <span class="small mono muted" dir="ltr">{{ row.mobile ?? '' }}@if (row.secondPhone) { · {{ row.secondPhone }}}</span>
               @if (row.isVip) {
                 <app-badge tone="violet">{{ i18n.t('patients.vip') }}</app-badge>
               }

@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 
-import type { InvoiceDocument, InvoiceLine } from '../../../../core/api/billing.contracts';
+import type { InvoiceDocument, InvoiceLine, InvoiceMovement } from '../../../../core/api/billing.contracts';
 import { I18nService } from '../../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../../shared/forms/localized-text';
 import { Code128Component } from '../../../../shared/print/code128.component';
 import { DocumentFrameComponent } from '../../../../shared/print/document-frame.component';
-import { formatPrintDateTime, formatPrintMoney } from '../billing-format';
+import { formatPrintDateTime, formatPrintMoney, movementMethodLabel } from '../billing-format';
 import { branchOf } from './receipt-document.component';
 
 /** The visit invoice (A4, CP-23 "receipts and invoice"): billed lines with shares and discounts, payments, refunds and the balance. */
@@ -82,7 +82,7 @@ import { branchOf } from './receipt-document.component';
           <caption>{{ i18n.t('billing.doc.payments') }}</caption>
           <tbody>
             @for (payment of doc().payments; track payment.number) {
-              <tr><td class="mono">{{ payment.number }}</td><td>{{ at(payment.atUtc) }}</td><td>{{ i18n.t('billing.method.' + payment.method) }}</td><td class="num">{{ money(payment.amount) }}</td></tr>
+              <tr><td class="mono">{{ payment.number }}</td><td>{{ at(payment.atUtc) }}</td><td>{{ method(payment) }}</td><td class="num">{{ money(payment.amount) }}</td></tr>
             } @empty {
               <tr><td colspan="4" class="muted">{{ i18n.t('billing.doc.none') }}</td></tr>
             }
@@ -92,7 +92,7 @@ import { branchOf } from './receipt-document.component';
           <caption>{{ i18n.t('billing.doc.refunds') }}</caption>
           <tbody>
             @for (refund of doc().refunds; track refund.number) {
-              <tr><td class="mono">{{ refund.number }}</td><td>{{ at(refund.atUtc) }}</td><td>{{ i18n.t('billing.method.' + refund.method) }}</td><td class="num">{{ money(refund.amount) }}</td></tr>
+              <tr><td class="mono">{{ refund.number }}</td><td>{{ at(refund.atUtc) }}</td><td>{{ method(refund) }}</td><td class="num">{{ money(refund.amount) }}</td></tr>
             } @empty {
               <tr><td colspan="4" class="muted">{{ i18n.t('billing.doc.none') }}</td></tr>
             }
@@ -130,6 +130,11 @@ export class InvoiceDocumentComponent {
   protected serviceName(line: InvoiceLine): string {
     const name = localizedPick({ en: line.serviceNameEn ?? '', ar: line.serviceNameAr ?? '' }, this.i18n.lang());
     return name === '' ? this.i18n.t('billing.doc.service') : name;
+  }
+
+  /** The laboratory's method name with its code (CP-30b), or the kind on a legacy movement. */
+  protected method(movement: InvoiceMovement): string {
+    return movementMethodLabel((key) => this.i18n.t(key), this.i18n.lang(), movement);
   }
 
   protected money(value: number): string {

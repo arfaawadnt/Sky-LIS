@@ -78,4 +78,10 @@ public interface IPricingServiceCatalog
 {
     /// <summary>The ids among <paramref name="serviceIds"/> that are services of the current tenant.</summary>
     Task<IReadOnlySet<Guid>> ExistingServiceIdsAsync(IReadOnlyCollection<Guid> serviceIds, CancellationToken cancellationToken);
+
+    /// <summary>The id of every catalogue service of the tenant whose code is among <paramref name="codes"/> (upper-case keys; the Excel import, C21). Unknown codes are absent.</summary>
+    Task<IReadOnlyDictionary<string, Guid>> ServiceIdsByCodeAsync(IReadOnlyCollection<string> codes, CancellationToken cancellationToken);
+
+    /// <summary>Code and names of the given services of the tenant (unknown ids absent), for answers that carry rows the grids label (C21 adjust preview).</summary>
+    Task<IReadOnlyDictionary<Guid, CatalogueServiceLabel>> ServiceLabelsAsync(IReadOnlyCollection<Guid> serviceIds, CancellationToken cancellationToken);
 }

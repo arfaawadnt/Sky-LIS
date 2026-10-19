@@ -20,7 +20,7 @@
               <span class="mono">{{ candidate.number }}</span>
               <span class="name">{{ candidate.fullName || i18n.t('patients.vipMasked') }}@if (candidate.nameAr) { · <span dir="rtl" lang="ar">{{ candidate.nameAr }}</span>}</span>
               <span class="small muted">
-                {{ i18n.t('patients.gender.' + candidate.gender) }} · {{ ageText(candidate.age) }}@if (candidate.mobile) { · <span class="mono" dir="ltr">{{ candidate.mobile }}</span>}
+                {{ i18n.t('patients.gender.' + candidate.gender) }} · {{ ageText(candidate.age) }}@if (candidate.mobile) { · <span class="mono" dir="ltr">{{ candidate.mobile }}</span>}@if (candidate.secondPhone) { · <span class="mono" dir="ltr">{{ candidate.secondPhone }}</span>}
               </span>
             </div>
             <app-badge [tone]="candidate.match === 'Exact' ? 'bad' : candidate.match === 'Mobile' ? 'warn' : 'info'">{{ matchLabel(candidate) }}</app-badge>
@@ -139,6 +139,10 @@
           <input type="tel" formControlName="mobile" maxlength="32" autocomplete="off" dir="ltr" inputmode="tel" (input)="onIdentityInput()" />
         </app-form-field>
       </div>
+      <!-- C3: a second phone, read with the same country as the mobile -->
+      <app-form-field [label]="i18n.t('patients.field.secondPhone')" [hint]="mobileLength() !== null ? i18n.tf('patients.hint.mobileLength', { length: num(mobileLength() ?? 0) }) : i18n.t('patients.hint.secondPhone')">
+        <input type="tel" formControlName="secondPhone" maxlength="32" autocomplete="off" dir="ltr" inputmode="tel" (input)="onIdentityInput()" />
+      </app-form-field>
     </div>
   </section>
 
@@ -177,9 +181,41 @@
         </app-form-field>
       }
 
-      <app-form-field [label]="i18n.t('patients.field.city')">
-        <input type="text" formControlName="city" maxlength="100" autocomplete="off" />
-      </app-form-field>
+      <!-- A2: the platform's cities / districts / areas of the governorate, one level feeding the next; free text when it lists none -->
+      @if (hasCities()) {
+        <app-form-field [label]="i18n.t('patients.field.city')">
+          <select formControlName="cityId" (change)="onCityChange()">
+            <option value="">—</option>
+            @for (city of cityOptions(); track city.id) {
+              <option [value]="city.id">{{ optionName(city) }}</option>
+            }
+          </select>
+        </app-form-field>
+        @if (districtOptions().length > 0) {
+          <app-form-field [label]="i18n.t('patients.field.district')">
+            <select formControlName="districtId" (change)="onDistrictChange()">
+              <option value="">—</option>
+              @for (district of districtOptions(); track district.id) {
+                <option [value]="district.id">{{ optionName(district) }}</option>
+              }
+            </select>
+          </app-form-field>
+        }
+        @if (areaOptions().length > 0) {
+          <app-form-field [label]="i18n.t('patients.field.area')">
+            <select formControlName="areaId">
+              <option value="">—</option>
+              @for (area of areaOptions(); track area.id) {
+                <option [value]="area.id">{{ optionName(area) }}</option>
+              }
+            </select>
+          </app-form-field>
+        }
+      } @else {
+        <app-form-field [label]="i18n.t('patients.field.city')">
+          <input type="text" formControlName="city" maxlength="100" autocomplete="off" />
+        </app-form-field>
+      }
 
       <app-form-field class="wide" [label]="i18n.t('patients.field.address')">
         <input type="text" formControlName="address" maxlength="500" autocomplete="off" />

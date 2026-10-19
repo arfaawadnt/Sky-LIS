@@ -564,6 +564,15 @@ export class RegistrationPage {
     void this.router.navigate(['/billing/payments'], { queryParams: success ? { visitId: success.visit.id } : {} });
   }
 
+  /** The success panel's *Accession details* (CP-10b): the saved visit on the accession page. */
+  protected accessionDetails(): void {
+    const success = this.success();
+    this.successOpen.set(false);
+    if (success !== null) {
+      void this.router.navigate(['/registration/accession'], { queryParams: { visitId: success.visit.id } });
+    }
+  }
+
   protected problemText(problem: ProblemDetails | null): string {
     return problem === null ? this.i18n.t('registration.saveError') : problemMessage(this.i18n, 'registration', problem);
   }

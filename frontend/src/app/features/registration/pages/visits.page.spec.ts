@@ -22,6 +22,7 @@ interface VisitsPageInternals {
   openCancel(row: VisitListItem): void;
   cancelServices(input: { visitId: string; request: CancelLinesRequest }): Promise<void>;
   results(row: VisitListItem): void;
+  details(row: VisitListItem): void;
   payments(row: VisitListItem): void;
   openPatient(row: VisitListItem): void;
   submitPatient(): void;
@@ -84,6 +85,7 @@ describe('VisitsPage (CP-10)', () => {
           { path: 'registration/visits', providers: [VisitsFacade], component: VisitsPage },
           { path: 'results/by-accession', component: BlankComponent },
           { path: 'billing/payments', component: BlankComponent },
+          { path: 'registration/accession', component: BlankComponent },
         ]),
       ],
     });
@@ -138,16 +140,16 @@ describe('VisitsPage (CP-10)', () => {
     expect(row?.querySelector('.chip.cancelled')?.textContent).toBe('GLU');
     expect(row?.querySelector('.chip:not(.cancelled)')?.textContent).toBe('CBC');
     expect(row?.textContent).toContain('60.00');
-    expect(row?.querySelectorAll('button').length).toBe(6);
+    expect(row?.querySelectorAll('button').length).toBe(7);
     expect(host.querySelector('app-page-header .btn.primary')).not.toBeNull();
   });
 
-  it('offers only the documents to a read-only role and masks VIP patients', async () => {
+  it('offers only the details and the documents to a read-only role and masks VIP patients', async () => {
     granted = new Set(['registration.view']);
     await open([visitRow({ patientMasked: true, patientName: null, mobile: null, remaining: 0 })]);
     const host = harness.routeNativeElement!;
     const row = host.querySelector('tbody tr[data-row]');
-    expect(row?.querySelectorAll('button').length).toBe(1);
+    expect(row?.querySelectorAll('button').length).toBe(2);
     expect(row?.textContent).toContain('registration.vipMasked');
     expect(row?.textContent).not.toContain('Mona');
     expect(row?.textContent).toContain('registration.visits.settled');
@@ -210,7 +212,7 @@ describe('VisitsPage (CP-10)', () => {
     granted.add('patients.edit');
     const page = await open();
     const host = harness.routeNativeElement!;
-    expect(host.querySelector('tbody tr[data-row]')?.querySelectorAll('button').length).toBe(7);
+    expect(host.querySelector('tbody tr[data-row]')?.querySelectorAll('button').length).toBe(8);
 
     await openPatient(page, false);
     expect(page.patientOpen()).toBe(true);
@@ -265,5 +267,9 @@ describe('VisitsPage (CP-10)', () => {
     page.payments(visitRow());
     await settle();
     expect(router.url).toBe('/billing/payments?visitId=v-1');
+
+    page.details(visitRow());
+    await settle();
+    expect(router.url).toBe('/registration/accession?accession=ACC-2026-00001');
   });
 });

@@ -58,9 +58,9 @@ export class PatientsFacade {
   readonly similar = resource({
     params: () => {
       const typed = this.typed();
-      return typed !== null && (typed.name.length >= MIN_NAME || typed.mobile.length >= MIN_MOBILE) ? typed : undefined;
+      return typed !== null && (typed.name.length >= MIN_NAME || typed.mobile.length >= MIN_MOBILE || typed.secondPhone.length >= MIN_MOBILE) ? typed : undefined;
     },
-    loader: ({ params, abortSignal }) => this.lookup.similar(params.name, params.mobile, abortSignal),
+    loader: ({ params, abortSignal }) => this.lookup.similar(params, abortSignal),
   });
 
   /** The candidates to warn about: empty when the tenant switched the warning off (`similarNameWarning`). */

@@ -217,7 +217,11 @@ public sealed class ReplaceServiceMembersHandler(IServiceRepository services, IL
     }
 }
 
-/// <summary>T12 (CP-42): the sequences of the listed services; INV-CAT-004 holds over the whole tenant after the change (a swap in one save is fine).</summary>
+/// <summary>
+/// T12 (CP-42): the sequences of the listed services; INV-CAT-004 holds over the whole tenant after the change (a swap in one save is
+/// fine). The reorder page sends only the rows it shows, renumbered within the numbers those rows already occupied, so a filtered subset
+/// never collides with the rows outside it; a number sent twice is CAT-033, a number held by a row outside the list CAT-105.
+/// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Edit)]
 public sealed record SaveServiceSequenceCommand(IReadOnlyList<ServiceSequenceChange> Items) : ICommand;
 
@@ -244,6 +248,8 @@ public sealed class SaveServiceSequenceHandler(IServiceRepository services, IUni
 {
     public async Task Handle(SaveServiceSequenceCommand command, CancellationToken cancellationToken)
     {
+        Service.EnsureDistinctSequences(command.Items.Select(item => item.Sequence));   // CAT-033 before any load
+
         var ids = command.Items.Select(item => item.ServiceId).ToList();
         var loaded = await services.GetManyForUpdateAsync(ids, cancellationToken);
         if (loaded.Count != ids.Count)
