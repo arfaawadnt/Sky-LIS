@@ -234,7 +234,7 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Installation record.** WIN-9S2KO4FA64L upgraded to 0.15.0 on 2026-10-19 (`docs/deploy/Installations.md`): clean-tag build, migration `PrototypeGaps` applied (16 of 16), verified backups before the migration and before the swap, configuration unchanged, smoke tests 20 / 20 by name and 20 / 20 by IP, new public lookup and served bundle verified through IIS. Documentation only; the installed 0.15.0 build is the same code as this release.
 
 ### v0.15.0 — 2026-10-19
 
