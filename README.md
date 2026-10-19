@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.14.1** · released 2026-10-14 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.15.0** · released 2026-10-19 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.15.0 — 2026-10-19
 
 Change request LIS-CR-003 (2026-10-19, `docs/build/CR-2026-10-19_Prototype-Gaps.md`): the *Not built* / *Partial* items of the
 client v3 / admin v4.1 prototype difference, migration `PrototypeGaps`.
