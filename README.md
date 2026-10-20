@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.15.3** · released 2026-10-20 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.16.0** · released 2026-10-20 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.16.0 — 2026-10-20
 
 Change request LIS-CR-004 (2026-10-20, `docs/build/CR-2026-10-20_Treasury-Removal.md`): business owner decision after the first use
 of 0.15.2 — *Payments* back in the menu and **the treasury removed from the system**. Migration `TreasuryRemoved`.
