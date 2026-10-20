@@ -56,5 +56,10 @@
   "recovery.error.VALIDATION-400": "كلمة المرور الجديدة لا تستوفي القاعدة.",
   "recovery.error.RATE-429": "محاولات كثيرة. يرجى الانتظار دقيقة.",
   "recovery.error.CRED-005": "تعذر تشفير كلمة المرور للإرسال. يرجى تحديث الصفحة والمحاولة مجدداً.",
-  "recovery.error.NETWORK-000": "تعذر الوصول إلى الخادم."
+  "recovery.error.NETWORK-000": "تعذر الوصول إلى الخادم.",
+  "hero.eyebrow": "دخول الموظفين",
+  "hero.title": "مرحبًا بعودتك إلى المختبر.",
+  "hero.lead": "فرعك وقائمة عملك وصلاحياتك تتبع حسابك.",
+  "copyright": "© National Technology · Sky LIS",
+  "otherLinks": "روابط أخرى"
 }

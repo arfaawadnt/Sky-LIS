@@ -258,7 +258,7 @@ QMS source is never read or copied (section 1); everything here is written from 
   on CRED-002/003, `problemDetailsInterceptor` → typed `ProblemError`), `core/crypto` (`credential-envelope.ts`: WebCrypto-only
   compact JWE seal; `CredentialEnvelopeClient` fetches the challenge), `core/api` (hand-written auth contracts until the
   OpenAPI generator lands), `core/i18n` (lang/dir signals, per-feature JSON in `public/i18n`), `core/state/mutation.ts`,
-  `shell/nav.registry.ts`, `features/auth` (login page), `features/home`; `shared/patient` (patient picker, form, demographics
+  `shell/nav.registry.ts`, `features/auth` (login page: design 5c "light premium" of 2026-10-20 — brand light ground, large logo, hero + card, keys `auth.hero.*`, `auth.copyright`, `auth.otherLinks`; the comparison canvas lives in a private claude.ai artifact), `features/home`; `shared/patient` (patient picker, form, demographics
   and lookup API shared by Patients and Registration; reads the `patients` dictionary); `core/release.ts` (`RELEASE_SCOPE`,
   `inReleaseScope`); `AuthStore.updateLanguage` saves the language switch (CP-65) and `hydrate` applies the saved one.
   **Session rules (validation fixes C-01, A-01, 2026-10-11)**: `AuthStore.refreshOnce()` compares user and tenant with the

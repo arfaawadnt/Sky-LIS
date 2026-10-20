@@ -136,6 +136,28 @@ describe('Sign-in and password recovery (CP-03, CP-04 entry)', () => {
     });
   });
 
+  it('lays out the 5c sign-in: the Sky LIS logo, the welcome hero, the card with its h2, and the footer links (2026-10-20)', async () => {
+    const fixture = TestBed.createComponent(LoginPage);
+    fixture.componentRef.setInput('reason', 'idle');
+    const root = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
+
+    expect(root.querySelector('.head .brand img')?.getAttribute('src')).toBe('/brand/sky-lis-logo.png');
+    expect(root.querySelector('.hero h1')?.textContent).toContain('auth.hero.title');
+    expect(root.querySelector('.card h2')?.textContent).toContain('auth.title');
+    expect(root.querySelector('.card .info-strip')?.textContent).toContain('auth.sessionEndedIdle');
+    expect(root.querySelector('.card .forgot')?.getAttribute('href')).toBe('/login/recover');
+    expect([...root.querySelectorAll('.foot nav a')].map((link) => link.getAttribute('href'))).toEqual(['/welcome', '/welcome/subscribe']);
+
+    const eye = root.querySelector<HTMLButtonElement>('.card .eye');
+    eye?.click();
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLInputElement>('#password')?.type).toBe('text');
+    expect(eye?.getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('sends a laboratory session without a branch to branch selection after sign-in', async () => {
     const fixture = TestBed.createComponent(LoginPage);
     const root = fixture.nativeElement as HTMLElement;

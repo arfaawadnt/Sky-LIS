@@ -1,65 +1,78 @@
-<section class="login card">
-  <div class="top">
+<div class="page">
+  <header class="head">
     <a class="brand" routerLink="/welcome">
-      <img src="/brand/sky-lis-logo.png" alt="" height="34" />
+      <img src="/brand/sky-lis-logo.png" alt="Sky LIS" width="231" height="112" />
       <span class="visually-hidden">{{ i18n.t('auth.publicSite') }}</span>
     </a>
     <button type="button" class="lang-btn" (click)="toggleLanguage()" [attr.aria-label]="i18n.t('auth.switchLanguage')">
-      <app-icon name="globe" [size]="14" />
+      <app-icon name="globe" [size]="16" />
       <span>{{ otherLanguage() }}</span>
     </button>
-  </div>
+  </header>
 
-  <h1>{{ i18n.t('auth.title') }}</h1>
-  <p class="muted">{{ i18n.t('auth.subtitle') }}</p>
-
-  @if (endedIdle()) {
-    <p class="info-strip" role="status">{{ i18n.t('auth.sessionEndedIdle') }}</p>
-  }
-
-  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
-    <div class="field">
-      <label for="username">{{ i18n.t('auth.username') }}</label>
-      <input id="username" type="text" formControlName="username" autocomplete="username" autocapitalize="none" spellcheck="false" />
+  <main class="main">
+    <div class="hero">
+      <p class="eyebrow">{{ i18n.t('auth.hero.eyebrow') }}</p>
+      <h1>{{ i18n.t('auth.hero.title') }}</h1>
+      <p class="lead">{{ i18n.t('auth.hero.lead') }}</p>
     </div>
 
-    <div class="field">
-      <label for="password">{{ i18n.t('auth.password') }}</label>
-      <div class="password">
-        <input id="password" [type]="showPassword() ? 'text' : 'password'" formControlName="password" autocomplete="current-password" />
-        <button type="button" class="icon-btn" (click)="showPassword.set(!showPassword())" [attr.aria-pressed]="showPassword()" [attr.aria-label]="showPassword() ? i18n.t('auth.hidePassword') : i18n.t('auth.showPassword')">
-          <app-icon name="eye" [size]="16" />
+    <section class="card" aria-labelledby="sign-in-title">
+      <h2 id="sign-in-title">{{ i18n.t('auth.title') }}</h2>
+
+      @if (endedIdle()) {
+        <p class="info-strip" role="status">{{ i18n.t('auth.sessionEndedIdle') }}</p>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <div class="field">
+          <label for="username">{{ i18n.t('auth.username') }}</label>
+          <input id="username" type="text" formControlName="username" autocomplete="username" autocapitalize="none" spellcheck="false" />
+        </div>
+
+        <div class="field">
+          <label for="password">{{ i18n.t('auth.password') }}</label>
+          <div class="password">
+            <input id="password" [type]="showPassword() ? 'text' : 'password'" formControlName="password" autocomplete="current-password" />
+            <button type="button" class="eye" (click)="showPassword.set(!showPassword())" [attr.aria-pressed]="showPassword()" [attr.aria-label]="showPassword() ? i18n.t('auth.hidePassword') : i18n.t('auth.showPassword')">
+              <app-icon name="eye" [size]="18" />
+            </button>
+          </div>
+          <a class="forgot" routerLink="/login/recover">{{ i18n.t('auth.forgotPassword') }}</a>
+        </div>
+
+        @if (tenants().length > 0) {
+          <div class="field">
+            <label for="tenant">{{ i18n.t('auth.tenant') }}</label>
+            <select id="tenant" formControlName="tenant">
+              @for (tenant of tenants(); track tenant.tenantId) {
+                <option [value]="tenant.tenantId">{{ tenant.displayName }}</option>
+              }
+            </select>
+          </div>
+        }
+
+        @if (signIn.problem(); as problem) {
+          <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
+        }
+
+        <button type="submit" class="submit" [disabled]="signIn.pending()">
+          {{ signIn.pending() ? i18n.t('auth.signingIn') : i18n.t('auth.signIn') }}
         </button>
-      </div>
-    </div>
+      </form>
 
-    @if (tenants().length > 0) {
-      <div class="field">
-        <label for="tenant">{{ i18n.t('auth.tenant') }}</label>
-        <select id="tenant" formControlName="tenant">
-          @for (tenant of tenants(); track tenant.tenantId) {
-            <option [value]="tenant.tenantId">{{ tenant.displayName }}</option>
-          }
-        </select>
-      </div>
-    }
+      <p class="sealed">
+        <app-icon name="shield" [size]="14" />
+        <span>{{ i18n.t('auth.subtitle') }}</span>
+      </p>
+    </section>
+  </main>
 
-    <div class="row-links">
-      <a routerLink="/login/recover">{{ i18n.t('auth.forgotPassword') }}</a>
-    </div>
-
-    @if (signIn.problem(); as problem) {
-      <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
-    }
-
-    <button type="submit" class="primary" [disabled]="signIn.pending()">
-      {{ signIn.pending() ? i18n.t('auth.signingIn') : i18n.t('auth.signIn') }}
-    </button>
-  </form>
-
-  <div class="foot">
-    <span>{{ i18n.t('auth.newLaboratory') }}</span>
-    <a routerLink="/welcome/subscribe">{{ i18n.t('auth.subscribe') }}</a>
-  </div>
-  <p class="center small"><a routerLink="/welcome">← {{ i18n.t('auth.publicSite') }}</a></p>
-</section>
+  <footer class="foot">
+    <span>{{ i18n.t('auth.copyright') }}</span>
+    <nav [attr.aria-label]="i18n.t('auth.otherLinks')">
+      <a routerLink="/welcome">{{ i18n.t('auth.publicSite') }}</a>
+      <span>{{ i18n.t('auth.newLaboratory') }} <a class="strong" routerLink="/welcome/subscribe">{{ i18n.t('auth.subscribe') }}</a></span>
+    </nav>
+  </footer>
+</div>

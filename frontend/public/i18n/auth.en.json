@@ -56,5 +56,10 @@
   "recovery.error.VALIDATION-400": "The new password does not meet the rule.",
   "recovery.error.RATE-429": "Too many attempts. Please wait a minute.",
   "recovery.error.CRED-005": "The password could not be sealed for sending. Please refresh the page and try again.",
-  "recovery.error.NETWORK-000": "The server could not be reached."
+  "recovery.error.NETWORK-000": "The server could not be reached.",
+  "hero.eyebrow": "Staff sign in",
+  "hero.title": "Welcome back to the bench.",
+  "hero.lead": "Your branch, your worklist and your rights follow your account.",
+  "copyright": "© National Technology · Sky LIS",
+  "otherLinks": "Other links"
 }

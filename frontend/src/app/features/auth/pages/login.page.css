@@ -1,83 +1,208 @@
-.login {
-  max-width: 420px;
-  margin: 3rem auto;
+/* Sign-in, design 5c "light premium" (2026-10-20): the brand light ground, the Sky LIS logo large, a white card. */
+:host {
+  display: block;
 }
 
-.top {
+.page {
+  min-height: 100vh;
   display: flex;
+  flex-direction: column;
+  border-top: 4px solid transparent;
+  border-image: var(--grad) 1;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(900px 520px at 100% 0%, rgba(110, 59, 228, 0.1), transparent 65%),
+    radial-gradient(900px 600px at 0% 100%, rgba(42, 125, 245, 0.12), transparent 65%),
+    radial-gradient(rgba(11, 42, 91, 0.07) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 24px 24px;
+}
+
+.head,
+.foot {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--sp-4);
+  gap: var(--sp-4);
+  padding: var(--sp-6) 56px var(--sp-2);
 }
 
-.brand {
-  display: inline-flex;
+.brand img {
+  display: block;
+  height: 112px;
+  width: auto;
 }
 
 .lang-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-2);
+  min-height: 44px;
+  padding: 0 18px;
   border: 1px solid var(--line);
+  border-radius: var(--r-pill);
   background: var(--surface);
   color: var(--ink-2);
-  border-radius: var(--r-pill);
-  padding: 4px 10px;
-  font-size: var(--fs-sm);
   cursor: pointer;
 }
 
-h1 {
-  margin: 0 0 0.25rem;
-  color: var(--navy);
-  font-size: 1.5rem;
-}
-
-.muted {
-  color: var(--muted);
-  margin: 0 0 1.25rem;
-}
-
-.password {
-  display: flex;
-  gap: var(--sp-2);
-  align-items: center;
-}
-
-.password input {
+.main {
   flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 64px;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: var(--sp-6) 56px 56px;
+  box-sizing: border-box;
+}
+
+.hero {
+  flex: 1 1 420px;
   min-width: 0;
 }
 
-.row-links {
-  display: flex;
-  justify-content: flex-end;
-  margin: calc(-1 * var(--sp-1)) 0 var(--sp-3);
-  font-size: var(--fs-sm);
+.eyebrow {
+  margin: 0 0 var(--sp-4);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--violet-2);
 }
 
-button.primary {
+h1 {
+  margin: 0 0 var(--sp-4);
+  font-size: clamp(36px, 4.4vw, 58px);
+  line-height: 1.08;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.lead {
+  margin: 0;
+  max-width: 460px;
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.card {
+  flex: 0 1 420px;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 36px;
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(11, 42, 91, 0.06), 0 30px 70px -30px rgba(11, 42, 91, 0.35);
+}
+
+h2 {
+  margin: 0 0 var(--sp-5);
+  font-size: 22px;
+  color: var(--navy);
+}
+
+.field input,
+.field select {
+  min-height: 48px;
+  border-radius: var(--r);
+  background: var(--surface-2);
+  font-size: 15px;
+}
+
+.password {
+  position: relative;
+}
+
+.password input {
+  padding-inline-end: 52px;
+}
+
+.eye {
+  position: absolute;
+  inset-inline-end: 2px;
+  top: 2px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.forgot {
+  display: inline-block;
+  margin-top: var(--sp-2);
+  font-size: 14px;
+}
+
+.submit {
   width: 100%;
+  height: 50px;
+  margin-top: var(--sp-2);
+  border: 0;
+  border-radius: var(--r);
+  background: linear-gradient(90deg, var(--blue-2), var(--violet-2));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 16px -8px rgba(91, 42, 203, 0.8);
 }
 
-.foot {
+.submit:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.sealed {
   display: flex;
-  justify-content: center;
+  align-items: center;
   gap: var(--sp-2);
-  margin-top: var(--sp-4);
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--line-soft);
-  font-size: var(--fs-sm);
+  margin: var(--sp-4) 0 0;
+  font-size: 13px;
   color: var(--muted);
 }
 
-.center {
-  text-align: center;
-  margin: var(--sp-3) 0 0;
+.foot {
+  padding-block: 20px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 14px;
+  color: var(--muted);
 }
 
-@media (max-width: 480px) {
-  .login {
-    margin: var(--sp-4) var(--sp-3);
+.foot nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.strong {
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .head,
+  .foot,
+  .main {
+    padding-inline: var(--sp-4);
+  }
+
+  .main {
+    gap: var(--sp-5);
+  }
+
+  .brand img {
+    height: 72px;
+  }
+
+  .card {
+    padding: var(--sp-5);
   }
 }
