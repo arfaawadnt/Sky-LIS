@@ -8,7 +8,6 @@ namespace Platform.Domain.UnitTests.Billing;
 public sealed class CashClosingTests
 {
     private static readonly DateTimeOffset Now = FixedClock.Instant;
-    private static readonly Guid Treasury = Guid.CreateVersion7();
     private static readonly Guid Branch = Guid.CreateVersion7();
     private static readonly Guid Cashier = Guid.CreateVersion7();
     private static readonly Guid Manager = Guid.CreateVersion7();
@@ -18,7 +17,7 @@ public sealed class CashClosingTests
     private static readonly ClosingTotals Day = new(500m, 200m, 30m, 20m, 7, 50m, 10m, 0m, 0m, 2, 120m, 35m, 6);
 
     private static CashClosing Close(decimal? counted = 450m, string? note = null, Guid? cashier = null, Guid? sessionBranch = null) =>
-        CashClosing.Close("CLS-2026-00001", Treasury, Branch, sessionBranch ?? Branch, cashier ?? Cashier, From, Now, Day, counted, note, Manager, Now);
+        CashClosing.Close("CLS-2026-00001", sessionBranch ?? Branch, cashier ?? Cashier, From, Now, Day, counted, note, Manager, Now);
 
     [Fact]
     public void BR_16_expected_cash_is_cash_payments_minus_cash_refunds()
@@ -34,10 +33,11 @@ public sealed class CashClosingTests
         var closing = Close();
 
         Assert.Equal((450m, 450m, 0m), (closing.ExpectedCash, closing.CountedCash, closing.Difference));
-        Assert.Equal((Treasury, Branch, Cashier, From, Now, Manager, Now), (closing.TreasuryId, closing.BranchId, closing.CashierUserId, closing.PeriodFromUtc, closing.PeriodToUtc, closing.ClosedByUserId, closing.ClosedAtUtc));
+        Assert.Null(closing.TreasuryId);   // LIS-CR-004: the scope is the session branch + cashier
+        Assert.Equal((Branch, Cashier, From, Now, Manager, Now), (closing.BranchId, closing.CashierUserId, closing.PeriodFromUtc, closing.PeriodToUtc, closing.ClosedByUserId, closing.ClosedAtUtc));
         Assert.Same(Day, closing.Totals);
         var raised = Assert.IsType<CashClosingClosed>(Assert.Single(closing.DomainEvents));
-        Assert.Equal(("CLS-2026-00001", 450m, 0m), (raised.Number, raised.ExpectedCash, raised.Difference));
+        Assert.Equal(("CLS-2026-00001", 450m, 0m, Branch, (Guid?)Cashier), (raised.Number, raised.ExpectedCash, raised.Difference, raised.BranchId, raised.CashierUserId));
     }
 
     [Fact]
@@ -69,49 +69,53 @@ public sealed class CashClosingTests
     [Fact]
     public void T5_Period_rules_BIL_030_031_033()
     {
-        Assert.Equal(BillingCodes.PeriodInvalid, Assert.Throws<DomainException>(() => CashClosing.Close("CLS-1", Treasury, Branch, Branch, null, Now, Now, Day, null, null, Manager, Now)).Code);
-        Assert.Equal(BillingCodes.PeriodInFuture, Assert.Throws<DomainException>(() => CashClosing.Close("CLS-1", Treasury, Branch, Branch, null, From, Now.AddMinutes(1), Day, null, null, Manager, Now)).Code);
-        Assert.Equal(BillingCodes.PeriodTooLong, Assert.Throws<DomainException>(() => CashClosing.Close("CLS-1", Treasury, Branch, Branch, null, Now.AddDays(-32), Now, Day, null, null, Manager, Now)).Code);
+        Assert.Equal(BillingCodes.PeriodInvalid, Assert.Throws<DomainException>(() => CashClosing.Close("CLS-1", Branch, null, Now, Now, Day, null, null, Manager, Now)).Code);
+        Assert.Equal(BillingCodes.PeriodInFuture, Assert.Throws<DomainException>(() => CashClosing.Close("CLS-1", Branch, null, From, Now.AddMinutes(1), Day, null, null, Manager, Now)).Code);
+        Assert.Equal(BillingCodes.PeriodTooLong, Assert.Throws<DomainException>(() => CashClosing.Close("CLS-1", Branch, null, Now.AddDays(-32), Now, Day, null, null, Manager, Now)).Code);
         CashClosing.RequirePeriod(Now.AddDays(-31), Now, Now);
     }
 
     [Fact]
-    public void T5_The_treasury_belongs_to_the_session_branch_BIL_022()
+    public void T5_The_scope_is_the_session_branch_TENANT_004_without_one()
     {
-        var refusal = Assert.Throws<DomainException>(() => Close(sessionBranch: Guid.CreateVersion7()));
-        Assert.Equal((BillingCodes.TreasuryOfAnotherBranch, DomainFault.Refused), (refusal.Code, refusal.Fault));
+        var refusal = Assert.Throws<DomainException>(() => Close(sessionBranch: Guid.Empty));
+        Assert.Equal(("TENANT-004", DomainFault.Refused), (refusal.Code, refusal.Fault));
+
+        var otherBranch = Guid.CreateVersion7();
+        Assert.Equal(otherBranch, Close(sessionBranch: otherBranch).BranchId);
     }
 
     [Fact]
     public void T5_CheckClose_refuses_like_Close_without_creating_anything()
     {
-        CashClosing.CheckClose(Treasury, Branch, Branch, From, Now, Day, 450m, null, Now);
-        Assert.Equal(BillingCodes.DifferenceNeedsNote, Assert.Throws<DomainException>(() => CashClosing.CheckClose(Treasury, Branch, Branch, From, Now, Day, 1m, null, Now)).Code);
+        CashClosing.CheckClose(Branch, From, Now, Day, 450m, null, Now);
+        Assert.Equal(BillingCodes.DifferenceNeedsNote, Assert.Throws<DomainException>(() => CashClosing.CheckClose(Branch, From, Now, Day, 1m, null, Now)).Code);
+        Assert.Equal("TENANT-004", Assert.Throws<DomainException>(() => CashClosing.CheckClose(Guid.Empty, From, Now, Day, 450m, null, Now)).Code);
     }
 
     [Fact]
-    public void INV_BIL_006_a_closing_covers_its_treasury_cashier_scope_and_half_open_period()
+    public void INV_BIL_006_a_closing_covers_its_branch_cashier_scope_and_half_open_period()
     {
         var mine = Close();
-        Assert.True(mine.Covers(Treasury, Cashier, From));
-        Assert.True(mine.Covers(Treasury, Cashier, Now.AddTicks(-1)));
-        Assert.False(mine.Covers(Treasury, Cashier, Now));
-        Assert.False(mine.Covers(Treasury, Guid.CreateVersion7(), From.AddHours(1)));
+        Assert.True(mine.Covers(Branch, Cashier, From));
+        Assert.True(mine.Covers(Branch, Cashier, Now.AddTicks(-1)));
+        Assert.False(mine.Covers(Branch, Cashier, Now));
+        Assert.False(mine.Covers(Branch, Guid.CreateVersion7(), From.AddHours(1)));
         Assert.False(mine.Covers(Guid.CreateVersion7(), Cashier, From.AddHours(1)));
 
-        var all = CashClosing.Close("CLS-2", Treasury, Branch, Branch, null, From, Now, Day, null, null, Manager, Now);
-        Assert.True(all.Covers(Treasury, Guid.CreateVersion7(), From.AddHours(1)));
+        var all = CashClosing.Close("CLS-2", Branch, null, From, Now, Day, null, null, Manager, Now);
+        Assert.True(all.Covers(Branch, Guid.CreateVersion7(), From.AddHours(1)));
     }
 
     [Fact]
-    public void INV_BIL_005_closed_periods_overlap_on_the_same_treasury_for_intersecting_cashier_scopes()
+    public void INV_BIL_005_closed_periods_overlap_on_the_same_branch_for_intersecting_cashier_scopes()
     {
         var mine = Close();
 
-        Assert.True(mine.Overlaps(Treasury, Cashier, From.AddHours(-1), From.AddMinutes(1)));
-        Assert.True(mine.Overlaps(Treasury, null, From.AddHours(1), Now.AddHours(1)));
-        Assert.False(mine.Overlaps(Treasury, Guid.CreateVersion7(), From, Now));
-        Assert.False(mine.Overlaps(Treasury, Cashier, Now, Now.AddHours(1)));
+        Assert.True(mine.Overlaps(Branch, Cashier, From.AddHours(-1), From.AddMinutes(1)));
+        Assert.True(mine.Overlaps(Branch, null, From.AddHours(1), Now.AddHours(1)));
+        Assert.False(mine.Overlaps(Branch, Guid.CreateVersion7(), From, Now));
+        Assert.False(mine.Overlaps(Branch, Cashier, Now, Now.AddHours(1)));
         Assert.False(mine.Overlaps(Guid.CreateVersion7(), Cashier, From, Now));
     }
 

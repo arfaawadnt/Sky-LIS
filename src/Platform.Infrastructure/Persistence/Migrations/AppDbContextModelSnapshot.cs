@@ -349,7 +349,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
-                    b.Property<Guid>("TreasuryId")
+                    b.Property<Guid?>("TreasuryId")
                         .HasColumnType("uuid")
                         .HasColumnName("treasury_id");
 
@@ -369,8 +369,8 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_cash_closings_tenant_id_number");
 
-                    b.HasIndex("TenantId", "TreasuryId", "PeriodFromUtc")
-                        .HasDatabaseName("ix_cash_closings_tenant_id_treasury_id_period_from_utc");
+                    b.HasIndex("TenantId", "BranchId", "PeriodFromUtc")
+                        .HasDatabaseName("ix_cash_closings_tenant_id_branch_id_period_from_utc");
 
                     b.ToTable("cash_closings", "app", t =>
                         {
@@ -406,7 +406,6 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnName("cashier_user_id");
 
                     b.Property<string>("DeviceId")
-                        .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)")
                         .HasColumnName("device_id");
@@ -443,7 +442,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("status");
 
-                    b.Property<Guid>("TreasuryId")
+                    b.Property<Guid?>("TreasuryId")
                         .HasColumnType("uuid")
                         .HasColumnName("treasury_id");
 
@@ -487,11 +486,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "VisitId")
                         .HasDatabaseName("ix_payments_tenant_id_visit_id");
 
+                    b.HasIndex("TenantId", "BranchId", "PaidAtUtc")
+                        .HasDatabaseName("ix_payments_tenant_id_branch_id_paid_at_utc");
+
                     b.HasIndex("TenantId", "CashierUserId", "PaidAtUtc")
                         .HasDatabaseName("ix_payments_tenant_id_cashier_user_id_paid_at_utc");
-
-                    b.HasIndex("TenantId", "TreasuryId", "PaidAtUtc")
-                        .HasDatabaseName("ix_payments_tenant_id_treasury_id_paid_at_utc");
 
                     b.ToTable("payments", "app", t =>
                         {
@@ -615,7 +614,6 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnName("cashier_user_id");
 
                     b.Property<string>("DeviceId")
-                        .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)")
                         .HasColumnName("device_id");
@@ -655,7 +653,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("refunded_at_utc");
 
-                    b.Property<Guid>("TreasuryId")
+                    b.Property<Guid?>("TreasuryId")
                         .HasColumnType("uuid")
                         .HasColumnName("treasury_id");
 
@@ -679,8 +677,8 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "VisitId")
                         .HasDatabaseName("ix_refunds_tenant_id_visit_id");
 
-                    b.HasIndex("TenantId", "TreasuryId", "RefundedAtUtc")
-                        .HasDatabaseName("ix_refunds_tenant_id_treasury_id_refunded_at_utc");
+                    b.HasIndex("TenantId", "BranchId", "RefundedAtUtc")
+                        .HasDatabaseName("ix_refunds_tenant_id_branch_id_refunded_at_utc");
 
                     b.ToTable("refunds", "app", t =>
                         {
@@ -7706,199 +7704,6 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_memberships", "app");
                 });
 
-            modelBuilder.Entity("Platform.Domain.Treasury.Treasury", b =>
-                {
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("BranchId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("branch_id");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("code");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("CreatedByDisplayName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("created_by_display_name");
-
-                    b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_user_id");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_at_utc");
-
-                    b.Property<string>("ModifiedByDisplayName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("modified_by_display_name");
-
-                    b.Property<Guid?>("ModifiedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("modified_by_user_id");
-
-                    b.Property<uint>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("TenantId", "Id")
-                        .HasName("pk_treasuries");
-
-                    b.HasIndex("TenantId", "BranchId")
-                        .HasDatabaseName("ix_treasuries_tenant_id_branch_id");
-
-                    b.HasIndex("TenantId", "Code")
-                        .IsUnique()
-                        .HasDatabaseName("ix_treasuries_tenant_id_code");
-
-                    b.ToTable("treasuries", "app");
-                });
-
-            modelBuilder.Entity("Platform.Domain.Treasury.TreasuryAccessRequest", b =>
-                {
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("BranchId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("branch_id");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("CreatedByDisplayName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("created_by_display_name");
-
-                    b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_user_id");
-
-                    b.Property<DateTimeOffset?>("DecidedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("decided_at_utc");
-
-                    b.Property<Guid?>("DecidedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("decided_by_user_id");
-
-                    b.Property<string>("DecisionReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("decision_reason");
-
-                    b.Property<string>("DeviceId")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("device_id");
-
-                    b.Property<string>("DeviceLabel")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("device_label");
-
-                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("modified_at_utc");
-
-                    b.Property<string>("ModifiedByDisplayName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("modified_by_display_name");
-
-                    b.Property<Guid?>("ModifiedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("modified_by_user_id");
-
-                    b.Property<string>("Number")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("number");
-
-                    b.Property<DateTimeOffset>("RequestedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("requested_at_utc");
-
-                    b.Property<Guid>("RequestedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("requested_by_user_id");
-
-                    b.Property<uint>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("TreasuryId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("treasury_id");
-
-                    b.HasKey("TenantId", "Id")
-                        .HasName("pk_treasury_access_requests");
-
-                    b.HasIndex("RequestedByUserId")
-                        .HasDatabaseName("ix_treasury_access_requests_requested_by_user_id");
-
-                    b.HasIndex("TenantId", "Number")
-                        .IsUnique()
-                        .HasDatabaseName("ix_treasury_access_requests_tenant_id_number");
-
-                    b.HasIndex("TenantId", "RequestedByUserId")
-                        .HasDatabaseName("ix_treasury_access_requests_tenant_id_requested_by_user_id");
-
-                    b.HasIndex("TenantId", "Status")
-                        .HasDatabaseName("ix_treasury_access_requests_tenant_id_status");
-
-                    b.HasIndex("TenantId", "TreasuryId")
-                        .HasDatabaseName("ix_treasury_access_requests_tenant_id_treasury_id");
-
-                    b.HasIndex("TenantId", "RequestedByUserId", "TreasuryId", "DeviceId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_treasury_access_requests_live")
-                        .HasFilter("status IN ('Pending', 'Approved')");
-
-                    b.ToTable("treasury_access_requests", "app", t =>
-                        {
-                            t.HasCheckConstraint("ck_treasury_access_requests_status_domain", "\"status\" IN ('Pending', 'Approved', 'Rejected', 'Revoked', 'Cancelled')");
-                        });
-                });
-
             modelBuilder.Entity("Platform.Infrastructure.Persistence.Audit.AuditTrailEntry", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -8659,13 +8464,6 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_cash_closings_platform_users_closed_by_user_id");
 
-                    b.HasOne("Platform.Domain.Treasury.Treasury", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "TreasuryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_cash_closings_treasuries_tenant_id_treasury_id");
-
                     b.OwnsOne("Platform.Domain.Billing.ClosingTotals", "Totals", b1 =>
                         {
                             b1.Property<Guid>("CashClosingTenantId")
@@ -8767,13 +8565,6 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_payments_platform_users_voided_by_user_id");
 
-                    b.HasOne("Platform.Domain.Treasury.Treasury", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "TreasuryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_payments_treasuries_tenant_id_treasury_id");
-
                     b.HasOne("Platform.Domain.Billing.VisitAccount", null)
                         .WithMany("Payments")
                         .HasForeignKey("TenantId", "VisitId")
@@ -8828,13 +8619,6 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_refunds_platform_users_cashier_user_id");
-
-                    b.HasOne("Platform.Domain.Treasury.Treasury", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "TreasuryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_refunds_treasuries_tenant_id_treasury_id");
 
                     b.HasOne("Platform.Domain.Billing.VisitAccount", null)
                         .WithMany("Refunds")
@@ -11296,96 +11080,6 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("SpecialRightsOverride");
-                });
-
-            modelBuilder.Entity("Platform.Domain.Treasury.Treasury", b =>
-                {
-                    b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
-                        {
-                            b1.Property<Guid>("TreasuryTenantId")
-                                .HasColumnType("uuid")
-                                .HasColumnName("tenant_id");
-
-                            b1.Property<Guid>("TreasuryId")
-                                .HasColumnType("uuid")
-                                .HasColumnName("id");
-
-                            b1.Property<string>("Ar")
-                                .IsRequired()
-                                .HasMaxLength(400)
-                                .HasColumnType("character varying(400)")
-                                .HasColumnName("name_ar");
-
-                            b1.Property<string>("En")
-                                .IsRequired()
-                                .HasMaxLength(400)
-                                .HasColumnType("character varying(400)")
-                                .HasColumnName("name_en");
-
-                            b1.HasKey("TreasuryTenantId", "TreasuryId")
-                                .HasName("pk_treasuries");
-
-                            b1.ToTable("treasuries", "app");
-
-                            b1.WithOwner()
-                                .HasForeignKey("TreasuryTenantId", "TreasuryId")
-                                .HasConstraintName("fk_treasuries_treasuries_tenant_id_id");
-                        });
-
-                    b.Navigation("Name")
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Platform.Domain.Treasury.TreasuryAccessRequest", b =>
-                {
-                    b.HasOne("Platform.Domain.Identity.PlatformUser", null)
-                        .WithMany()
-                        .HasForeignKey("RequestedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_treasury_access_requests_requested_by_user");
-
-                    b.HasOne("Platform.Domain.Treasury.Treasury", null)
-                        .WithMany()
-                        .HasForeignKey("TenantId", "TreasuryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_treasury_access_requests_treasuries_tenant_id_treasury_id");
-
-                    b.OwnsOne("Platform.SharedKernel.Primitives.Approval", "Approval", b1 =>
-                        {
-                            b1.Property<Guid>("TreasuryAccessRequestTenantId")
-                                .HasColumnType("uuid")
-                                .HasColumnName("tenant_id");
-
-                            b1.Property<Guid>("TreasuryAccessRequestId")
-                                .HasColumnType("uuid")
-                                .HasColumnName("id");
-
-                            b1.Property<Guid>("ActorUserId")
-                                .HasColumnType("uuid")
-                                .HasColumnName("approved_by_user_id");
-
-                            b1.Property<DateTimeOffset>("AtUtc")
-                                .HasColumnType("timestamp with time zone")
-                                .HasColumnName("approved_at_utc");
-
-                            b1.Property<string>("Comment")
-                                .HasMaxLength(1000)
-                                .HasColumnType("character varying(1000)")
-                                .HasColumnName("approval_comment");
-
-                            b1.HasKey("TreasuryAccessRequestTenantId", "TreasuryAccessRequestId")
-                                .HasName("pk_treasury_access_requests");
-
-                            b1.ToTable("treasury_access_requests", "app");
-
-                            b1.WithOwner()
-                                .HasForeignKey("TreasuryAccessRequestTenantId", "TreasuryAccessRequestId")
-                                .HasConstraintName("fk_treasury_access_requests_treasury_access_requests_tenant_id");
-                        });
-
-                    b.Navigation("Approval");
                 });
 
             modelBuilder.Entity("Platform.Domain.Billing.VisitAccount", b =>

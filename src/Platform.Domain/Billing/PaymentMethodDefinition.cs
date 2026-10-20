@@ -7,7 +7,7 @@ namespace Platform.Domain.Billing;
 /// <summary>
 /// A payment method the laboratory offers at its cash desks (Sky LIS set-up list CP-30b; change request 2026-10-19,
 /// LIS-CR-003 P-C10): a code, bilingual names, the <see cref="PaymentMethod"/> kind that carries the money semantics
-/// (cash lives in the treasury drawer, the closing and the collections report group by kind), whether a transaction
+/// (cash lives in the cash drawer, the closing and the collections report group by kind), whether a transaction
 /// reference is required, the order of the pick lists and the active flag. Reference-like aggregate: created from the
 /// defaults or by the laboratory, edited, deactivated instead of deleted (history keeps the posted code). The laboratory
 /// always keeps at least one active method of kind Cash (INV-BIL-010, BIL-052), so a cash desk can always take cash.
@@ -42,7 +42,7 @@ public sealed class PaymentMethodDefinition : AggregateRoot, ITenantScoped
 
     public LocalizedText Name { get; private set; }
 
-    /// <summary>The money semantics: Cash needs the treasury drawer; Card / Pos / Transfer are not in the drawer.</summary>
+    /// <summary>The money semantics: Cash goes to the cash drawer; Card / Pos / Transfer are not in the drawer.</summary>
     public PaymentMethod Kind { get; private set; }
 
     /// <summary>A transaction number (card slip, POS or transfer reference) is mandatory on every movement with this method (BIL-003).</summary>

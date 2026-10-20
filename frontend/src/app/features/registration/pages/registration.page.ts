@@ -49,7 +49,6 @@ const BLOCKER_TARGETS: Readonly<Record<SaveBlocker, string | null>> = {
   discountReason: '#reg-discount-reason',
   discountCap: '#reg-discount-value',
   paymentReference: '#reg-pay-reference',
-  paymentTreasury: '#reg-pay-treasury',
   paymentAmount: '#reg-pay-amount',
 };
 
@@ -173,8 +172,6 @@ export class RegistrationPage {
 
   protected readonly currency = computed(() => this.facade.result()?.currency ?? this.facade.settings.value()?.currency ?? '');
 
-  protected readonly treasuryList = computed(() => this.facade.treasuries.value() ?? []);
-
   protected readonly doctorRequired = computed(() => this.facade.settings.value()?.mandatoryDoctor ?? false);
 
   protected readonly discountActive = computed(() => (this.facade.discount().value ?? 0) > 0);
@@ -216,7 +213,7 @@ export class RegistrationPage {
     }
 
     if (this.facade.canPay() && this.facade.paymentAmount() > 0) {
-      add('payment', this.i18n.t('registration.ready.payment'), ['paymentTreasury', 'paymentReference', 'paymentAmount']);
+      add('payment', this.i18n.t('registration.ready.payment'), ['paymentReference', 'paymentAmount']);
     }
 
     return items;
@@ -265,11 +262,6 @@ export class RegistrationPage {
 
         this.facade.defaultTier();
       });
-    });
-
-    effect(() => {
-      const list = this.treasuryList();
-      untracked(() => (list.length > 0 ? this.facade.defaultTreasury() : undefined));
     });
 
     effect(() => {

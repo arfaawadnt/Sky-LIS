@@ -7,19 +7,21 @@ namespace Platform.Contracts.Billing;
 // ---- requests -------------------------------------------------------------------------------------------------
 
 /// <summary>
-/// T1 (CP-23; BR-26 from the registration page). The device id is the browser's identity (BR-27). <paramref name="MethodCode"/>
-/// (change request 2026-10-19) names the laboratory's payment method definition: when present its kind and reference rule
-/// apply; without it <paramref name="Method"/> is the kind and every kind but cash needs a reference.
+/// T1 (CP-23; BR-26 from the registration page). The cashier is the session user and the branch the session branch
+/// (change request LIS-CR-004, 2026-10-20: no treasury, no device; a body that still carries <c>treasuryId</c> /
+/// <c>deviceId</c> is accepted and those members are ignored). <paramref name="MethodCode"/> (change request 2026-10-19)
+/// names the laboratory's payment method definition: when present its kind and reference rule apply; without it
+/// <paramref name="Method"/> is the kind and every kind but cash needs a reference.
 /// </summary>
-public sealed record RecordPaymentRequest(Guid VisitId, decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId, string? MethodCode = null);
+public sealed record RecordPaymentRequest(Guid VisitId, decimal Amount, string Method, string? Reference, string? MethodCode = null);
 
 public sealed record VoidPaymentRequest(string Reason);
 
-/// <summary>T3 (CP-24): <paramref name="ReasonId"/> is a catalogue reason of kind Refund.</summary>
-public sealed record RecordRefundRequest(Guid VisitId, decimal Amount, string Method, string? Reference, Guid ReasonId, string? Note, Guid TreasuryId, string DeviceId, string? MethodCode = null);
+/// <summary>T3 (CP-24): <paramref name="ReasonId"/> is a catalogue reason of kind Refund; cashier and branch from the session.</summary>
+public sealed record RecordRefundRequest(Guid VisitId, decimal Amount, string Method, string? Reference, Guid ReasonId, string? Note, string? MethodCode = null);
 
 /// <summary>T4 (CP-27): the amount is distributed across the members in accession order.</summary>
-public sealed record PayBatchRequest(decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId, string? MethodCode = null);
+public sealed record PayBatchRequest(decimal Amount, string Method, string? Reference, string? MethodCode = null);
 
 // ---- payment method definitions (set-up list CP-30b, change request 2026-10-19) -----------------------------------
 
@@ -37,8 +39,8 @@ public sealed record PaymentMethodOption(Guid Id, string Code, string NameEn, st
 /// <summary>The defaults endpoint: how many of the four default methods were added (0 when all existed).</summary>
 public sealed record PaymentMethodDefaultsResult(int Created);
 
-/// <summary>T5 (CP-30): <paramref name="CashierUserId"/> null = every cashier; the period is half-open.</summary>
-public sealed record CloseCashDrawerRequest(Guid TreasuryId, Guid? CashierUserId, DateTimeOffset PeriodFromUtc, DateTimeOffset PeriodToUtc, decimal? CountedCash, string? Note);
+/// <summary>T5 (CP-30): the session branch; <paramref name="CashierUserId"/> null = every cashier of the branch; the period is half-open.</summary>
+public sealed record CloseCashDrawerRequest(Guid? CashierUserId, DateTimeOffset PeriodFromUtc, DateTimeOffset PeriodToUtc, decimal? CountedCash, string? Note);
 
 // ---- responses of commands ------------------------------------------------------------------------------------
 
@@ -62,14 +64,9 @@ public sealed record PaymentListItem(
     decimal Amount,
     string Method,
     string? Reference,
-    Guid TreasuryId,
-    string TreasuryCode,
-    string TreasuryNameEn,
-    string TreasuryNameAr,
     Guid CashierUserId,
     string CashierName,
     Guid BranchId,
-    string DeviceId,
     Guid? BatchId,
     DateTimeOffset PaidAtUtc,
     string Status,
@@ -93,14 +90,9 @@ public sealed record RefundListItem(
     string? ReasonNameEn,
     string? ReasonNameAr,
     string? Note,
-    Guid TreasuryId,
-    string TreasuryCode,
-    string TreasuryNameEn,
-    string TreasuryNameAr,
     Guid CashierUserId,
     string CashierName,
     Guid BranchId,
-    string DeviceId,
     DateTimeOffset RefundedAtUtc,
     string? MethodCode = null,
     string? MethodNameEn = null,
@@ -124,13 +116,11 @@ public sealed record CashClosingTotalsView(
     decimal DiscountTotal,
     int VisitCount);
 
+/// <summary>A closing of the register: <paramref name="BranchId"/> is its scope (the closer's session branch), <paramref name="CashierUserId"/> null = every cashier.</summary>
 public sealed record CashClosingListItem(
     Guid Id,
     string Number,
-    Guid TreasuryId,
-    string TreasuryCode,
-    string TreasuryNameEn,
-    string TreasuryNameAr,
+    Guid BranchId,
     Guid? CashierUserId,
     string? CashierName,
     DateTimeOffset PeriodFromUtc,
@@ -147,11 +137,8 @@ public sealed record CashClosingListItem(
 /// <summary>One movement of a drawer: <paramref name="Kind"/> is Payment or Refund; <paramref name="Status"/> Posted/Voided (refunds: Posted).</summary>
 public sealed record DrawerMovement(string Kind, Guid Id, string Number, Guid VisitId, string? Accession, string Method, decimal Amount, DateTimeOffset AtUtc, Guid CashierUserId, string CashierName, string Status);
 
-/// <summary>A cashier who moved money on a treasury in a period (the closing page's cashier filter).</summary>
+/// <summary>A cashier who moved money in the session branch in a period (the closing page's cashier filter).</summary>
 public sealed record DrawerCashier(Guid UserId, string Name);
-
-/// <summary>A treasury of the session branch as the billing pages offer it.</summary>
-public sealed record BillingTreasuryItem(Guid Id, string Code, string NameEn, string NameAr, Guid BranchId, bool IsActive);
 
 /// <summary>The print parameters the cash desk needs (CP-57 <c>autoPrintReceipt</c>), readable with <c>billing.view</c> (UAT A-05: a cashier holds no <c>settings.view</c>).</summary>
 public sealed record BillingPrintSettings(bool AutoPrintReceipt);
@@ -222,11 +209,9 @@ public sealed record BatchAccountView(
 
 // ---- cash closing -------------------------------------------------------------------------------------------------
 
+/// <summary>The drawer of the session branch (<paramref name="BranchId"/>) for one cashier or all (<paramref name="CashierUserId"/> null) and a period.</summary>
 public sealed record CashClosingPreview(
-    Guid TreasuryId,
-    string TreasuryCode,
-    string TreasuryNameEn,
-    string TreasuryNameAr,
+    Guid BranchId,
     Guid? CashierUserId,
     string? CashierName,
     DateTimeOffset PeriodFromUtc,
@@ -255,9 +240,6 @@ public sealed record PaymentReceiptDocument(
     decimal Amount,
     string Method,
     string? Reference,
-    string TreasuryCode,
-    string TreasuryNameEn,
-    string TreasuryNameAr,
     string CashierName,
     decimal PatientShareTotal,
     decimal Paid,
@@ -314,9 +296,6 @@ public sealed record RefundReceiptDocument(
     string? ReasonNameEn,
     string? ReasonNameAr,
     string? Note,
-    string TreasuryCode,
-    string TreasuryNameEn,
-    string TreasuryNameAr,
     string CashierName,
     string Currency,
     string PrintedBy,
@@ -329,9 +308,6 @@ public sealed record CashClosingSheetDocument(
     DocumentLetterhead Letterhead,
     Guid ClosingId,
     string Number,
-    string TreasuryCode,
-    string TreasuryNameEn,
-    string TreasuryNameAr,
     Guid? CashierUserId,
     string? CashierName,
     DateTimeOffset PeriodFromUtc,
@@ -348,7 +324,7 @@ public sealed record CashClosingSheetDocument(
     string PrintedBy,
     DateTimeOffset PrintedAtUtc);
 
-// ---- collections (treasury) report ---------------------------------------------------------------------------------
+// ---- collections report ---------------------------------------------------------------------------------------
 
 /// <summary>Payments in, refunds out and the net of one method on a report row.</summary>
 public sealed record CollectionsMethodView(decimal Payments, decimal Refunds, decimal Net);
@@ -373,7 +349,7 @@ public sealed record CollectionsReportRow(
     decimal Net);
 
 /// <summary>
-/// The treasury (collections) report of the Payments register (A4): <paramref name="Scope"/> User | Branch, <paramref name="GroupBy"/>
+/// The collections report of the Payments register (A4): <paramref name="Scope"/> User | Branch, <paramref name="GroupBy"/>
 /// Branch | User | Method, the period as whole laboratory days (<paramref name="TimeZone"/>) and its UTC bounds (half-open),
 /// the cashier in user scope, the rows and the grand total.
 /// </summary>

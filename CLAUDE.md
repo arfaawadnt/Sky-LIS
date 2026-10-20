@@ -102,7 +102,7 @@ treat those as open questions for the user, never as facts.
 - `SkyLIS_Prototypes_Knowledge.md` — every screen, field and rule in both portals, plus a Sky ↔ LDM terminology map.
 - `SkyLIS_vs_LDM_Gap_Analysis.md` — what matches LDM, what Sky adds, what Sky still lacks, by area.
 
-Use Sky LIS terminology (Service / Test / Package, Payer / Contract, Clinical Group, Treasury) in LIS design. The
+Use Sky LIS terminology (Service / Test / Package, Payer / Contract, Clinical Group) in LIS design (the treasury concept was removed on 2026-10-20, LIS-CR-004). The
 prototypes cite an SRS that is not in this repo; ask for it before treating a gap as a scope decision.
 
 ### Prototypes v2 / v3 (built here)
@@ -300,9 +300,9 @@ QMS source is never read or copied (section 1); everything here is written from 
   bounds, never request values); `shared/forms/problem-text.ts` renders them field by field in both languages. Commands in `frontend/`: `npm run build`,
   `npm run lint` (ESLint + `scripts/check-boundaries.mjs`), `npm run test:ci`. Rules: no `any`/`$any()`, no web storage, no
   `subscribe()` in components, core/shared never import features, features never import each other.
-- Business modules (Task 5, 03 §3–§10, D-04/D-07): the first feature module is **Treasury access** (SRS CP-28/CP-29,
-  BR-27), specified in `docs/intake/LIS-INT-TRS-001_Treasury-Access.md` (full 16-section intake; the business owner has not
-  yet reviewed it). Pattern for every module: aggregates in `Platform.Domain/<Module>` (state enum, codes `<MOD>-nnn`,
+- Business modules (Task 5, 03 §3–§10, D-04/D-07): the first feature module was **Treasury access** (SRS CP-28/CP-29, BR-27,
+  `docs/intake/LIS-INT-TRS-001_Treasury-Access.md`); it was **removed on 2026-10-20** (change request LIS-CR-004,
+  `docs/build/CR-2026-10-20_Treasury-Removal.md`; see the LIS-CR-004 entry below). Pattern for every module: aggregates in `Platform.Domain/<Module>` (state enum, codes `<MOD>-nnn`,
   events, SoD inside the transition methods via `EnsureActorIsNot`), contracts in `Platform.Contracts/<Module>`, commands and
   queries in `Platform.Application/<Module>/{Commands,Queries}` (every request carries `[RequirePermissionPolicy]`; one
   `SaveChangesAsync` per command handler, enforced by `TransitionAtomicityTests`), EF configuration + repositories in
@@ -312,15 +312,12 @@ QMS source is never read or copied (section 1); everything here is written from 
   gates buttons, the server decides). Permissions come from tenant roles: `Role` aggregate (`app.roles`, permission keys
   validated against `PermissionCatalog`) assigned to a `TenantMembership` (`role_id`); `SessionPrincipalQuery` joins the role
   so sign-in, refresh and `me` return the same permission set the authorization behavior enforces. Reference numbers
-  (`TRQ-yyyy-nnnnn`) come from `IReferenceNumbers` over `app.reference_counters` (atomic upsert). Endpoints:
-  `/api/v1/treasuries`, `/api/v1/treasury-access-requests`. Frontend route `/treasury/access`, nav entry gated by
-  `treasury.view`, dictionaries `public/i18n/treasury.{en,ar}.json`, device id minted by `core/device` (the only allowed
-  localStorage use, documented inline). SOD-TRS-001 exception (2026-10-14): `ICurrentUser.IsPrimaryAdministrator` (from the session
-  principal, `CurrentUserAccessor.Set`) lets `TreasuryAccessRequest.Approve(…, actorMayApproveOwn: true)` skip the self-approval refusal
-  for the laboratory's primary administrator (never for Reject); `AuthProfile.IsPrimaryAdministrator` shows the button (intake TRS-001 §9).
+  (`<PREFIX>-yyyy-nnnnn`) come from `IReferenceNumbers` over `app.reference_counters` (atomic upsert). The SPA uses no web
+  storage at all since `core/device` was removed with the treasury. `ICurrentUser.IsPrimaryAdministrator` /
+  `AuthProfile.isPrimaryAdministrator` (the membership's `is_primary_administrator`) stay as facts of the session.
 - Dev tooling: `tools/Platform.DevTools` (`seed-user <username> <password> [tenantId]`,
-  `grant-role <username> <tenantId> <roleNameEn> <perm,perm,…>`, `seed-treasury <tenantId> <code> <nameEn> <nameAr>`,
-  `seed-demo-lab <username> <password> [tenantId]` (a complete Release-1 laboratory: branch, catalogue with prices, reasons, treasury, a
+  `grant-role <username> <tenantId> <roleNameEn> <perm,perm,…>`,
+  `seed-demo-lab <username> <password> [tenantId]` (a complete Release-1 laboratory: branch, catalogue with prices, reasons, a
   role with every permission, users `<username>` and `<username>.manager`; the dev database `lis` holds one, credentials in
   git-ignored `.local/dev-credentials.md`), `seed-reasons <tenantId>` (cancellation/refund/discount/rejection reasons) with
   `LIS_DEVTOOLS_CONNECTION`, guarded like the API; the test suites truncate the dev database, so reseed after a test run);
@@ -344,7 +341,7 @@ QMS source is never read or copied (section 1); everything here is written from 
   under `Lis:Outbox:{Enabled,PollInterval,BatchSize,Lease,MaxAttempts}`; policies = `sealed class XPolicy :
   IDomainEventHandler<TEvent>` under `Application/<Module>/Policies/`, registered by `AddApplication`
   (`DomainEventPolicyTests`). **Notifications/OTP** — `INotificationSender`, `INotificationTemplateSource` (codes `otp`,
-  `password-recovery`, `portal-url`, `treasury-request`, `panic-value`; defaults `TryAdd`ed after the convention so a
+  `password-recovery`, `portal-url`, `panic-value`; defaults `TryAdd`ed after the convention so a
   module adapter wins), `IOtpService` over `identity.otp_challenges` (HMAC digests, 5 min, 5 attempts;
   `Lis:Security:Session:Otp{Length,Lifetime,MaxAttempts}`; the code is logged at Debug only under
   `AllowInsecureLocalDevelopment`); **delivery** `Lis:Notifications:*` (`Infrastructure/Notifications`, LIS-VR-002 §7):
@@ -458,7 +455,7 @@ QMS source is never read or copied (section 1); everything here is written from 
   a picked city also fills `City`), form selects in `shared/patient` keyed on dedicated `computed` signals (a broad `params()` read re-runs
   `resource` on every keystroke); **C9** `/registration/accession` (`AccessionFacade`: detail + tolerant card reads of samples, Billing account and
   result case, each asked only with its module's permission; `tolerantOne/tolerantPage` + `abortable` in `registration.api.ts`); **C11**
-  `NavEntry.menu: false` on Treasuries, Treasury access and Payments (links from the pages that need them); **C10** `PaymentMethodDefinition`
+  `NavEntry.menu: false` on Treasuries, Treasury access and Payments (reversed by LIS-CR-004: Payments is in the menu again, the treasury pages are gone); **C10** `PaymentMethodDefinition`
   (`app.payment_methods`, RLS, `BIL-051…055`, `BIL-121`, `BIL-410`; defaults seeded by the migration for existing tenants and by
   `SeedPaymentMethodsPolicy` on `TenantProvisioned`; `POST …/defaults` idempotent), `Payment/Refund.MethodCode` + `PaymentMethodUse` (the definition's
   kind and reference rule win over the request's kind; the CHECKs `ck_payments/refunds_reference_for_non_cash` admit a non-cash row without
@@ -471,6 +468,16 @@ QMS source is never read or copied (section 1); everything here is written from 
   **C22** `GET /api/v1/pricing/service-prices/{serviceId}` and SPA `/pricing/service-prices`. Specs of resources keyed on another resource need two
   `TestBed.tick()` rounds (the dependants load on the tick after the first resolves: `accession.facade.spec.ts`). Slot databases that pre-date a
   migration must be reset (`scripts/new-slot-database.sh <slot> --reset`).
+- Change request LIS-CR-004 (2026-10-20, `docs/build/CR-2026-10-20_Treasury-Removal.md`; migration `TreasuryRemoved`): *Payments* is back in
+  the Finance menu (collections report inside it) and the **treasury is removed from the system** — no cash drawers, no device-bound access
+  requests, no BR-27. A payment / refund / batch payment carries visit, amount, method (+ `methodCode`), reference, cashier (session user)
+  and branch (session branch); requests no longer have `treasuryId` / `deviceId` (old bodies that still send them are accepted, the
+  fields ignored). Cash closing (CP-30, R2) is scoped by session branch + cashier + period. Removed: the Treasury module in every layer,
+  `/api/v1/treasuries`, `/api/v1/treasury-access-requests`, `GET /api/v1/billing/my-treasuries`, the `treasury` permission group (purged
+  from `app.roles.permissions` by the migration), the `treasury-request` notification code, `seed-treasury`, the SPA feature
+  `features/treasury`, `core/device` and `core/api/treasury.contracts.ts` (`CreatedResource` lives in `core/api/created-resource.ts`).
+  Kept as history: `app.treasuries`, `app.treasury_access_requests` and the now nullable `treasury_id` / `device_id` columns (no FK).
+  SRS 1.2 marks CP-28, CP-29 and BR-27 withdrawn (ids reserved).
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

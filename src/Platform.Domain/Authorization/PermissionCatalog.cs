@@ -21,7 +21,6 @@ public static class PermissionCatalog
     public const string Files = "files";
 
     // Business modules (one per accepted intake; docs/build/MODULES.md maps SRS pages to modules)
-    public const string Treasury = "treasury";
     public const string Catalogue = "catalogue";
     public const string Patients = "patients";
     public const string Registration = "registration";
@@ -49,7 +48,6 @@ public static class PermissionCatalog
         new(Audit, "Audit trail and security events", PermissionAction.View, PermissionAction.Export),
         new(Reporting, "Reports and exports", PermissionAction.View, PermissionAction.Export),
         new(Files, "Attachments and documents", PermissionAction.View, PermissionAction.Create, PermissionAction.Manage),
-        new(Treasury, "Treasuries and treasury access", PermissionAction.View, PermissionAction.Create, PermissionAction.Approve, PermissionAction.Cancel, PermissionAction.Manage, PermissionAction.Export),
         new(Catalogue, "Laboratory catalogue and lists", PermissionAction.View, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Manage, PermissionAction.Export),
         new(Patients, "Patient files and documents", PermissionAction.View, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Manage, PermissionAction.ViewConfidential, PermissionAction.Export),
         new(Registration, "Visits, orders and bookings", PermissionAction.View, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Cancel, PermissionAction.Approve, PermissionAction.Manage, PermissionAction.Export),

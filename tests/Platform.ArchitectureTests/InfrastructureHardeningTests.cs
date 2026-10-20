@@ -118,7 +118,7 @@ public sealed class InfrastructureHardeningTests
         Assert.False(FieldChangeInterceptor.IsTracked(model.FindEntityType(typeof(Platform.Infrastructure.Persistence.Audit.FieldChange))!), "the field-change interceptor must never audit its own rows");
         Assert.False(FieldChangeInterceptor.IsTracked(model.FindEntityType(typeof(Platform.Domain.Identity.RefreshSession))!), "sessions are not field-audited");
         Assert.False(FieldChangeInterceptor.IsTracked(model.FindEntityType(typeof(Platform.Infrastructure.Persistence.Outbox.OutboxEvent))!), "outbox rows are not field-audited");
-        Assert.True(FieldChangeInterceptor.IsTracked(model.FindEntityType(typeof(Platform.Domain.Treasury.TreasuryAccessRequest))!), "aggregates are field-audited");
+        Assert.True(FieldChangeInterceptor.IsTracked(model.FindEntityType(typeof(Platform.Domain.Billing.CashClosing))!), "aggregates are field-audited");
         Assert.True(FieldChangeInterceptor.IsSkippedProperty("PasswordHash"));
         Assert.True(FieldChangeInterceptor.IsSkippedProperty("RowVersion"));
         Assert.False(FieldChangeInterceptor.IsSkippedProperty("Status"));

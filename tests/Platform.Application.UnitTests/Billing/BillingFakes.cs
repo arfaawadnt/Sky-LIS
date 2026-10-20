@@ -24,13 +24,9 @@ internal sealed class BillingWorld
 
     public Guid Branch { get; } = Guid.CreateVersion7();
 
-    public Guid TreasuryId { get; } = Guid.CreateVersion7();
-
     public Guid RefundReasonId { get; } = Guid.CreateVersion7();
 
     public FakeVisits Visits { get; } = new();
-
-    public FakeStations Stations { get; } = new();
 
     public InMemoryAccounts Accounts { get; } = new();
 
@@ -65,7 +61,6 @@ internal sealed class BillingWorld
     {
         User.UserId = Cashier;
         User.BranchId = Branch;
-        Stations.Add(new TreasuryStationView(TreasuryId, "MAIN", "Main drawer", "الخزينة الرئيسية", Branch, IsActive: true, ApprovedForDevice: true));
         Reasons.Active.Add(RefundReasonId);
     }
 
@@ -102,38 +97,6 @@ internal sealed class FakeVisits : IBillableVisitLookup
 
     public Task<IReadOnlyList<BillableVisit>> BatchMembersAsync(Guid batchId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<BillableVisit>>([.. Items.Where(visit => visit.BatchId == batchId).OrderBy(visit => visit.Accession, StringComparer.Ordinal)]);
-}
-
-internal sealed class FakeStations : ITreasuryStationLookup
-{
-    private readonly List<TreasuryStationView> _items = [];
-
-    public void Add(TreasuryStationView station) => _items.Add(station);
-
-    public void Replace(TreasuryStationView station)
-    {
-        _items.RemoveAll(item => item.TreasuryId == station.TreasuryId);
-        _items.Add(station);
-    }
-
-    public string? LastDeviceId { get; private set; }
-
-    public Task<TreasuryStationView?> GetAsync(Guid treasuryId, Guid userId, string deviceId, CancellationToken cancellationToken)
-    {
-        LastDeviceId = deviceId;
-        return Task.FromResult(_items.FirstOrDefault(item => item.TreasuryId == treasuryId));
-    }
-
-    public Task<IReadOnlyList<BillingTreasuryItem>> ApprovedAsync(Guid userId, string deviceId, Guid branchId, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<BillingTreasuryItem>>([.. _items.Where(item => item.ApprovedForDevice && item.IsActive && item.BranchId == branchId).Select(Item)]);
-
-    public Task<IReadOnlyList<BillingTreasuryItem>> OfBranchAsync(Guid branchId, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<BillingTreasuryItem>>([.. _items.Where(item => item.BranchId == branchId).Select(Item)]);
-
-    public Task<BillingTreasuryItem?> GetTreasuryAsync(Guid treasuryId, CancellationToken cancellationToken) =>
-        Task.FromResult(_items.Where(item => item.TreasuryId == treasuryId).Select(Item).FirstOrDefault());
-
-    private static BillingTreasuryItem Item(TreasuryStationView view) => new(view.TreasuryId, view.Code, view.NameEn, view.NameAr, view.BranchId, view.IsActive);
 }
 
 internal sealed class InMemoryAccounts : IVisitAccountRepository
@@ -179,16 +142,16 @@ internal sealed class InMemoryAccounts : IVisitAccountRepository
             .Where(payment => (filter.VisitId is null || payment.VisitId == filter.VisitId) && (filter.Status is null || payment.Status == filter.Status) && (filter.Method is null || payment.Method == filter.Method))
             .OrderByDescending(payment => payment.PaidAtUtc)
             .Select(payment => new PaymentListItem(
-                payment.Id, payment.ReceiptNumber, payment.VisitId, null, payment.Amount, payment.Method.ToString(), payment.Reference, payment.TreasuryId, "MAIN", "Main drawer", "الخزينة الرئيسية",
-                payment.CashierUserId, "Cashier One", payment.BranchId, payment.DeviceId, payment.BatchId, payment.PaidAtUtc, payment.Status.ToString(), false, payment.VoidReason, null, payment.VoidedAtUtc));
+                payment.Id, payment.ReceiptNumber, payment.VisitId, null, payment.Amount, payment.Method.ToString(), payment.Reference,
+                payment.CashierUserId, "Cashier One", payment.BranchId, payment.BatchId, payment.PaidAtUtc, payment.Status.ToString(), false, payment.VoidReason, null, payment.VoidedAtUtc));
 
     private IEnumerable<RefundListItem> Refunds(RefundFilter filter) =>
         Items.SelectMany(account => account.Refunds)
             .Where(refund => filter.VisitId is null || refund.VisitId == filter.VisitId)
             .OrderByDescending(refund => refund.RefundedAtUtc)
             .Select(refund => new RefundListItem(
-                refund.Id, refund.Number, refund.VisitId, null, refund.Amount, refund.Method.ToString(), refund.Reference, refund.ReasonId, null, null, refund.Note, refund.TreasuryId, "MAIN",
-                "Main drawer", "الخزينة الرئيسية", refund.CashierUserId, "Cashier One", refund.BranchId, refund.DeviceId, refund.RefundedAtUtc));
+                refund.Id, refund.Number, refund.VisitId, null, refund.Amount, refund.Method.ToString(), refund.Reference, refund.ReasonId, null, null, refund.Note,
+                refund.CashierUserId, "Cashier One", refund.BranchId, refund.RefundedAtUtc));
 }
 
 internal sealed class InMemoryClosings : ICashClosingRepository
@@ -201,11 +164,11 @@ internal sealed class InMemoryClosings : ICashClosingRepository
 
     public void Add(CashClosing aggregate) => Items.Add(aggregate);
 
-    public Task<bool> OverlapsAsync(Guid treasuryId, Guid? cashierUserId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken) =>
-        Task.FromResult(Items.Any(closing => closing.Overlaps(treasuryId, cashierUserId, fromUtc, toUtc)));
+    public Task<bool> OverlapsAsync(Guid branchId, Guid? cashierUserId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Any(closing => closing.Overlaps(branchId, cashierUserId, fromUtc, toUtc)));
 
-    public Task<bool> CoversAsync(Guid treasuryId, Guid cashierUserId, DateTimeOffset atUtc, CancellationToken cancellationToken) =>
-        Task.FromResult(CoversAnything || Items.Any(closing => closing.Covers(treasuryId, cashierUserId, atUtc)));
+    public Task<bool> CoversAsync(Guid branchId, Guid cashierUserId, DateTimeOffset atUtc, CancellationToken cancellationToken) =>
+        Task.FromResult(CoversAnything || Items.Any(closing => closing.Covers(branchId, cashierUserId, atUtc)));
 
     public Task<Paged<CashClosingListItem>> ListAsync(CashClosingFilter filter, PageRequest page, CancellationToken cancellationToken) => throw new NotSupportedException();
 
@@ -218,12 +181,24 @@ internal sealed class FakeDrawer : ICashDrawerQueries
 {
     public ClosingTotals Totals { get; set; } = ClosingTotals.Empty;
 
-    public Task<ClosingTotals> TotalsAsync(DrawerScope scope, CancellationToken cancellationToken) => Task.FromResult(Totals);
+    /// <summary>The scope of the last totals read (the handler decides it from the session).</summary>
+    public DrawerScope? LastScope { get; private set; }
+
+    public Guid? LastCashiersBranch { get; private set; }
+
+    public Task<ClosingTotals> TotalsAsync(DrawerScope scope, CancellationToken cancellationToken)
+    {
+        LastScope = scope;
+        return Task.FromResult(Totals);
+    }
 
     public Task<IReadOnlyList<DrawerMovement>> MovementsAsync(DrawerScope scope, int maxRows, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<DrawerMovement>>([]);
 
-    public Task<IReadOnlyList<DrawerCashier>> CashiersAsync(Guid treasuryId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<DrawerCashier>>([]);
+    public Task<IReadOnlyList<DrawerCashier>> CashiersAsync(Guid branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken)
+    {
+        LastCashiersBranch = branchId;
+        return Task.FromResult<IReadOnlyList<DrawerCashier>>([]);
+    }
 
     public Task<IReadOnlyDictionary<Guid, string>> UserNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyDictionary<Guid, string>>(userIds.ToDictionary(id => id, _ => "Cashier One"));

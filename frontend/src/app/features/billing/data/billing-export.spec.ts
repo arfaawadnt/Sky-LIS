@@ -17,7 +17,7 @@ describe('Billing exports carry the browser time zone', () => {
     backend = TestBed.inject(HttpTestingController);
   });
 
-  const filter: PaymentRegisterFilter = { accession: null, fromUtc: null, toUtc: null, treasuryId: null, method: null, status: null, page: 1, pageSize: 50 };
+  const filter: PaymentRegisterFilter = { accession: null, fromUtc: null, toUtc: null, method: null, status: null, page: 1, pageSize: 50 };
 
   it('the payments export sends timeZone; the paged list does not', async () => {
     const api = TestBed.inject(BillingApi);
@@ -44,7 +44,7 @@ describe('Billing exports carry the browser time zone', () => {
   it('names the downloaded file with the local date, not the server UTC stamp (UAT R3-05)', async () => {
     expect(localCsvName('payments', new Date(2026, 9, 11, 23, 30))).toBe('payments-2026-10-11.csv');
     const api = TestBed.inject(BillingApi);
-    const exporting = api.exportRefunds({ accession: null, fromUtc: null, toUtc: null, treasuryId: null, method: null, page: 1, pageSize: 50 } as never);
+    const exporting = api.exportRefunds({ accession: null, fromUtc: null, toUtc: null, method: null, page: 1, pageSize: 50 } as never);
     await settle();
     backend.expectOne((candidate) => candidate.url === `${BILLING_API.refunds}/export`).flush(new Blob(['x']), { headers: { 'Content-Disposition': 'attachment; filename=refunds-20261011-1449.csv' } });
     const file = await exporting;

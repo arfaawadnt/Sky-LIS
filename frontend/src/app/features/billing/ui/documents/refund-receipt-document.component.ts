@@ -38,7 +38,6 @@ import { branchOf } from './receipt-document.component';
             <tr><th scope="row">{{ i18n.t('billing.field.reference') }}</th><td class="mono">{{ reference }}</td></tr>
           }
           <tr><th scope="row">{{ i18n.t('billing.field.reason') }}</th><td>{{ reason() }}</td></tr>
-          <tr><th scope="row">{{ i18n.t('billing.field.treasury') }}</th><td>{{ doc().treasuryCode }} · {{ treasury() }}</td></tr>
           <tr><th scope="row">{{ i18n.t('billing.field.cashier') }}</th><td>{{ doc().cashierName }}</td></tr>
         </tbody>
       </table>
@@ -63,8 +62,6 @@ export class RefundReceiptDocumentComponent {
   readonly doc = input.required<RefundReceiptDocument>();
 
   protected readonly branch = computed(() => branchOf(this.doc().letterhead.branchNameEn, this.doc().letterhead.branchNameAr, this.i18n.lang()));
-
-  protected readonly treasury = computed(() => localizedPick({ en: this.doc().treasuryNameEn, ar: this.doc().treasuryNameAr }, this.i18n.lang()));
 
   /** The laboratory's method name with its code (CP-30b), or the kind on a legacy refund. */
   protected readonly method = computed(() => movementMethodLabel((key) => this.i18n.t(key), this.i18n.lang(), this.doc()));

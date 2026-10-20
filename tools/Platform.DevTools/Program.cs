@@ -6,7 +6,6 @@ using Platform.Application.Catalogue;
 using Platform.Application.Organization;
 using Platform.Application.Pricing;
 using Platform.Application.Tenancy;
-using Platform.Application.Treasury;
 using Platform.Domain.Authorization;
 using Platform.Domain.Catalogue;
 using Platform.Domain.Identity;
@@ -24,9 +23,8 @@ using Platform.SharedKernel.MultiTenancy;
 // Development-only seeding through the production services (same guards, same tenant stamping, same outbox).
 //   seed-user  <username> <password> [tenantId]                        a platform user with one active membership
 //   grant-role <username> <tenantId> <roleNameEn> <perm,perm,…>        creates or updates the role and assigns it to the membership
-//   seed-treasury <tenantId> <code> <nameEn> <nameAr>                   a treasury in a generated branch
 //   seed-demo-lab <username> <password> [tenantId]                      a complete Release-1 laboratory for browser walk-throughs: branch, catalogue with prices,
-//                                                                       treasury, a role with every laboratory permission, users <username> and <username>.manager
+//                                                                       reasons, a role with every laboratory permission, users <username> and <username>.manager
 //   seed-reasons <tenantId>                                             cancellation, refund, discount and rejection reasons (idempotent by name)
 //   seed-platform-admin <username> <password>                           a National Technology administrator of the platform tenant
 //                                                                       (user + membership in TenantIds.Platform + role "Platform Administrator" with every permission)
@@ -34,7 +32,7 @@ using Platform.SharedKernel.MultiTenancy;
 
 if (args.Length == 0)
 {
-    Console.Error.WriteLine("usage: seed-user | grant-role | seed-treasury | seed-demo-lab | seed-reasons | seed-platform-admin (see the header of Program.cs)");
+    Console.Error.WriteLine("usage: seed-user | grant-role | seed-demo-lab | seed-reasons | seed-platform-admin (see the header of Program.cs)");
     return 2;
 }
 
@@ -119,22 +117,12 @@ switch (args[0])
         return 0;
     }
 
-    case "seed-treasury" when args.Length >= 5 && Guid.TryParse(args[1], out var tenant):
-    {
-        tenantAccessor.SetTenant(tenant);
-        var treasuries = services.GetRequiredService<ITreasuryRepository>();
-        var treasury = Platform.Domain.Treasury.Treasury.Create(args[2], new LocalizedText(args[3], args[4]), Guid.CreateVersion7(), clock.UtcNow);
-        treasuries.Add(treasury);
-        await unitOfWork.SaveChangesAsync(CancellationToken.None);
-        Console.WriteLine($"seeded treasury {treasury.Code} ({treasury.Id}) in tenant {tenant}");
-        return 0;
-    }
-
     case "seed-demo-lab" when args.Length >= 3:
     {
         // A complete Release-1 laboratory for browser walk-throughs: one branch, two users (a laboratory administrator and a
-        // shift manager who can approve the administrator's treasury access request: SoD), a role with every permission,
-        // a small catalogue with prices on an active cash price list, and one treasury on the branch.
+        // shift manager, for the flows with segregation of duties), a role with every permission, a small catalogue with
+        // prices on an active cash price list, and the reasons. Money is taken by the session user on the session branch
+        // (LIS-CR-004, 2026-10-20: no treasury).
         var tenantId = args.Length > 3 && Guid.TryParse(args[3], out var parsedTenant) ? parsedTenant : Guid.CreateVersion7();
         tenantAccessor.SetTenant(tenantId);
         var now = clock.UtcNow;
@@ -222,8 +210,6 @@ switch (args[0])
         priceList.Activate(now);
         services.GetRequiredService<IBasePriceListRepository>().Add(priceList);
 
-        var treasury = Platform.Domain.Treasury.Treasury.Create("MAIN-CASH", new LocalizedText("Main cashier", "الخزينة الرئيسية"), branch.Id, now);
-        services.GetRequiredService<ITreasuryRepository>().Add(treasury);
         await unitOfWork.SaveChangesAsync(CancellationToken.None);
         var reasonsSeeded = await SeedReasonsAsync(services, unitOfWork, now);
 
@@ -250,9 +236,9 @@ switch (args[0])
 
         await unitOfWork.SaveChangesAsync(CancellationToken.None);
         Console.WriteLine($"seeded demo laboratory in tenant {tenantId} on {DatabaseRoleGuard.Describe(connectionString)}");
-        Console.WriteLine($"  branch {branch.Code} ({branch.Id}); treasury {treasury.Code} ({treasury.Id}); price list {priceList.Code}");
+        Console.WriteLine($"  branch {branch.Code} ({branch.Id}); price list {priceList.Code}");
         Console.WriteLine($"  users {args[1]} and {managerUsername} (same password), role '{role.Name.En}' with every permission, all special and result rights");
-        Console.WriteLine($"  services {string.Join(", ", tests.Select(test => test.Code))}; {reasonsSeeded} reasons; request treasury access as {args[1]} and approve it as {managerUsername}");
+        Console.WriteLine($"  services {string.Join(", ", tests.Select(test => test.Code))}; {reasonsSeeded} reasons");
         return 0;
     }
 
@@ -274,7 +260,7 @@ switch (args[0])
     }
 
     default:
-        Console.Error.WriteLine("usage: seed-user | grant-role | seed-treasury | seed-demo-lab | seed-reasons | seed-platform-admin (see the header of Program.cs)");
+        Console.Error.WriteLine("usage: seed-user | grant-role | seed-demo-lab | seed-reasons | seed-platform-admin (see the header of Program.cs)");
         return 2;
 }
 

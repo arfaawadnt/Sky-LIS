@@ -221,12 +221,12 @@ describe('Account facades (CP-05, CP-65, CP-66, CP-67, CP-68)', () => {
     backend.expectOne(ACCOUNT_API.auditActors).flush([{ userId: 'u1', displayName: 'Mona', username: 'mona', isActive: true }]);
     backend.expectOne(AUDIT_API.clients).flush([]);
 
-    facade.apply({ fromDay: '2026-10-01', toDay: '2026-10-09', userId: 'u1', entityType: ' Treasury ', entityId: '', clientTenantId: '' });
+    facade.apply({ fromDay: '2026-10-01', toDay: '2026-10-09', userId: 'u1', entityType: ' Payment ', entityId: '', clientTenantId: '' });
     await runEffects();
     const filtered = backend.expectOne((r) => r.url === AUDIT_API.entries);
     expect(filtered.request.params.get('from')).toBe(dayToInstant('2026-10-01', false));
     expect(filtered.request.params.get('to')).toBe(dayToInstant('2026-10-09', true));
-    expect(filtered.request.params.get('entityType')).toBe('Treasury');
+    expect(filtered.request.params.get('entityType')).toBe('Payment');
     expect(filtered.request.params.has('entityId')).toBe(false);
     filtered.flush(page([]));
 

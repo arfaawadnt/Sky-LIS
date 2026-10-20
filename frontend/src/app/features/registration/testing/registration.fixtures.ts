@@ -2,7 +2,6 @@
 
 import type { HttpTestingController } from '@angular/common/http/testing';
 
-import { BILLING_API, type BillingTreasuryItem } from '../../../core/api/billing.contracts';
 import { CATALOGUE_B_API } from '../../../core/api/catalogue-b.contracts';
 import type { Paged } from '../../../core/api/paging';
 import type { PatientSummary } from '../../../core/api/patients.contracts';
@@ -39,15 +38,6 @@ export const insurerTier: TierOption = {
   nameEn: 'Gold',
   nameAr: 'ذهبي',
   isDefault: false,
-};
-
-export const treasury: BillingTreasuryItem = {
-  id: 't-1',
-  code: 'MAIN',
-  nameEn: 'Main drawer',
-  nameAr: 'الخزينة الرئيسية',
-  branchId: 'b-1',
-  isActive: true,
 };
 
 export function settings(overrides: Partial<RegistrationPageSettings> = {}): RegistrationPageSettings {
@@ -270,16 +260,14 @@ export function visitRow(overrides: Partial<VisitListItem> = {}): VisitListItem 
   };
 }
 
-/** Answers the reference lists the registration page reads on start (settings, tiers, doctors, diagnoses, reasons, treasuries). */
-export function flushReferenceLists(backend: HttpTestingController, options: { tiers?: readonly TierOption[]; treasuries?: readonly BillingTreasuryItem[]; settings?: RegistrationPageSettings } = {}): void {
+/** Answers the reference lists the registration page reads on start (settings, tiers, doctors, diagnoses, reasons; the payment methods answer 404, so the panel offers the four kinds). */
+export function flushReferenceLists(backend: HttpTestingController, options: { tiers?: readonly TierOption[]; settings?: RegistrationPageSettings } = {}): void {
   for (const call of backend.match((request) => request.method === 'GET')) {
     const url = call.request.url;
     if (url === REGISTRATION_API.settings) {
       call.flush(options.settings ?? settings());
     } else if (url === PRICING_API.tierOptions) {
       call.flush(options.tiers ?? [cashTier, insurerTier]);
-    } else if (url === BILLING_API.myTreasuries) {
-      call.flush(options.treasuries ?? [treasury]);
     } else if (url === CATALOGUE_B_API.doctors || url === CATALOGUE_B_API.diagnoses || url === CATALOGUE_B_API.reasons) {
       call.flush(page([]));
     } else {

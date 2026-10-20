@@ -12,13 +12,11 @@ namespace Platform.Application.UnitTests.Billing;
 /// <summary>The use cases of intake LIS-INT-BIL-001 over in-memory ports: T1–T5 handlers, refusals before numbers are drawn, the account view and the CSV export.</summary>
 public sealed class BillingUseCaseTests
 {
-    private const string Device = "device-reception-1";
-
     private static RecordPaymentHandler PaymentHandler(BillingWorld world) =>
-        new(world.Visits, world.Stations, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        new(world.Visits, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
     private static RecordRefundHandler RefundHandler(BillingWorld world) =>
-        new(world.Visits, world.Stations, world.Reasons, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        new(world.Visits, world.Reasons, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
     [Fact]
     public async Task T1_A_first_payment_opens_the_account_draws_a_receipt_and_commits_once()
@@ -26,17 +24,17 @@ public sealed class BillingUseCaseTests
         var world = new BillingWorld();
         var visit = world.AddVisit(300m, "ACC-2026-00001");
 
-        var created = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 120m, "cash", null, world.TreasuryId, $" {Device} "), CancellationToken.None);
+        var created = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 120m, "cash", null), CancellationToken.None);
 
         Assert.Equal("RCT-2026-00001", created.ReceiptNumber);
         var account = Assert.Single(world.Accounts.Items);
         Assert.Equal((visit.VisitId, 120m), (account.VisitId, account.PaidTotal));
         var payment = Assert.Single(account.Payments);
-        Assert.Equal((created.Id, Device, world.Branch, world.Cashier), (payment.Id, payment.DeviceId, payment.BranchId, payment.CashierUserId));
-        Assert.Equal(Device, world.Stations.LastDeviceId);
+        Assert.Equal((created.Id, world.Branch, world.Cashier), (payment.Id, payment.BranchId, payment.CashierUserId));
+        Assert.Equal(((Guid?)null, (string?)null), (payment.TreasuryId, payment.DeviceId));   // LIS-CR-004: cashier and branch from the session only
         Assert.Equal(1, world.UnitOfWork.Commits);
 
-        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 180m, "Pos", "POS-77", world.TreasuryId, Device), CancellationToken.None);
+        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 180m, "Pos", "POS-77"), CancellationToken.None);
         Assert.Single(world.Accounts.Items);
         Assert.Equal(300m, world.Accounts.Items[0].PaidTotal);
     }
@@ -47,7 +45,7 @@ public sealed class BillingUseCaseTests
         var world = new BillingWorld();
         var visit = world.AddVisit(50m, "ACC-2026-00002");
 
-        var refusal = await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 60m, "Cash", null, world.TreasuryId, Device), CancellationToken.None));
+        var refusal = await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 60m, "Cash", null), CancellationToken.None));
 
         Assert.Equal(BillingCodes.AmountExceedsRemaining, refusal.Code);
         Assert.Equal(0, world.Numbers.Drawn);
@@ -56,22 +54,42 @@ public sealed class BillingUseCaseTests
     }
 
     [Fact]
-    public async Task T1_Refusals_before_the_aggregate_TENANT_004_BIL_404_BIL_409_BIL_020()
+    public async Task T1_Refusals_before_the_aggregate_AUTH_001_TENANT_004_BIL_404()
     {
         var world = new BillingWorld();
         var visit = world.AddVisit(100m, "ACC-2026-00003");
 
         world.User.BranchId = null;
-        Assert.Equal(ProblemCodes.BranchRequired, (await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 10m, "Cash", null, world.TreasuryId, Device), CancellationToken.None))).Code);
+        Assert.Equal(ProblemCodes.BranchRequired, (await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 10m, "Cash", null), CancellationToken.None))).Code);
         world.User.BranchId = world.Branch;
 
-        Assert.Equal(BillingCodes.VisitNotFound, (await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(Guid.CreateVersion7(), 10m, "Cash", null, world.TreasuryId, Device), CancellationToken.None))).Code);
-        Assert.Equal(BillingCodes.TreasuryNotFound, (await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 10m, "Cash", null, Guid.CreateVersion7(), Device), CancellationToken.None))).Code);
+        world.User.UserId = null;
+        Assert.Equal(ProblemCodes.AuthenticatedActorRequired, (await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 10m, "Cash", null), CancellationToken.None))).Code);
+        world.User.UserId = world.Cashier;
 
-        world.Stations.Replace(new TreasuryStationView(world.TreasuryId, "MAIN", "Main drawer", "الخزينة الرئيسية", world.Branch, IsActive: true, ApprovedForDevice: false));
-        var revoked = await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 10m, "Cash", null, world.TreasuryId, Device), CancellationToken.None));
-        Assert.Equal((BillingCodes.TreasuryNotApproved, DomainFault.Refused), (revoked.Code, revoked.Fault));
+        Assert.Equal(BillingCodes.VisitNotFound, (await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(Guid.CreateVersion7(), 10m, "Cash", null), CancellationToken.None))).Code);
         Assert.Equal(0, world.Numbers.Drawn);
+    }
+
+    [Fact]
+    public async Task T1_T3_The_cashier_and_the_branch_come_from_the_session_LIS_CR_004()
+    {
+        var world = new BillingWorld();
+        var visit = world.AddVisit(300m, "ACC-2026-00007");
+        var otherBranch = Guid.CreateVersion7();
+        world.User.BranchId = otherBranch;   // the session moved to another branch: the money follows it, nothing else is asked
+
+        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 300m, "Cash", null), CancellationToken.None);
+        world.Visits.Items[0] = visit with { PatientShareTotal = 250m };
+        await RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 50m, "Cash", null, world.RefundReasonId, null), CancellationToken.None);
+
+        var account = Assert.Single(world.Accounts.Items);
+        var payment = Assert.Single(account.Payments);
+        var refund = Assert.Single(account.Refunds);
+        Assert.Equal((world.Cashier, otherBranch, (Guid?)null), (payment.CashierUserId, payment.BranchId, payment.TreasuryId));
+        Assert.Equal((world.Cashier, otherBranch, (Guid?)null), (refund.CashierUserId, refund.BranchId, refund.TreasuryId));
+        var recorded = account.DomainEvents.OfType<PaymentRecorded>().Single();
+        Assert.Equal((world.Cashier, otherBranch), (recorded.CashierUserId, recorded.BranchId));
     }
 
     [Fact]
@@ -80,7 +98,7 @@ public sealed class BillingUseCaseTests
         var world = new BillingWorld();
         var visit = world.AddVisit(100m, "ACC-2026-00004", Guid.CreateVersion7(), "LabToLab", "BTH-2026-00001");
 
-        var refusal = await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 10m, "Cash", null, world.TreasuryId, Device), CancellationToken.None));
+        var refusal = await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 10m, "Cash", null), CancellationToken.None));
 
         Assert.Equal(BillingCodes.BilledThroughClaims, refusal.Code);
     }
@@ -90,7 +108,7 @@ public sealed class BillingUseCaseTests
     {
         var world = new BillingWorld();
         var visit = world.AddVisit(100m, "ACC-2026-00005");
-        var created = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Cash", null, world.TreasuryId, Device), CancellationToken.None);
+        var created = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Cash", null), CancellationToken.None);
         var handler = new VoidPaymentHandler(world.Accounts, world.Closings, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
         world.Closings.CoversAnything = true;
@@ -107,15 +125,15 @@ public sealed class BillingUseCaseTests
     {
         var world = new BillingWorld();
         var visit = world.AddVisit(300m, "ACC-2026-00006");
-        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 300m, "Cash", null, world.TreasuryId, Device), CancellationToken.None);
+        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 300m, "Cash", null), CancellationToken.None);
         world.Visits.Items[0] = visit with { PatientShareTotal = 200m };   // VisitTransferred re-priced the visit
         var drawn = world.Numbers.Drawn;
 
-        var unknown = await Assert.ThrowsAsync<DomainException>(() => RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 100m, "Cash", null, Guid.CreateVersion7(), null, world.TreasuryId, Device), CancellationToken.None));
+        var unknown = await Assert.ThrowsAsync<DomainException>(() => RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 100m, "Cash", null, Guid.CreateVersion7(), null), CancellationToken.None));
         Assert.Equal((BillingCodes.RefundReasonInvalid, DomainFault.Validation), (unknown.Code, unknown.Fault));
         Assert.Equal(drawn, world.Numbers.Drawn);
 
-        var created = await RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 100m, "Cash", null, world.RefundReasonId, "contract transfer", world.TreasuryId, Device), CancellationToken.None);
+        var created = await RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 100m, "Cash", null, world.RefundReasonId, "contract transfer"), CancellationToken.None);
         Assert.Equal("RFD-2026-00001", created.Number);
         Assert.Equal(100m, world.Accounts.Items[0].RefundedTotal);
     }
@@ -129,9 +147,9 @@ public sealed class BillingUseCaseTests
         var second = world.AddVisit(150m, "ACC-2026-00012", batchId, "Group", "BTH-2026-00001");
         var settled = world.AddVisit(0m, "ACC-2026-00011", batchId, "Group", "BTH-2026-00001");
         var first = world.AddVisit(100m, "ACC-2026-00010", batchId, "Group", "BTH-2026-00001");
-        var handler = new PayBatchHandler(world.Visits, world.Stations, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        var handler = new PayBatchHandler(world.Visits, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
-        var result = await handler.Handle(new PayBatchCommand(batchId, 200m, "Cash", null, world.TreasuryId, Device), CancellationToken.None);
+        var result = await handler.Handle(new PayBatchCommand(batchId, 200m, "Cash", null), CancellationToken.None);
 
         Assert.Equal(
             [(first.VisitId, "ACC-2026-00010", 100m, "RCT-2026-00001"), (second.VisitId, "ACC-2026-00012", 100m, "RCT-2026-00002")],
@@ -140,7 +158,7 @@ public sealed class BillingUseCaseTests
         Assert.All(world.Accounts.Items.SelectMany(account => account.Payments), payment => Assert.Equal(batchId, payment.BatchId));
         Assert.Equal(1, world.UnitOfWork.Commits);
 
-        var over = await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new PayBatchCommand(batchId, 50.01m, "Cash", null, world.TreasuryId, Device), CancellationToken.None));
+        var over = await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new PayBatchCommand(batchId, 50.01m, "Cash", null), CancellationToken.None));
         Assert.Equal(BillingCodes.AmountExceedsBatchRemaining, over.Code);
     }
 
@@ -151,10 +169,10 @@ public sealed class BillingUseCaseTests
         var batchId = Guid.CreateVersion7();
         world.Visits.Batches.Add(new BillableBatch(batchId, "BTH-2026-00002", "LabToLab", null, null, Guid.CreateVersion7()));
         world.AddVisit(100m, "ACC-2026-00020", batchId, "LabToLab", "BTH-2026-00002");
-        var handler = new PayBatchHandler(world.Visits, world.Stations, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        var handler = new PayBatchHandler(world.Visits, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
-        Assert.Equal(BillingCodes.BilledThroughClaims, (await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new PayBatchCommand(batchId, 10m, "Cash", null, world.TreasuryId, Device), CancellationToken.None))).Code);
-        Assert.Equal(BillingCodes.BatchNotFound, (await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new PayBatchCommand(Guid.CreateVersion7(), 10m, "Cash", null, world.TreasuryId, Device), CancellationToken.None))).Code);
+        Assert.Equal(BillingCodes.BilledThroughClaims, (await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new PayBatchCommand(batchId, 10m, "Cash", null), CancellationToken.None))).Code);
+        Assert.Equal(BillingCodes.BatchNotFound, (await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new PayBatchCommand(Guid.CreateVersion7(), 10m, "Cash", null), CancellationToken.None))).Code);
     }
 
     [Fact]
@@ -162,18 +180,66 @@ public sealed class BillingUseCaseTests
     {
         var world = new BillingWorld();
         world.Drawer.Totals = new ClosingTotals(500m, 200m, 0m, 0m, 3, 50m, 0m, 0m, 0m, 1, 0m, 0m, 3);
-        var handler = new CloseCashDrawerHandler(world.Stations, world.Closings, world.Drawer, world.Numbers, world.UnitOfWork, world.User, world.Clock);
+        var handler = new CloseCashDrawerHandler(world.Closings, world.Drawer, world.Numbers, world.UnitOfWork, world.User, world.Clock);
         var from = BillingWorld.Now.AddHours(-8);
 
-        var created = await handler.Handle(new CloseCashDrawerCommand(world.TreasuryId, world.Cashier, from, BillingWorld.Now, 450m, null), CancellationToken.None);
+        var created = await handler.Handle(new CloseCashDrawerCommand(world.Cashier, from, BillingWorld.Now, 450m, null), CancellationToken.None);
 
         Assert.Equal("CLS-2026-00001", created.Number);
         var closing = Assert.Single(world.Closings.Items);
-        Assert.Equal((450m, 0m, world.Branch), (closing.ExpectedCash, closing.Difference, closing.BranchId));
+        Assert.Equal((450m, 0m, world.Branch, (Guid?)null), (closing.ExpectedCash, closing.Difference, closing.BranchId, closing.TreasuryId));
+        Assert.Equal(new DrawerScope(world.Branch, world.Cashier, from, BillingWorld.Now), world.Drawer.LastScope);
 
-        var overlap = await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new CloseCashDrawerCommand(world.TreasuryId, null, from.AddHours(1), BillingWorld.Now, null, null), CancellationToken.None));
+        var overlap = await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new CloseCashDrawerCommand(null, from.AddHours(1), BillingWorld.Now, null, null), CancellationToken.None));
         Assert.Equal((BillingCodes.ClosingOverlaps, DomainFault.Conflict), (overlap.Code, overlap.Fault));
         Assert.Equal(1, world.Numbers.Drawn);
+    }
+
+    [Fact]
+    public async Task T5_The_drawer_is_the_session_branch_per_cashier_LIS_CR_004()
+    {
+        var world = new BillingWorld();
+        world.Drawer.Totals = new ClosingTotals(100m, 0m, 0m, 0m, 1, 0m, 0m, 0m, 0m, 0, 0m, 0m, 1);
+        var handler = new CloseCashDrawerHandler(world.Closings, world.Drawer, world.Numbers, world.UnitOfWork, world.User, world.Clock);
+        var from = BillingWorld.Now.AddHours(-8);
+        var colleague = Guid.CreateVersion7();
+
+        // two cashiers of the same branch close their own drawers for the same period: no overlap
+        await handler.Handle(new CloseCashDrawerCommand(world.Cashier, from, BillingWorld.Now, 100m, null), CancellationToken.None);
+        await handler.Handle(new CloseCashDrawerCommand(colleague, from, BillingWorld.Now, 100m, null), CancellationToken.None);
+        Assert.Equal(2, world.Closings.Items.Count);
+
+        // "every cashier of the branch" intersects both
+        var all = await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new CloseCashDrawerCommand(null, from, BillingWorld.Now, null, null), CancellationToken.None));
+        Assert.Equal(BillingCodes.ClosingOverlaps, all.Code);
+
+        // the same period on another branch is another drawer
+        world.User.BranchId = Guid.CreateVersion7();
+        await handler.Handle(new CloseCashDrawerCommand(null, from, BillingWorld.Now, 100m, null), CancellationToken.None);
+        Assert.Equal(3, world.Closings.Items.Count);
+
+        world.User.BranchId = null;
+        Assert.Equal(ProblemCodes.BranchRequired, (await Assert.ThrowsAsync<DomainException>(() => handler.Handle(new CloseCashDrawerCommand(null, from, BillingWorld.Now, null, null), CancellationToken.None))).Code);
+        Assert.Equal(3, world.Numbers.Drawn);
+    }
+
+    [Fact]
+    public async Task T5_The_preview_and_the_cashier_list_read_the_session_branch()
+    {
+        var world = new BillingWorld();
+        world.Drawer.Totals = new ClosingTotals(80m, 20m, 0m, 0m, 2, 0m, 0m, 0m, 0m, 0, 0m, 0m, 2);
+        var from = BillingWorld.Now.AddHours(-4);
+        var preview = await new PreviewCashClosingHandler(world.Drawer, world.Closings, world.Visits, world.Settings, world.User, world.Clock)
+            .Handle(new PreviewCashClosingQuery(world.Cashier, from, BillingWorld.Now), CancellationToken.None);
+
+        Assert.Equal((world.Branch, (Guid?)world.Cashier, "Cashier One", 80m, false), (preview.BranchId, preview.CashierUserId, preview.CashierName, preview.Totals.ExpectedCash, preview.OverlapsClosedPeriod));
+        Assert.Equal(new DrawerScope(world.Branch, world.Cashier, from, BillingWorld.Now), world.Drawer.LastScope);
+
+        await new ListDrawerCashiersHandler(world.Drawer, world.User).Handle(new ListDrawerCashiersQuery(from, BillingWorld.Now), CancellationToken.None);
+        Assert.Equal(world.Branch, world.Drawer.LastCashiersBranch);
+
+        world.User.BranchId = null;
+        Assert.Equal(ProblemCodes.BranchRequired, (await Assert.ThrowsAsync<DomainException>(() => new ListDrawerCashiersHandler(world.Drawer, world.User).Handle(new ListDrawerCashiersQuery(from, BillingWorld.Now), CancellationToken.None))).Code);
     }
 
     [Fact]
@@ -181,19 +247,19 @@ public sealed class BillingUseCaseTests
     {
         var world = new BillingWorld();
         var visit = world.AddVisit(300m, "ACC-2026-00060");
-        var paid = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 300m, "Cash", null, world.TreasuryId, Device), CancellationToken.None);
+        var paid = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 300m, "Cash", null), CancellationToken.None);
         world.Visits.Items[0] = visit with { PatientShareTotal = 200m };
         world.Privileges.SpecialRights = new SpecialRights(null, canPay: false, canRefund: false, canTransfer: true, canCancel: false, canModifyVerifiedResult: true, canPreviewWithoutVerify: true, canPrintInvoice: false, canSeeVip: true);
         var drawn = world.Numbers.Drawn;
 
         async Task<DomainException> Refused(Func<Task> call) => await Assert.ThrowsAsync<DomainException>(call);
 
-        var pay = await Refused(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 1m, "Cash", null, world.TreasuryId, Device), CancellationToken.None));
+        var pay = await Refused(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 1m, "Cash", null), CancellationToken.None));
         Assert.Equal((BillingCodes.PayRightRequired, DomainFault.Refused), (pay.Code, pay.Fault));
-        var batch = await Refused(() => new PayBatchHandler(world.Visits, world.Stations, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock)
-            .Handle(new PayBatchCommand(Guid.CreateVersion7(), 1m, "Cash", null, world.TreasuryId, Device), CancellationToken.None));
+        var batch = await Refused(() => new PayBatchHandler(world.Visits, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock)
+            .Handle(new PayBatchCommand(Guid.CreateVersion7(), 1m, "Cash", null), CancellationToken.None));
         Assert.Equal(BillingCodes.PayRightRequired, batch.Code);
-        var refund = await Refused(() => RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 100m, "Cash", null, world.RefundReasonId, null, world.TreasuryId, Device), CancellationToken.None));
+        var refund = await Refused(() => RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 100m, "Cash", null, world.RefundReasonId, null), CancellationToken.None));
         Assert.Equal(BillingCodes.RefundRightRequired, refund.Code);
         var cancel = await Refused(() => new VoidPaymentHandler(world.Accounts, world.Closings, world.UnitOfWork, world.User, world.Privileges, world.Clock).Handle(new VoidPaymentCommand(paid.Id, "x"), CancellationToken.None));
         Assert.Equal(BillingCodes.CancelRightRequired, cancel.Code);
@@ -210,8 +276,8 @@ public sealed class BillingUseCaseTests
     {
         var world = new BillingWorld();
         var visit = world.AddVisit(300m, "ACC-2026-00030");
-        var first = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Cash", null, world.TreasuryId, Device), CancellationToken.None);
-        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 50m, "Card", "SLIP", world.TreasuryId, Device), CancellationToken.None);
+        var first = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Cash", null), CancellationToken.None);
+        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 50m, "Card", "SLIP"), CancellationToken.None);
         await new VoidPaymentHandler(world.Accounts, world.Closings, world.UnitOfWork, world.User, world.Privileges, world.Clock).Handle(new VoidPaymentCommand(first.Id, "duplicate"), CancellationToken.None);
         var handler = new GetVisitAccountHandler(world.Visits, world.Accounts, world.Reasons, world.Directory, world.Settings);
 
@@ -229,8 +295,8 @@ public sealed class BillingUseCaseTests
     {
         var world = new BillingWorld();
         var visit = world.AddVisit(300m, "ACC-2026-00040");
-        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Transfer", "=HYPERLINK(\"x\")", world.TreasuryId, Device), CancellationToken.None);
-        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 20.5m, "Card", "slip, 7", world.TreasuryId, Device), CancellationToken.None);
+        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Transfer", "=HYPERLINK(\"x\")"), CancellationToken.None);
+        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 20.5m, "Card", "slip, 7"), CancellationToken.None);
 
         var file = await new ExportPaymentsHandler(world.Accounts, world.Visits, world.Clock).Handle(new ExportPaymentsQuery(null, null, null, null, null, null, null, null), CancellationToken.None);
 
@@ -248,7 +314,7 @@ public sealed class BillingUseCaseTests
         // UAT R1-06: the register shows local times; its CSV was still in UTC.
         var world = new BillingWorld();
         var visit = world.AddVisit(300m, "ACC-2026-00041");
-        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Cash", null, world.TreasuryId, Device), CancellationToken.None);
+        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Cash", null), CancellationToken.None);
         var paidAt = world.Clock.UtcNow;
         var zone = TimeZoneInfo.FindSystemTimeZoneById("Africa/Cairo");
 
@@ -270,7 +336,7 @@ public sealed class BillingUseCaseTests
     {
         var world = new BillingWorld();
         var visit = world.AddVisit(300m, "ACC-2026-00050");
-        var created = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 120m, "Cash", null, world.TreasuryId, Device), CancellationToken.None);
+        var created = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 120m, "Cash", null), CancellationToken.None);
         var handler = new GetPaymentReceiptHandler(world.Accounts, world.Visits, new FakeBalances(world.Accounts, world.Visits), world.Directory, world.Settings, world.User, world.Clock);
 
         var receipt = await handler.Handle(new GetPaymentReceiptQuery(created.Id), CancellationToken.None);

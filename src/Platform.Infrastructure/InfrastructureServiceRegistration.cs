@@ -12,7 +12,6 @@ using Platform.Application.Abstractions.Security;
 using Platform.Application.Abstractions.Tokens;
 using Platform.Application.Identity;
 using Platform.Application.Organization;
-using Platform.Application.Treasury;
 using Platform.Application.Tenancy;
 using Platform.Application.PlatformAdmin.Jobs;
 using Platform.Infrastructure.Audit;
@@ -24,7 +23,6 @@ using Platform.Infrastructure.Persistence.Interceptors;
 using Platform.Infrastructure.Persistence.Organization;
 using Platform.Infrastructure.Persistence.Outbox;
 using Platform.Infrastructure.Persistence.Tenancy;
-using Platform.Infrastructure.Persistence.Treasury;
 using Platform.Infrastructure.Security;
 using Platform.Infrastructure.Security.CredentialTransport;
 using Platform.Infrastructure.Security.Hashing;
@@ -116,8 +114,6 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IRefreshSessionRepository, RefreshSessionRepository>();
         services.AddScoped<ITenantMembershipRepository, TenantMembershipRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
-        services.AddScoped<ITreasuryRepository, TreasuryRepository>();
-        services.AddScoped<ITreasuryAccessRequestRepository, TreasuryAccessRequestRepository>();
         services.AddScoped<IReferenceNumbers, ReferenceNumbers>();
 
         services.AddScoped<LoggerSecurityEventLog>();

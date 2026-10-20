@@ -1,6 +1,6 @@
 # Sky LIS — Release 1 User Acceptance Test Scripts (LIS-UAT-001)
 
-Version 0.4 · 2026-10-10 · Status: draft for review by the business owner (corrected after the automated dry runs of UAT-ADM / UAT-REG, `docs/uat/results/2026-10-10_dry-run_admin-reception.md`, of UAT-CSH / UAT-FIN / UAT-SMP / UAT-RES / UAT-VER, `docs/uat/results/2026-10-10_dry-run_laboratory.md`, and of UAT-OPS / UAT-MDR / UAT-SUP, `docs/uat/results/2026-10-10_dry-run_super-admin.md`) · Build plan phase P6 ("User acceptance & training")
+Version 0.6 · 2026-10-20 · Status: draft for review by the business owner (0.6: treasury removed, LIS-CR-004 — see the revision history).
 
 Sources: business SRS LIS-SRS-001 (`docs/srs`, page ids CP-nn / SA-nn, workflows WF-nn, rules BR-nn), the module intakes
 (`docs/intake`, acceptance scenario ids and refusal codes), the Release-1 scope record (`docs/build/MODULES.md` §6, wave 4),
@@ -39,7 +39,7 @@ are Release 1 and are tested.
 | Item | Value |
 | --- | --- |
 | Environment | The **test lane** of the deployment runbook (LIS-DEP-001 §7): service `NTLIS_TEST` on 5180, site `lis-ui-test`, database `lis_test`, **with a certificate** (over plain http the refresh cookie is refused and every session ends after 15 minutes). |
-| Browser | Current Chrome or Edge. One browser **profile per persona** on each test workstation: the cashier's device identity (BR-27) is minted once per browser profile; clearing site data creates a new device and invalidates the treasury approval. |
+| Browser | Current Chrome or Edge. One browser **profile per persona** on each test workstation: sessions are kept per browser profile. |
 | Printing | Labels, job orders, receipts and reports open the browser's print dialog; a PDF printer is enough. Keep the printed PDFs with the results sheet. |
 | SMS / e-mail | The OTP of the subscription wizard, the password recovery and the panic-value notification need the notification gateway of the test lane. When no gateway is configured, the scripts marked *gateway* are executed with the operator reading the code from the API log (only possible when `Lis:Security:AllowInsecureLocalDevelopment` is on, which is never the case on a production-like lane) or are deferred and recorded as "blocked — gateway". |
 
@@ -55,11 +55,11 @@ Platform.DevTools.exe seed-demo-lab lab.admin <one-time password>               
 Chemistry) and **HEMA** (Haematology); sample types **SER** (Serum) and **EDTA** (Whole blood); units mmol/L, mg/dL, g/dL;
 tests **K** (Potassium, 3.5–5.0, panic 2.5 / 6.5, 1 decimal), **NA** (Sodium, 135–145, panic 120 / 160), **GLU** (Glucose
 fasting, 70–110, panic 40 / 400), **HGB** (Haemoglobin, EDTA, 12.0–16.0, panic 7.0 / 20.0); one Test service per test
-priced **120 / 120 / 90 / 150** EGP on the active base list **CASH-2026**; treasury **MAIN-CASH** on MAIN; the eight
+priced **120 / 120 / 90 / 150** EGP on the active base list **CASH-2026**; the eight
 reasons of `seed-reasons` (cancellation "Patient declined" / "Ordered by mistake", refund "Service cancelled" /
 "Overpayment", discount "Staff and relatives" / "Management approval", rejection ×2); the role **Laboratory
 Administrator** (every permission, every special right, every result right) assigned to **lab.admin** and
-**lab.admin.manager** (the shift manager who approves treasury access: SoD). Each user signs in with the laboratory
+**lab.admin.manager** (the shift manager). Each user signs in with the laboratory
 selected on the sign-in page.
 
 The remaining UAT users and roles are **created during the UAT itself** by the laboratory administrator scripts
@@ -67,7 +67,7 @@ The remaining UAT users and roles are **created during the UAT itself** by the l
 must hold. A second laboratory ("UAT Lab B") is created by UAT-OPS-02 and is used for the isolation checks.
 
 Run order: UAT-SUP-01/02 → UAT-ADM-01…07 → UAT-ADM-08…10 (catalogue additions the reception and results scripts
-depend on) → UAT-FIN-01…03 → UAT-CSH-01 → UAT-REG → UAT-SMP → UAT-RES → UAT-VER → UAT-CSH-02…10 → UAT-FIN-04…06 →
+depend on) → UAT-FIN-01…03 → UAT-REG → UAT-SMP → UAT-RES → UAT-VER → UAT-CSH-03…08 → UAT-FIN-04…06 →
 UAT-OPS, UAT-MDR, remaining UAT-SUP. Scripts inside a persona run in their numbered order unless a script says otherwise.
 
 ## 3. Script conventions
@@ -94,9 +94,8 @@ UAT-OPS, UAT-MDR, remaining UAT-SUP. Scripts inside a persona run in their numbe
 | Persona | UAT user | Role to create (permission keys · special rights · result rights) | Preconditions |
 | --- | --- | --- | --- |
 | Laboratory administrator | `lab.admin` (seeded) | Laboratory Administrator (seeded: everything) | branch MAIN; `lab.admin.manager` available as a second administrator for the SoD steps |
-| Shift manager (approver) | `lab.admin.manager` (seeded) | same role | approves treasury access, never requests it in the scripts |
-| Reception clerk | `uat.reception` | **Reception**: dashboard.view · registration.view/create/edit/cancel/export · patients.view/create/edit · pricing.view · catalogue.view · billing.view/create · treasury.view/create/cancel · results.view · samples.view (the Samples dialog of CP-10) · special: discount cap **10 %**, CanPay, CanCancel · result rights: see on CHEM and HEMA, every branch | branch MAIN; treasury MAIN-CASH approved for the clerk on the clerk's workstation (UAT-CSH-01 run as the clerk, approved by the manager) |
-| Cashier | `uat.cashier` | **Cashier**: dashboard.view · registration.view · billing.view/create/approve/cancel/export · treasury.view/create/cancel · pricing.view · catalogue.view (the refund reason list of CP-24 is read from the catalogue) · special: CanPay, CanRefund, CanCancel, CanPrintInvoice · no result rights | branch MAIN; own browser profile |
+| Shift manager (approver) | `lab.admin.manager` (seeded) | same role | second administrator account |
+| Cashier | `uat.cashier` | **Cashier**: dashboard.view · registration.view · billing.view/create/approve/cancel/export · pricing.view · catalogue.view (the refund reason list of CP-24 is read from the catalogue) · special: CanPay, CanRefund, CanCancel, CanPrintInvoice · no result rights | branch MAIN; own browser profile |
 | Phlebotomist / technician (sample side) | `uat.reception` and `uat.tech` | as Reception / Technician | visits registered by UAT-REG-03 |
 | Laboratory technician | `uat.tech` | **Technician**: dashboard.view · results.view/create/approve/export · catalogue.view · result rights: see, review, edit, print on **CHEM and HEMA**, every branch (no verify) · no special rights | branch MAIN |
 | Technician, chemistry only | `uat.tech.chem` | **Technician (chemistry)**: as Technician but result rights on **CHEM only** | used by UAT-RES-08 |
@@ -155,7 +154,7 @@ Setup › Users (`/organization/users`).
 6. In a new browser profile sign in as `uat.reception` with `<pw>`.
 7. Change the password on the profile page (current + new + confirm), then open the dashboard.
 8. Arabic check.
-Expected: (1–2) seven users Active, column Role filled, `Inherits the role`; the list marks `Must change password`. (3) refused by the page under the username ("The value has the wrong format." with the hint "4–30 lower-case letters, digits, \".\" or \"_\""; `ORG-023` on a forced request). (4) refused by the page: "At least 8 characters." (`ORG-020` on a forced request). (5) refused `ORG-021` "The password must not contain the username." (6) the user lands on Account › Profile with "Your administrator asked you to choose a new password before you continue."; other pages redirect back to it. (7) "Your password was changed."; the dashboard opens; the sidebar shows Reception, Laboratory (Worklist, Results by accession), Finance (Treasuries and Treasury access, Payers & contracts and Base price lists read-only, Payments), the read-only catalogue lists under Setup (`catalogue.view`) and Account — no Branches, Roles & privileges or Users.
+Expected: (1–2) seven users Active, column Role filled, `Inherits the role`; the list marks `Must change password`. (3) refused by the page under the username ("The value has the wrong format." with the hint "4–30 lower-case letters, digits, \".\" or \"_\""; `ORG-023` on a forced request). (4) refused by the page: "At least 8 characters." (`ORG-020` on a forced request). (5) refused `ORG-021` "The password must not contain the username." (6) the user lands on Account › Profile with "Your administrator asked you to choose a new password before you continue."; other pages redirect back to it. (7) "Your password was changed."; the dashboard opens; the sidebar shows Reception, Laboratory (Worklist, Results by accession), Finance (Payers & contracts and Base price lists read-only, Payments), the read-only catalogue lists under Setup (`catalogue.view`) and Account — no Branches, Roles & privileges or Users.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-ADM-04 — Lock, reset, protected administrator · standard
@@ -179,30 +178,11 @@ Refs: CP-38 · WF-11 step 3 · BR-17 · ORG AS-U4.
 Expected: (1) the user is marked **Modified**, "Differences from the role" lists `results.cancel`. (2) `Undo` is available to `uat.tech`. (3) `uat.tech2` has no `Undo`: an override affects one user only (BR-17). (4) the badge disappears, "The user inherits the role again."; `Undo` is gone for `uat.tech`.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
-#### UAT-ADM-06 — Treasuries · critical
-Refs: CP-28 · TRS T6–T9, S-T1-inactive · BR-27.
-Finance › Treasuries (`/treasury/treasuries`).
-1. `Add treasury`: code `north-cash`, name "North cashier" / "خزينة الفرع الشمالي", branch NORTH. Save.
-2. `Add treasury` with code `MAIN-CASH`.
-3. Edit NORTH-CASH: rename. Save.
-4. `Deactivate` NORTH-CASH. Then Finance › Treasury access › `Request access from this device` on NORTH-CASH.
-5. Reactivate NORTH-CASH.
-6. Arabic check.
-Expected: (1) row **NORTH-CASH** Active with branch `NORTH · North Branch` (the branch is picked from the active branches). (2) refused `TRS-100` "A treasury with this code already exists." (3) renamed. (4) Inactive; the inactive treasury is not offered in the Treasury access picker (`TRS-010` on a forced request). (5) Active (the row action reads `Activate`).
-Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
+#### UAT-ADM-06 — Treasuries · withdrawn
+**Withdrawn on 2026-10-20** (change request LIS-CR-004: the treasury was removed from the system — Finance › Treasuries no longer exists). The id stays reserved; nothing to run.
 
-#### UAT-ADM-07 — Treasury access decisions · critical
-Refs: CP-29 · WF-09 step 1 · BR-27 · TRS S-T2-ok, S-T2-sod, S-T2-state, S-T3-reason, S-T4-ok.
-Run after UAT-CSH-01 created the cashier's pending request (and, as `lab.admin`, after requesting access on MAIN-CASH from the administrator's own browser).
-1. As `lab.admin`, Finance › Treasury access (`/treasury/access`): on **your own** pending request click `Approve`.
-2. Sign in as `lab.admin.manager`: `Approve` the administrator's request (comment optional); `Approve` the cashier's request `TRQ-2026-nnnnn`.
-3. `Approve` the same request again (force a second click / stale list).
-4. On a second pending request (ask the clerk to request access on NORTH-CASH): `Reject`, leave the reason empty, confirm.
-5. `Reject` it again with the reason "wrong branch".
-6. On the administrator's approved request: `Revoke` with reason "test revoke"; then request again from the same browser.
-7. Arabic check.
-Expected: (1) your own pending row offers `Cancel request` only; forcing the call answers `SOD-TRS-001` "The requester cannot approve their own request." (2) both requests **Approved**; the row shows the approver and the decision time (the approve dialog takes no comment in Release 1). (3) refused `TRS-013` ("not allowed while the request is in state Approved"). (4) refused — the dialog insists: "A reason is required." (`TRS-020`). (5) **Rejected** (the reason is kept on the request; the list shows the decider and time). (6) **Revoked**; the new request is a new `TRQ` number, Pending; the revoked row stays as history.
-Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
+#### UAT-ADM-07 — Treasury access decisions · withdrawn
+**Withdrawn on 2026-10-20** (change request LIS-CR-004: the treasury was removed from the system — payments need no device approval). The id stays reserved; nothing to run.
 
 #### UAT-ADM-08 — Catalogue A: groups, sample types, units, tests, services · critical
 Refs: CP-39, CP-40, CP-41, CP-43, CP-44 · BR-08, BR-19, BR-24 · CAT S-T1-ok/code, S-T9-test, S-T9-members, S-T15, S-T16, S-T17, S-T14-type.
@@ -309,7 +289,7 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 #### UAT-FIN-05 — Payments register and receipts · standard
 Refs: CP-23 (Register tab) · BIL §14.
 Run after UAT-CSH-07. Finance › Payments (`/billing/payments`) › tab `Register`.
-1. Filter the day: list the receipts of the UAT visits with method, treasury, cashier and status (Posted / Voided).
+1. Filter the day: list the receipts of the UAT visits with method, cashier and status (Posted / Voided).
 2. `Reprint` a receipt.
 3. Enter the accession of UAT-REG-03 on the `Collect` tab: the account shows total, discount, patient share, paid, refunded, remaining; the `Pay` button.
 4. Arabic check.
@@ -328,32 +308,20 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 Sign in as `uat.cashier` in the cashier's browser profile; branch MAIN (auto-selected: one branch assigned).
 
-#### UAT-CSH-01 — Request treasury access from this device · critical
-Refs: CP-29 · WF-09 step 1 · BR-27 · TRS S-T1-ok, S-T1-live.
-Finance › Treasury access (`/treasury/access`).
-1. `Request access from this device`: treasury MAIN-CASH, device label "Cashier desk 1". `Request access`.
-2. Request MAIN-CASH again from the same browser.
-3. Tick `My requests only`.
-4. Arabic check.
-Expected: (1) "Access requested."; a row `TRQ-2026-nnnnn` **Pending**, requested by the cashier, device label, treasury (`CODE · name`; the branch is the treasury's), decider column empty. (2) refused `TRS-012` "A pending or approved request already exists for this treasury on this device." (3) only the cashier's rows. The manager approves in UAT-ADM-07.
-Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
+#### UAT-CSH-01 — Request treasury access from this device · withdrawn
+**Withdrawn on 2026-10-20** (change request LIS-CR-004: the treasury was removed from the system — there is no access request). The id stays reserved; nothing to run.
 
-#### UAT-CSH-02 — Payment refused before approval · critical
-Refs: CP-23 · BR-27 · BIL S-T1-station (BIL-020).
-Before the manager approves (or in a browser profile that has no approved request):
-1. Finance › Payments › `Collect`: accession of a visit with a balance (UAT-REG-08 leaves 50 EGP open). `Pay` 50 cash.
-2. Arabic check.
-Expected: the treasury list is empty with "No treasury is approved for you on this device." and the `Request treasury access` link; a forced request answers `BIL-020`. Nothing is recorded.
-Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
+#### UAT-CSH-02 — Payment refused before approval · withdrawn
+**Withdrawn on 2026-10-20** (change request LIS-CR-004: the treasury was removed from the system — a payment needs no approval). The id stays reserved; nothing to run.
 
 #### UAT-CSH-03 — Full payment and receipt · critical
 Refs: CP-23 · WF-09 step 2 · BR-26 · BIL S-T1-ok.
-After approval. Visit: the one UAT-REG-09 saved without payment (patient share 210).
+Visit: the one UAT-REG-09 saved without payment (patient share 210).
 1. Payments › `Collect` › accession → account: remaining 210, status Unpaid.
-2. `Pay`: amount defaults to 210, method Cash, treasury MAIN-CASH, device shown. `Pay`.
+2. `Pay`: amount defaults to 210, method Cash; the card reads "Cashier: <your name>". `Pay`.
 3. `Reprint` the receipt.
 4. Arabic check.
-Expected: (2) "Payment recorded — receipt RCT-2026-nnnnn."; the receipt prints (auto-print); account paid 210, remaining 0, status **Paid**; the payment row shows receipt, time, amount, method, reference, cashier and status; treasury and device are stamped on the payment (Register tab column Treasury; `treasuryCode` / `deviceId` in the account). (3) a reprint copy. Search registrations shows the visit Settled.
+Expected: (2) "Payment recorded — receipt RCT-2026-nnnnn."; the receipt prints (auto-print); account paid 210, remaining 0, status **Paid**; the payment row shows receipt, time, amount, method, reference, cashier and status; the payment is stamped with the cashier and the session branch (no treasury, no device anywhere on the page, the receipt or the CSV). (3) a reprint copy. Search registrations shows the visit Settled.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-CSH-04 — Partial payments, card reference · critical
@@ -394,39 +362,28 @@ Run after UAT-REG-11 cancelled a paid service (balance −150, status **Refund d
 4. Amount 150, reason "Service cancelled". `Refund`. Print the refund receipt.
 5. `Refund the balance` again.
 6. Arabic check.
-Expected: (1) the form shows "Refundable: 150.00 EGP" and the reason list of kind Refund (the Cashier role needs `catalogue.view` for it, §4; without it the form reads "The refund reasons could not be loaded."). (2) refused by the page: "The value must be at most 150." (`BIL-011` "The amount exceeds the refundable balance." on a forced request). (3) refused by the page: the Reason field reads "This field is required." (`BIL-004` on a forced request). (4) "Refund RFD-2026-nnnnn recorded; print the receipt for the patient's signature."; the refund receipt shows amount, method, reason and "I received the amount above." signature box; remaining 0; the refunds register lists the refund with reason, cashier and treasury. (5) the Refunds form reads "Nothing is refundable on this visit."; the Payments account offers no `Refund the balance` link any more.
+Expected: (1) the form shows "Refundable: 150.00 EGP" and the reason list of kind Refund (the Cashier role needs `catalogue.view` for it, §4; without it the form reads "The refund reasons could not be loaded."). (2) refused by the page: "The value must be at most 150." (`BIL-011` "The amount exceeds the refundable balance." on a forced request). (3) refused by the page: the Reason field reads "This field is required." (`BIL-004` on a forced request). (4) "Refund RFD-2026-nnnnn recorded; print the receipt for the patient's signature."; the refund receipt shows amount, method, reason and "I received the amount above." signature box; remaining 0; the refunds register lists the refund with reason and cashier. (5) the Refunds form reads "Nothing is refundable on this visit."; the Payments account offers no `Refund the balance` link any more.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
-#### UAT-CSH-08 — Treasury of another branch · standard
-Refs: CP-23 · BIL S-T1-station (BIL-022), ORG AS-S1.
-Precondition: the cashier is assigned MAIN and NORTH (UAT-ADM-03 edit), has an approved request on NORTH-CASH, and NORTH-CASH is active.
-1. Sign in, choose branch **MAIN** on the branch selection page.
-2. `Pay` a balance on NORTH-CASH.
-3. Sign out, sign in with branch NORTH, pay on NORTH-CASH.
+#### UAT-CSH-08 — Payment stamped with the session branch · standard
+Refs: CP-23 · CP-04 · LIS-CR-004 (cashier + session branch), ORG AS-S1.
+Precondition: the cashier is assigned MAIN and NORTH (UAT-ADM-03 edit).
+1. Sign in, choose branch **NORTH** on the branch selection page.
+2. `Pay` a balance of a NORTH visit.
+3. Payments register: filter the day; open the payment's receipt.
 4. Arabic check.
-Expected: (1) the branch page lists only the assigned branches (CP-04). (2) NORTH-CASH is not offered for the MAIN session; a forced request answers `BIL-022` "The treasury belongs to another branch than your session." (3) recorded, stamped with branch NORTH.
+Expected: (1) the branch page lists only the assigned branches (CP-04). (2) "Payment recorded"; no treasury or device is asked. (3) the row and the receipt carry the cashier and branch **NORTH**; a MAIN session does not see it in the branch's cash of the day.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
-#### UAT-CSH-09 — Revoked access · critical
-Refs: CP-29 · BR-27 · TRS S-T4-ok · BIL S-T1-station.
-1. Manager (`lab.admin.manager`): Treasury access › `Revoke` the cashier's MAIN-CASH approval with a reason.
-2. Cashier: `Pay` any balance on MAIN-CASH.
-3. Cashier: request MAIN-CASH again; manager approves.
-4. Arabic check.
-Expected: (1) row **Revoked** with the decider and time (the reason is kept on the request; the list does not show it yet — open point D-05 of the first dry run). (2) the treasury disappears from the Payments page ("No treasury is approved for you on this device."); `BIL-020` on a forced request. (3) a new TRQ, approved; payments work again.
-Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
+#### UAT-CSH-09 — Revoked access · withdrawn
+**Withdrawn on 2026-10-20** (change request LIS-CR-004: the treasury was removed from the system — there is no access to revoke). The id stays reserved; nothing to run.
 
-#### UAT-CSH-10 — Cancel own request · standard
-Refs: CP-29 · TRS S-T5-ok, S-T5-other.
-1. Cashier: request access on NORTH-CASH (pending). `Cancel request`, reason optional, confirm.
-2. Clerk (`uat.reception`): request NORTH-CASH; cashier tries `Cancel request` on the clerk's row.
-3. Arabic check.
-Expected: (1) **Cancelled**. (2) the button is absent on another user's row; a forced request answers `TRS-030` "Only the requester can cancel a request."
-Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
+#### UAT-CSH-10 — Cancel own request · withdrawn
+**Withdrawn on 2026-10-20** (change request LIS-CR-004: the treasury was removed from the system — there is no access request). The id stays reserved; nothing to run.
 
 ### 5.4 Reception clerk (UAT-REG)
 
-Sign in as `uat.reception`; branch MAIN; treasury MAIN-CASH approved on the clerk's browser (UAT-CSH-01/UAT-ADM-07 run for the clerk as well).
+Sign in as `uat.reception`; branch MAIN.
 
 #### UAT-REG-01 — Sign in, branch, dashboard · critical
 Refs: CP-03, CP-04, CP-05 · ACC S-D1 · ORG AS-S1.
@@ -456,7 +413,7 @@ Reception › Registration (`/registration/new`).
 2. Visit: payer Cash / Default (default), referring doctor DR01, flags none.
 3. Service entry: type `K` Enter, `GLU` Enter, `HGB` Enter. 
 4. Preparation "Fasting hours?" → `12 h`.
-5. Payment card: method Cash, amount (defaults to the amount due 360), treasury MAIN-CASH. 
+5. Payment card: method Cash, amount (defaults to the amount due 360). 
 6. Ctrl+S.
 7. In the success dialog open the labels and the job order, then `Open the visit`.
 8. Reception › Search registrations: find the accession.
@@ -511,12 +468,11 @@ Refs: CP-06 · WF-02 step 6 · BR-26 · REG Q19 · BIL S-T1-ref, S-T1-over.
 Expected: (1) saved; "100 received — receipt …"; Search registrations shows remaining **50**, balance Partial (used by UAT-CSH-04). (2) refused by the page: "Enter the transaction reference." (3) refused by the page: "The amount paid cannot exceed the amount due." (4) saved with the card receipt.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
-#### UAT-REG-09 — Registration without an approved treasury · critical
-Refs: CP-06 · BR-27 · REG Q19 · registration dictionary `payment.noTreasury`.
-In a browser profile where the clerk has **no** approved treasury (a fresh profile):
-1. New registration (Mona Hassan): K + GLU. Look at the Payment card. Save.
+#### UAT-REG-09 — Registration saved without a payment · critical
+Refs: CP-06 · CP-23 · LIS-CR-004 (the payment panel needs no treasury).
+1. New registration (Mona Hassan): K + GLU. In the Payment card type amount **0**. Save.
 2. Arabic check.
-Expected: (1) the card reads "No treasury is approved for you on this device in this branch. The visit is saved without a payment; collect it on the Payments page."; the visit is saved (ACC number, labels, job order), no receipt; the success dialog offers `Collect on the Payments page`; Search registrations shows remaining 210.00, status Open (used by UAT-CSH-03).
+Expected: (1) the card shows no treasury, no device and no "request access" link; the visit is saved (ACC number, labels, job order), no receipt; Search registrations shows remaining 210.00, status Open (used by UAT-CSH-03).
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-10 — Search registrations and row actions · critical
@@ -955,7 +911,7 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 Refs: cross-cutting "Tenancy & branches" · PLT S-PLT-403 · wave-4 fix (return URL per portal) · TRS/REG/RES/BIL S-TENANT.
 1. Signed in as `lab.admin` (client portal), type the URL `/admin/clients`.
 2. Sign out as `lab.admin`; sign in as `platform.admin` on the same browser.
-3. As `labb.admin` (UAT Lab B): Search registrations by the accession of UAT-REG-03; Patients by Mona's number; Treasury access list.
+3. As `labb.admin` (UAT Lab B): Search registrations by the accession of UAT-REG-03; Patients by Mona's number; Payments register.
 4. As `uat.ops`: Clients › UAT Lab B › "Open wallet"; try any client-portal page URL (`/registration/new`).
 5. Arabic check.
 Expected: (1) the URL redirects to the client dashboard — the client portal has no admin routes; a forced API call answers `PLT-403`. (2) the platform administrator lands on the **Super Admin** home, never on the client dashboard (each portal returns only to its own routes). (3) nothing found: no visit, patient or request of the UAT laboratory is visible from Lab B. (4) the wallet opens (Subscriptions & wallets with the client selected); a client-page URL redirects to the Super Admin home — client pages are not available in the Super Admin portal (the server scopes every call to the platform tenant regardless).
@@ -987,9 +943,9 @@ signs when the three Super Admin personas have accepted.
 
 | Persona | Scripts | Critical | Signature (name, date) |
 | --- | --- | --- | --- |
-| Laboratory administrator | UAT-ADM-01…11 (11) | ADM-01, 02, 03, 06, 07, 08 | |
+| Laboratory administrator | UAT-ADM-01…11 (11; ADM-06, 07 withdrawn) | ADM-01, 02, 03, 08 | |
 | Accounts | UAT-FIN-01…06 (6) | FIN-01, 02 | |
-| Cashier | UAT-CSH-01…10 (10) | CSH-01, 02, 03, 04, 05, 07, 09 | |
+| Cashier | UAT-CSH-01…10 (10; CSH-01, 02, 09, 10 withdrawn) | CSH-03, 04, 05, 07 | |
 | Reception clerk | UAT-REG-01…15 (15) | REG-01, 03, 04, 05, 07, 08, 09, 10, 11 | |
 | Phlebotomist / technician (samples) | UAT-SMP-01…03 (3) | SMP-01 | |
 | Laboratory technician | UAT-RES-01…08 (8) | RES-01, 02, 04, 08 | |
@@ -1017,10 +973,10 @@ signs when the three Super Admin personas have accepted.
 | CP-12 Price query | FIN-02, FIN-04, REG-12 |
 | CP-18 Worklist | RES-01, RES-08, SMP-01 |
 | CP-19 Results by accession | RES-02…08, VER-01…06 |
-| CP-23 Payments (+ refund action of CP-24, void) | CSH-02…09, FIN-05, FIN-06 |
+| CP-23 Payments (+ refund action of CP-24, void) | CSH-03…08, REG-09, FIN-05, FIN-06 |
 | CP-26 Cancellations (as action of CP-10) | REG-11, SMP-03 |
-| CP-28 Treasuries | ADM-06 |
-| CP-29 Treasury requests | CSH-01, CSH-09, CSH-10, ADM-07 |
+| CP-28 Treasuries | withdrawn (LIS-CR-004) |
+| CP-29 Treasury requests | withdrawn (LIS-CR-004) |
 | CP-32 Payers & contracts | FIN-01 |
 | CP-33 Base price lists | FIN-02, FIN-03 |
 | CP-36 Branches | ADM-01 |
@@ -1047,7 +1003,7 @@ signs when the three Super Admin personas have accepted.
 | WF-01 Laboratory onboarding | OPS-07 (wizard), OPS-02 (manual), ADM-01…03, FIN-01, FIN-02, REG-03 |
 | WF-02 Walk-in patient — registration to receipt | REG-03…09, CSH-03, CSH-04 |
 | WF-06 Result entry, review, verification and printing (R1 part) | RES-01…04, VER-01…06 |
-| WF-09 Money movements (R1 part: treasury, payments, refund, cancellation) | CSH-01…09, REG-11, ADM-07 |
+| WF-09 Money movements (R1 part: payments, refund, cancellation) | CSH-03…08, REG-09, REG-11 |
 | WF-10 Pricing maintenance (R1 part: lists, payers) | FIN-01…04 |
 | WF-11 Privileges administration | ADM-02, ADM-03, ADM-05 |
 | WF-12 Platform operations | OPS-02…05, MDR-01…03, SUP-05, SUP-06 |
@@ -1079,7 +1035,7 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 5 | The notification gateway of the test lane decides whether the *gateway* scripts can run. | REG-02, OPS-07, VER-07 |
 | 6 | The refund reason list (CP-24) is read from the catalogue, so the Cashier role needs `catalogue.view` (now in §4); alternatively Billing exposes its own reason list. | CSH-07 |
 | 7 | Service-entry resolution (code + Enter) needs `registration.create` (REG intake §6): on the Price query page a `registration.view`-only role (Accounts) falls back to the picker without a message. Confirm, or relax the policy to `registration.view`. | FIN-02, FIN-04 |
-| 8 | The treasury-access list shows the decider and time but not the decision reason / revocation reason (D-05 of the first dry run). | CSH-09, ADM-07 |
+| 8 | Closed 2026-10-20: the treasury-access list was withdrawn with the treasury (LIS-CR-004). | — |
 | 9 | Printing a verified report from Search registrations › Documents needs `results.export` and the print result right; the Reception role of §4 holds `results.view` only (preview works). Decide whether reception prints reports. | VER-06, REG-10 |
 | 10 | The Countries master gives Egypt a mobile length of 10: an Egyptian number typed with the trunk 0 (11 digits, as the seeded patients) is refused under "Egypt (10)" and accepted under "Any". Confirm the convention. | REG-03, SMP-01 |
 | 11 | The creation of a client (tenant, wallet, branch, administrator, master-data copy) is audited in the **new laboratory's** trail, where its administrator sees "Created Tenant · Platform Administrator"; the platform trail starts with the first later change (deactivation, top-up). The security-event ledger records `TENANT_PROVISIONED`. Decide whether the platform trail must carry the provisioning (D-15 of the Super Admin dry run). | SUP-04, OPS-02 |
@@ -1095,3 +1051,4 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 0.3 | 2026-10-10 | Claude Code (UAT dry-run agent) | Corrections from the automated dry run of UAT-CSH-01/02/03/04/05/07/09, UAT-FIN-01/02, UAT-SMP-01, UAT-RES-01/02/04/08 and UAT-VER-01/02/03/05/06 (`results/2026-10-10_dry-run_laboratory.md`): §4 Cashier role gains `catalogue.view`; expected texts aligned with the built screens (page validators on the Payments / Refunds / price-grid forms, the Refunds page reached by `Refund the balance`, validator message for the web username, no deactivate action on the Default tier, picker fallback of the service entry for Accounts, status boxes of the worklist, comment-library panel, absent Verify / Amend actions, RES-014 on printing a unit with missing values, delta tooltip text, status log as the carrier of signatures and print copies, preview-only for the clerk); open points 6–10. Ids unchanged. |
 | 0.4 | 2026-10-10 | Claude Code (UAT dry-run agent) | Corrections from the automated dry run of UAT-OPS-01/02/03/05, UAT-MDR-01 and UAT-SUP-01/02/04/05/08 (`results/2026-10-10_dry-run_super-admin.md`): §4 Operations Admin keys (`wallet.view/create/manage`); expected texts aligned with the built screens (page refusals for the deactivation reason, top-up reference and amount, empty role, username format, parameter range; rows offering only the opposite life-cycle action; disabled Lock / Reset on the main administrator; no Privileges tab in the platform user editor; the global catalogue preconditions and the age band of MDR-01; trial only for wizard clients; the audit chain message; client creation audited in the laboratory's trail); open points 11–13. Ids unchanged. |
 | 0.5 | 2026-10-14 | Claude Code | UAT-ADM-08 gains step 13 (the parent-services block of the test editor, change request 2026-10-14: leave and rejoin a profile, locked chip on a test service); the Arabic check becomes step 14. Ids unchanged. |
+| 0.6 | 2026-10-20 | Claude Code | Treasury removed from the system (change request LIS-CR-004): UAT-ADM-06, UAT-ADM-07, UAT-CSH-01, UAT-CSH-02, UAT-CSH-09 and UAT-CSH-10 withdrawn (ids reserved); UAT-CSH-08 becomes "Payment stamped with the session branch"; UAT-REG-09 becomes "Registration saved without a payment" (amount 0); payment steps, personas (no `treasury.*` keys), run order, coverage and open point 8 updated. |

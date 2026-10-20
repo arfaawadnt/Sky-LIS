@@ -18,7 +18,7 @@ const isKind = (value: unknown): value is PaymentMethod => typeof value === 'str
 
 /**
  * Payment methods set-up list (Sky LIS CP-30b, change request 2026-10-19 P-C10) on the generic master-data page: code
- * (immutable), bilingual name, kind (the money semantics: cash lives in the treasury drawer), whether a transaction
+ * (immutable), bilingual name, kind (the money semantics: cash lives in the cashier's drawer), whether a transaction
  * reference is required, the order of the pick lists, and activation (deactivate instead of delete: posted movements
  * keep the code). An empty list asks the server for the four defaults (CASH, CARD, POS, TRANSFER) once, when the user
  * may manage billing; the server keeps at least one active cash method (BIL-052).

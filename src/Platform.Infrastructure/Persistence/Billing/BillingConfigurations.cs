@@ -35,12 +35,16 @@ internal sealed class VisitAccountConfiguration : IEntityTypeConfiguration<Visit
 
 /// <summary>
 /// <c>app.payments</c> — the MODULES.md §5 contract (<c>id, tenant_id, visit_id, receipt_number, amount, method, status,
-/// paid_at_utc, treasury_id, cashier_user_id</c>) plus reference, device, branch, batch and the void columns. Receipt
-/// numbers are unique per tenant (INV-BIL-003); CHECK constraints repeat the aggregate's rules; a trigger keeps the row
-/// immutable except for the void (<c>Billing.migration.sql</c>).
+/// paid_at_utc, cashier_user_id</c>) plus reference, branch, batch and the void columns. Receipt numbers are unique per
+/// tenant (INV-BIL-003); CHECK constraints repeat the aggregate's rules; a trigger keeps the row immutable except for the
+/// void (<c>Billing.migration.sql</c>). <c>treasury_id</c> and <c>device_id</c> are history of the withdrawn treasury
+/// (LIS-CR-004, 2026-10-20): nullable, no foreign key, never written by a new payment.
 /// </summary>
 internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 {
+    /// <summary>The length of the historical <c>device_id</c> column (the withdrawn BR-27 device identity).</summary>
+    internal const int LegacyDeviceIdLength = 128;
+
     public void Configure(EntityTypeBuilder<Payment> builder)
     {
         builder.ToTable("payments", AppDbContext.AppSchema, table =>
@@ -60,19 +64,19 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(payment => payment.Method).IsRequired();
         builder.Property(payment => payment.MethodCode).HasMaxLength(Payment.MaxMethodCodeLength);   // the definition's code at posting time; null on legacy rows
         builder.Property(payment => payment.Reference).HasMaxLength(Payment.MaxReferenceLength);
-        builder.Property(payment => payment.DeviceId).HasMaxLength(CashierStation.MaxDeviceIdLength).IsRequired();
+        builder.Property(payment => payment.TreasuryId);   // history only (LIS-CR-004): app.treasuries is an orphan table
+        builder.Property(payment => payment.DeviceId).HasMaxLength(LegacyDeviceIdLength);
         builder.Property(payment => payment.BranchId).IsRequired();   // the session branch; FK to app.branches belongs to the Organization package
         builder.Property(payment => payment.PaidAtUtc).IsRequired();
         builder.Property(payment => payment.Status).IsRequired();
         builder.Property(payment => payment.VoidReason).HasMaxLength(Payment.MaxReasonLength);
 
-        builder.HasOne<Domain.Treasury.Treasury>().WithMany().HasForeignKey(payment => new { payment.TenantId, payment.TreasuryId }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<PlatformUser>().WithMany().HasForeignKey(payment => payment.CashierUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<PlatformUser>().WithMany().HasForeignKey(payment => payment.VoidedByUserId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(payment => new { payment.TenantId, payment.VisitId });
         builder.HasIndex(payment => new { payment.TenantId, payment.PaidAtUtc });
-        builder.HasIndex(payment => new { payment.TenantId, payment.TreasuryId, payment.PaidAtUtc });
+        builder.HasIndex(payment => new { payment.TenantId, payment.BranchId, payment.PaidAtUtc });
         builder.HasIndex(payment => new { payment.TenantId, payment.CashierUserId, payment.PaidAtUtc });
         builder.HasIndex(payment => new { payment.TenantId, payment.BatchId }).HasFilter("batch_id IS NOT NULL");
 
@@ -80,7 +84,7 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
     }
 }
 
-/// <summary><c>app.refunds</c> — the MODULES.md §5 contract (<c>id, tenant_id, visit_id, number, amount, method, refunded_at_utc, treasury_id</c>) plus reference, reason, note, device, cashier and branch. Immutable (trigger).</summary>
+/// <summary><c>app.refunds</c> — the MODULES.md §5 contract (<c>id, tenant_id, visit_id, number, amount, method, refunded_at_utc</c>) plus reference, reason, note, cashier and branch; <c>treasury_id</c> / <c>device_id</c> are nullable history (LIS-CR-004). Immutable (trigger).</summary>
 internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
 {
     public void Configure(EntityTypeBuilder<Refund> builder)
@@ -100,20 +104,20 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         builder.Property(refund => refund.Reference).HasMaxLength(Payment.MaxReferenceLength);
         builder.Property(refund => refund.ReasonId).IsRequired();   // app.reasons (Catalogue B), referenced by id
         builder.Property(refund => refund.Note).HasMaxLength(Refund.MaxNoteLength);
-        builder.Property(refund => refund.DeviceId).HasMaxLength(CashierStation.MaxDeviceIdLength).IsRequired();
+        builder.Property(refund => refund.TreasuryId);   // history only (LIS-CR-004)
+        builder.Property(refund => refund.DeviceId).HasMaxLength(PaymentConfiguration.LegacyDeviceIdLength);
         builder.Property(refund => refund.BranchId).IsRequired();
         builder.Property(refund => refund.RefundedAtUtc).IsRequired();
 
-        builder.HasOne<Domain.Treasury.Treasury>().WithMany().HasForeignKey(refund => new { refund.TenantId, refund.TreasuryId }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<PlatformUser>().WithMany().HasForeignKey(refund => refund.CashierUserId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(refund => new { refund.TenantId, refund.VisitId });
         builder.HasIndex(refund => new { refund.TenantId, refund.RefundedAtUtc });
-        builder.HasIndex(refund => new { refund.TenantId, refund.TreasuryId, refund.RefundedAtUtc });
+        builder.HasIndex(refund => new { refund.TenantId, refund.BranchId, refund.RefundedAtUtc });
     }
 }
 
-/// <summary><c>app.cash_closings</c>: the totals snapshot lives in columns of the same row; immutable (trigger).</summary>
+/// <summary><c>app.cash_closings</c>: the totals snapshot lives in columns of the same row; immutable (trigger). The scope is the branch (+ cashier); <c>treasury_id</c> is nullable history (LIS-CR-004).</summary>
 internal sealed class CashClosingConfiguration : IEntityTypeConfiguration<CashClosing>
 {
     public void Configure(EntityTypeBuilder<CashClosing> builder)
@@ -125,6 +129,7 @@ internal sealed class CashClosingConfiguration : IEntityTypeConfiguration<CashCl
         builder.HasIndex(closing => new { closing.TenantId, closing.Number }).IsUnique();
 
         builder.Property(closing => closing.BranchId).IsRequired();
+        builder.Property(closing => closing.TreasuryId);   // history only (LIS-CR-004)
         builder.Property(closing => closing.PeriodFromUtc).IsRequired();
         builder.Property(closing => closing.PeriodToUtc).IsRequired();
         builder.Property(closing => closing.ExpectedCash).HasPrecision(BillingAmounts.Precision, BillingAmounts.Scale).IsRequired();
@@ -151,11 +156,10 @@ internal sealed class CashClosingConfiguration : IEntityTypeConfiguration<CashCl
         });
         builder.Navigation(closing => closing.Totals).IsRequired();
 
-        builder.HasOne<Domain.Treasury.Treasury>().WithMany().HasForeignKey(closing => new { closing.TenantId, closing.TreasuryId }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<PlatformUser>().WithMany().HasForeignKey(closing => closing.CashierUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<PlatformUser>().WithMany().HasForeignKey(closing => closing.ClosedByUserId).OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(closing => new { closing.TenantId, closing.TreasuryId, closing.PeriodFromUtc });
+        builder.HasIndex(closing => new { closing.TenantId, closing.BranchId, closing.PeriodFromUtc });
         builder.HasIndex(closing => new { closing.TenantId, closing.ClosedAtUtc });
     }
 

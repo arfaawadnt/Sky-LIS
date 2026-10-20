@@ -33,19 +33,16 @@ internal sealed class BranchDashboardReader(AppDbContext context, ITenantSetting
         GROUP BY 1
         """;
 
-    // Cash of the day on the branch's treasuries (the cash-closing view), else on the visit's branch (intake §16 Q3).
+    // Cash of the day by the movement's own branch (the cashier's session branch, as the cash closing scopes it;
+    // LIS-CR-004 2026-10-20: no treasury join).
     internal const string PaymentsSql = """
         SELECT COALESCE(sum(p.amount), 0)::numeric FROM app.payments p
-        LEFT JOIN app.treasuries t ON t.tenant_id = p.tenant_id AND t.id = p.treasury_id
-        LEFT JOIN app.visits v ON v.tenant_id = p.tenant_id AND v.id = p.visit_id
-        WHERE p.status = 'Posted' AND p.paid_at_utc >= @from AND p.paid_at_utc < @to AND COALESCE(t.branch_id, v.branch_id) = @branch
+        WHERE p.status = 'Posted' AND p.paid_at_utc >= @from AND p.paid_at_utc < @to AND p.branch_id = @branch
         """;
 
     internal const string RefundsSql = """
         SELECT COALESCE(sum(r.amount), 0)::numeric FROM app.refunds r
-        LEFT JOIN app.treasuries t ON t.tenant_id = r.tenant_id AND t.id = r.treasury_id
-        LEFT JOIN app.visits v ON v.tenant_id = r.tenant_id AND v.id = r.visit_id
-        WHERE r.refunded_at_utc >= @from AND r.refunded_at_utc < @to AND COALESCE(t.branch_id, v.branch_id) = @branch
+        WHERE r.refunded_at_utc >= @from AND r.refunded_at_utc < @to AND r.branch_id = @branch
         """;
 
     internal const string SamplesReceivedSql = """

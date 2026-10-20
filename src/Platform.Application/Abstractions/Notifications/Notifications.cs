@@ -64,13 +64,10 @@ public static class NotificationTemplateCodes
     /// <summary>The portal address of a new laboratory (CP-02 step 4). Placeholders: <c>labName</c>, <c>url</c>, <c>username</c>.</summary>
     public const string PortalUrl = "portal-url";
 
-    /// <summary>A treasury access request awaits a decision (CP-29). Placeholders: <c>number</c>, <c>requester</c>, <c>treasury</c>.</summary>
-    public const string TreasuryRequest = "treasury-request";
-
     /// <summary>A panic value was verified (CP-20). Placeholders: <c>patient</c>, <c>test</c>, <c>value</c>, <c>accession</c>.</summary>
     public const string PanicValue = "panic-value";
 
-    public static readonly IReadOnlyList<string> All = [Otp, PasswordRecovery, PortalUrl, TreasuryRequest, PanicValue];
+    public static readonly IReadOnlyList<string> All = [Otp, PasswordRecovery, PortalUrl, PanicValue];
 }
 
 /// <summary>

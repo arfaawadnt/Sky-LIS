@@ -21,7 +21,8 @@ public sealed partial class PermissionCatalogTests
         Assert.True(PermissionCatalog.IsKnown(PermissionCatalog.Key(PermissionCatalog.Platform, PermissionAction.Manage)));
         Assert.True(PermissionCatalog.IsKnown("audit.export"));
         Assert.True(PermissionCatalog.IsKnown("organization.export"));   // UAT R1-05: registers export under the module's export key
-        Assert.True(PermissionCatalog.IsKnown("treasury.export"));
+        Assert.True(PermissionCatalog.IsKnown("billing.export"));
+        Assert.False(PermissionCatalog.IsKnown("treasury.view"));   // LIS-CR-004: the treasury group is withdrawn
         Assert.False(PermissionCatalog.IsKnown("audit.manage"));
         Assert.False(PermissionCatalog.IsKnown("Platform.Manage"));
         Assert.False(PermissionCatalog.IsKnown(string.Empty));

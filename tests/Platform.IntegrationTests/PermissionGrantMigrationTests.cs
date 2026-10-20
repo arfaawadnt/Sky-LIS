@@ -35,7 +35,7 @@ public sealed class PermissionGrantMigrationTests(DatabaseFixture fixture)
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var migrator = context.GetService<IMigrator>();
 
-        var labAdministratorBefore = EffectivePrivileges.TenantGrantableKeys.Where(key => key is not "organization.export" and not "treasury.export").ToArray();
+        var labAdministratorBefore = EffectivePrivileges.TenantGrantableKeys.Where(key => key is not "organization.export").ToArray();
         try
         {
             await DatabaseFixture.TruncateAsync(context);
@@ -54,8 +54,9 @@ public sealed class PermissionGrantMigrationTests(DatabaseFixture fixture)
             Assert.Equal(PermissionCatalog.Keys.Order(StringComparer.Ordinal), await KeysAsync(platformAdministrator));
             Assert.Equal(["organization.export", "organization.manage", "organization.view", "tenancy.view"], await KeysAsync(platformSupport));
             Assert.Equal(EffectivePrivileges.TenantGrantableKeys, await KeysAsync(labAdministrator));
-            Assert.Equal(["treasury.export", "treasury.manage", "treasury.view"], await KeysAsync(treasurer));
-            Assert.Equal(["organization.view", "treasury.create", "treasury.view"], await KeysAsync(reception));
+            // LIS-CR-004 (migration TreasuryRemoved): the withdrawn treasury.* keys are purged, the export key granted on the way included
+            Assert.Empty(await KeysAsync(treasurer));
+            Assert.Equal(["organization.view"], await KeysAsync(reception));
             Assert.Equal(["organization.view"], await KeysAsync(namesake));   // only the platform tenant's administrator gets the catalogue
         }
         finally

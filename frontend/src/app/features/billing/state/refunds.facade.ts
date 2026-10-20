@@ -6,16 +6,15 @@ import { AuthStore } from '../../../core/auth/auth.store';
 import { mutation } from '../../../core/state/mutation';
 import { BillingApi, type DownloadedFile } from '../data/billing.api';
 import { type MovementInput, methodCodeOf } from '../ui/movement-form.component';
-import { CashDeskFacade, reloadWhenSettled } from './cash-desk.facade';
+import { reloadWhenSettled } from './cash-desk.facade';
 import type { VisitLookup } from './payments.facade';
 
-export const DEFAULT_REFUND_FILTER: RefundRegisterFilter = { accession: null, fromUtc: null, toUtc: null, treasuryId: null, method: null, page: 1, pageSize: 50 };
+export const DEFAULT_REFUND_FILTER: RefundRegisterFilter = { accession: null, fromUtc: null, toUtc: null, method: null, page: 1, pageSize: 50 };
 
 /** CP-24 Refunds: a visit with a negative balance, the refund mutation (BR-14), the catalogue reasons and the refunds register. */
 @Injectable()
 export class RefundsFacade {
   private readonly api = inject(BillingApi);
-  private readonly desk = inject(CashDeskFacade);
   private readonly auth = inject(AuthStore);
 
   readonly lookup = signal<VisitLookup | null>(null);
@@ -48,8 +47,6 @@ export class RefundsFacade {
         reference: input.reference,
         reasonId: input.reasonId,
         note: input.note,
-        treasuryId: input.treasuryId,
-        deviceId: this.desk.deviceId(),
       }),
     { then: () => this.refresh() },
   );

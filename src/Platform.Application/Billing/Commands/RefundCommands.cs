@@ -15,7 +15,7 @@ namespace Platform.Application.Billing.Commands;
 /// right <c>CanRefund</c> (BIL-041, intake Q1).
 /// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Approve)]
-public sealed record RecordRefundCommand(Guid VisitId, decimal Amount, string Method, string? Reference, Guid ReasonId, string? Note, Guid TreasuryId, string DeviceId, string? MethodCode = null) : ICommand<RefundCreated>;
+public sealed record RecordRefundCommand(Guid VisitId, decimal Amount, string Method, string? Reference, Guid ReasonId, string? Note, string? MethodCode = null) : ICommand<RefundCreated>;
 
 public sealed class RecordRefundValidator : AbstractValidator<RecordRefundCommand>
 {
@@ -27,14 +27,11 @@ public sealed class RecordRefundValidator : AbstractValidator<RecordRefundComman
         RuleFor(command => command.Reference).MaximumLength(Payment.MaxReferenceLength);
         RuleFor(command => command.ReasonId).NotEmpty();
         RuleFor(command => command.Note).MaximumLength(Refund.MaxNoteLength);
-        RuleFor(command => command.TreasuryId).NotEmpty();
-        RuleFor(command => command.DeviceId).NotEmpty().MaximumLength(CashierStation.MaxDeviceIdLength);
     }
 }
 
 public sealed class RecordRefundHandler(
     IBillableVisitLookup visits,
-    ITreasuryStationLookup stations,
     IRefundReasonLookup reasons,
     IPaymentMethodRepository methods,
     IVisitAccountRepository accounts,
@@ -48,9 +45,8 @@ public sealed class RecordRefundHandler(
     {
         var actor = BillingActor.Of(user);
         BillingRights.RequireRefund(privileges);
-        var branch = BranchScope.Require(user);
+        var cashier = BillingCashier.Of(actor, user);
         var visit = await visits.GetAsync(command.VisitId, cancellationToken) ?? throw BillingNotFound.Visit();
-        var station = await BillingStations.ResolveAsync(stations, command.TreasuryId, actor, command.DeviceId, branch, cancellationToken);
         var method = await BillingMethods.ResolveAsync(methods, command.Method, command.MethodCode, cancellationToken);
         if (command.ReasonId != Guid.Empty && await reasons.GetActiveAsync(command.ReasonId, cancellationToken) is null)
         {
@@ -59,11 +55,11 @@ public sealed class RecordRefundHandler(
 
         var existing = await accounts.GetForUpdateAsync(visit.VisitId, cancellationToken);
         var account = existing ?? VisitAccount.Open(visit.VisitId);
-        account.CheckRefund(command.Amount, method, command.Reference, command.ReasonId, command.Note, station, visit.Charge);
+        account.CheckRefund(command.Amount, method, command.Reference, command.ReasonId, command.Note, cashier, visit.Charge);
 
         var now = clock.UtcNow;
         var number = await numbers.NextAsync(Refund.NumberKind, Refund.NumberPrefix, now, cancellationToken);
-        var refund = account.RecordRefund(number, command.Amount, method, command.Reference, command.ReasonId, command.Note, station, visit.Charge, now);
+        var refund = account.RecordRefund(number, command.Amount, method, command.Reference, command.ReasonId, command.Note, cashier, visit.Charge, now);
         if (existing is null)
         {
             accounts.Add(account);

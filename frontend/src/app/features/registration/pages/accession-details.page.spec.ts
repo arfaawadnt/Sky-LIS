@@ -81,7 +81,7 @@ const account = {
   balanceStatus: 'Partial',
   currency: 'EGP',
   payments: [
-    { id: 'pay-1', receiptNumber: 'RCP-2026-00001', visitId: 'v-1', accession: 'ACC-2026-00001', amount: 40, method: 'Cash', reference: null, treasuryId: 't-1', treasuryCode: 'T1', treasuryNameEn: 'Main desk', treasuryNameAr: 'الخزينة الرئيسية', cashierUserId: 'u-1', cashierName: 'Cashier One', branchId: 'b-1', deviceId: 'd-1', batchId: null, paidAtUtc: '2026-10-10T08:10:00Z', status: 'Posted', isFrozen: false, voidReason: null, voidedByName: null, voidedAtUtc: null },
+    { id: 'pay-1', receiptNumber: 'RCP-2026-00001', visitId: 'v-1', accession: 'ACC-2026-00001', amount: 40, method: 'Cash', reference: null, cashierUserId: 'u-1', cashierName: 'Cashier One', branchId: 'b-1', batchId: null, paidAtUtc: '2026-10-10T08:10:00Z', status: 'Posted', isFrozen: false, voidReason: null, voidedByName: null, voidedAtUtc: null },
   ],
   refunds: [],
 } as unknown as VisitAccountView;

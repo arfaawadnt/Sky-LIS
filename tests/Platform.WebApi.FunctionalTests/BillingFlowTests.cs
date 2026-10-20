@@ -9,7 +9,6 @@ using Platform.Application.Abstractions.Security;
 using Platform.Contracts.Billing;
 using Platform.Contracts.Common;
 using Platform.Contracts.Settings;
-using Platform.Contracts.Treasury;
 using Platform.Domain.Catalogue;
 using Platform.Domain.Organization;
 using Platform.Domain.Tenancy;
@@ -20,9 +19,10 @@ using Platform.WebApi.FunctionalTests.Support;
 namespace Platform.WebApi.FunctionalTests;
 
 /// <summary>
-/// WF-09 over the real API (intake LIS-INT-BIL-001 §16): a cashier with an approved treasury on their device collects
-/// partial and full payments, the refusals arrive as their codes, a supervisor voids, refunds a negative balance and
-/// closes the drawer; permissions decide who may call what (D-04).
+/// WF-09 over the real API (intake LIS-INT-BIL-001 §16): a cashier of the session branch collects partial and full
+/// payments, the refusals arrive as their codes, a supervisor voids, refunds a negative balance and closes the drawer of
+/// the branch per cashier; permissions decide who may call what (D-04). Since LIS-CR-004 (2026-10-20) there is no treasury,
+/// no device and no approval: a body that still carries them is accepted and they are ignored.
 /// </summary>
 public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
@@ -30,11 +30,9 @@ public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
     private const string Refunds = "/api/v1/billing/refunds";
     private const string Closings = "/api/v1/billing/cash-closings";
     private const string CollectionsReport = "/api/v1/billing/collections-report";
-    private const string Device = "device-cash-desk-1";
 
-    private static readonly string[] CashierPermissions = ["billing.view", "billing.create", "treasury.view", "treasury.create", "treasury.manage"];
-    private static readonly string[] SupervisorPermissions = ["billing.view", "billing.approve", "billing.cancel", "billing.manage", "billing.export", "treasury.view", "treasury.create"];
-    private static readonly string[] ManagerPermissions = ["treasury.view", "treasury.approve"];
+    private static readonly string[] CashierPermissions = ["billing.view", "billing.create"];
+    private static readonly string[] SupervisorPermissions = ["billing.view", "billing.approve", "billing.cancel", "billing.manage", "billing.export"];
 
     // The cashier may take money and print invoices (CP-37 special rights); refunds and voids belong to the supervisor.
     private static readonly SpecialRights CashierRights = new(null, canPay: true, canRefund: false, canTransfer: false, canCancel: false, canModifyVerifiedResult: false, canPreviewWithoutVerify: false, canPrintInvoice: true, canSeeVip: false);
@@ -45,27 +43,22 @@ public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         var desk = await DeskAsync();
         var (visitId, accession) = await InsertVisitAsync(desk.Tenant, 300m);
 
-        var mine = await desk.Cashier.GetFromJsonAsync<List<BillingTreasuryItem>>($"/api/v1/billing/my-treasuries?deviceId={Device}");
-        Assert.Equal([desk.TreasuryId], mine!.Select(item => item.Id).ToArray());
-        Assert.Empty((await desk.Cashier.GetFromJsonAsync<List<BillingTreasuryItem>>("/api/v1/billing/my-treasuries?deviceId=unknown-device"))!);
-
         var account = await desk.Cashier.GetFromJsonAsync<VisitAccountView>($"/api/v1/billing/visits/by-accession/{accession}/account");
         Assert.Equal((visitId, 300m, "Unpaid"), (account!.VisitId, account.Remaining, account.BalanceStatus));
 
-        var cash = await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 100m, "Cash", null, desk.TreasuryId, Device));
+        var cash = await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 100m, "Cash", null));
         Assert.Equal(HttpStatusCode.Created, cash.StatusCode);
         var receipt = (await cash.Content.ReadFromJsonAsync<PaymentCreated>())!;
         Assert.StartsWith("RCT-", receipt.ReceiptNumber, StringComparison.Ordinal);
 
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", null, desk.TreasuryId, Device)), HttpStatusCode.UnprocessableEntity, "BIL-003");
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 250m, "Card", "SLIP-9", desk.TreasuryId, Device)), HttpStatusCode.Conflict, "BIL-010");
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 10m, "Cash", null, desk.TreasuryId, "unknown-device")), HttpStatusCode.Forbidden, "BIL-020");
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 10m, "Barter", null, desk.TreasuryId, Device)), HttpStatusCode.BadRequest, ProblemCodes.ValidationFailed);
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(Guid.CreateVersion7(), 10m, "Cash", null, desk.TreasuryId, Device)), HttpStatusCode.NotFound, "BIL-404");
-        await ExpectAsync(desk.Outsider.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 10m, "Cash", null, desk.TreasuryId, Device)), HttpStatusCode.Forbidden, ProblemCodes.Forbidden);
-        await ExpectAsync(desk.NoRight.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 10m, "Cash", null, desk.TreasuryId, Device)), HttpStatusCode.Forbidden, "BIL-040");
+        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", null)), HttpStatusCode.UnprocessableEntity, "BIL-003");
+        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 250m, "Card", "SLIP-9")), HttpStatusCode.Conflict, "BIL-010");
+        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 10m, "Barter", null)), HttpStatusCode.BadRequest, ProblemCodes.ValidationFailed);
+        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(Guid.CreateVersion7(), 10m, "Cash", null)), HttpStatusCode.NotFound, "BIL-404");
+        await ExpectAsync(desk.Outsider.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 10m, "Cash", null)), HttpStatusCode.Forbidden, ProblemCodes.Forbidden);
+        await ExpectAsync(desk.NoRight.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 10m, "Cash", null)), HttpStatusCode.Forbidden, "BIL-040");
 
-        var card = await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 200m, "Card", "SLIP-1", desk.TreasuryId, Device));
+        var card = await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 200m, "Card", "SLIP-1"));
         Assert.Equal(HttpStatusCode.Created, card.StatusCode);
 
         var settled = await desk.Cashier.GetFromJsonAsync<VisitAccountView>($"/api/v1/billing/visits/{visitId}/account");
@@ -102,18 +95,18 @@ public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
     {
         var desk = await DeskAsync();
         var (visitId, _) = await InsertVisitAsync(desk.Tenant, 100m);
-        var paid = (await (await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 100m, "Cash", null, desk.TreasuryId, Device))).Content.ReadFromJsonAsync<PaymentCreated>())!;
+        var paid = (await (await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 100m, "Cash", null))).Content.ReadFromJsonAsync<PaymentCreated>())!;
         await SetShareAsync(desk.Tenant, visitId, 60m);   // a contract transfer re-priced the visit (VisitTransferred)
         var reason = await SeedRefundReasonAsync(desk.Tenant);
 
         var due = await desk.Supervisor.GetFromJsonAsync<VisitAccountView>($"/api/v1/billing/visits/{visitId}/account");
         Assert.Equal((-40m, 40m, "RefundDue"), (due!.Remaining, due.Refundable, due.BalanceStatus));
 
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Refunds, new RecordRefundRequest(visitId, 40m, "Cash", null, reason, null, desk.TreasuryId, Device)), HttpStatusCode.Forbidden, ProblemCodes.Forbidden);
-        await ExpectAsync(desk.Supervisor.PostAsJsonAsync(Refunds, new RecordRefundRequest(visitId, 41m, "Cash", null, reason, null, desk.TreasuryId, Device)), HttpStatusCode.Conflict, "BIL-011");
-        await ExpectAsync(desk.Supervisor.PostAsJsonAsync(Refunds, new RecordRefundRequest(visitId, 40m, "Cash", null, Guid.CreateVersion7(), null, desk.TreasuryId, Device)), HttpStatusCode.UnprocessableEntity, "BIL-016");
+        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Refunds, new RecordRefundRequest(visitId, 40m, "Cash", null, reason, null)), HttpStatusCode.Forbidden, ProblemCodes.Forbidden);
+        await ExpectAsync(desk.Supervisor.PostAsJsonAsync(Refunds, new RecordRefundRequest(visitId, 41m, "Cash", null, reason, null)), HttpStatusCode.Conflict, "BIL-011");
+        await ExpectAsync(desk.Supervisor.PostAsJsonAsync(Refunds, new RecordRefundRequest(visitId, 40m, "Cash", null, Guid.CreateVersion7(), null)), HttpStatusCode.UnprocessableEntity, "BIL-016");
 
-        var refunded = await desk.Supervisor.PostAsJsonAsync(Refunds, new RecordRefundRequest(visitId, 40m, "Cash", null, reason, "transfer to contract", desk.TreasuryId, Device));
+        var refunded = await desk.Supervisor.PostAsJsonAsync(Refunds, new RecordRefundRequest(visitId, 40m, "Cash", null, reason, "transfer to contract"));
         Assert.Equal(HttpStatusCode.Created, refunded.StatusCode);
         var refund = (await refunded.Content.ReadFromJsonAsync<RefundCreated>())!;
         Assert.StartsWith("RFD-", refund.Number, StringComparison.Ordinal);
@@ -125,23 +118,65 @@ public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         factory.Clock.Advance(TimeSpan.FromMinutes(1));
         var from = factory.Clock.UtcNow.AddHours(-2);
         var to = factory.Clock.UtcNow;
-        var preview = await desk.Supervisor.GetFromJsonAsync<CashClosingPreview>($"{Closings}/preview?treasuryId={desk.TreasuryId}&from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}");
+        var preview = await desk.Supervisor.GetFromJsonAsync<CashClosingPreview>($"{Closings}/preview?from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}");
         Assert.Equal((100m, 40m, 60m, 2, false), (preview!.Totals.CashPayments, preview.Totals.CashRefunds, preview.Totals.ExpectedCash, preview.Movements.Count, preview.OverlapsClosedPeriod));
+        Assert.Equal((desk.Branch, (Guid?)null), (preview.BranchId, preview.CashierUserId));
 
-        await ExpectAsync(desk.Supervisor.PostAsJsonAsync(Closings, new CloseCashDrawerRequest(desk.TreasuryId, null, from, to, 55m, null)), HttpStatusCode.UnprocessableEntity, "BIL-034");
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Closings, new CloseCashDrawerRequest(desk.TreasuryId, null, from, to, 60m, null)), HttpStatusCode.Forbidden, ProblemCodes.Forbidden);
-        var closed = await desk.Supervisor.PostAsJsonAsync(Closings, new CloseCashDrawerRequest(desk.TreasuryId, null, from, to, 55m, "5 short, reported"));
+        // the drawer of one cashier: the cashier's payment only (the refund was the supervisor's)
+        var period = $"from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}";
+        var mine = await desk.Supervisor.GetFromJsonAsync<CashClosingPreview>($"{Closings}/preview?cashierUserId={desk.CashierId}&{period}");
+        Assert.Equal((100m, 0m, 1, (Guid?)desk.CashierId, "Cashier One"), (mine!.Totals.CashPayments, mine.Totals.CashRefunds, mine.Movements.Count, mine.CashierUserId, mine.CashierName));
+        var cashiers = await desk.Supervisor.GetFromJsonAsync<List<DrawerCashier>>($"{Closings}/cashiers?{period}");
+        Assert.Equal(["Cashier One", "Shift Supervisor"], cashiers!.Select(cashier => cashier.Name).Order(StringComparer.Ordinal).ToArray());
+
+        await ExpectAsync(desk.Supervisor.PostAsJsonAsync(Closings, new CloseCashDrawerRequest(null, from, to, 55m, null)), HttpStatusCode.UnprocessableEntity, "BIL-034");
+        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Closings, new CloseCashDrawerRequest(null, from, to, 60m, null)), HttpStatusCode.Forbidden, ProblemCodes.Forbidden);
+        var closed = await desk.Supervisor.PostAsJsonAsync(Closings, new CloseCashDrawerRequest(null, from, to, 55m, "5 short, reported"));
         Assert.Equal(HttpStatusCode.Created, closed.StatusCode);
         var closing = (await closed.Content.ReadFromJsonAsync<CashClosingCreated>())!;
         Assert.StartsWith("CLS-", closing.Number, StringComparison.Ordinal);
 
-        await ExpectAsync(desk.Supervisor.PostAsJsonAsync(Closings, new CloseCashDrawerRequest(desk.TreasuryId, desk.CashierId, from.AddMinutes(30), to, 0m, "x")), HttpStatusCode.Conflict, "BIL-120");
+        await ExpectAsync(desk.Supervisor.PostAsJsonAsync(Closings, new CloseCashDrawerRequest(desk.CashierId, from.AddMinutes(30), to, 0m, "x")), HttpStatusCode.Conflict, "BIL-120");
         await ExpectAsync(desk.Supervisor.PostAsJsonAsync($"{Payments}/{paid.Id}/void", new VoidPaymentRequest("too late")), HttpStatusCode.Conflict, "BIL-013");
 
         var sheet = await desk.Supervisor.GetFromJsonAsync<CashClosingSheetDocument>($"{Closings}/{closing.Id}/documents/sheet");
         Assert.Equal((60m, 55m, -5m, "5 short, reported", 2), (sheet!.Totals.ExpectedCash, sheet.CountedCash, sheet.Difference, sheet.Note, sheet.Movements.Count));
-        var list = await desk.Supervisor.GetFromJsonAsync<Paged<CashClosingListItem>>($"{Closings}?treasuryId={desk.TreasuryId}");
-        Assert.Equal(closing.Number, Assert.Single(list!.Items).Number);
+        var list = await desk.Supervisor.GetFromJsonAsync<Paged<CashClosingListItem>>($"{Closings}?branchId={desk.Branch}");
+        var listed = Assert.Single(list!.Items);
+        Assert.Equal((closing.Number, desk.Branch, (Guid?)null), (listed.Number, listed.BranchId, listed.CashierUserId));
+        Assert.Empty((await desk.Supervisor.GetFromJsonAsync<Paged<CashClosingListItem>>($"{Closings}?branchId={Guid.CreateVersion7()}"))!.Items);
+    }
+
+    [DatabaseFact]
+    public async Task A_body_that_still_names_a_treasury_and_a_device_is_accepted_and_they_are_ignored()
+    {
+        // An old browser tab survives the swap (LIS-CR-004): unknown members of the JSON body are ignored.
+        var desk = await DeskAsync();
+        var (visitId, _) = await InsertVisitAsync(desk.Tenant, 100m);
+
+        var posted = await desk.Cashier.PostAsJsonAsync(Payments, new { visitId, amount = 60m, method = "Cash", reference = (string?)null, treasuryId = Guid.CreateVersion7(), deviceId = "old-tab" });
+        Assert.Equal(HttpStatusCode.Created, posted.StatusCode);
+        var created = (await posted.Content.ReadFromJsonAsync<PaymentCreated>())!;
+
+        using var scope = factory.Services.CreateScope();
+        using var tenantScope = scope.ServiceProvider.GetRequiredService<ICurrentTenantSetter>().ForTenant(desk.Tenant);
+        var payment = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Set<Platform.Domain.Billing.Payment>().AsNoTracking().SingleAsync(row => row.Id == created.Id);
+        Assert.Equal(((Guid?)null, (string?)null, desk.Branch, desk.CashierId), (payment.TreasuryId, payment.DeviceId, payment.BranchId, payment.CashierUserId));
+
+        var refund = await desk.Supervisor.PostAsJsonAsync(Refunds, new { visitId, amount = 1m, method = "Cash", reasonId = await SeedRefundReasonAsync(desk.Tenant), treasuryId = Guid.CreateVersion7(), deviceId = "old-tab" });
+        Assert.Equal(HttpStatusCode.Conflict, refund.StatusCode);   // nothing to refund yet (BIL-011): the body was read, the treasury ignored
+        Assert.Equal("BIL-011", await AuthClient.CodeOf(refund));
+    }
+
+    [DatabaseFact]
+    public async Task The_treasury_endpoints_are_gone()
+    {
+        var desk = await DeskAsync();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await desk.Supervisor.GetAsync("/api/v1/treasuries")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await desk.Supervisor.GetAsync("/api/v1/treasury-access-requests")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await desk.Supervisor.GetAsync("/api/v1/billing/my-treasuries?deviceId=any")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await desk.Supervisor.GetAsync("/api/v1/billing/treasuries")).StatusCode);
     }
 
     [DatabaseFact]
@@ -171,8 +206,8 @@ public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         // CP-37 right (BIL-044); a role limited to today (SpecialRights.None: report days limit 0) cannot look back (BIL-045).
         var desk = await DeskAsync();
         var (visitId, _) = await InsertVisitAsync(desk.Tenant, 300m);
-        Assert.Equal(HttpStatusCode.Created, (await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 100m, "Cash", null, desk.TreasuryId, Device))).StatusCode);
-        Assert.Equal(HttpStatusCode.Created, (await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 200m, "Card", "SLIP-1", desk.TreasuryId, Device))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 100m, "Cash", null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 200m, "Card", "SLIP-1"))).StatusCode);
 
         var own = await desk.Cashier.GetFromJsonAsync<CollectionsReportDocument>(CollectionsReport);
         Assert.Equal(("User", "Method", "Cashier One"), (own!.Scope, own.GroupBy, own.CashierName));
@@ -201,9 +236,9 @@ public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
 
     // ---- desk -------------------------------------------------------------------------------------------------
 
-    private sealed record Desk(Guid Tenant, Guid Branch, Guid TreasuryId, Guid CashierId, HttpClient Cashier, HttpClient Supervisor, HttpClient Outsider, HttpClient NoRight);
+    private sealed record Desk(Guid Tenant, Guid Branch, Guid CashierId, HttpClient Cashier, HttpClient Supervisor, HttpClient Outsider, HttpClient NoRight);
 
-    /// <summary>A branch with a treasury on which the cashier and the supervisor are both approved for <see cref="Device"/> (BR-27).</summary>
+    /// <summary>A branch whose cashier and supervisor are signed in on it (their only branch, so the session selects it).</summary>
     private async Task<Desk> DeskAsync()
     {
         var tenant = Guid.CreateVersion7();
@@ -212,28 +247,14 @@ public sealed class BillingFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         var (supervisorName, _, supervisorId) = await factory.SeedUserAsync(tenantId: tenant, permissions: SupervisorPermissions, displayName: "Shift Supervisor", branchIds: [branch]);
         await GrantAsync(tenant, cashierId, CashierRights);   // CP-37 special rights, before sign-in (the principal is cached)
         await GrantAsync(tenant, supervisorId, SpecialRights.All);
-        var (managerName, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ManagerPermissions, displayName: "Branch Manager", branchIds: [branch]);
         var (outsiderName, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: null, displayName: "No Role", branchIds: [branch]);
         var (noRightName, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: CashierPermissions, displayName: "Cashier Without Rights", branchIds: [branch]);
         var cashier = await SignedInClientAsync(cashierName);
         var supervisor = await SignedInClientAsync(supervisorName);
-        var manager = await SignedInClientAsync(managerName);
         var outsider = await SignedInClientAsync(outsiderName);
         var noRight = await SignedInClientAsync(noRightName);
 
-        var created = await cashier.PostAsJsonAsync("/api/v1/treasuries", new CreateTreasuryRequest("DESK1", "Cash desk 1", "خزينة 1", branch));
-        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        var treasuryId = (await created.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
-
-        foreach (var client in new[] { cashier, supervisor })
-        {
-            var requested = await client.PostAsJsonAsync("/api/v1/treasury-access-requests", new RequestTreasuryAccessRequest(treasuryId, Device, "Cash desk PC"));
-            Assert.Equal(HttpStatusCode.Created, requested.StatusCode);
-            var requestId = (await requested.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
-            Assert.Equal(HttpStatusCode.NoContent, (await manager.PostAsync($"/api/v1/treasury-access-requests/{requestId}/approve", null)).StatusCode);
-        }
-
-        return new Desk(tenant, branch, treasuryId, cashierId, cashier, supervisor, outsider, noRight);
+        return new Desk(tenant, branch, cashierId, cashier, supervisor, outsider, noRight);
     }
 
     private static async Task ExpectAsync(Task<HttpResponseMessage> call, HttpStatusCode status, string code)

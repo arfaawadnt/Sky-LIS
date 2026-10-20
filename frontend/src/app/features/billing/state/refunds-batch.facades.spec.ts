@@ -4,7 +4,6 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { BILLING_API, type BatchAccountView, type Paged, type RefundListItem } from '../../../core/api/billing.contracts';
-import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { flushCashDesk } from '../testing/billing.fixtures';
 import { BatchPaymentFacade } from './batch-payment.facade';
@@ -45,7 +44,6 @@ describe('RefundsFacade and BatchPaymentFacade (CP-24, CP-27)', () => {
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
-        { provide: DeviceIdentityService, useValue: { deviceId: () => 'device-test' } satisfies Pick<DeviceIdentityService, 'deviceId'> },
         CashDeskFacade,
         RefundsFacade,
         BatchPaymentFacade,
@@ -62,7 +60,7 @@ describe('RefundsFacade and BatchPaymentFacade (CP-24, CP-27)', () => {
     }
   }
 
-  it('offers the active catalogue reasons of kind Refund and posts a refund with the device', async () => {
+  it('offers the active catalogue reasons of kind Refund and posts a refund without treasury or device (LIS-CR-004)', async () => {
     const facade = TestBed.inject(RefundsFacade);
     await runEffects();
     const reasons = backend.expectOne((request) => request.url === BILLING_API.refundReasons);
@@ -75,17 +73,17 @@ describe('RefundsFacade and BatchPaymentFacade (CP-24, CP-27)', () => {
     await runEffects();
     expect(facade.reasons.value()?.map((reason) => reason.id)).toEqual(['r-1']);
 
-    const pending = facade.refund.execute({ visitId: 'v-1', treasuryId: 't-1', amount: 40, method: 'Cash', reference: null, reasonId: 'r-1', note: 'transfer' });
+    const pending = facade.refund.execute({ visitId: 'v-1', amount: 40, method: 'Cash', reference: null, reasonId: 'r-1', note: 'transfer' });
     await settle();
     const post = backend.expectOne((request) => request.url === BILLING_API.refunds && request.method === 'POST');
-    expect(post.request.body).toEqual({ visitId: 'v-1', amount: 40, method: 'Cash', reference: null, reasonId: 'r-1', note: 'transfer', treasuryId: 't-1', deviceId: 'device-test' });
+    expect(post.request.body).toEqual({ visitId: 'v-1', amount: 40, method: 'Cash', reference: null, reasonId: 'r-1', note: 'transfer' });
     post.flush({ id: 'rf-1', number: 'RFD-2026-00001' }, { status: 201, statusText: 'Created' });
     expect(await pending).toEqual({ id: 'rf-1', number: 'RFD-2026-00001' });
     await runEffects();
     backend.expectOne((request) => request.url === BILLING_API.refunds && request.method === 'GET').flush(page<RefundListItem>([]));
   });
 
-  it('looks a batch up by number and pays all with the device', async () => {
+  it('looks a batch up by number and pays all without treasury or device (LIS-CR-004)', async () => {
     const facade = TestBed.inject(BatchPaymentFacade);
     facade.find(' BTH-2026-00001 ');
     await runEffects();
@@ -93,10 +91,10 @@ describe('RefundsFacade and BatchPaymentFacade (CP-24, CP-27)', () => {
     await runEffects();
     expect(facade.current()?.remaining).toBe(250);
 
-    const pending = facade.payAll.execute({ batchId: 'bt-1', treasuryId: 't-1', amount: 250, method: 'Pos', reference: 'POS-9', reasonId: null, note: null });
+    const pending = facade.payAll.execute({ batchId: 'bt-1', amount: 250, method: 'Pos', reference: 'POS-9', reasonId: null, note: null });
     await settle();
     const post = backend.expectOne(`${BILLING_API.batches}/bt-1/pay-all`);
-    expect(post.request.body).toEqual({ amount: 250, method: 'Pos', reference: 'POS-9', treasuryId: 't-1', deviceId: 'device-test' });
+    expect(post.request.body).toEqual({ amount: 250, method: 'Pos', reference: 'POS-9' });
     post.flush({ batchId: 'bt-1', amount: 250, payments: [] });
     await pending;
     await runEffects();
@@ -128,21 +126,13 @@ describe('RefundsFacade and BatchPaymentFacade (CP-24, CP-27)', () => {
     backend.expectNone((request) => request.url.startsWith(BILLING_API.visits));   // no visit looked up: stays idle
   });
 
-  it('reads the treasuries approved for this device and keeps the chosen one while it stays approved', async () => {
+  it('reads no treasury for the desk and does not print while the print parameter is refused (UAT A-05)', async () => {
     const desk = TestBed.inject(CashDeskFacade);
     await runEffects(false);
-    const mine = backend.expectOne((request) => request.url === BILLING_API.myTreasuries);
-    expect(mine.request.params.get('deviceId')).toBe('device-test');
-    mine.flush([
-      { id: 't-1', code: 'A', nameEn: 'A', nameAr: 'أ', branchId: 'b-1', isActive: true },
-      { id: 't-2', code: 'B', nameEn: 'B', nameAr: 'ب', branchId: 'b-1', isActive: true },
-    ]);
+    backend.expectNone((request) => request.url.includes('treasur'));
     backend.expectOne(BILLING_API.printSettings).flush({ type: 'about:blank', title: 'Forbidden', status: 403, code: 'AUTHZ-001' }, { status: 403, statusText: 'Forbidden' });
     await runEffects();
 
-    expect(desk.treasuryId()).toBe('t-1');
-    desk.treasuryId.set('t-2');
-    expect(desk.hasStation()).toBe(true);
     expect(desk.shouldAutoPrint()).toBe(false);   // UAT A-05: an unknown parameter does not print (it used to print by default)
   });
 });

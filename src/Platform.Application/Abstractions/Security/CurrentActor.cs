@@ -23,7 +23,7 @@ public interface ICurrentUser
     /// <summary>The branch the session is bound to (CP-04), or <see langword="null"/> until one is selected. Branch-stamped modules go through <see cref="BranchScope.Require"/>.</summary>
     Guid? BranchId { get; }
 
-    /// <summary>The session's membership is the primary administrator of its tenant (CP-38): the named exception of SOD-TRS-001 (own treasury request, 2026-10-14).</summary>
+    /// <summary>The session's membership is the primary administrator of its tenant (CP-38); Organization reads it.</summary>
     bool IsPrimaryAdministrator { get; }
 }
 

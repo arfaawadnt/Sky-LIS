@@ -3,7 +3,9 @@
 You are building one bounded context of Sky LIS end to end (domain → application → infrastructure → API → Angular
 feature → tests). The architecture pack in `prompt/` is the constitution; the Business SRS (`docs/srs/src/srs.data.js`)
 is the business content; `docs/build/MODULES.md` says which SRS pages are yours and which decisions are fixed.
-The **Treasury module** is the reference implementation: read it before writing anything.
+The **payment methods** slice of Billing (CP-30b) is the reference implementation: read it before writing anything. (The
+first reference, the Treasury module, was removed on 2026-10-20 by LIS-CR-004; for an aggregate with a state machine and
+segregation of duties read it at tag `v0.15.3` with `git show v0.15.3:<path>`.)
 
 ## 0. Read first (in this order)
 
@@ -12,10 +14,11 @@ The **Treasury module** is the reference implementation: read it before writing 
 3. `prompt/01-SYSTEM-ARCHITECTURE-BLUEPRINT.md` §3.3 (module conventions), §4.2 (tenant table checklist), §6 (frontend).
 4. `prompt/03-BUSINESS-INTAKE-AND-DDD-GUIDE.md` §3–§10 (aggregates, states, transitions, invariants, SoD, gates, events).
 5. `prompt/04-ARCHITECTURAL-PITFALLS-AND-AVOIDANCE-GUIDE.md` (skim the pitfall codes you will cite).
-6. The reference module, every file: `src/Platform.Domain/Treasury/`, `src/Platform.Contracts/Treasury/`,
-   `src/Platform.Application/Treasury/`, `src/Platform.Infrastructure/Persistence/Treasury/`,
-   `src/Platform.WebApi/Controllers/Treasury/`, `frontend/src/app/features/treasury/`,
-   `frontend/src/app/core/api/treasury.contracts.ts`, `tests/**/Treasury*` and `docs/intake/LIS-INT-TRS-001_Treasury-Access.md`.
+6. The reference slice, every file: `src/Platform.Domain/Billing/PaymentMethodDefinition.cs`,
+   `src/Platform.Application/Billing/{Commands/PaymentMethodCommands.cs,Queries/PaymentMethodQueries.cs,Policies/SeedPaymentMethodsPolicy.cs}`,
+   `src/Platform.Infrastructure/Persistence/Billing/PaymentMethodPersistence.cs`, `src/Platform.WebApi/Controllers/Billing/PaymentMethodsController.cs`,
+   `frontend/src/app/features/billing/pages/payment-methods.page.ts` (master-data page kit), `tests/**/PaymentMethod*` and
+   `docs/intake/LIS-INT-BIL-001_Billing.md` §17.
 7. Your SRS pages: `grep -n "CP-xx\|SA-xx" docs/srs/src/srs.data.js` (purpose, data, actions, rules, dependencies) and the
    workflows (WF-xx) and business rules (BR-xx) that cite them. The LDM synthesis `docs/knowledge/ldm/LDM_Business_Knowledge.md`
    explains the laboratory domain when a rule is unclear.

@@ -110,3 +110,14 @@ BEGIN
     RETURN NEW;
 END
 $fn$;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 2026-10-20 Treasury removed (change request LIS-CR-004, P-API). Appended to the TreasuryRemoved migration after EF made
+-- treasury_id / device_id nullable on app.payments, app.refunds and app.cash_closings, dropped their foreign keys to
+-- app.treasuries and replaced the (tenant_id, treasury_id, …) indexes by (tenant_id, branch_id, …). Idempotent.
+-- ---------------------------------------------------------------------------------------------------------------------
+
+-- Reviewed: app.billing_guard_payment() compares treasury_id and device_id with IS DISTINCT FROM, so a payment posted with
+-- NULLs stays immutable like the others and its void still passes; app.billing_refuse_change() names no column. No
+-- function or trigger needs a change. app.treasuries and app.treasury_access_requests stay as orphan tables (history);
+-- old movements and closings keep their treasury_id and device_id. Nothing to backfill: new rows simply carry NULL.

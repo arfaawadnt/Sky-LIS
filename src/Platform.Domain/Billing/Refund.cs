@@ -17,10 +17,9 @@ public sealed class Refund : Entity, ITenantScoped
     private Refund()
     {
         Number = string.Empty;
-        DeviceId = string.Empty;
     }
 
-    internal Refund(Guid visitId, string number, decimal amount, PaymentMethodUse method, string? reference, Guid reasonId, string? note, CashierStation station, string deviceId, DateTimeOffset nowUtc)
+    internal Refund(Guid visitId, string number, decimal amount, PaymentMethodUse method, string? reference, Guid reasonId, string? note, Cashier cashier, DateTimeOffset nowUtc)
         : base(Guid.CreateVersion7())
     {
         VisitId = visitId;
@@ -31,10 +30,8 @@ public sealed class Refund : Entity, ITenantScoped
         Reference = reference;
         ReasonId = reasonId;
         Note = note;
-        TreasuryId = station.TreasuryId;
-        DeviceId = deviceId;
-        CashierUserId = station.CashierUserId;
-        BranchId = station.SessionBranchId;
+        CashierUserId = cashier.UserId;
+        BranchId = cashier.BranchId;
         RefundedAtUtc = nowUtc;
     }
 
@@ -59,9 +56,11 @@ public sealed class Refund : Entity, ITenantScoped
 
     public string? Note { get; private set; }
 
-    public Guid TreasuryId { get; private set; }
+    /// <summary>The treasury of a movement posted before the treasury was removed (LIS-CR-004, 2026-10-20); null on every new refund, kept as history.</summary>
+    public Guid? TreasuryId { get; private set; }
 
-    public string DeviceId { get; private set; }
+    /// <summary>The browser device of a movement posted under BR-27 (withdrawn 2026-10-20); null on every new refund, kept as history.</summary>
+    public string? DeviceId { get; private set; }
 
     public Guid CashierUserId { get; private set; }
 

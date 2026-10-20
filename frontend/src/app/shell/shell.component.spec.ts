@@ -56,7 +56,7 @@ describe('ShellComponent', () => {
   });
 
   it('signs out with a full page load of the sign-in page, so no module keeps the user state (A-01, B-11)', async () => {
-    await signIn('11111111-1111-1111-1111-111111111111', ['treasury.view']);
+    await signIn('11111111-1111-1111-1111-111111111111', ['billing.view']);
     const fixture = TestBed.createComponent(ShellComponent);
     await fixture.whenStable();
     const host = fixture.nativeElement as HTMLElement;
@@ -117,7 +117,7 @@ describe('ShellComponent', () => {
   });
 
   it('shows the admin navigation for the platform tenant', async () => {
-    await signIn(PLATFORM_TENANT_ID, ['treasury.view']);
+    await signIn(PLATFORM_TENANT_ID, ['billing.view']);
     const fixture = TestBed.createComponent(ShellComponent);
     await fixture.whenStable();
 
@@ -125,7 +125,7 @@ describe('ShellComponent', () => {
   });
 
   it('focuses the global search box on Ctrl+K when the page has none, and opens the user menu', async () => {
-    await signIn('11111111-1111-1111-1111-111111111111', ['treasury.view']);
+    await signIn('11111111-1111-1111-1111-111111111111', ['billing.view']);
     const fixture = TestBed.createComponent(ShellComponent);
     document.body.appendChild(fixture.nativeElement as HTMLElement);
     await fixture.whenStable();
@@ -148,7 +148,7 @@ describe('ShellComponent', () => {
   });
 
   it('names the role in the language of the page, in the sidebar and the top bar (validation v0.5.0 B-09)', async () => {
-    await signIn('11111111-1111-1111-1111-111111111111', ['treasury.view'], 'أمين الصندوق');
+    await signIn('11111111-1111-1111-1111-111111111111', ['billing.view'], 'أمين الصندوق');
     const fixture = TestBed.createComponent(ShellComponent);
     await fixture.whenStable();
     const host = fixture.nativeElement as HTMLElement;
@@ -163,7 +163,7 @@ describe('ShellComponent', () => {
   });
 
   it('names the user in the language of the page in the top bar (validation v0.5.0 R-12)', async () => {
-    await signIn('11111111-1111-1111-1111-111111111111', ['treasury.view'], 'أمين الصندوق', { displayNameEn: 'Mona Adel', displayNameAr: 'منى عادل' });
+    await signIn('11111111-1111-1111-1111-111111111111', ['billing.view'], 'أمين الصندوق', { displayNameEn: 'Mona Adel', displayNameAr: 'منى عادل' });
     const fixture = TestBed.createComponent(ShellComponent);
     await fixture.whenStable();
     const host = fixture.nativeElement as HTMLElement;

@@ -11,18 +11,17 @@ using Platform.SharedKernel.Abstractions;
 
 namespace Platform.Application.Billing.Queries;
 
-// Cash closing (CP-30, BR-16): the preview of a drawer, the cashiers of a treasury, the closings register, its export
-// and the closing sheet.
+// Cash closing (CP-30, BR-16): the preview of a drawer, the cashiers of the session branch, the closings register, its
+// export and the closing sheet. The drawer is the session branch + a cashier (or all) since LIS-CR-004 (2026-10-20).
 
-/// <summary>The figures of a drawer before it is closed (same scope rules as the close: BIL-022, BIL-030/031/033).</summary>
+/// <summary>The figures of the session branch's drawer before it is closed (same scope rules as the close: TENANT-004, BIL-030/031/033).</summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Manage)]
-public sealed record PreviewCashClosingQuery(Guid TreasuryId, Guid? CashierUserId, DateTimeOffset FromUtc, DateTimeOffset ToUtc) : IQuery<CashClosingPreview>;
+public sealed record PreviewCashClosingQuery(Guid? CashierUserId, DateTimeOffset FromUtc, DateTimeOffset ToUtc) : IQuery<CashClosingPreview>;
 
 public sealed class PreviewCashClosingValidator : AbstractValidator<PreviewCashClosingQuery>
 {
     public PreviewCashClosingValidator()
     {
-        RuleFor(query => query.TreasuryId).NotEmpty();
         RuleFor(query => query.CashierUserId).NotEqual(Guid.Empty).When(query => query.CashierUserId is not null);
         RuleFor(query => query.FromUtc).NotEmpty();
         RuleFor(query => query.ToUtc).NotEmpty();
@@ -30,7 +29,6 @@ public sealed class PreviewCashClosingValidator : AbstractValidator<PreviewCashC
 }
 
 public sealed class PreviewCashClosingHandler(
-    ITreasuryStationLookup stations,
     ICashDrawerQueries drawer,
     ICashClosingRepository closings,
     IBillableVisitLookup visits,
@@ -41,23 +39,19 @@ public sealed class PreviewCashClosingHandler(
     public async Task<CashClosingPreview> Handle(PreviewCashClosingQuery query, CancellationToken cancellationToken)
     {
         var branch = BranchScope.Require(user);
-        var treasury = await stations.GetTreasuryAsync(query.TreasuryId, cancellationToken) ?? throw BillingNotFound.Treasury();
-        CashClosing.RequireScope(treasury.BranchId, branch, query.FromUtc, query.ToUtc, clock.UtcNow);
+        CashClosing.RequireScope(branch, query.FromUtc, query.ToUtc, clock.UtcNow);
 
-        var scope = new DrawerScope(treasury.Id, query.CashierUserId, query.FromUtc, query.ToUtc);
+        var scope = new DrawerScope(branch, query.CashierUserId, query.FromUtc, query.ToUtc);
         var totals = await drawer.TotalsAsync(scope, cancellationToken);
         var movements = await drawer.MovementsAsync(scope, BillingLimits.MaxDrawerMovements + 1, cancellationToken);
         var truncated = movements.Count > BillingLimits.MaxDrawerMovements;
         var shown = await BillingAccessions.FillAsync(visits, truncated ? movements.Take(BillingLimits.MaxDrawerMovements).ToList() : movements, cancellationToken);
-        var overlaps = await closings.OverlapsAsync(treasury.Id, query.CashierUserId, query.FromUtc, query.ToUtc, cancellationToken);
+        var overlaps = await closings.OverlapsAsync(branch, query.CashierUserId, query.FromUtc, query.ToUtc, cancellationToken);
         var cashierName = await CashierNames.OfAsync(drawer, query.CashierUserId, cancellationToken);
         var currency = await settings.GetAsync(SettingKeys.DefaultCurrency, cancellationToken);
 
         return new CashClosingPreview(
-            treasury.Id,
-            treasury.Code,
-            treasury.NameEn,
-            treasury.NameAr,
+            branch,
             query.CashierUserId,
             cashierName,
             query.FromUtc,
@@ -70,28 +64,27 @@ public sealed class PreviewCashClosingHandler(
     }
 }
 
-/// <summary>The cashiers who moved money on a treasury in a period (the closing page's cashier filter).</summary>
+/// <summary>The cashiers who moved money in the session branch in a period (the closing page's cashier filter).</summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Manage)]
-public sealed record ListDrawerCashiersQuery(Guid TreasuryId, DateTimeOffset FromUtc, DateTimeOffset ToUtc) : IQuery<IReadOnlyList<DrawerCashier>>;
+public sealed record ListDrawerCashiersQuery(DateTimeOffset FromUtc, DateTimeOffset ToUtc) : IQuery<IReadOnlyList<DrawerCashier>>;
 
 public sealed class ListDrawerCashiersValidator : AbstractValidator<ListDrawerCashiersQuery>
 {
     public ListDrawerCashiersValidator()
     {
-        RuleFor(query => query.TreasuryId).NotEmpty();
         RuleFor(query => query).Must(query => query.FromUtc < query.ToUtc && query.ToUtc - query.FromUtc <= TimeSpan.FromDays(CashClosing.MaxPeriodDays))
             .OverridePropertyName("toUtc").WithMessage("The period must start before it ends and cover at most 31 days.");
     }
 }
 
-public sealed class ListDrawerCashiersHandler(ICashDrawerQueries drawer) : IQueryHandler<ListDrawerCashiersQuery, IReadOnlyList<DrawerCashier>>
+public sealed class ListDrawerCashiersHandler(ICashDrawerQueries drawer, ICurrentUser user) : IQueryHandler<ListDrawerCashiersQuery, IReadOnlyList<DrawerCashier>>
 {
     public Task<IReadOnlyList<DrawerCashier>> Handle(ListDrawerCashiersQuery query, CancellationToken cancellationToken) =>
-        drawer.CashiersAsync(query.TreasuryId, query.FromUtc, query.ToUtc, cancellationToken);
+        drawer.CashiersAsync(BranchScope.Require(user), query.FromUtc, query.ToUtc, cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.View)]
-public sealed record ListCashClosingsQuery(Guid? TreasuryId, Guid? CashierUserId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, int? Page, int? PageSize) : IQuery<Paged<CashClosingListItem>>;
+public sealed record ListCashClosingsQuery(Guid? BranchId, Guid? CashierUserId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, int? Page, int? PageSize) : IQuery<Paged<CashClosingListItem>>;
 
 public sealed class ListCashClosingsValidator : AbstractValidator<ListCashClosingsQuery>
 {
@@ -107,11 +100,11 @@ public sealed class ListCashClosingsValidator : AbstractValidator<ListCashClosin
 public sealed class ListCashClosingsHandler(ICashClosingRepository closings) : IQueryHandler<ListCashClosingsQuery, Paged<CashClosingListItem>>
 {
     public Task<Paged<CashClosingListItem>> Handle(ListCashClosingsQuery query, CancellationToken cancellationToken) =>
-        closings.ListAsync(new CashClosingFilter(query.TreasuryId, query.CashierUserId, query.FromUtc, query.ToUtc), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        closings.ListAsync(new CashClosingFilter(query.BranchId, query.CashierUserId, query.FromUtc, query.ToUtc), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Export)]
-public sealed record ExportCashClosingsQuery(Guid? TreasuryId, Guid? CashierUserId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, string? TimeZone = null) : IQuery<BillingExportFile>;
+public sealed record ExportCashClosingsQuery(Guid? BranchId, Guid? CashierUserId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, string? TimeZone = null) : IQuery<BillingExportFile>;
 
 public sealed class ExportCashClosingsValidator : AbstractValidator<ExportCashClosingsQuery>
 {
@@ -126,15 +119,15 @@ public sealed class ExportCashClosingsValidator : AbstractValidator<ExportCashCl
 public sealed class ExportCashClosingsHandler(ICashClosingRepository closings, IClock clock) : IQueryHandler<ExportCashClosingsQuery, BillingExportFile>
 {
     private static readonly string[] Header =
-        ["Number", "Treasury", "Cashier", "From (UTC)", "To (UTC)", "Payments", "Refunds", "Expected cash", "Counted cash", "Difference", "Closed by", "Closed at (UTC)"];
+        ["Number", "Cashier", "From (UTC)", "To (UTC)", "Payments", "Refunds", "Expected cash", "Counted cash", "Difference", "Closed by", "Closed at (UTC)"];
 
     public async Task<BillingExportFile> Handle(ExportCashClosingsQuery query, CancellationToken cancellationToken)
     {
-        var rows = await closings.SearchAsync(new CashClosingFilter(query.TreasuryId, query.CashierUserId, query.FromUtc, query.ToUtc), BillingCsv.MaxRows + 1, cancellationToken);
+        var rows = await closings.SearchAsync(new CashClosingFilter(query.BranchId, query.CashierUserId, query.FromUtc, query.ToUtc), BillingCsv.MaxRows + 1, cancellationToken);
         BillingCsv.RequireWithinLimit(rows.Count);
         return BillingCsv.Build("cash-closings", clock.UtcNow, Header, rows.Select(row => (IReadOnlyList<object?>)
         [
-            row.Number, row.TreasuryCode, row.CashierName ?? "*", row.PeriodFromUtc, row.PeriodToUtc, row.TotalPayments, row.TotalRefunds, row.ExpectedCash, row.CountedCash, row.Difference,
+            row.Number, row.CashierName ?? "*", row.PeriodFromUtc, row.PeriodToUtc, row.TotalPayments, row.TotalRefunds, row.ExpectedCash, row.CountedCash, row.Difference,
             row.ClosedByName, row.ClosedAtUtc,
         ]), BillingCsv.Zone(query.TimeZone));
     }
@@ -162,7 +155,7 @@ public sealed class GetCashClosingSheetHandler(
     {
         var record = await closings.GetRecordAsync(query.ClosingId, cancellationToken) ?? throw BillingNotFound.Closing();
         var item = record.Item;
-        var movements = await drawer.MovementsAsync(new DrawerScope(item.TreasuryId, item.CashierUserId, item.PeriodFromUtc, item.PeriodToUtc), BillingLimits.MaxDrawerMovements + 1, cancellationToken);
+        var movements = await drawer.MovementsAsync(new DrawerScope(item.BranchId, item.CashierUserId, item.PeriodFromUtc, item.PeriodToUtc, record.LegacyTreasuryId), BillingLimits.MaxDrawerMovements + 1, cancellationToken);
         var truncated = movements.Count > BillingLimits.MaxDrawerMovements;
         var shown = await BillingAccessions.FillAsync(visits, truncated ? movements.Take(BillingLimits.MaxDrawerMovements).ToList() : movements, cancellationToken);
         var letterhead = await directory.LetterheadAsync(record.BranchId, cancellationToken);
@@ -172,9 +165,6 @@ public sealed class GetCashClosingSheetHandler(
             letterhead,
             item.Id,
             item.Number,
-            item.TreasuryCode,
-            item.TreasuryNameEn,
-            item.TreasuryNameAr,
             item.CashierUserId,
             item.CashierName,
             item.PeriodFromUtc,

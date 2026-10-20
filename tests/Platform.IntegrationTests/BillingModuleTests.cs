@@ -4,11 +4,9 @@ using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Billing;
 using Platform.Application.Identity;
 using Platform.Application.Registration;
-using Platform.Application.Treasury;
 using Platform.Contracts.Common;
 using Platform.Domain.Billing;
 using Platform.Domain.Identity;
-using Platform.Domain.Treasury;
 using Platform.Infrastructure.Persistence;
 using Platform.IntegrationTests.Support;
 using Platform.SharedKernel.Localization;
@@ -19,13 +17,13 @@ namespace Platform.IntegrationTests;
 /// <summary>
 /// The engine side of intake LIS-INT-BIL-001: tenant invisibility of accounts, payments, refunds and closings; unique
 /// numbers; the xmin serialisation of two cashiers; the immutability triggers; the read ports over Registration's tables
-/// (raw SQL on the MODULES.md §5 columns) and the BR-27 lookup over the Treasury tables.
+/// (raw SQL on the MODULES.md §5 columns); since LIS-CR-004 (2026-10-20) the drawer is the branch and the cashier, and the
+/// movements posted under the withdrawn treasury stay readable.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public sealed class BillingModuleTests(DatabaseFixture fixture)
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 9, 9, 0, 0, TimeSpan.Zero);
-    private const string Device = "device-billing-1";
 
     [DatabaseFact]
     public async Task Accounts_payments_refunds_and_closings_of_another_tenant_are_invisible()
@@ -72,8 +70,8 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
         using var second = fixture.AppScope(world.Tenant, world.Cashier, branchId: world.Branch);
         var accountA = (await first.ServiceProvider.GetRequiredService<IVisitAccountRepository>().GetForUpdateAsync(visit, CancellationToken.None))!;
         var accountB = (await second.ServiceProvider.GetRequiredService<IVisitAccountRepository>().GetForUpdateAsync(visit, CancellationToken.None))!;
-        accountA.RecordPayment("RCT-RACE-A", 99m, PaymentMethod.Cash, null, world.Station, new VisitCharge(100m, false), Now);
-        accountB.RecordPayment("RCT-RACE-B", 99m, PaymentMethod.Cash, null, world.Station, new VisitCharge(100m, false), Now);
+        accountA.RecordPayment("RCT-RACE-A", 99m, PaymentMethod.Cash, null, world.Desk, new VisitCharge(100m, false), Now);
+        accountB.RecordPayment("RCT-RACE-B", 99m, PaymentMethod.Cash, null, world.Desk, new VisitCharge(100m, false), Now);
 
         await first.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
         var refusal = await Assert.ThrowsAsync<DomainException>(() => second.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None));
@@ -94,7 +92,7 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
         foreach (var (scope, number) in new[] { (first, "RCT-OPEN-A"), (second, "RCT-OPEN-B") })
         {
             var account = VisitAccount.Open(visit);
-            account.RecordPayment(number, 60m, PaymentMethod.Cash, null, world.Station, new VisitCharge(100m, false), Now);
+            account.RecordPayment(number, 60m, PaymentMethod.Cash, null, world.Desk, new VisitCharge(100m, false), Now);
             scope.ServiceProvider.GetRequiredService<IVisitAccountRepository>().Add(account);
         }
 
@@ -147,27 +145,39 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
     }
 
     [DatabaseFact]
-    public async Task The_station_lookup_follows_the_live_approval_for_user_treasury_and_device()
+    public async Task New_movements_carry_no_treasury_and_a_movement_posted_under_the_treasury_stays_in_the_registers()
     {
         var world = await WorldAsync();
-        using (var scope = fixture.AppScope(world.Tenant, world.Cashier))
+        var visit = await InsertVisitAsync(world.Tenant, "ACC-LEG-1", 500m);
+        var current = await PayAsync(world, visit, 100m);
+        var legacyTreasury = Guid.CreateVersion7();   // app.treasuries is an orphan table: no foreign key any more
+        var legacy = Guid.CreateVersion7();
+
+        using (var scope = fixture.AppScope(world.Tenant, world.Cashier, branchId: world.Branch))
         {
-            var stations = scope.ServiceProvider.GetRequiredService<ITreasuryStationLookup>();
-            Assert.True((await stations.GetAsync(world.Treasury, world.Cashier, Device, CancellationToken.None))!.ApprovedForDevice);
-            Assert.False((await stations.GetAsync(world.Treasury, world.Cashier, "another-device", CancellationToken.None))!.ApprovedForDevice);
-            Assert.Equal([world.Treasury], (await stations.ApprovedAsync(world.Cashier, Device, world.Branch, CancellationToken.None)).Select(item => item.Id).ToArray());
-            Assert.Empty(await stations.ApprovedAsync(world.Cashier, Device, Guid.CreateVersion7(), CancellationToken.None));
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var stored = await context.Set<Payment>().AsNoTracking().SingleAsync(payment => payment.Id == current);
+            Assert.Equal(((Guid?)null, (string?)null, world.Branch, world.Cashier), (stored.TreasuryId, stored.DeviceId, stored.BranchId, stored.CashierUserId));
+
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO app.payments (tenant_id, id, visit_id, receipt_number, amount, method, treasury_id, device_id, cashier_user_id, branch_id, paid_at_utc, status)
+                VALUES ({world.Tenant}, {legacy}, {visit}, {"RCT-LEGACY-1"}, {50m}, {"Cash"}, {legacyTreasury}, {"legacy-device"}, {world.Cashier}, {world.Branch}, {Now}, {"Posted"})
+                """);
         }
 
-        using (var scope = fixture.AppScope(world.Tenant, world.Approver))
-        {
-            var request = (await scope.ServiceProvider.GetRequiredService<ITreasuryAccessRequestRepository>().GetForUpdateAsync(world.Request, CancellationToken.None))!;
-            request.Revoke(world.Approver, Now, "device reassigned");
-            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
-        }
+        using var reader = fixture.AppScope(world.Tenant, world.Cashier, branchId: world.Branch);
+        var page = await reader.ServiceProvider.GetRequiredService<IVisitAccountRepository>().ListPaymentsAsync(new PaymentFilter(visit, null, null, null, null, null, null), PageRequest.Normalized(1, 10), CancellationToken.None);
+        Assert.Equal(new[] { current, legacy }.Order().ToArray(), page.Items.Select(item => item.Id).Order().ToArray());
+        var account = (await reader.ServiceProvider.GetRequiredService<IVisitAccountRepository>().GetForUpdateAsync(visit, CancellationToken.None))!;
+        var old = account.Payments.Single(payment => payment.Id == legacy);
+        Assert.Equal(((Guid?)legacyTreasury, "legacy-device"), (old.TreasuryId, old.DeviceId));
 
-        using var after = fixture.AppScope(world.Tenant, world.Cashier);
-        Assert.False((await after.ServiceProvider.GetRequiredService<ITreasuryStationLookup>().GetAsync(world.Treasury, world.Cashier, Device, CancellationToken.None))!.ApprovedForDevice);
+        // the branch drawer counts both; the sheet of a closing made under the treasury narrows to that drawer
+        var drawer = reader.ServiceProvider.GetRequiredService<ICashDrawerQueries>();
+        Assert.Equal(150m, (await drawer.TotalsAsync(new DrawerScope(world.Branch, null, Now.AddHours(-1), Now.AddHours(1)), CancellationToken.None)).CashPayments);
+        var narrowed = await drawer.MovementsAsync(new DrawerScope(world.Branch, null, Now.AddHours(-1), Now.AddHours(1), legacyTreasury), 100, CancellationToken.None);
+        Assert.Equal(legacy, Assert.Single(narrowed).Id);
+        Assert.Empty(await drawer.MovementsAsync(new DrawerScope(Guid.CreateVersion7(), null, Now.AddHours(-1), Now.AddHours(1)), 100, CancellationToken.None));
     }
 
     [DatabaseFact]
@@ -186,10 +196,10 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
 
         using (var scope = fixture.AppScope(world.Tenant, world.Cashier, branchId: world.Branch))
         {
-            var totals = await scope.ServiceProvider.GetRequiredService<ICashDrawerQueries>().TotalsAsync(new DrawerScope(world.Treasury, null, Now.AddHours(-1), Now.AddHours(1)), CancellationToken.None);
+            var totals = await scope.ServiceProvider.GetRequiredService<ICashDrawerQueries>().TotalsAsync(new DrawerScope(world.Branch, null, Now.AddHours(-1), Now.AddHours(1)), CancellationToken.None);
             Assert.Equal((700m, 100m, 3, 20m, 1, 680m), (totals.CashPayments, totals.CardPayments, totals.PaymentCount, totals.CashRefunds, totals.RefundCount, totals.ExpectedCash));
             Assert.Equal((100m, 25m, 2), (totals.OutstandingBalance, totals.DiscountTotal, totals.VisitCount));   // A owes 100, B is settled
-            var movements = await scope.ServiceProvider.GetRequiredService<ICashDrawerQueries>().MovementsAsync(new DrawerScope(world.Treasury, world.Cashier, Now.AddHours(-1), Now.AddHours(1)), 100, CancellationToken.None);
+            var movements = await scope.ServiceProvider.GetRequiredService<ICashDrawerQueries>().MovementsAsync(new DrawerScope(world.Branch, world.Cashier, Now.AddHours(-1), Now.AddHours(1)), 100, CancellationToken.None);
             Assert.Equal(5, movements.Count);   // four payments (one voided) and one refund
             Assert.Contains(movements, movement => movement.Status == "Voided");
         }
@@ -198,14 +208,17 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
 
         using var reader = fixture.AppScope(world.Tenant, world.Cashier);
         var closings = reader.ServiceProvider.GetRequiredService<ICashClosingRepository>();
-        Assert.True(await closings.CoversAsync(world.Treasury, world.Cashier, Now, CancellationToken.None));
-        Assert.True(await closings.OverlapsAsync(world.Treasury, null, Now, Now.AddHours(2), CancellationToken.None));
-        Assert.False(await closings.OverlapsAsync(world.Treasury, null, Now.AddHours(1), Now.AddHours(2), CancellationToken.None));
+        Assert.True(await closings.CoversAsync(world.Branch, world.Cashier, Now, CancellationToken.None));
+        Assert.False(await closings.CoversAsync(Guid.CreateVersion7(), world.Cashier, Now, CancellationToken.None));   // another branch is another drawer
+        Assert.True(await closings.OverlapsAsync(world.Branch, null, Now, Now.AddHours(2), CancellationToken.None));
+        Assert.False(await closings.OverlapsAsync(world.Branch, null, Now.AddHours(1), Now.AddHours(2), CancellationToken.None));
         var page = await reader.ServiceProvider.GetRequiredService<IVisitAccountRepository>().ListPaymentsAsync(new PaymentFilter(visitA, null, null, null, null, null, null), PageRequest.Normalized(1, 10), CancellationToken.None);
         Assert.All(page.Items, item => Assert.True(item.IsFrozen));
-        Assert.All(page.Items, item => Assert.Equal(("MAIN", "Billing Cashier"), (item.TreasuryCode[..4], item.CashierName)));
-        var record = (await closings.GetRecordAsync((await closings.ListAsync(new CashClosingFilter(world.Treasury, null, null, null), PageRequest.Normalized(1, 10), CancellationToken.None)).Items.Single().Id, CancellationToken.None))!;
+        Assert.All(page.Items, item => Assert.Equal((world.Branch, "Billing Cashier"), (item.BranchId, item.CashierName)));
+        var record = (await closings.GetRecordAsync((await closings.ListAsync(new CashClosingFilter(world.Branch, null, null, null), PageRequest.Normalized(1, 10), CancellationToken.None)).Items.Single().Id, CancellationToken.None))!;
         Assert.Equal((680m, 680m, 0m), (record.Totals.ExpectedCash, record.Item.ExpectedCash, record.Item.Difference));
+        Assert.Equal((world.Branch, world.Branch, (Guid?)null), (record.Item.BranchId, record.BranchId, record.LegacyTreasuryId));
+        Assert.Empty((await closings.ListAsync(new CashClosingFilter(Guid.CreateVersion7(), null, null, null), PageRequest.Normalized(1, 10), CancellationToken.None)).Items);
     }
 
     [DatabaseFact]
@@ -213,7 +226,7 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
     {
         var world = await WorldAsync();
         var second = await RegisterUserAsync("Billing Cashier Two");
-        var secondStation = world.Station with { CashierUserId = second };
+        var secondStation = world.Desk with { UserId = second };
         var visitA = await InsertVisitAsync(world.Tenant, "ACC-COL-1", 500m);
         var visitB = await InsertVisitAsync(world.Tenant, "ACC-COL-2", 400m);
         await PayAsync(world, visitA, 300m);
@@ -271,7 +284,7 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
 
     // ---- world --------------------------------------------------------------------------------------------------
 
-    private sealed record World(Guid Tenant, Guid Branch, Guid Cashier, Guid Approver, Guid Treasury, Guid Request, CashierStation Station);
+    private sealed record World(Guid Tenant, Guid Branch, Guid Cashier, Guid Approver, Cashier Desk);
 
     private async Task<World> WorldAsync()
     {
@@ -280,34 +293,7 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
         var cashier = await RegisterUserAsync("Billing Cashier");
         var approver = await RegisterUserAsync("Billing Approver");
 
-        Guid treasuryId;
-        using (var scope = fixture.AppScope(tenant, approver))
-        {
-            var treasury = Domain.Treasury.Treasury.Create("MAIN" + Guid.CreateVersion7().ToString("N")[..6], new LocalizedText("Main drawer", "الخزينة الرئيسية"), branch, Now);
-            scope.ServiceProvider.GetRequiredService<ITreasuryRepository>().Add(treasury);
-            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
-            treasuryId = treasury.Id;
-        }
-
-        Guid requestId;
-        using (var scope = fixture.AppScope(tenant, cashier))
-        {
-            var treasury = (await scope.ServiceProvider.GetRequiredService<ITreasuryRepository>().GetForUpdateAsync(treasuryId, CancellationToken.None))!;
-            var number = await scope.ServiceProvider.GetRequiredService<IReferenceNumbers>().NextAsync(TreasuryAccessRequest.NumberKind, TreasuryAccessRequest.NumberPrefix, Now, CancellationToken.None);
-            var request = TreasuryAccessRequest.Request(treasury, number, cashier, Device, "Billing PC", Now);
-            scope.ServiceProvider.GetRequiredService<ITreasuryAccessRequestRepository>().Add(request);
-            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
-            requestId = request.Id;
-        }
-
-        using (var scope = fixture.AppScope(tenant, approver))
-        {
-            var request = (await scope.ServiceProvider.GetRequiredService<ITreasuryAccessRequestRepository>().GetForUpdateAsync(requestId, CancellationToken.None))!;
-            request.Approve(approver, Now);
-            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
-        }
-
-        return new World(tenant, branch, cashier, approver, treasuryId, requestId, new CashierStation(treasuryId, branch, true, true, Device, cashier, branch));
+        return new World(tenant, branch, cashier, approver, new Cashier(cashier, branch));
     }
 
     private async Task<Guid> RegisterUserAsync(string displayName)
@@ -319,10 +305,10 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
         return user.Id;
     }
 
-    private async Task<Guid> PayAsync(World world, Guid visit, decimal amount, PaymentMethod method = PaymentMethod.Cash, string? reference = null, string? number = null, CashierStation? station = null)
+    private async Task<Guid> PayAsync(World world, Guid visit, decimal amount, PaymentMethod method = PaymentMethod.Cash, string? reference = null, string? number = null, Cashier? station = null)
     {
-        var at = station ?? world.Station;
-        using var scope = fixture.AppScope(world.Tenant, at.CashierUserId, branchId: world.Branch);
+        var at = station ?? world.Desk;
+        using var scope = fixture.AppScope(world.Tenant, at.UserId, branchId: world.Branch);
         var accounts = scope.ServiceProvider.GetRequiredService<IVisitAccountRepository>();
         var share = (await scope.ServiceProvider.GetRequiredService<IBillableVisitLookup>().GetAsync(visit, CancellationToken.None))!.Charge;
         var existing = await accounts.GetForUpdateAsync(visit, CancellationToken.None);
@@ -346,10 +332,10 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
     }
 
-    private async Task RefundAsync(World world, Guid visit, decimal amount, CashierStation? station = null)
+    private async Task RefundAsync(World world, Guid visit, decimal amount, Cashier? station = null)
     {
-        var at = station ?? world.Station;
-        using var scope = fixture.AppScope(world.Tenant, at.CashierUserId, branchId: world.Branch);
+        var at = station ?? world.Desk;
+        using var scope = fixture.AppScope(world.Tenant, at.UserId, branchId: world.Branch);
         var share = (await scope.ServiceProvider.GetRequiredService<IBillableVisitLookup>().GetAsync(visit, CancellationToken.None))!.Charge;
         var account = (await scope.ServiceProvider.GetRequiredService<IVisitAccountRepository>().GetForUpdateAsync(visit, CancellationToken.None))!;
         var number = await scope.ServiceProvider.GetRequiredService<IReferenceNumbers>().NextAsync(Refund.NumberKind, Refund.NumberPrefix, Now, CancellationToken.None);
@@ -360,9 +346,9 @@ public sealed class BillingModuleTests(DatabaseFixture fixture)
     private async Task CloseAsync(World world, DateTimeOffset from, DateTimeOffset to)
     {
         using var scope = fixture.AppScope(world.Tenant, world.Approver, branchId: world.Branch);
-        var totals = await scope.ServiceProvider.GetRequiredService<ICashDrawerQueries>().TotalsAsync(new DrawerScope(world.Treasury, null, from, to), CancellationToken.None);
+        var totals = await scope.ServiceProvider.GetRequiredService<ICashDrawerQueries>().TotalsAsync(new DrawerScope(world.Branch, null, from, to), CancellationToken.None);
         var number = await scope.ServiceProvider.GetRequiredService<IReferenceNumbers>().NextAsync(CashClosing.NumberKind, CashClosing.NumberPrefix, Now, CancellationToken.None);
-        var closing = CashClosing.Close(number, world.Treasury, world.Branch, world.Branch, null, from, to, totals, totals.ExpectedCash, null, world.Approver, to);
+        var closing = CashClosing.Close(number, world.Branch, null, from, to, totals, totals.ExpectedCash, null, world.Approver, to);
         scope.ServiceProvider.GetRequiredService<ICashClosingRepository>().Add(closing);
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
     }

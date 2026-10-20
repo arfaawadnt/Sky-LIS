@@ -9,13 +9,13 @@ namespace Platform.Application.Billing;
 // current tenant (query filter + RLS); adapters live in Platform.Infrastructure/Persistence/Billing and register by
 // convention. Ports over tables of other modules read them directly (MODULES.md §1), never their repositories.
 
-public sealed record PaymentFilter(Guid? VisitId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? TreasuryId, Guid? CashierUserId, PaymentMethod? Method, PaymentStatus? Status);
+public sealed record PaymentFilter(Guid? VisitId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? BranchId, Guid? CashierUserId, PaymentMethod? Method, PaymentStatus? Status);
 
-public sealed record RefundFilter(Guid? VisitId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? TreasuryId, Guid? CashierUserId, PaymentMethod? Method);
+public sealed record RefundFilter(Guid? VisitId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? BranchId, Guid? CashierUserId, PaymentMethod? Method);
 
-public sealed record CashClosingFilter(Guid? TreasuryId, Guid? CashierUserId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc);
+public sealed record CashClosingFilter(Guid? BranchId, Guid? CashierUserId, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc);
 
-/// <summary>The account of a visit with its payments and refunds; register projections join treasuries and user names.</summary>
+/// <summary>The account of a visit with its payments and refunds; register projections join user names and method definitions.</summary>
 public interface IVisitAccountRepository : IRepository<VisitAccount>
 {
     /// <summary>The account holding the payment (tracked, with its payments and refunds), or <see langword="null"/>.</summary>
@@ -40,15 +40,16 @@ public interface IVisitAccountRepository : IRepository<VisitAccount>
 }
 
 /// <summary>A closing with everything its sheet shows.</summary>
-public sealed record CashClosingRecord(CashClosingListItem Item, ClosingTotals Totals, string? Note, Guid BranchId);
+/// <param name="LegacyTreasuryId">The treasury of a closing made before LIS-CR-004 (its sheet lists that drawer's movements only); null otherwise.</param>
+public sealed record CashClosingRecord(CashClosingListItem Item, ClosingTotals Totals, string? Note, Guid BranchId, Guid? LegacyTreasuryId = null);
 
 public interface ICashClosingRepository : IRepository<CashClosing>
 {
-    /// <summary>INV-BIL-005: a closed period of the treasury intersects <c>[from, to)</c> for an intersecting cashier scope.</summary>
-    Task<bool> OverlapsAsync(Guid treasuryId, Guid? cashierUserId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken);
+    /// <summary>INV-BIL-005: a closed period of the branch intersects <c>[from, to)</c> for an intersecting cashier scope.</summary>
+    Task<bool> OverlapsAsync(Guid branchId, Guid? cashierUserId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken);
 
-    /// <summary>INV-BIL-006: a closed period covers a movement of the cashier on the treasury at <paramref name="atUtc"/>.</summary>
-    Task<bool> CoversAsync(Guid treasuryId, Guid cashierUserId, DateTimeOffset atUtc, CancellationToken cancellationToken);
+    /// <summary>INV-BIL-006: a closed period of the branch covers a movement of the cashier at <paramref name="atUtc"/>.</summary>
+    Task<bool> CoversAsync(Guid branchId, Guid cashierUserId, DateTimeOffset atUtc, CancellationToken cancellationToken);
 
     Task<Paged<CashClosingListItem>> ListAsync(CashClosingFilter filter, PageRequest page, CancellationToken cancellationToken);
 
@@ -57,8 +58,9 @@ public interface ICashClosingRepository : IRepository<CashClosing>
     Task<CashClosingRecord?> GetRecordAsync(Guid closingId, CancellationToken cancellationToken);
 }
 
-/// <summary>The scope of a drawer: a treasury, one cashier or all (<see langword="null"/>), and a half-open period.</summary>
-public sealed record DrawerScope(Guid TreasuryId, Guid? CashierUserId, DateTimeOffset FromUtc, DateTimeOffset ToUtc);
+/// <summary>The scope of a drawer: a branch, one cashier or all (<see langword="null"/>), and a half-open period (LIS-CR-004: the branch replaces the treasury).</summary>
+/// <param name="LegacyTreasuryId">Narrows the scope to one treasury of the branch: only for the sheet of a closing made before LIS-CR-004.</param>
+public sealed record DrawerScope(Guid BranchId, Guid? CashierUserId, DateTimeOffset FromUtc, DateTimeOffset ToUtc, Guid? LegacyTreasuryId = null);
 
 /// <summary>The figures of a drawer (CP-30, BR-16) over <c>app.payments</c>, <c>app.refunds</c> and, for outstanding balances and discounts, <c>app.visits</c>.</summary>
 public interface ICashDrawerQueries
@@ -69,8 +71,8 @@ public interface ICashDrawerQueries
     /// <summary>Payments (posted and voided) and refunds of the scope in time order, at most <paramref name="maxRows"/>; accessions left empty.</summary>
     Task<IReadOnlyList<DrawerMovement>> MovementsAsync(DrawerScope scope, int maxRows, CancellationToken cancellationToken);
 
-    /// <summary>The cashiers who moved money on the treasury in the period.</summary>
-    Task<IReadOnlyList<DrawerCashier>> CashiersAsync(Guid treasuryId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken);
+    /// <summary>The cashiers who moved money in the branch in the period.</summary>
+    Task<IReadOnlyList<DrawerCashier>> CashiersAsync(Guid branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken);
 
     /// <summary>Display names of platform users, keyed by id (unknown ids are absent).</summary>
     Task<IReadOnlyDictionary<Guid, string>> UserNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
@@ -144,28 +146,6 @@ public interface IBillableVisitLookup
 
     /// <summary>The member visits of a batch in accession order.</summary>
     Task<IReadOnlyList<BillableVisit>> BatchMembersAsync(Guid batchId, CancellationToken cancellationToken);
-}
-
-/// <summary>A treasury with the BR-27 facts for one user and device.</summary>
-public sealed record TreasuryStationView(Guid TreasuryId, string Code, string NameEn, string NameAr, Guid BranchId, bool IsActive, bool ApprovedForDevice);
-
-/// <summary>
-/// BR-27 through the Treasury module's tables: a movement is accepted only on an active treasury of the session branch
-/// for which a live Approved access request exists for (user, treasury, device). Revoking the request ends the approval.
-/// </summary>
-public interface ITreasuryStationLookup
-{
-    /// <summary>The treasury with the approval flag for the user on the device, or <see langword="null"/> when it does not exist.</summary>
-    Task<TreasuryStationView?> GetAsync(Guid treasuryId, Guid userId, string deviceId, CancellationToken cancellationToken);
-
-    /// <summary>The active treasuries of the branch approved for the user on the device (the pay forms' choice).</summary>
-    Task<IReadOnlyList<BillingTreasuryItem>> ApprovedAsync(Guid userId, string deviceId, Guid branchId, CancellationToken cancellationToken);
-
-    /// <summary>Every treasury of the branch, active or not (a deactivated drawer may still need its closing).</summary>
-    Task<IReadOnlyList<BillingTreasuryItem>> OfBranchAsync(Guid branchId, CancellationToken cancellationToken);
-
-    /// <summary>Treasury facts without an approval check (closings, registers), or <see langword="null"/>.</summary>
-    Task<BillingTreasuryItem?> GetTreasuryAsync(Guid treasuryId, CancellationToken cancellationToken);
 }
 
 /// <summary>A catalogue reason of kind Refund (names may be unknown while Catalogue B's adapter is pending).</summary>

@@ -39,7 +39,6 @@ import { formatPrintDateTime, formatPrintMoney, movementMethodLabel } from '../b
           @if (doc().reference; as reference) {
             <tr><th scope="row">{{ i18n.t('billing.field.reference') }}</th><td class="mono">{{ reference }}</td></tr>
           }
-          <tr><th scope="row">{{ i18n.t('billing.field.treasury') }}</th><td>{{ doc().treasuryCode }} · {{ treasury() }}</td></tr>
           <tr><th scope="row">{{ i18n.t('billing.field.cashier') }}</th><td>{{ doc().cashierName }}</td></tr>
         </tbody>
       </table>
@@ -65,8 +64,6 @@ export class ReceiptDocumentComponent {
   readonly doc = input.required<PaymentReceiptDocument>();
 
   protected readonly branch = computed(() => branchOf(this.doc().letterhead.branchNameEn, this.doc().letterhead.branchNameAr, this.i18n.lang()));
-
-  protected readonly treasury = computed(() => localizedPick({ en: this.doc().treasuryNameEn, ar: this.doc().treasuryNameAr }, this.i18n.lang()));
 
   /** The laboratory's method name with its code (CP-30b), or the kind on a legacy receipt. */
   protected readonly method = computed(() => movementMethodLabel((key) => this.i18n.t(key), this.i18n.lang(), this.doc()));

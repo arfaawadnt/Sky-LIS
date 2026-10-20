@@ -4,7 +4,6 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { BILLING_API, type Paged, type PaymentListItem } from '../../../core/api/billing.contracts';
-import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
 import { account, collectionsReport, flushCashDesk, flushReportPrivileges } from '../testing/billing.fixtures';
@@ -27,7 +26,6 @@ describe('PaymentsFacade (CP-23)', () => {
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
-        { provide: DeviceIdentityService, useValue: { deviceId: () => 'device-test' } satisfies Pick<DeviceIdentityService, 'deviceId'> },
         CashDeskFacade,
         PaymentsFacade,
       ],
@@ -73,17 +71,17 @@ describe('PaymentsFacade (CP-23)', () => {
     backend.verify();
   });
 
-  it('posts a payment with this device and reloads the account', async () => {
+  it('posts a payment without treasury or device (LIS-CR-004) and reloads the account', async () => {
     facade.open('v-1');
     await runEffects();
     backend.expectOne(`${BILLING_API.visits}/v-1/account`).flush(account());
     await runEffects();
 
-    const pending = facade.pay.execute({ visitId: 'v-1', treasuryId: 't-1', amount: 200, method: 'Card', reference: 'SLIP-1', reasonId: null, note: null });
+    const pending = facade.pay.execute({ visitId: 'v-1', amount: 200, method: 'Card', reference: 'SLIP-1', reasonId: null, note: null });
     await settle();
     const post = backend.expectOne(BILLING_API.payments);
     expect(post.request.method).toBe('POST');
-    expect(post.request.body).toEqual({ visitId: 'v-1', amount: 200, method: 'Card', reference: 'SLIP-1', treasuryId: 't-1', deviceId: 'device-test' });
+    expect(post.request.body).toEqual({ visitId: 'v-1', amount: 200, method: 'Card', reference: 'SLIP-1' });
     post.flush({ id: 'pay-1', receiptNumber: 'RCT-2026-00002' }, { status: 201, statusText: 'Created' });
     expect(await pending).toEqual({ id: 'pay-1', receiptNumber: 'RCT-2026-00002' });
 
@@ -96,7 +94,7 @@ describe('PaymentsFacade (CP-23)', () => {
 
   it('keeps the refusal code of a payment as its problem', async () => {
     await runEffects();
-    const pending = facade.pay.execute({ visitId: 'v-1', treasuryId: 't-1', amount: 900, method: 'Cash', reference: null, reasonId: null, note: null });
+    const pending = facade.pay.execute({ visitId: 'v-1', amount: 900, method: 'Cash', reference: null, reasonId: null, note: null });
     await settle();
     backend.expectOne(BILLING_API.payments).flush({ type: 'about:blank', title: 'Over', status: 409, code: 'BIL-010' }, { status: 409, statusText: 'Conflict' });
 
@@ -119,7 +117,7 @@ describe('PaymentsFacade (CP-23)', () => {
     expect(list.request.params.get('page')).toBe('1');
     expect(list.request.params.has('treasuryId')).toBe(false);
     list.flush(page<PaymentListItem>([]));
-    backend.expectOne(BILLING_API.treasuries).flush([]);
+    backend.expectNone('/api/v1/billing/treasuries');
     await runEffects();
     backend.verify();
   });

@@ -4,15 +4,14 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { BILLING_API } from '../../../core/api/billing.contracts';
-import { DeviceIdentityService } from '../../../core/device/device-identity.service';
+import { AuthStore } from '../../../core/auth/auth.store';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { CashDeskFacade } from './cash-desk.facade';
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
-const main = { id: 't-1', code: 'MAIN', nameEn: 'Main drawer', nameAr: 'الخزينة الرئيسية', branchId: 'b-1', isActive: true };
-
-describe('CashDeskFacade (BR-27, UAT D-08)', () => {
+describe('CashDeskFacade (UAT D-08, LIS-CR-004)', () => {
   let desk: CashDeskFacade;
   let backend: HttpTestingController;
 
@@ -22,7 +21,13 @@ describe('CashDeskFacade (BR-27, UAT D-08)', () => {
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
-        { provide: DeviceIdentityService, useValue: { deviceId: () => 'device-test' } satisfies Pick<DeviceIdentityService, 'deviceId'> },
+        {
+          provide: AuthStore,
+          useValue: {
+            currentUser: () => ({ id: 'u-1' }),
+            profile: () => ({ displayName: 'sara', displayNameEn: 'Sara Cashier', displayNameAr: 'سارة الكاشير' }),
+          },
+        },
         CashDeskFacade,
       ],
     });
@@ -35,24 +40,39 @@ describe('CashDeskFacade (BR-27, UAT D-08)', () => {
     await settle();
   }
 
-  it('leaves a load in flight alone but re-reads the approved treasuries once the previous read settled', async () => {
+  it('leaves a load in flight alone but re-reads the print parameter once the previous read settled', async () => {
     await tick();
-    const first = backend.expectOne((request) => request.url === BILLING_API.myTreasuries);
+    const first = backend.expectOne(BILLING_API.printSettings);
 
     desk.refresh();
     await tick();
-    backend.expectNone((request) => request.url === BILLING_API.myTreasuries);
+    backend.expectNone(BILLING_API.printSettings);
 
-    first.flush([]);
+    first.flush({ autoPrintReceipt: false });
     await tick();
-    expect(desk.hasStation()).toBe(false);
+    expect(desk.shouldAutoPrint()).toBe(false);
 
     desk.refresh();
     await tick();
-    backend.expectOne((request) => request.url === BILLING_API.myTreasuries).flush([main]);
+    backend.expectOne(BILLING_API.printSettings).flush({ autoPrintReceipt: true });
     await tick();
-    expect(desk.hasStation()).toBe(true);
-    expect(desk.treasuryId()).toBe('t-1');
+    expect(desk.shouldAutoPrint()).toBe(true);
+    backend.match(() => true).forEach((request) => request.flush([]));
+  });
+
+  it('reads no treasury and no device: the movement is posted for the signed-in cashier, named in the page language (LIS-CR-004)', async () => {
+    await tick();
+    backend.expectNone((request) => request.url.includes('treasur'));
+    expect(desk.cashierName()).toBe('Sara Cashier');
+    TestBed.inject(I18nService).setLanguage('ar');
+    try {
+      expect(desk.cashierName()).toBe('سارة الكاشير');
+    } finally {
+      TestBed.inject(I18nService).setLanguage('en');
+    }
+
+    backend.match(() => true).forEach((request) => request.flush([]));
+    backend.verify();
   });
 
   it('reads autoPrintReceipt through billing (no settings.view needed) and prints only when it is on (UAT A-05)', async () => {
@@ -74,19 +94,6 @@ describe('CashDeskFacade (BR-27, UAT D-08)', () => {
     backend.expectOne(BILLING_API.printSettings).flush({ type: 'about:blank', title: 'Forbidden', status: 403, code: 'AUTHZ-001' }, { status: 403, statusText: 'Forbidden' });
     await tick();
     expect(desk.shouldAutoPrint()).toBe(false);   // refused: no print
-  });
-
-  it('re-reads after a refused read, so a right granted since (BR-17) is not hidden behind the old refusal', async () => {
-    await tick();
-    backend.expectOne((request) => request.url === BILLING_API.myTreasuries).flush({ type: 'about:blank', title: 'Forbidden', status: 403, code: 'AUTHZ-001' }, { status: 403, statusText: 'Forbidden' });
-    await tick();
-    expect(desk.approved()).toEqual([]);
-
-    desk.refresh();
-    await tick();
-    backend.expectOne((request) => request.url === BILLING_API.myTreasuries).flush([main]);
-    await tick();
-    expect(desk.approved().map((item) => item.code)).toEqual(['MAIN']);
   });
 
   it("reads the laboratory's payment methods for the movement forms, falls back to no options on a refusal and re-reads them on refresh (CP-30b)", async () => {

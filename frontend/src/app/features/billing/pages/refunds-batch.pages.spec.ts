@@ -6,7 +6,6 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
 import { BILLING_API, type BatchAccountView, type BatchMemberView, type Paged, type RefundListItem, type VisitAccountView } from '../../../core/api/billing.contracts';
-import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { BillingPrinter } from '../state/billing-printer';
@@ -64,7 +63,6 @@ describe('RefundsPage and BatchPaymentPage (CP-24, CP-27)', () => {
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
-        { provide: DeviceIdentityService, useValue: { deviceId: () => 'device-test' } satisfies Pick<DeviceIdentityService, 'deviceId'> },
         { provide: PermissionsService, useValue: { can: () => true } satisfies Pick<PermissionsService, 'can'> },
         {
           provide: BillingPrinter,
@@ -117,7 +115,7 @@ describe('RefundsPage and BatchPaymentPage (CP-24, CP-27)', () => {
     }
 
     await Promise.all([
-      page.refund(account(), { treasuryId: 't-1', amount: 40, method: 'Cash', reference: null, reasonId: 'r-1', note: null }),
+      page.refund(account(), { amount: 40, method: 'Cash', reference: null, reasonId: 'r-1', note: null }),
       (async () => {
         await settle();
         backend.expectOne((request) => request.url === BILLING_API.refunds && request.method === 'POST').flush({ id: 'rf-1', number: 'RFD-2026-00001' }, { status: 201, statusText: 'Created' });
@@ -147,7 +145,7 @@ describe('RefundsPage and BatchPaymentPage (CP-24, CP-27)', () => {
     expect(page.canPay({ ...batch, billedThroughClaims: true }, member('a', 100))).toBe(false);
 
     await Promise.all([
-      page.payAll(batch, { treasuryId: 't-1', amount: 100, method: 'Cash', reference: null, reasonId: null, note: null }),
+      page.payAll(batch, { amount: 100, method: 'Cash', reference: null, reasonId: null, note: null }),
       (async () => {
         await settle();
         backend.expectOne(`${BILLING_API.batches}/bt-1/pay-all`).flush({ batchId: 'bt-1', amount: 100, payments: [{ visitId: 'a', accession: 'ACC-a', paymentId: 'pay-a', receiptNumber: 'RCT-2026-00009', amount: 100 }] });

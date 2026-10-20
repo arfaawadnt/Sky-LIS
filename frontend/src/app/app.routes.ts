@@ -8,7 +8,7 @@ import { navRegistryGuard } from './shell/nav.guard';
 /**
  * Lazy routes per feature (01 §6.5). Guards are affordance; the server decides on every request. The signed-in
  * pages are children of the shell route (sidebar + top bar); the integrator registers each module's routes as a
- * sibling of `treasury` (client portal) or under `admin` (Super Admin portal, platform tenant only).
+ * sibling of `billing` (client portal) or under `admin` (Super Admin portal, platform tenant only).
  */
 export const routes: Routes = [
   {
@@ -33,11 +33,6 @@ export const routes: Routes = [
         pathMatch: 'full',
         canActivate: [tenantGuard],   // every client feature below is guarded the same way: a platform session is sent to /admin (UAT D-17)
         loadChildren: () => import('./features/home/home.routes').then((m) => m.HOME_ROUTES),
-      },
-      {
-        path: 'treasury',
-        canActivate: [tenantGuard],
-        loadChildren: () => import('./features/treasury/treasury.routes').then((m) => m.TREASURY_ROUTES),
       },
       {
         path: 'catalogue',

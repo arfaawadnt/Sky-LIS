@@ -23,7 +23,7 @@ export interface CurrentUser {
   readonly displayName: string;
   readonly language: string;
   readonly scope: string;
-  /** The primary administrator of the laboratory (CP-38): the SOD-TRS-001 exception on the treasury access page. */
+  /** The primary administrator of the laboratory (CP-38). */
   readonly isPrimaryAdministrator?: boolean;
 }
 

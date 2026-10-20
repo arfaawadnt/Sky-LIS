@@ -134,7 +134,7 @@ public sealed class IntegrationFlowTests(ApiFactory factory) : IClassFixture<Api
         var tenant = Guid.CreateVersion7();
         var engineer = await SignedInAsync(host, tenant, EngineerPermissions);
         var viewer = await SignedInAsync(host, tenant, ["integration.view"]);
-        var outsider = await SignedInAsync(host, tenant, ["treasury.view"]);
+        var outsider = await SignedInAsync(host, tenant, ["billing.view"]);
 
         var badSerial = await engineer.PostAsJsonAsync(Analysers, Analyser("SER1", null) with { Connection = new AnalyserConnectionDto("Serial", "9600-n-8-1", "COM3", null, null, null, null) });
         Assert.Equal(HttpStatusCode.UnprocessableEntity, badSerial.StatusCode);

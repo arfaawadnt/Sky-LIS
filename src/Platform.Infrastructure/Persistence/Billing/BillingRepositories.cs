@@ -91,9 +91,9 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
             query = query.Where(payment => payment.PaidAtUtc < to);
         }
 
-        if (filter.TreasuryId is { } treasuryId)
+        if (filter.BranchId is { } branchId)
         {
-            query = query.Where(payment => payment.TreasuryId == treasuryId);
+            query = query.Where(payment => payment.BranchId == branchId);
         }
 
         if (filter.CashierUserId is { } cashierUserId)
@@ -133,9 +133,9 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
             query = query.Where(refund => refund.RefundedAtUtc < to);
         }
 
-        if (filter.TreasuryId is { } treasuryId)
+        if (filter.BranchId is { } branchId)
         {
-            query = query.Where(refund => refund.TreasuryId == treasuryId);
+            query = query.Where(refund => refund.BranchId == branchId);
         }
 
         if (filter.CashierUserId is { } cashierUserId)
@@ -155,10 +155,9 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
 
     private static IQueryable<Refund> Newest(IQueryable<Refund> query) => query.OrderByDescending(refund => refund.RefundedAtUtc).ThenByDescending(refund => refund.Id);
 
-    /// <summary>Joins the treasury and the user names, and marks a payment frozen when a closed period covers it (INV-BIL-006).</summary>
+    /// <summary>Joins the user names and the method definition, and marks a payment frozen when a closed period of its branch covers it (INV-BIL-006).</summary>
     private IQueryable<PaymentRow> Project(IQueryable<Payment> payments) =>
         from payment in payments
-        join treasury in Context.Treasuries.AsNoTracking() on payment.TreasuryId equals treasury.Id
         join cashier in Context.PlatformUsers.AsNoTracking() on payment.CashierUserId equals cashier.Id
         from voider in Context.PlatformUsers.AsNoTracking().Where(user => user.Id == payment.VoidedByUserId).DefaultIfEmpty()
         from definition in Context.Set<PaymentMethodDefinition>().AsNoTracking().Where(candidate => candidate.Code == payment.MethodCode).DefaultIfEmpty()
@@ -173,19 +172,14 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
             MethodNameEn = definition == null ? null : definition.Name.En,
             MethodNameAr = definition == null ? null : definition.Name.Ar,
             Reference = payment.Reference,
-            TreasuryId = payment.TreasuryId,
-            TreasuryCode = treasury.Code,
-            TreasuryNameEn = treasury.Name.En,
-            TreasuryNameAr = treasury.Name.Ar,
             CashierUserId = payment.CashierUserId,
             CashierName = cashier.DisplayName,
             BranchId = payment.BranchId,
-            DeviceId = payment.DeviceId,
             BatchId = payment.BatchId,
             PaidAtUtc = payment.PaidAtUtc,
             Status = payment.Status,
             IsFrozen = Context.Set<CashClosing>().Any(closing =>
-                closing.TreasuryId == payment.TreasuryId
+                closing.BranchId == payment.BranchId
                 && (closing.CashierUserId == null || closing.CashierUserId == payment.CashierUserId)
                 && payment.PaidAtUtc >= closing.PeriodFromUtc
                 && payment.PaidAtUtc < closing.PeriodToUtc),
@@ -196,7 +190,6 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
 
     private IQueryable<RefundRow> Project(IQueryable<Refund> refunds) =>
         from refund in refunds
-        join treasury in Context.Treasuries.AsNoTracking() on refund.TreasuryId equals treasury.Id
         join cashier in Context.PlatformUsers.AsNoTracking() on refund.CashierUserId equals cashier.Id
         from definition in Context.Set<PaymentMethodDefinition>().AsNoTracking().Where(candidate => candidate.Code == refund.MethodCode).DefaultIfEmpty()
         select new RefundRow
@@ -212,25 +205,20 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
             Reference = refund.Reference,
             ReasonId = refund.ReasonId,
             Note = refund.Note,
-            TreasuryId = refund.TreasuryId,
-            TreasuryCode = treasury.Code,
-            TreasuryNameEn = treasury.Name.En,
-            TreasuryNameAr = treasury.Name.Ar,
             CashierUserId = refund.CashierUserId,
             CashierName = cashier.DisplayName,
             BranchId = refund.BranchId,
-            DeviceId = refund.DeviceId,
             RefundedAtUtc = refund.RefundedAtUtc,
         };
 
     private static PaymentListItem ToItem(PaymentRow row) => new(
-        row.Id, row.ReceiptNumber, row.VisitId, null, row.Amount, row.Method.ToString(), row.Reference, row.TreasuryId, row.TreasuryCode, row.TreasuryNameEn, row.TreasuryNameAr,
-        row.CashierUserId, row.CashierName, row.BranchId, row.DeviceId, row.BatchId, row.PaidAtUtc, row.Status.ToString(), row.IsFrozen, row.VoidReason, row.VoidedByName, row.VoidedAtUtc,
+        row.Id, row.ReceiptNumber, row.VisitId, null, row.Amount, row.Method.ToString(), row.Reference,
+        row.CashierUserId, row.CashierName, row.BranchId, row.BatchId, row.PaidAtUtc, row.Status.ToString(), row.IsFrozen, row.VoidReason, row.VoidedByName, row.VoidedAtUtc,
         row.MethodCode, row.MethodNameEn, row.MethodNameAr);
 
     private static RefundListItem ToItem(RefundRow row) => new(
-        row.Id, row.Number, row.VisitId, null, row.Amount, row.Method.ToString(), row.Reference, row.ReasonId, null, null, row.Note, row.TreasuryId, row.TreasuryCode,
-        row.TreasuryNameEn, row.TreasuryNameAr, row.CashierUserId, row.CashierName, row.BranchId, row.DeviceId, row.RefundedAtUtc,
+        row.Id, row.Number, row.VisitId, null, row.Amount, row.Method.ToString(), row.Reference, row.ReasonId, null, null, row.Note,
+        row.CashierUserId, row.CashierName, row.BranchId, row.RefundedAtUtc,
         row.MethodCode, row.MethodNameEn, row.MethodNameAr);
 
     private sealed class PaymentRow
@@ -253,21 +241,11 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
 
         public string? Reference { get; init; }
 
-        public Guid TreasuryId { get; init; }
-
-        public string TreasuryCode { get; init; } = string.Empty;
-
-        public string TreasuryNameEn { get; init; } = string.Empty;
-
-        public string TreasuryNameAr { get; init; } = string.Empty;
-
         public Guid CashierUserId { get; init; }
 
         public string CashierName { get; init; } = string.Empty;
 
         public Guid BranchId { get; init; }
-
-        public string DeviceId { get; init; } = string.Empty;
 
         public Guid? BatchId { get; init; }
 
@@ -308,21 +286,11 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
 
         public string? Note { get; init; }
 
-        public Guid TreasuryId { get; init; }
-
-        public string TreasuryCode { get; init; } = string.Empty;
-
-        public string TreasuryNameEn { get; init; } = string.Empty;
-
-        public string TreasuryNameAr { get; init; } = string.Empty;
-
         public Guid CashierUserId { get; init; }
 
         public string CashierName { get; init; } = string.Empty;
 
         public Guid BranchId { get; init; }
-
-        public string DeviceId { get; init; } = string.Empty;
 
         public DateTimeOffset RefundedAtUtc { get; init; }
     }
@@ -331,17 +299,17 @@ internal sealed class VisitAccountRepository(AppDbContext context) : Repository<
 /// <summary>Closed periods: overlap and cover checks (INV-BIL-005/006) and the closings register.</summary>
 internal sealed class CashClosingRepository(AppDbContext context) : Repository<CashClosing>(context), ICashClosingRepository
 {
-    public Task<bool> OverlapsAsync(Guid treasuryId, Guid? cashierUserId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken) =>
+    public Task<bool> OverlapsAsync(Guid branchId, Guid? cashierUserId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken) =>
         Set.AnyAsync(
-            closing => closing.TreasuryId == treasuryId
+            closing => closing.BranchId == branchId
                        && (closing.CashierUserId == null || cashierUserId == null || closing.CashierUserId == cashierUserId)
                        && fromUtc < closing.PeriodToUtc
                        && closing.PeriodFromUtc < toUtc,
             cancellationToken);
 
-    public Task<bool> CoversAsync(Guid treasuryId, Guid cashierUserId, DateTimeOffset atUtc, CancellationToken cancellationToken) =>
+    public Task<bool> CoversAsync(Guid branchId, Guid cashierUserId, DateTimeOffset atUtc, CancellationToken cancellationToken) =>
         Set.AnyAsync(
-            closing => closing.TreasuryId == treasuryId
+            closing => closing.BranchId == branchId
                        && (closing.CashierUserId == null || closing.CashierUserId == cashierUserId)
                        && atUtc >= closing.PeriodFromUtc
                        && atUtc < closing.PeriodToUtc,
@@ -364,16 +332,16 @@ internal sealed class CashClosingRepository(AppDbContext context) : Repository<C
     public async Task<CashClosingRecord?> GetRecordAsync(Guid closingId, CancellationToken cancellationToken)
     {
         var row = await Project(Set.AsNoTracking().Where(closing => closing.Id == closingId)).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-        return row is null ? null : new CashClosingRecord(row.Item(), row.Totals, row.Note, row.BranchId);
+        return row is null ? null : new CashClosingRecord(row.Item(), row.Totals, row.Note, row.BranchId, row.LegacyTreasuryId);
     }
 
     private IQueryable<CashClosing> Filter(CashClosingFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
         var query = Set.AsNoTracking();
-        if (filter.TreasuryId is { } treasuryId)
+        if (filter.BranchId is { } branchId)
         {
-            query = query.Where(closing => closing.TreasuryId == treasuryId);
+            query = query.Where(closing => closing.BranchId == branchId);
         }
 
         if (filter.CashierUserId is { } cashierUserId)
@@ -398,18 +366,14 @@ internal sealed class CashClosingRepository(AppDbContext context) : Repository<C
 
     private IQueryable<ClosingRow> Project(IQueryable<CashClosing> closings) =>
         from closing in closings
-        join treasury in Context.Treasuries.AsNoTracking() on closing.TreasuryId equals treasury.Id
         join closer in Context.PlatformUsers.AsNoTracking() on closing.ClosedByUserId equals closer.Id
         from cashier in Context.PlatformUsers.AsNoTracking().Where(user => user.Id == closing.CashierUserId).DefaultIfEmpty()
         select new ClosingRow
         {
             Id = closing.Id,
             Number = closing.Number,
-            TreasuryId = closing.TreasuryId,
-            TreasuryCode = treasury.Code,
-            TreasuryNameEn = treasury.Name.En,
-            TreasuryNameAr = treasury.Name.Ar,
             BranchId = closing.BranchId,
+            LegacyTreasuryId = closing.TreasuryId,
             CashierUserId = closing.CashierUserId,
             CashierName = cashier == null ? null : cashier.DisplayName,
             PeriodFromUtc = closing.PeriodFromUtc,
@@ -430,15 +394,9 @@ internal sealed class CashClosingRepository(AppDbContext context) : Repository<C
 
         public string Number { get; init; } = string.Empty;
 
-        public Guid TreasuryId { get; init; }
-
-        public string TreasuryCode { get; init; } = string.Empty;
-
-        public string TreasuryNameEn { get; init; } = string.Empty;
-
-        public string TreasuryNameAr { get; init; } = string.Empty;
-
         public Guid BranchId { get; init; }
+
+        public Guid? LegacyTreasuryId { get; init; }
 
         public Guid? CashierUserId { get; init; }
 
@@ -465,7 +423,7 @@ internal sealed class CashClosingRepository(AppDbContext context) : Repository<C
         public DateTimeOffset ClosedAtUtc { get; init; }
 
         public CashClosingListItem Item() => new(
-            Id, Number, TreasuryId, TreasuryCode, TreasuryNameEn, TreasuryNameAr, CashierUserId, CashierName, PeriodFromUtc, PeriodToUtc,
+            Id, Number, BranchId, CashierUserId, CashierName, PeriodFromUtc, PeriodToUtc,
             Totals.TotalPayments, Totals.TotalRefunds, ExpectedCash, CountedCash, Difference, ClosedByUserId, ClosedByName, ClosedAtUtc);
     }
 }

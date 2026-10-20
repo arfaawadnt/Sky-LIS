@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 
 import type { CashClosingSheetDocument } from '../../../../core/api/billing.contracts';
 import { I18nService } from '../../../../core/i18n/i18n.service';
-import { localizedPick } from '../../../../shared/forms/localized-text';
 import { DocumentFrameComponent } from '../../../../shared/print/document-frame.component';
 import { formatPrintDateTime, formatPrintMoney } from '../billing-format';
 import { branchOf } from './receipt-document.component';
@@ -27,7 +26,6 @@ import { branchOf } from './receipt-document.component';
       <div class="split">
         <table class="facts">
           <tbody>
-            <tr><th scope="row">{{ i18n.t('billing.field.treasury') }}</th><td>{{ doc().treasuryCode }} · {{ treasury() }}</td></tr>
             <tr><th scope="row">{{ i18n.t('billing.field.cashier') }}</th><td>{{ doc().cashierName ?? i18n.t('billing.closing.allCashiers') }}</td></tr>
           </tbody>
         </table>
@@ -123,8 +121,6 @@ export class ClosingSheetDocumentComponent {
   readonly doc = input.required<CashClosingSheetDocument>();
 
   protected readonly branch = computed(() => branchOf(this.doc().letterhead.branchNameEn, this.doc().letterhead.branchNameAr, this.i18n.lang()));
-
-  protected readonly treasury = computed(() => localizedPick({ en: this.doc().treasuryNameEn, ar: this.doc().treasuryNameAr }, this.i18n.lang()));
 
   protected money(value: number | null): string {
     return formatPrintMoney(value, this.i18n.lang());

@@ -6,7 +6,6 @@ import { TestBed } from '@angular/core/testing';
 import { BILLING_API, type PaymentMethodOption, type RecordPaymentRequest } from '../../../core/api/billing.contracts';
 import { REGISTRATION_API } from '../../../core/api/registration.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { checkResult, flushReferenceLists, patient, settle } from '../testing/registration.fixtures';
 import { RegistrationFacade } from './registration.facade';
@@ -34,7 +33,6 @@ describe('RegistrationFacade payment methods (CP-30b)', () => {
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
         { provide: AuthStore, useValue: { currentBranch: signal<string | null>('b-1'), hasPermission: () => true } satisfies Pick<AuthStore, 'currentBranch' | 'hasPermission'> },
-        { provide: DeviceIdentityService, useValue: { deviceId: () => 'device-test' } satisfies Pick<DeviceIdentityService, 'deviceId'> },
         RegistrationFacade,
       ],
     });
@@ -61,7 +59,6 @@ describe('RegistrationFacade payment methods (CP-30b)', () => {
     flushReferenceLists(backend);
     await runEffects();
     facade.defaultTier();
-    facade.defaultTreasury();
     facade.setPatient(patient);
     facade.addServices([{ serviceId: 's-cbc', code: 'CBC', nameEn: '', nameAr: '' }]);
     await runEffects();
@@ -99,7 +96,7 @@ describe('RegistrationFacade payment methods (CP-30b)', () => {
     const paying = facade.pay.execute('v-1');
     await settle();
     const post = backend.expectOne(BILLING_API.payments);
-    expect(post.request.body as RecordPaymentRequest).toEqual({ visitId: 'v-1', amount: 100, method: 'Card', methodCode: 'WALLET', reference: null, treasuryId: 't-1', deviceId: 'device-test' });
+    expect(post.request.body as RecordPaymentRequest).toEqual({ visitId: 'v-1', amount: 100, method: 'Card', methodCode: 'WALLET', reference: null });
     post.flush({ id: 'pay-1', receiptNumber: 'RCT-2026-00001' }, { status: 201, statusText: 'Created' });
     await paying;
 
@@ -130,7 +127,7 @@ describe('RegistrationFacade payment methods (CP-30b)', () => {
     const paying = facade.pay.execute('v-1');
     await settle();
     const post = backend.expectOne(BILLING_API.payments);
-    expect(post.request.body as RecordPaymentRequest).toEqual({ visitId: 'v-1', amount: 100, method: 'Card', reference: 'SLIP-1', treasuryId: 't-1', deviceId: 'device-test' });
+    expect(post.request.body as RecordPaymentRequest).toEqual({ visitId: 'v-1', amount: 100, method: 'Card', reference: 'SLIP-1' });
     post.flush({ id: 'pay-1', receiptNumber: 'RCT-2026-00001' }, { status: 201, statusText: 'Created' });
     await paying;
     backend.verify();

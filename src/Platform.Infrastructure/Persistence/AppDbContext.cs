@@ -4,7 +4,6 @@ using Platform.Application.Abstractions.Security;
 using Platform.Domain.Identity;
 using Platform.Domain.Organization;
 using Platform.Domain.Tenancy;
-using Platform.Domain.Treasury;
 using Platform.Infrastructure.Persistence.Conventions;
 using Platform.Infrastructure.Persistence.Outbox;
 using Platform.Infrastructure.Security.CredentialTransport;
@@ -43,10 +42,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<CredentialNonce> CredentialNonces => Set<CredentialNonce>();
 
     public DbSet<Role> Roles => Set<Role>();
-
-    public DbSet<Domain.Treasury.Treasury> Treasuries => Set<Domain.Treasury.Treasury>();
-
-    public DbSet<TreasuryAccessRequest> TreasuryAccessRequests => Set<TreasuryAccessRequest>();
 
     public DbSet<ReferenceCounter> ReferenceCounters => Set<ReferenceCounter>();
 

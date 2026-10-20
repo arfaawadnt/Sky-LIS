@@ -12,7 +12,6 @@ using Platform.Application.PlatformAdmin;
 using Platform.Application.Pricing;
 using Platform.Application.Results;
 using Platform.Application.Samples;
-using Platform.Application.Treasury;
 using Platform.Contracts.Catalogue;
 using Platform.Contracts.Common;
 using Platform.Contracts.Identity;
@@ -48,7 +47,7 @@ public sealed class SetupListsAndAccessFlowTests(ApiFactory factory) : IClassFix
     /// <summary>The readers of the other paged registers of a laboratory (B-03 completion).</summary>
     private static readonly string[] Reader =
     [
-        "catalogue.view", "organization.view", "patients.view", "pricing.view", "treasury.view", "samples.view", "results.view", "integration.view",
+        "catalogue.view", "organization.view", "patients.view", "pricing.view", "samples.view", "results.view", "integration.view",
     ];
 
     /// <summary>The Super Admin readers of the platform registers (clients, reference data, integration library); <c>tenancy.manage</c> creates the countries of the order test.</summary>
@@ -211,7 +210,7 @@ public sealed class SetupListsAndAccessFlowTests(ApiFactory factory) : IClassFix
         };
         await ServesEverySortKeyAsync(admin, registers);
 
-        // The other paged registers of a laboratory: catalogue order aids and tests, roles, patients, pricing, treasuries,
+        // The other paged registers of a laboratory: catalogue order aids and tests, roles, patients, pricing,
         // samples, the worklist (a reader with result rights, so the sorted query runs) and the integration registers.
         var (readerName, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: Reader, displayName: "Register Reader");
         await GrantResultRightsAsync(tenant, readerName);
@@ -228,7 +227,6 @@ public sealed class SetupListsAndAccessFlowTests(ApiFactory factory) : IClassFix
             ("/api/v1/patients", PatientSortKeys.Patients),
             ("/api/v1/pricing/payers", PricingSortKeys.Payers),
             ("/api/v1/pricing/base-price-lists", PricingSortKeys.BasePriceLists),
-            ("/api/v1/treasuries", TreasurySortKeys.Treasuries),
             ("/api/v1/samples", SamplesSortKeys.Samples),
             ("/api/v1/results/worklist", ResultsSortKeys.Worklist),
             ("/api/v1/integration/analysers", IntegrationSortKeys.Analysers),

@@ -51,7 +51,7 @@ public sealed class GetPaymentMethodHandler(IPaymentMethodRepository methods) : 
 }
 
 /// <summary>
-/// The active methods in pick-list order, read with <c>billing.view</c> like <c>my-treasuries</c>: the registration page
+/// The active methods in pick-list order, read with <c>billing.view</c>: the registration page
 /// already needs that key to capture a payment (BR-26), so the reception role holds it wherever it pays.
 /// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.View)]

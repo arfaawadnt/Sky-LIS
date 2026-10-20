@@ -7,7 +7,7 @@ using Platform.Contracts.Audit;
 using Platform.Contracts.Common;
 using Platform.Contracts.Identity;
 using Platform.Contracts.Settings;
-using Platform.Contracts.Treasury;
+using Platform.Contracts.Billing;
 using Platform.Domain.Authorization;
 using Platform.SharedKernel.MultiTenancy;
 using Platform.WebApi.FunctionalTests.Support;
@@ -161,22 +161,22 @@ public sealed class FoundationFlowTests(ApiFactory factory) : IClassFixture<ApiF
     public async Task The_audit_log_lists_field_changes_and_events_and_the_chain_verifies()
     {
         var tenant = Guid.CreateVersion7();
-        var (auditor, _, auditorId) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["audit.view", "treasury.manage", "treasury.view"], displayName: "Auditor One");
-        var (outsider, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["treasury.view"]);
+        var (auditor, _, auditorId) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["audit.view", "billing.manage", "billing.view"], displayName: "Auditor One");
+        var (outsider, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["billing.view"]);
         var client = await SignedInClientAsync(auditor);
 
-        var created = await client.PostAsJsonAsync("/api/v1/treasuries", new CreateTreasuryRequest("AUD", "Audited drawer", "خزينة مدققة", Guid.CreateVersion7()));
+        var created = await client.PostAsJsonAsync("/api/v1/billing/payment-methods", new PaymentMethodRequest("AUD", "Audited card", "بطاقة مدققة", "Card", true, null));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        var treasuryId = (await created.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
+        var methodId = (await created.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
 
-        var page = await client.GetFromJsonAsync<Paged<AuditEntryItem>>($"{AuditEntries}?entityType=Treasury&entityId={treasuryId}&pageSize=10");
+        var page = await client.GetFromJsonAsync<Paged<AuditEntryItem>>($"{AuditEntries}?entityType=PaymentMethodDefinition&entityId={methodId}&pageSize=10");
         Assert.Equal(2, page!.TotalCount);
         var change = Assert.Single(page.Items, item => item.Kind == AuditEntryItem.KindFieldChange);
         Assert.Equal(("Created", auditorId, "Auditor One"), (change.Action, change.ActorUserId, change.ActorName));
         Assert.Contains(change.Changes!, field => field.Field == "Code" && field.After == "AUD");
         Assert.NotNull(change.CorrelationId);
         var trail = Assert.Single(page.Items, item => item.Kind == AuditEntryItem.KindEvent);
-        Assert.Equal(("TreasuryCreated", "Auditor One"), (trail.Action, trail.ActorName));
+        Assert.Equal(("PaymentMethodDefined", "Auditor One"), (trail.Action, trail.ActorName));
         Assert.NotNull(trail.Sequence);
 
         var verified = await client.GetFromJsonAsync<ChainVerificationResult>(VerifyChain);

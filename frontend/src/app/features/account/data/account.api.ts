@@ -19,7 +19,7 @@ import { AUDIT_API, type AuditClientItem, type AuditEntriesPage, type AuditEntry
 import { ORGANIZATION_API, type SelectableBranch, type SelectableBranchesResponse } from '../../../core/api/organization.contracts';
 import type { Paged } from '../../../core/api/paging';
 import { PLATFORM_API, type CreateTopUpRequest, type WalletDetail, type WalletTransactionItem, type WalletTransactionKind } from '../../../core/api/platform.contracts';
-import type { CreatedResource } from '../../../core/api/treasury.contracts';
+import type { CreatedResource } from '../../../core/api/created-resource';
 import { toHttpParams } from '../../../shared/forms/paging';
 
 /** The audit filter without paging, for the CSV export. */

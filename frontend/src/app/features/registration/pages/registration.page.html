@@ -328,40 +328,28 @@
         <div class="fold">
           <div class="fold-title">{{ i18n.t('registration.payment.cardTitle') }}</div>
           <div class="fold-body">
-            @if (treasuryList().length === 0) {
-              <p class="warn-strip">{{ i18n.t('registration.payment.noTreasury') }} <a routerLink="/treasury/access">{{ i18n.t('registration.accession.requestAccess') }}</a></p>
-            } @else {
-              <!-- CP-30b (change request 2026-10-19): the laboratory's methods by name; the four kinds only until the laboratory has definitions -->
-              <div class="methods" role="radiogroup" [attr.aria-label]="i18n.t('registration.payment.method')">
-                @for (option of facade.methodOptions(); track option.id) {
-                  <button type="button" class="btn" role="radio" [attr.aria-checked]="facade.selectedMethod()?.code === option.code" [class.primary]="facade.selectedMethod()?.code === option.code" (click)="facade.selectMethod(option)">
-                    {{ name(option.nameEn, option.nameAr) }}
+            <!-- CP-30b (change request 2026-10-19): the laboratory's methods by name; the four kinds only until the laboratory has definitions -->
+            <div class="methods" role="radiogroup" [attr.aria-label]="i18n.t('registration.payment.method')">
+              @for (option of facade.methodOptions(); track option.id) {
+                <button type="button" class="btn" role="radio" [attr.aria-checked]="facade.selectedMethod()?.code === option.code" [class.primary]="facade.selectedMethod()?.code === option.code" (click)="facade.selectMethod(option)">
+                  {{ name(option.nameEn, option.nameAr) }}
+                </button>
+              } @empty {
+                @for (method of methods; track method) {
+                  <button type="button" class="btn" role="radio" [attr.aria-checked]="facade.payment().method === method" [class.primary]="facade.payment().method === method" (click)="setMethod(method)">
+                    {{ i18n.t('registration.payment.methods.' + method) }}
                   </button>
-                } @empty {
-                  @for (method of methods; track method) {
-                    <button type="button" class="btn" role="radio" [attr.aria-checked]="facade.payment().method === method" [class.primary]="facade.payment().method === method" (click)="setMethod(method)">
-                      {{ i18n.t('registration.payment.methods.' + method) }}
-                    </button>
-                  }
                 }
-              </div>
-              <label class="field" [class.invalid]="invalid('paymentAmount')">
-                <span class="label">{{ i18n.t('registration.payment.amount') }} ({{ currency() }})</span>
-                <input id="reg-pay-amount" class="inp amount" type="number" min="0" step="0.01" [attr.aria-invalid]="invalid('paymentAmount')" [value]="facade.paymentAmount()" (input)="facade.patchPayment({ amount: numberOrNull($event) })" />
-              </label>
-              @if (facade.referenceRequired()) {
-                <label class="field" [class.invalid]="invalid('paymentReference')">
-                  <span class="label">{{ i18n.t('registration.payment.reference') }} <span class="req" aria-hidden="true">*</span></span>
-                  <input id="reg-pay-reference" class="inp" type="text" maxlength="100" required [attr.aria-invalid]="invalid('paymentReference')" [value]="facade.payment().reference" (input)="facade.patchPayment({ reference: value($event) })" />
-                </label>
               }
-              <label class="field" [class.invalid]="invalid('paymentTreasury')">
-                <span class="label">{{ i18n.t('registration.payment.treasury') }}</span>
-                <select id="reg-pay-treasury" class="inp" [attr.aria-invalid]="invalid('paymentTreasury')" (change)="facade.patchPayment({ treasuryId: value($event) })">
-                  @for (treasury of treasuryList(); track treasury.id) {
-                    <option [value]="treasury.id" [selected]="treasury.id === facade.payment().treasuryId">{{ treasury.code }} · {{ name(treasury.nameEn, treasury.nameAr) }}</option>
-                  }
-                </select>
+            </div>
+            <label class="field" [class.invalid]="invalid('paymentAmount')">
+              <span class="label">{{ i18n.t('registration.payment.amount') }} ({{ currency() }})</span>
+              <input id="reg-pay-amount" class="inp amount" type="number" min="0" step="0.01" [attr.aria-invalid]="invalid('paymentAmount')" [value]="facade.paymentAmount()" (input)="facade.patchPayment({ amount: numberOrNull($event) })" />
+            </label>
+            @if (facade.referenceRequired()) {
+              <label class="field" [class.invalid]="invalid('paymentReference')">
+                <span class="label">{{ i18n.t('registration.payment.reference') }} <span class="req" aria-hidden="true">*</span></span>
+                <input id="reg-pay-reference" class="inp" type="text" maxlength="100" required [attr.aria-invalid]="invalid('paymentReference')" [value]="facade.payment().reference" (input)="facade.patchPayment({ reference: value($event) })" />
               </label>
             }
           </div>

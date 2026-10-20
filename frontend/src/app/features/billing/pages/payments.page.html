@@ -36,21 +36,14 @@
       </app-section-card>
 
       <div class="columns">
-        <app-section-card class="pay-card" *appCan="permissions.pay" [title]="i18n.t('billing.pay.title')" [subtitle]="i18n.t('billing.pay.device') + ': ' + desk.deviceId()">
-          @if (!desk.hasStation()) {
-            <p class="warn-strip">
-              {{ i18n.t('billing.pay.noTreasury') }}
-              <a routerLink="/treasury/access">{{ i18n.t('billing.pay.requestAccess') }}</a>
-            </p>
-          } @else if (account.billedThroughClaims) {
+        <app-section-card class="pay-card" *appCan="permissions.pay" [title]="i18n.t('billing.pay.title')" [subtitle]="desk.cashierLine()">
+          @if (account.billedThroughClaims) {
             <p class="info-strip">{{ i18n.t('billing.account.billedThroughClaims') }}</p>
           } @else if (account.remaining <= 0) {
             <p class="info-strip">{{ i18n.t('billing.pay.nothingDue') }}</p>
           } @else {
             <app-billing-movement-form
-              [treasuries]="desk.approved()"
               [methods]="desk.methodOptions()"
-              [(treasuryId)]="desk.treasuryId"
               [dueAmount]="account.remaining"
               [currency]="account.currency"
               [pending]="facade.pay.pending()"
@@ -109,15 +102,6 @@
       <label toolbarFilters class="filter">
         <span>{{ i18n.t('billing.filter.to') }}</span>
         <input class="inp" type="date" (change)="onTo($event)" />
-      </label>
-      <label toolbarFilters class="filter">
-        <span>{{ i18n.t('billing.field.treasury') }}</span>
-        <select class="inp" (change)="onTreasury($event)">
-          <option value="">{{ i18n.t('billing.filter.all') }}</option>
-          @for (treasury of branchTreasuries(); track treasury.id) {
-            <option [value]="treasury.id">{{ treasury.code }} · {{ treasuryName(treasury) }}</option>
-          }
-        </select>
       </label>
       <label toolbarFilters class="filter">
         <span>{{ i18n.t('billing.field.method') }}</span>

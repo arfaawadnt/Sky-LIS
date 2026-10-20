@@ -8,7 +8,8 @@ using Platform.Contracts.Common;
 namespace Platform.WebApi.Controllers.Billing;
 
 // Billing (SRS CP-23, CP-24, CP-27, CP-30; intake LIS-INT-BIL-001). Dispatch only: the policy on each request decides
-// who may call it (D-04); reasons and device ids travel in typed bodies or query parameters, never in headers (P-16).
+// who may call it (D-04); reasons travel in typed bodies or query parameters, never in headers (P-16). Cashier and
+// branch of a movement are the session's (LIS-CR-004, 2026-10-20: no treasury, no device).
 
 /// <summary>Payments (CP-23; BR-26: the registration page posts the captured payment here right after saving the visit).</summary>
 [ApiController]
@@ -21,14 +22,14 @@ public sealed class BillingPaymentsController(ISender sender) : ControllerBase
         [FromQuery] string? accession,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
-        [FromQuery] Guid? treasuryId,
+        [FromQuery] Guid? branchId,
         [FromQuery] Guid? cashierUserId,
         [FromQuery] string? method,
         [FromQuery] string? status,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListPaymentsQuery(visitId, accession, from, to, treasuryId, cashierUserId, method, status, page, pageSize), cancellationToken));
+        Ok(await sender.Send(new ListPaymentsQuery(visitId, accession, from, to, branchId, cashierUserId, method, status, page, pageSize), cancellationToken));
 
     [HttpGet("export")]
     public async Task<IActionResult> Export(
@@ -36,14 +37,14 @@ public sealed class BillingPaymentsController(ISender sender) : ControllerBase
         [FromQuery] string? accession,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
-        [FromQuery] Guid? treasuryId,
+        [FromQuery] Guid? branchId,
         [FromQuery] Guid? cashierUserId,
         [FromQuery] string? method,
         [FromQuery] string? status,
         [FromQuery] string? timeZone,
         CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportPaymentsQuery(visitId, accession, from, to, treasuryId, cashierUserId, method, status, timeZone), cancellationToken);
+        var file = await sender.Send(new ExportPaymentsQuery(visitId, accession, from, to, branchId, cashierUserId, method, status, timeZone), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -51,7 +52,7 @@ public sealed class BillingPaymentsController(ISender sender) : ControllerBase
     public async Task<ActionResult<PaymentCreated>> Record([FromBody] RecordPaymentRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var created = await sender.Send(new RecordPaymentCommand(request.VisitId, request.Amount, request.Method, request.Reference, request.TreasuryId, request.DeviceId, request.MethodCode), cancellationToken);
+        var created = await sender.Send(new RecordPaymentCommand(request.VisitId, request.Amount, request.Method, request.Reference, request.MethodCode), cancellationToken);
         return Created($"/api/v1/billing/payments/{created.Id}", created);
     }
 
@@ -79,13 +80,13 @@ public sealed class BillingRefundsController(ISender sender) : ControllerBase
         [FromQuery] string? accession,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
-        [FromQuery] Guid? treasuryId,
+        [FromQuery] Guid? branchId,
         [FromQuery] Guid? cashierUserId,
         [FromQuery] string? method,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListRefundsQuery(visitId, accession, from, to, treasuryId, cashierUserId, method, page, pageSize), cancellationToken));
+        Ok(await sender.Send(new ListRefundsQuery(visitId, accession, from, to, branchId, cashierUserId, method, page, pageSize), cancellationToken));
 
     [HttpGet("export")]
     public async Task<IActionResult> Export(
@@ -93,13 +94,13 @@ public sealed class BillingRefundsController(ISender sender) : ControllerBase
         [FromQuery] string? accession,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
-        [FromQuery] Guid? treasuryId,
+        [FromQuery] Guid? branchId,
         [FromQuery] Guid? cashierUserId,
         [FromQuery] string? method,
         [FromQuery] string? timeZone,
         CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportRefundsQuery(visitId, accession, from, to, treasuryId, cashierUserId, method, timeZone), cancellationToken);
+        var file = await sender.Send(new ExportRefundsQuery(visitId, accession, from, to, branchId, cashierUserId, method, timeZone), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -108,7 +109,7 @@ public sealed class BillingRefundsController(ISender sender) : ControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
         var created = await sender.Send(
-            new RecordRefundCommand(request.VisitId, request.Amount, request.Method, request.Reference, request.ReasonId, request.Note, request.TreasuryId, request.DeviceId, request.MethodCode),
+            new RecordRefundCommand(request.VisitId, request.Amount, request.Method, request.Reference, request.ReasonId, request.Note, request.MethodCode),
             cancellationToken);
         return Created($"/api/v1/billing/refunds/{created.Id}", created);
     }
@@ -153,7 +154,7 @@ public sealed class BillingBatchesController(ISender sender) : ControllerBase
     public async Task<ActionResult<BatchPaymentResult>> PayAll(Guid batchId, [FromBody] PayBatchRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return Ok(await sender.Send(new PayBatchCommand(batchId, request.Amount, request.Method, request.Reference, request.TreasuryId, request.DeviceId, request.MethodCode), cancellationToken));
+        return Ok(await sender.Send(new PayBatchCommand(batchId, request.Amount, request.Method, request.Reference, request.MethodCode), cancellationToken));
     }
 }
 
@@ -162,44 +163,44 @@ public sealed class BillingBatchesController(ISender sender) : ControllerBase
 [Route("api/v1/billing/cash-closings")]
 public sealed class BillingCashClosingsController(ISender sender) : ControllerBase
 {
+    /// <summary>The drawer of the session branch for one cashier (<c>cashierUserId</c>) or all of them (omitted).</summary>
     [HttpGet("preview")]
     public async Task<ActionResult<CashClosingPreview>> Preview(
-        [FromQuery] Guid treasuryId,
         [FromQuery] Guid? cashierUserId,
         [FromQuery] DateTimeOffset from,
         [FromQuery] DateTimeOffset to,
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new PreviewCashClosingQuery(treasuryId, cashierUserId, from, to), cancellationToken));
+        Ok(await sender.Send(new PreviewCashClosingQuery(cashierUserId, from, to), cancellationToken));
 
     [HttpGet("cashiers")]
-    public async Task<ActionResult<IReadOnlyList<DrawerCashier>>> Cashiers([FromQuery] Guid treasuryId, [FromQuery] DateTimeOffset from, [FromQuery] DateTimeOffset to, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListDrawerCashiersQuery(treasuryId, from, to), cancellationToken));
+    public async Task<ActionResult<IReadOnlyList<DrawerCashier>>> Cashiers([FromQuery] DateTimeOffset from, [FromQuery] DateTimeOffset to, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListDrawerCashiersQuery(from, to), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<CashClosingCreated>> Close([FromBody] CloseCashDrawerRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         var created = await sender.Send(
-            new CloseCashDrawerCommand(request.TreasuryId, request.CashierUserId, request.PeriodFromUtc, request.PeriodToUtc, request.CountedCash, request.Note),
+            new CloseCashDrawerCommand(request.CashierUserId, request.PeriodFromUtc, request.PeriodToUtc, request.CountedCash, request.Note),
             cancellationToken);
         return Created($"/api/v1/billing/cash-closings/{created.Id}", created);
     }
 
     [HttpGet]
     public async Task<ActionResult<Paged<CashClosingListItem>>> List(
-        [FromQuery] Guid? treasuryId,
+        [FromQuery] Guid? branchId,
         [FromQuery] Guid? cashierUserId,
         [FromQuery] DateTimeOffset? from,
         [FromQuery] DateTimeOffset? to,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListCashClosingsQuery(treasuryId, cashierUserId, from, to, page, pageSize), cancellationToken));
+        Ok(await sender.Send(new ListCashClosingsQuery(branchId, cashierUserId, from, to, page, pageSize), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<IActionResult> Export([FromQuery] Guid? treasuryId, [FromQuery] Guid? cashierUserId, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] string? timeZone, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromQuery] Guid? branchId, [FromQuery] Guid? cashierUserId, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] string? timeZone, CancellationToken cancellationToken)
     {
-        var file = await sender.Send(new ExportCashClosingsQuery(treasuryId, cashierUserId, from, to, timeZone), cancellationToken);
+        var file = await sender.Send(new ExportCashClosingsQuery(branchId, cashierUserId, from, to, timeZone), cancellationToken);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
@@ -208,26 +209,18 @@ public sealed class BillingCashClosingsController(ISender sender) : ControllerBa
         Ok(await sender.Send(new GetCashClosingSheetQuery(id), cancellationToken));
 }
 
-/// <summary>The treasuries the billing pages offer: approved for this user on this device (BR-27), or every treasury of the session branch.</summary>
+/// <summary>The cash desk's own reads: print parameters and the collections report (the treasury reads were removed by LIS-CR-004).</summary>
 [ApiController]
 [Route("api/v1/billing")]
-public sealed class BillingTreasuriesController(ISender sender) : ControllerBase
+public sealed class BillingDeskController(ISender sender) : ControllerBase
 {
-    [HttpGet("my-treasuries")]
-    public async Task<ActionResult<IReadOnlyList<BillingTreasuryItem>>> Mine([FromQuery] string? deviceId, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListMyTreasuriesQuery(deviceId ?? string.Empty), cancellationToken));
-
-    [HttpGet("treasuries")]
-    public async Task<ActionResult<IReadOnlyList<BillingTreasuryItem>>> OfBranch(CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListBillingTreasuriesQuery(), cancellationToken));
-
     /// <summary>The cash desk's print parameters (<c>autoPrintReceipt</c>) under <c>billing.view</c> (UAT A-05).</summary>
     [HttpGet("print-settings")]
     public async Task<ActionResult<BillingPrintSettings>> PrintSettings(CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetBillingPrintSettingsQuery(), cancellationToken));
 
     /// <summary>
-    /// The treasury (collections) report printed from the Payments register (change request 2026-10-13, item 2): whole
+    /// The collections report printed from the Payments register (change request 2026-10-13, item 2): whole
     /// laboratory days <c>from</c>…<c>to</c> (default today), <c>scope</c> User | Branch (BIL-044 without the right),
     /// <c>groupBy</c> Branch | User | Method; a period before the member's report days limit is refused with BIL-045.
     /// </summary>

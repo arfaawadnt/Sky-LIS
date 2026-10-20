@@ -10,13 +10,12 @@ Scripts: `Release-1_UAT_Scripts.md` (LIS-UAT-001). This page is the procedure; t
 2. **Seed** (runbook §5.7, DevTools against `lis_test`): `seed-platform-admin platform.admin <pw>` and
    `seed-demo-lab lab.admin <pw>`. Hand the one-time passwords to the test lead only. Do not reuse a database that a test
    suite has run against (the suites truncate it); reseed instead.
-3. **Workstations**: one browser profile per persona (the cashier's treasury approval is bound to the browser profile,
-   BR-27); a PDF printer; the notification gateway of the lane configured or the *gateway* scripts marked blocked.
+3. **Workstations**: one browser profile per persona (sessions are per profile); a PDF printer; the notification gateway of the lane configured or the *gateway* scripts marked blocked.
 4. **People**: a test lead (owns the run order, the results sheets and the defect log), one tester per persona drawn from
    the laboratory's actual staff for that role (reception, cashier, technician, unit head, administrator, accounts) and
    from National Technology for the Super Admin personas, a scribe, and a developer on call who never drives the browser.
 5. **Run order** (LIS-UAT-001 §2): Super Admin roles and users → laboratory administrator set-up (branches, roles, users,
-   treasuries, catalogue additions) → accounts (payers, lists) → cashier access request → reception → samples → results →
+   payment methods, catalogue additions) → accounts (payers, lists) → reception → samples → results →
    verification → remaining cashier, accounts, Super Admin scripts. A script's preconditions name the scripts it depends on.
 
 ## 2. During the session

@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, firstValueFrom } from 'rxjs';
 
-import { BILLING_API, type BillingTreasuryItem, type PaymentCreated, type PaymentReceiptDocument, type RecordPaymentRequest, type VisitAccountView } from '../../../core/api/billing.contracts';
+import { BILLING_API, type PaymentCreated, type PaymentReceiptDocument, type RecordPaymentRequest, type VisitAccountView } from '../../../core/api/billing.contracts';
 import { CATALOGUE_A_API, type ServiceLookupItem } from '../../../core/api/catalogue-a.contracts';
 import { CATALOGUE_B_API, type DiagnosisListItem, type DoctorListItem, type ReasonKind, type ReasonListItem } from '../../../core/api/catalogue-b.contracts';
 import { emptyPage, type Paged } from '../../../core/api/paging';
@@ -181,12 +181,7 @@ export class RegistrationApi {
     return tolerantPage(this.http.get<Paged<ReasonListItem>>(CATALOGUE_B_API.reasons, { params }), signal);
   }
 
-  /** Treasuries approved for the current user on this device in the session branch (BR-27); empty when Billing refuses. */
-  myTreasuries(deviceId: string, signal?: AbortSignal): Promise<readonly BillingTreasuryItem[]> {
-    return tolerant(this.http.get<readonly BillingTreasuryItem[]>(BILLING_API.myTreasuries, { params: new HttpParams({ fromObject: { deviceId } }) }), signal);
-  }
-
-  /** BR-26: the payment captured on the registration page, posted right after the visit is saved. */
+  /** BR-26: the payment captured on the registration page, posted right after the visit is saved (cashier and branch from the session, LIS-CR-004). */
   pay(request: RecordPaymentRequest): Promise<PaymentCreated> {
     return firstValueFrom(this.http.post<PaymentCreated>(BILLING_API.payments, request));
   }

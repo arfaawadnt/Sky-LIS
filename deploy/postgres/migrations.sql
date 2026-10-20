@@ -6523,5 +6523,123 @@ BEGIN
     VALUES ('20261019131901_PrototypeGaps', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    ALTER TABLE app.cash_closings DROP CONSTRAINT fk_cash_closings_treasuries_tenant_id_treasury_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    ALTER TABLE app.payments DROP CONSTRAINT fk_payments_treasuries_tenant_id_treasury_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    ALTER TABLE app.refunds DROP CONSTRAINT fk_refunds_treasuries_tenant_id_treasury_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    DROP INDEX app.ix_refunds_tenant_id_treasury_id_refunded_at_utc;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    DROP INDEX app.ix_payments_tenant_id_treasury_id_paid_at_utc;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    DROP INDEX app.ix_cash_closings_tenant_id_treasury_id_period_from_utc;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    ALTER TABLE app.refunds ALTER COLUMN treasury_id DROP NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    ALTER TABLE app.refunds ALTER COLUMN device_id DROP NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    ALTER TABLE app.payments ALTER COLUMN treasury_id DROP NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    ALTER TABLE app.payments ALTER COLUMN device_id DROP NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    ALTER TABLE app.cash_closings ALTER COLUMN treasury_id DROP NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    CREATE INDEX ix_refunds_tenant_id_branch_id_refunded_at_utc ON app.refunds (tenant_id, branch_id, refunded_at_utc);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    CREATE INDEX ix_payments_tenant_id_branch_id_paid_at_utc ON app.payments (tenant_id, branch_id, paid_at_utc);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    CREATE INDEX ix_cash_closings_tenant_id_branch_id_period_from_utc ON app.cash_closings (tenant_id, branch_id, period_from_utc);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    UPDATE app.roles SET permission_keys = ARRAY(SELECT k FROM unnest(permission_keys) k WHERE k NOT LIKE 'treasury.%' ORDER BY k)
+     WHERE EXISTS (SELECT 1 FROM unnest(permission_keys) k WHERE k LIKE 'treasury.%');
+    UPDATE app.tenant_memberships SET added_permission_keys = ARRAY(SELECT k FROM unnest(added_permission_keys) k WHERE k NOT LIKE 'treasury.%' ORDER BY k)
+     WHERE EXISTS (SELECT 1 FROM unnest(added_permission_keys) k WHERE k LIKE 'treasury.%');
+    UPDATE app.tenant_memberships SET removed_permission_keys = ARRAY(SELECT k FROM unnest(removed_permission_keys) k WHERE k NOT LIKE 'treasury.%' ORDER BY k)
+     WHERE EXISTS (SELECT 1 FROM unnest(removed_permission_keys) k WHERE k LIKE 'treasury.%');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261020093923_TreasuryRemoved') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261020093923_TreasuryRemoved', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

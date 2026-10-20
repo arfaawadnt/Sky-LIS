@@ -15,7 +15,6 @@ import type {
   VisitDiscountRequest,
 } from '../../../core/api/registration.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { mutation } from '../../../core/state/mutation';
 import { RegistrationPaymentMethodsApi } from '../data/payment-methods.api';
 import { RegistrationApi } from '../data/registration.api';
@@ -53,15 +52,14 @@ export interface PaymentState {
   /** null = the amount due. */
   readonly amount: number | null;
   readonly reference: string;
-  readonly treasuryId: string;
 }
 
 /** Why the page cannot save yet (each maps to `registration.validation.<key>`). */
-export type SaveBlocker = 'patient' | 'contract' | 'lines' | 'issues' | 'checking' | 'doctor' | 'discountReason' | 'discountCap' | 'paymentReference' | 'paymentTreasury' | 'paymentAmount';
+export type SaveBlocker = 'patient' | 'contract' | 'lines' | 'issues' | 'checking' | 'doctor' | 'discountReason' | 'discountCap' | 'paymentReference' | 'paymentAmount';
 
 const EMPTY_HEADER: VisitHeaderState = { tierId: '', doctorId: '', diagnosisId: '', treatmentNo: '', insuranceId: '', urgent: false, biohazard: false, collectedOutside: false };
 const EMPTY_DISCOUNT: DiscountState = { kind: 'Percent', value: null, reasonId: '' };
-const EMPTY_PAYMENT: PaymentState = { method: 'Cash', amount: null, reference: '', treasuryId: '' };
+const EMPTY_PAYMENT: PaymentState = { method: 'Cash', amount: null, reference: '' };
 
 /**
  * State of the registration page (CP-06, WF-02; 01 §6.3): reference lists through `resource()`, the visit being typed
@@ -74,7 +72,6 @@ export class RegistrationFacade {
   private readonly api = inject(RegistrationApi);
   private readonly paymentMethods = inject(RegistrationPaymentMethodsApi);
   private readonly auth = inject(AuthStore);
-  private readonly device = inject(DeviceIdentityService);
 
   readonly visitId = signal<string | null>(null);
   readonly patient = signal<PatientSummary | null>(null);
@@ -89,14 +86,9 @@ export class RegistrationFacade {
   readonly doctors = resource({ params: () => ({ branch: this.auth.currentBranch() }), loader: ({ params, abortSignal }) => this.api.doctors(params.branch, abortSignal) });
   readonly diagnoses = resource({ loader: ({ abortSignal }) => this.api.diagnoses(abortSignal) });
   readonly discountReasons = resource({ loader: ({ abortSignal }) => this.api.reasons('Discount', abortSignal) });
-  readonly treasuries = resource({
-    params: () => (this.visitId() === null ? { deviceId: this.device.deviceId() } : undefined),
-    loader: ({ params, abortSignal }) => this.api.myTreasuries(params.deviceId, abortSignal),
-  });
-
-  /** The laboratory's active payment methods (CP-30b, change request 2026-10-19), for new visits like the treasuries. */
+  /** The laboratory's active payment methods (CP-30b, change request 2026-10-19), read for new visits only (the panel is for new visits). */
   readonly methods = resource({
-    params: () => (this.visitId() === null ? { deviceId: this.device.deviceId() } : undefined),
+    params: () => (this.visitId() === null ? { newVisit: true } : undefined),
     loader: ({ abortSignal }) => this.paymentMethods.options(abortSignal),
   });
 
@@ -185,9 +177,6 @@ export class RegistrationFacade {
     return { list, payer, patient, discount, due, paid, refunded, remaining: round2(due - (paid - refunded)) };
   });
 
-  /** True once a treasury is approved for this user on this device in the session branch (BR-27); without one the visit is saved unpaid. */
-  readonly hasTreasury = computed(() => (this.treasuries.value() ?? []).length > 0);
-
   /** The definitions the panel offers in pick-list order; empty = the four kinds with the legacy rule. */
   readonly methodOptions = computed<readonly PaymentMethodOption[]>(() => this.methods.value() ?? []);
 
@@ -207,12 +196,12 @@ export class RegistrationFacade {
     return selected === null ? this.payment().method !== 'Cash' : selected.requiresReference;
   });
 
-  /** The amount the payment panel records (the due amount unless typed), never negative; nothing when no treasury is approved (the page says so). */
+  /**
+   * The amount the payment panel records (the due amount unless typed), never negative. The cashier is the session user and the
+   * branch the session branch (change request LIS-CR-004, 2026-10-20: no treasury), so the panel is offered whenever there is
+   * something to pay.
+   */
   readonly paymentAmount = computed(() => {
-    if (!this.hasTreasury()) {
-      return 0;
-    }
-
     const typed = this.payment().amount;
     return round2(Math.max(0, typed === null ? this.totals().due : typed));
   });
@@ -260,10 +249,6 @@ export class RegistrationFacade {
 
     if (this.canPay() && this.paymentAmount() > 0) {
       const payment = this.payment();
-      if (payment.treasuryId === '') {
-        blockers.push('paymentTreasury');
-      }
-
       if (this.referenceRequired() && payment.reference.trim() === '') {
         blockers.push('paymentReference');
       }
@@ -311,8 +296,6 @@ export class RegistrationFacade {
       method: selected?.kind ?? payment.method,
       ...(selected === null ? {} : { methodCode: selected.code }),
       reference: this.referenceRequired() ? blank(payment.reference) : null,
-      treasuryId: payment.treasuryId,
-      deviceId: this.device.deviceId(),
     });
   });
 
@@ -348,13 +331,6 @@ export class RegistrationFacade {
     const preferred = options.find((tier) => tier.isDefault && tier.payerType === 'Cash') ?? options.find((tier) => tier.isDefault) ?? options[0];
     if (preferred) {
       this.patchHeader({ tierId: preferred.id });
-    }
-  }
-
-  defaultTreasury(): void {
-    const treasuries = this.treasuries.value() ?? [];
-    if (this.payment().treasuryId === '' && treasuries.length > 0) {
-      this.payment.update((payment) => ({ ...payment, treasuryId: treasuries[0]?.id ?? '' }));
     }
   }
 
@@ -406,7 +382,7 @@ export class RegistrationFacade {
   }
 
   /**
-   * Re-reads the parameters and rights, the reference lists, the treasuries, the saved visit and the dry run when the page
+   * Re-reads the parameters and rights, the reference lists, the payment methods, the saved visit and the dry run when the page
    * opens again (what was typed stays): the facade outlives the page (route provider), so the previous visit's answer — even another sign-in's — must never stay on screen (UAT D-14, A-01). A load in flight is left alone.
    */
   refresh(): void {
@@ -415,7 +391,6 @@ export class RegistrationFacade {
     this.doctors.reload();
     this.diagnoses.reload();
     this.discountReasons.reload();
-    this.treasuries.reload();
     this.methods.reload();
     this.visit.reload();
     this.check.reload();
@@ -429,7 +404,7 @@ export class RegistrationFacade {
     this.lines.set([]);
     this.answers.set({});
     this.discount.set(EMPTY_DISCOUNT);
-    this.payment.update((payment) => ({ ...EMPTY_PAYMENT, treasuryId: payment.treasuryId }));
+    this.payment.set(EMPTY_PAYMENT);
     this.methodCode.set('');
     this.register.reset();
     this.addLines.reset();

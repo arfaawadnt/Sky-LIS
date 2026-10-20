@@ -3,12 +3,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Account;
 using Platform.Application.Audit;
+using Platform.Application.Catalogue;
 using Platform.Application.Identity;
 using Platform.Application.Tenancy;
-using Platform.Application.Treasury;
 using Platform.Contracts.Audit;
 using Platform.Contracts.Common;
 using Platform.Domain.Account;
+using Platform.Domain.Catalogue;
 using Platform.Domain.Identity;
 using Platform.Domain.Tenancy;
 using Platform.Infrastructure.Persistence;
@@ -166,23 +167,23 @@ public sealed class AccountModuleTests(DatabaseFixture fixture)
     {
         var tenant = Guid.CreateVersion7();
         var user = await RegisterUserAsync("Auditor");
-        Guid treasuryId;
+        Guid groupId;
         using (var scope = fixture.AppScope(tenant, user, "Auditor"))
         {
-            var treasury = Platform.Domain.Treasury.Treasury.Create("EXP" + Guid.CreateVersion7().ToString("N")[..6], new LocalizedText("Export drawer", "خزينة"), Guid.CreateVersion7(), Now);
-            scope.ServiceProvider.GetRequiredService<ITreasuryRepository>().Add(treasury);
+            var group = ClinicalGroup.Create("EXP" + Guid.CreateVersion7().ToString("N")[..6], "E", new LocalizedText("Export group", "مجموعة"), null, null, 1, Now);
+            scope.ServiceProvider.GetRequiredService<IClinicalGroupRepository>().Add(group);
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
-            treasuryId = treasury.Id;
+            groupId = group.Id;
         }
 
         using var reader = fixture.AppScope(tenant, user);
-        var rows = await reader.ServiceProvider.GetRequiredService<IAuditExportReader>().ReadAsync(new AuditEntryFilter(null, null, null, "Treasury", treasuryId.ToString()), 100, CancellationToken.None);
+        var rows = await reader.ServiceProvider.GetRequiredService<IAuditExportReader>().ReadAsync(new AuditEntryFilter(null, null, null, "ClinicalGroup", groupId.ToString()), 100, CancellationToken.None);
         Assert.Equal(2, rows.Count);
         Assert.Contains(rows, row => row.Kind == AuditEntryItem.KindFieldChange && row.Action == "Created");
-        Assert.Contains(rows, row => row.Kind == AuditEntryItem.KindEvent && row.Action == "TreasuryCreated" && row.ActorName == "Auditor");
+        Assert.Contains(rows, row => row.Kind == AuditEntryItem.KindEvent && row.Action == "ClinicalGroupCreated" && row.ActorName == "Auditor");
 
         using var stranger = fixture.AppScope(Guid.CreateVersion7(), user);
-        Assert.Empty(await stranger.ServiceProvider.GetRequiredService<IAuditExportReader>().ReadAsync(new AuditEntryFilter(null, null, null, null, treasuryId.ToString()), 100, CancellationToken.None));
+        Assert.Empty(await stranger.ServiceProvider.GetRequiredService<IAuditExportReader>().ReadAsync(new AuditEntryFilter(null, null, null, null, groupId.ToString()), 100, CancellationToken.None));
     }
 
     private async Task<Guid> RegisterUserAsync(string displayName = "Support Tester")

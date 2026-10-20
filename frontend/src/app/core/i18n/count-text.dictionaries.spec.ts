@@ -34,8 +34,6 @@ import sharedAr from '../../../../public/i18n/shared.ar.json';
 import sharedEn from '../../../../public/i18n/shared.en.json';
 import shellAr from '../../../../public/i18n/shell.ar.json';
 import shellEn from '../../../../public/i18n/shell.en.json';
-import treasuryAr from '../../../../public/i18n/treasury.ar.json';
-import treasuryEn from '../../../../public/i18n/treasury.en.json';
 
 type Dictionary = Readonly<Record<string, string>>;
 
@@ -62,7 +60,6 @@ const DICTIONARIES: readonly (readonly [string, Dictionary, Dictionary])[] = [
   ['samples', samplesEn, samplesAr],
   ['shared', sharedEn, sharedAr],
   ['shell', shellEn, shellAr],
-  ['treasury', treasuryEn, treasuryAr],
 ];
 
 const FORMS = ['None', 'One', 'Two', 'Many'] as const;

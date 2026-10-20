@@ -11,7 +11,8 @@ import { RefundsFacade } from './state/refunds.facade';
 
 /**
  * Billing (SRS CP-23 Payments, CP-24 Refunds, CP-27 Batch payment, CP-30 Cash closing), mounted at /billing by the
- * integrator. The cash desk (device, approved treasuries, auto-print) is shared by the pages; each page has its facade.
+ * integrator. The cash desk (auto-print, payment methods, cashier) is shared by the pages; each page has its facade.
+ * Money moves for the signed-in cashier on the session branch (LIS-CR-004: no treasury).
  * `/billing/payments?visitId=…` (or `?accession=…`) opens a visit directly (BR-26: the registration page links here).
  */
 /** The module's dictionary is loaded before its first page renders, so no raw key (`billing.loading`) shows on the first visit (UAT A-07). */

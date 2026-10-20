@@ -1,6 +1,11 @@
 namespace Platform.Domain.Billing;
 
 /// <summary>Refusal codes of the Billing module (intake LIS-INT-BIL-001, sections 7–8).</summary>
+/// <remarks>
+/// Retired with the treasury (change request LIS-CR-004, 2026-10-20) and never reused: BIL-006 (device id), BIL-020
+/// (treasury not approved, BR-27), BIL-021 (treasury inactive), BIL-022 (treasury of another branch), BIL-409 (treasury
+/// not found).
+/// </remarks>
 public static class BillingCodes
 {
     public const string AmountInvalid = "BIL-001";
@@ -8,7 +13,6 @@ public static class BillingCodes
     public const string ReferenceRequired = "BIL-003";
     public const string RefundReasonRequired = "BIL-004";
     public const string VoidReasonRequired = "BIL-005";
-    public const string DeviceRequired = "BIL-006";
     public const string TextTooLong = "BIL-007";
     public const string NumberRequired = "BIL-008";
 
@@ -19,10 +23,6 @@ public static class BillingCodes
     public const string AmountExceedsBatchRemaining = "BIL-014";
     public const string BilledThroughClaims = "BIL-015";
     public const string RefundReasonInvalid = "BIL-016";
-
-    public const string TreasuryNotApproved = "BIL-020";
-    public const string TreasuryInactive = "BIL-021";
-    public const string TreasuryOfAnotherBranch = "BIL-022";
 
     public const string PeriodInvalid = "BIL-030";
     public const string PeriodInFuture = "BIL-031";
@@ -59,6 +59,5 @@ public static class BillingCodes
     public const string BatchNotFound = "BIL-406";
     public const string RefundNotFound = "BIL-407";
     public const string ClosingNotFound = "BIL-408";
-    public const string TreasuryNotFound = "BIL-409";
     public const string MethodNotFound = "BIL-410";
 }

@@ -29,7 +29,7 @@ public sealed class EffectivePrivilegesTests
         Assert.Equal(["audit.view"], EffectivePrivileges.PermissionKeys(role, [], [], platformTenant: false));
         Assert.Equal(3, EffectivePrivileges.PermissionKeys(role, [], [], platformTenant: true).Count);
         Assert.True(EffectivePrivileges.IsPlatformOnly("tenancy.view"));
-        Assert.False(EffectivePrivileges.IsPlatformOnly("treasury.view"));
+        Assert.False(EffectivePrivileges.IsPlatformOnly("billing.view"));
     }
 
     [Fact]

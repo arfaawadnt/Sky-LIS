@@ -14,8 +14,6 @@ import registrationAr from '../../../../public/i18n/registration.ar.json';
 import registrationEn from '../../../../public/i18n/registration.en.json';
 import resultsAr from '../../../../public/i18n/results.ar.json';
 import resultsEn from '../../../../public/i18n/results.en.json';
-import treasuryAr from '../../../../public/i18n/treasury.ar.json';
-import treasuryEn from '../../../../public/i18n/treasury.en.json';
 
 type Dictionary = Record<string, string>;
 
@@ -33,7 +31,6 @@ describe('Export confirmation wording', () => {
     ['pricing', pricingEn, pricingAr, 'exported'],
     ['registration', registrationEn, registrationAr, 'exported'],
     ['results', resultsEn, resultsAr, 'worklist.exported'],
-    ['treasury', treasuryEn, treasuryAr, 'exported'],
   ];
 
   it.each(toasts)('%s uses the one wording in English and Arabic', (_, en, ar, key) => {

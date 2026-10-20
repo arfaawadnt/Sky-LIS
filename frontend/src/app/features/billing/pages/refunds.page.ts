@@ -1,7 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, untracked, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 
 import { BILLING_PERMISSIONS, PAYMENT_METHODS, type PaymentMethod, type RefundListItem, type VisitAccountView } from '../../../core/api/billing.contracts';
 import type { PageRequest } from '../../../core/api/paging';
@@ -31,14 +30,13 @@ import { saveFile } from '../ui/save-file';
 
 /**
  * Refunds (SRS CP-24, BR-14; LDM `Return Money` §10.8): find a visit, see the refundable amount (a negative balance after a
- * transfer or a cancellation), refund up to it with a catalogue reason on an approved treasury of this device, and print the
+ * transfer or a cancellation), refund up to it with a catalogue reason as the signed-in cashier on the session branch, and print the
  * refund receipt for the patient's signature (always). The register below lists every refund with filters and CSV export.
  */
 @Component({
   selector: 'app-billing-refunds-page',
   imports: [
     ReactiveFormsModule,
-    RouterLink,
     CanDirective,
     PageHeaderComponent,
     SectionCardComponent,
@@ -82,7 +80,6 @@ export class RefundsPage {
     { key: 'method', header: 'billing.column.method' },
     { key: 'reason', header: 'billing.column.reason', value: (row) => this.reasonName(row) },
     { key: 'cashierName', header: 'billing.column.cashier', secondary: true },
-    { key: 'treasury', header: 'billing.column.treasury', secondary: true, value: (row) => row.treasuryCode },
   ];
 
   protected readonly rows = computed<readonly RefundListItem[]>(() => (this.facade.register.hasValue() ? this.facade.register.value().items : []));
@@ -95,8 +92,8 @@ export class RefundsPage {
 
   constructor() {
     void this.i18n.load('billing');
-    // UAT D-08: the cash desk is shared by the module's pages for the life of the route; re-read the approved treasuries
-    // (and the refund reasons) each time a page opens so an approval or a role change since the last read shows at once.
+    // UAT D-08: the cash desk is shared by the module's pages for the life of the route; re-read the print parameter,
+    // the payment methods and the refund reasons each time a page opens so a role change since the last read shows at once.
     this.desk.refresh();
     this.facade.refreshReasons();
     this.facade.refresh();   // the page's facade outlives the page too: re-read on open (UAT D-14, A-01)
@@ -116,7 +113,7 @@ export class RefundsPage {
   }
 
   protected reload(): void {
-    this.desk.treasuries.reload();
+    this.desk.refresh();
     this.facade.reasons.reload();
     this.facade.register.reload();
     if (this.facade.lookup() !== null) {

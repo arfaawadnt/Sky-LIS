@@ -45,15 +45,14 @@ internal static class BillingRights
     }
 }
 
-/// <summary>Builds the BR-27 facts of a movement from the Treasury module and the session.</summary>
-internal static class BillingStations
+/// <summary>
+/// The cashier of a movement from the session alone (change request LIS-CR-004, 2026-10-20): the authenticated user
+/// (AUTH-001) and the session branch (TENANT-004); nothing comes from the request body (pitfall P-30).
+/// </summary>
+internal static class BillingCashier
 {
-    public static async Task<CashierStation> ResolveAsync(ITreasuryStationLookup stations, Guid treasuryId, Guid actor, string deviceId, Guid sessionBranchId, CancellationToken cancellationToken)
-    {
-        var device = (deviceId ?? string.Empty).Trim();
-        var view = await stations.GetAsync(treasuryId, actor, device, cancellationToken).ConfigureAwait(false) ?? throw BillingNotFound.Treasury();
-        return new CashierStation(view.TreasuryId, view.BranchId, view.IsActive, view.ApprovedForDevice, device, actor, sessionBranchId);
-    }
+    /// <summary>The cashier of <paramref name="actor"/> (already resolved by <see cref="BillingActor"/>) on the session branch.</summary>
+    public static Cashier Of(Guid actor, ICurrentUser user) => new(actor, BranchScope.Require(user));
 }
 
 /// <summary>Coded "not found" refusals of the module (404).</summary>
@@ -68,8 +67,6 @@ internal static class BillingNotFound
     public static DomainException Refund() => new(BillingCodes.RefundNotFound, "Refund not found.", DomainFault.NotFound);
 
     public static DomainException Closing() => new(BillingCodes.ClosingNotFound, "Cash closing not found.", DomainFault.NotFound);
-
-    public static DomainException Treasury() => new(BillingCodes.TreasuryNotFound, "Treasury not found.", DomainFault.NotFound);
 
     public static DomainException Method() => new(BillingCodes.MethodNotFound, "Payment method not found.", DomainFault.NotFound);
 }

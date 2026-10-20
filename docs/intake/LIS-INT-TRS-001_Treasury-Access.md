@@ -4,8 +4,38 @@
 | --- | --- |
 | Module | `treasury` (Sky LIS Client Portal, pages CP-28 Treasuries, CP-29 Treasury access; business rule BR-27) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001) because the TASK 5 intake slot was left blank. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.1 — 2026-10-12 (validation v0.5.0 D-05, O-4, O-5, O-10; see the revision history at the end) |
-| Implemented in | `src/Platform.Domain/Treasury`, `src/Platform.Application/Treasury`, `src/Platform.Infrastructure/Persistence/Treasury`, `src/Platform.WebApi/Controllers/Treasury`, `frontend/src/app/features/treasury` |
+| Version | 1.2 — 2026-10-20 — **WITHDRAWN** by change request LIS-CR-004 (see "Withdrawn" below); 1.1 — 2026-10-12 (validation v0.5.0 D-05, O-4, O-5, O-10; see the revision history at the end) |
+| Implemented in | Removed on 2026-10-20 (was `src/Platform.Domain/Treasury`, `src/Platform.Application/Treasury`, `src/Platform.Infrastructure/Persistence/Treasury`, `src/Platform.WebApi/Controllers/Treasury`, `frontend/src/app/features/treasury`). The tables `app.treasuries` and `app.treasury_access_requests` stay in the database as history. |
+
+## Withdrawn — 2026-10-20 (change request LIS-CR-004)
+
+**Why.** After the first use of 0.15.2 the business owner decided (2026-10-20) that the treasury concept is removed from the system:
+no cash drawers, no device-bound access requests, no approval, no BR-27. The approval step stood between the reception desk and
+the money of every visit and added no control the finance function asked for: a movement is already attributable to its cashier,
+branch, method, reference and time, and the cash closing reconciles per cashier and branch (LDM "Total Daily Income per user").
+
+**What replaced it.** The facts of a money movement (payment, refund, batch payment) are the visit, the amount, the method (kind
+and optional method code), the reference, the **cashier = the session user** and the **branch = the session branch**
+(`BranchScope.Require`, TENANT-004 without one), and the posted time. The cash closing is scoped to the **session branch + one
+cashier, or every cashier of the branch**, with every other rule unchanged (intake LIS-INT-BIL-001 §18). The dashboard's cash of
+the day reads the movement's own branch. The permission group `treasury` is removed from the catalogue and purged from the
+stored roles by the migration `TreasuryRemoved`.
+
+**What was removed.** The aggregates `Treasury` and `TreasuryAccessRequest`, their commands, queries, policies, repositories and
+controllers; the endpoints `/api/v1/treasuries`, `/api/v1/treasury-access-requests`, `GET /api/v1/billing/my-treasuries` and
+`GET /api/v1/billing/treasuries` (they answer 404); the notification template code `treasury-request` from the built-in
+defaults (an existing SA-20 row of that code stays, unused); the SOD-TRS-001 exception path (the membership fact
+`IsPrimaryAdministrator` stays: Organization uses it); the DevTools command `seed-treasury` and the treasury of `seed-demo-lab`;
+the SPA feature `features/treasury` and `core/device` (integrator). Billing codes BIL-006, BIL-020, BIL-021, BIL-022 and BIL-409
+are retired and never reused; the codes TRS-xxx and SOD-TRS-001 no longer occur.
+
+**Data kept.** Nothing is deleted. `app.treasuries` and `app.treasury_access_requests` become orphan tables (no entity, no
+foreign key into them). The columns `treasury_id` and `device_id` of `app.payments`, `app.refunds` and `app.cash_closings` become
+nullable and keep their values on every row posted before the change; new rows carry NULL. The audit ledger keeps the treasury
+events and field changes; `TRQ-yyyy-nnnnn` counters stay in `app.reference_counters`. The sheet of a closing made before the change
+still lists that drawer's movements only.
+
+The sections below describe the module as it was built (1.0–1.1) and are kept as the record of the withdrawn design.
 
 ## 1. Purpose and policy basis
 
@@ -269,4 +299,5 @@ Open questions (assumed answers let the build proceed; confirm or change):
 | Version | Date | Change |
 | --- | --- | --- |
 | 1.0 | 2026-10-09 | First intake, derived from the Business SRS. |
+| 1.2 | 2026-10-20 | **Withdrawn** (change request LIS-CR-004): the treasury concept is removed; module, endpoints and permission group deleted; tables and columns kept as history. See the "Withdrawn" section at the top. |
 | 1.1 | 2026-10-12 | Validation v0.5.0: approval comment and decision reason on the request rows and in the new CSV export (D-05); requests limited to the requester's branches, TRS-015, INV-TRS-008 (O-4, Q3 assumption); `TreasuryUpdated` on a rename (O-5); one device id per user and browser profile (O-10, Q1). |

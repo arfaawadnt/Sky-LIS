@@ -1,6 +1,6 @@
 /** Audit contracts mirrored from `Platform.Contracts.Audit` (SRS CP-68 / SA-09; bootstrap until the OpenAPI generator lands, 01 §6.2). */
 
-import type { Paged } from './treasury.contracts';
+import type { Paged } from './paging';
 
 export type AuditEntryKind = 'FieldChange' | 'Event';
 

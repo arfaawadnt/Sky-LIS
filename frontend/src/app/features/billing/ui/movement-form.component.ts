@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { type AbstractControl, FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors, type ValidatorFn, Validators } from '@angular/forms';
 
-import { PAYMENT_METHODS, type BillingReasonOption, type BillingTreasuryItem, type PaymentMethod, type PaymentMethodOption } from '../../../core/api/billing.contracts';
+import { PAYMENT_METHODS, type BillingReasonOption, type PaymentMethod, type PaymentMethodOption } from '../../../core/api/billing.contracts';
 import type { ProblemDetails } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
@@ -14,10 +14,10 @@ import { formatMoney, hasTwoDecimals, roundMoney } from './billing-format';
 /**
  * What a cashier submits: a payment (CP-23, CP-27) or a refund (CP-24, with reason and note). `method` is the kind the
  * money semantics follow; `methodCode` names the laboratory's definition (CP-30b) when one was chosen, null on a form
- * without definitions (the server then applies the legacy rule: every kind but cash needs a reference).
+ * without definitions (the server then applies the legacy rule: every kind but cash needs a reference). No treasury and no
+ * device (LIS-CR-004): the server posts the movement for the signed-in cashier on the session branch.
  */
 export interface MovementInput {
-  readonly treasuryId: string;
   readonly amount: number;
   readonly method: PaymentMethod;
   readonly methodCode?: string | null;
@@ -39,7 +39,7 @@ const twoDecimals: ValidatorFn = (control: AbstractControl): ValidationErrors | 
 const isKind = (value: string): value is PaymentMethod => (PAYMENT_METHODS as readonly string[]).includes(value);
 
 /**
- * The money form of the cash desk (dumb component): treasury approved for this device (BR-27), amount defaulting to
+ * The money form of the cash desk (dumb component): amount defaulting to
  * what is due and capped by it (BR-26 / BR-14), method, reference when the method requires it; in refund mode a
  * catalogue reason (mandatory) and a note. Ctrl+S submits. The server decides; the form only prevents obvious refusals.
  *
@@ -53,15 +53,6 @@ const isKind = (value: string): value is PaymentMethod => (PAYMENT_METHODS as re
   template: `
     <form [formGroup]="form" (ngSubmit)="submit()" appSaveShortcut (appSaveShortcut)="submit()" novalidate>
       <div class="form-grid">
-        <app-form-field [label]="i18n.t('billing.field.treasury')">
-          <select formControlName="treasuryId">
-            <option value="">{{ i18n.t('billing.pay.chooseTreasury') }}</option>
-            @for (treasury of treasuries(); track treasury.id) {
-              <option [value]="treasury.id">{{ treasury.code }} · {{ name(treasury) }}</option>
-            }
-          </select>
-        </app-form-field>
-
         <app-form-field [label]="i18n.t('billing.field.amount')" [hint]="amountHint()">
           <input type="number" inputmode="decimal" step="0.01" min="0.01" formControlName="amount" />
         </app-form-field>
@@ -127,11 +118,8 @@ export class MovementFormComponent {
   protected readonly kinds = PAYMENT_METHODS;
 
   readonly mode = input<MovementMode>('payment');
-  readonly treasuries = input.required<readonly BillingTreasuryItem[]>();
   /** The laboratory's active payment methods in pick-list order (CP-30b); empty = the four kinds. */
   readonly methods = input<readonly PaymentMethodOption[]>([]);
-  /** The treasury in use, shared with the page so it survives between visits. */
-  readonly treasuryId = model('');
   /** The amount the form proposes (remaining or refundable); also the cap. */
   readonly dueAmount = input.required<number>();
   readonly currency = input('');
@@ -156,7 +144,6 @@ export class MovementFormComponent {
   });
 
   protected readonly form = new FormGroup({
-    treasuryId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     amount: new FormControl<number | null>(null, { validators: [Validators.required, Validators.min(0.01), twoDecimals, (control) => this.capValidator(control)] }),
     methodKey: new FormControl<string>('Cash', { nonNullable: true, validators: [Validators.required] }),
     reference: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64), (control) => this.referenceValidator(control)] }),
@@ -173,15 +160,6 @@ export class MovementFormComponent {
       untracked(() => {
         this.form.controls.amount.setValue(due > 0 ? due : null);
         this.form.controls.amount.markAsUntouched();
-      });
-    });
-
-    effect(() => {
-      const selected = this.treasuryId();
-      untracked(() => {
-        if (this.form.controls.treasuryId.value !== selected) {
-          this.form.controls.treasuryId.setValue(selected);
-        }
       });
     });
 
@@ -208,17 +186,13 @@ export class MovementFormComponent {
 
   /**
    * A fresh form for the next movement, called by the page after a successful save (UAT A-06: a second refund was stored
-   * with the first one's note). The treasury in use stays; the amount is what is due again; method, reference, reason and
+   * with the first one's note). The amount is what is due again; method, reference, reason and
    * note go back to their defaults.
    */
   reset(): void {
     const due = roundMoney(Math.max(this.dueAmount(), 0));
-    this.form.reset({ treasuryId: this.treasuryId(), amount: due > 0 ? due : null, methodKey: this.defaultKey(), reference: '', reasonId: '', note: '' });
+    this.form.reset({ amount: due > 0 ? due : null, methodKey: this.defaultKey(), reference: '', reasonId: '', note: '' });
     this.methodKey.set(this.form.controls.methodKey.value);
-  }
-
-  protected name(treasury: BillingTreasuryItem): string {
-    return localizedPick({ en: treasury.nameEn, ar: treasury.nameAr }, this.i18n.lang());
   }
 
   protected optionName(option: PaymentMethodOption): string {
@@ -246,13 +220,11 @@ export class MovementFormComponent {
     }
 
     const value = this.form.getRawValue();
-    this.treasuryId.set(value.treasuryId);
     const selected = this.selected();
     const method: PaymentMethod = selected?.kind ?? (isKind(value.methodKey) ? value.methodKey : 'Cash');
     const reference = this.referenceRequired() ? value.reference.trim() : '';   // the input shows only when required
     const note = value.note.trim();
     this.submitted.emit({
-      treasuryId: value.treasuryId,
       amount: roundMoney(value.amount ?? 0),
       method,
       methodCode: selected?.code ?? null,

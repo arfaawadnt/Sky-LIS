@@ -57,7 +57,7 @@ public sealed class FieldChange : ITenantScoped
 
     public Guid Id { get; private set; }
 
-    /// <summary>The CLR name of the aggregate or entity (<c>TreasuryAccessRequest</c>, <c>TenantSetting</c> …).</summary>
+    /// <summary>The CLR name of the aggregate or entity (<c>VisitAccount</c>, <c>TenantSetting</c> …).</summary>
     public string EntityType { get; private set; }
 
     /// <summary>The record id, or the non-tenant key parts joined by <c>:</c> for keyed rows without an id.</summary>

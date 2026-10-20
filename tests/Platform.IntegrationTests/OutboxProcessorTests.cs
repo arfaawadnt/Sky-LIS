@@ -4,8 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Platform.Application.Abstractions.Messaging;
 using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
-using Platform.Application.Treasury;
-using Platform.Domain.Treasury;
+using Platform.Application.Billing;
+using Platform.Domain.Billing;
 using Platform.Infrastructure;
 using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Persistence.Outbox;
@@ -35,8 +35,8 @@ public sealed class OutboxProcessorTests(DatabaseFixture fixture)
     public async Task A_committed_event_is_delivered_to_the_policy_in_the_tenant_scope_and_marked_processed()
     {
         var tenant = Guid.CreateVersion7();
-        var treasuryId = await CreateTreasuryAsync(tenant, "OBX1");
-        var eventId = await EventIdOfAsync(tenant, typeof(TreasuryCreated));
+        var methodId = await CreateMethodAsync(tenant, "OBX1");
+        var eventId = await EventIdOfAsync(tenant, typeof(PaymentMethodDefined));
 
         var recorder = new Recorder();
         await using var provider = BuildProvider(recorder);
@@ -44,7 +44,7 @@ public sealed class OutboxProcessorTests(DatabaseFixture fixture)
 
         var row = await PollUntilAsync(processor, eventId, candidate => candidate.ProcessedAtUtc is not null);
 
-        var delivery = Assert.Single(recorder.Created, e => e.TreasuryId == treasuryId);
+        var delivery = Assert.Single(recorder.Created, e => e.MethodId == methodId);
         Assert.Equal(eventId, delivery.EventId);
         Assert.Equal(tenant, recorder.TenantSeen[delivery.EventId]);
         Assert.False(recorder.ElevatedSeen[delivery.EventId]);
@@ -53,23 +53,23 @@ public sealed class OutboxProcessorTests(DatabaseFixture fixture)
         Assert.Null(row.DeadLetteredAtUtc);
 
         await processor.RunOnceAsync(CancellationToken.None);   // a processed row is never claimed again
-        Assert.Single(recorder.Created, e => e.TreasuryId == treasuryId);
+        Assert.Single(recorder.Created, e => e.MethodId == methodId);
     }
 
     [DatabaseFact]
     public async Task A_throwing_policy_counts_an_attempt_reschedules_with_back_off_and_dead_letters_on_the_tenth()
     {
         var tenant = Guid.CreateVersion7();
-        var treasuryId = await CreateTreasuryAsync(tenant, "OBX2");
+        var methodId = await CreateMethodAsync(tenant, "OBX2");
         using (var scope = fixture.AppScope(tenant))
         {
-            var treasury = (await scope.ServiceProvider.GetRequiredService<ITreasuryRepository>().GetForUpdateAsync(treasuryId, CancellationToken.None))!;
-            treasury.Deactivate(Now);
+            var method = (await scope.ServiceProvider.GetRequiredService<IPaymentMethodRepository>().GetForUpdateAsync(methodId, CancellationToken.None))!;
+            method.Deactivate(otherActiveCashExists: true, Now);
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
         }
 
-        var eventId = await EventIdOfAsync(tenant, typeof(TreasuryDeactivated));
-        var recorder = new Recorder { FailingTreasuryId = treasuryId };
+        var eventId = await EventIdOfAsync(tenant, typeof(PaymentMethodDeactivated));
+        var recorder = new Recorder { FailingMethodId = methodId };
         await using var provider = BuildProvider(recorder);
         var processor = provider.GetRequiredService<OutboxProcessor>();
 
@@ -143,33 +143,34 @@ public sealed class OutboxProcessorTests(DatabaseFixture fixture)
         new ServiceCollection()
             .AddSingleton(recorder)
             .AddInfrastructure(TestDatabase.AppConnection!)
-            .AddScoped<IDomainEventHandler<TreasuryCreated>, CreatedPolicy>()
-            .AddScoped<IDomainEventHandler<TreasuryDeactivated>, ThrowingPolicy>()
+            .AddScoped<IDomainEventHandler<PaymentMethodDefined>, CreatedPolicy>()
+            .AddScoped<IDomainEventHandler<PaymentMethodDeactivated>, ThrowingPolicy>()
             .BuildServiceProvider();
 
-    private async Task<Guid> CreateTreasuryAsync(Guid tenantId, string code)
+    /// <summary>An aggregate whose creation and deactivation raise one event each (a non-cash payment method; the treasury served before LIS-CR-004).</summary>
+    private async Task<Guid> CreateMethodAsync(Guid tenantId, string code)
     {
         using var scope = fixture.AppScope(tenantId, Guid.CreateVersion7(), "Outbox tester");
-        var treasury = Domain.Treasury.Treasury.Create(code, new LocalizedText("Drawer " + code, "خزينة " + code), Guid.CreateVersion7(), Now);
-        scope.ServiceProvider.GetRequiredService<ITreasuryRepository>().Add(treasury);
+        var method = PaymentMethodDefinition.Define(code, new LocalizedText("Card " + code, "بطاقة " + code), PaymentMethod.Card, true, 1, Now);
+        scope.ServiceProvider.GetRequiredService<IPaymentMethodRepository>().Add(method);
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
-        return treasury.Id;
+        return method.Id;
     }
 
     private sealed class Recorder
     {
-        public Guid? FailingTreasuryId { get; init; }
+        public Guid? FailingMethodId { get; init; }
 
-        public ConcurrentBag<TreasuryCreated> Created { get; } = [];
+        public ConcurrentBag<PaymentMethodDefined> Created { get; } = [];
 
         public ConcurrentDictionary<Guid, Guid?> TenantSeen { get; } = new();
 
         public ConcurrentDictionary<Guid, bool> ElevatedSeen { get; } = new();
     }
 
-    private sealed class CreatedPolicy(Recorder recorder, ICurrentTenant tenant) : IDomainEventHandler<TreasuryCreated>
+    private sealed class CreatedPolicy(Recorder recorder, ICurrentTenant tenant) : IDomainEventHandler<PaymentMethodDefined>
     {
-        public Task HandleAsync(TreasuryCreated domainEvent, CancellationToken cancellationToken)
+        public Task HandleAsync(PaymentMethodDefined domainEvent, CancellationToken cancellationToken)
         {
             recorder.Created.Add(domainEvent);
             recorder.TenantSeen[domainEvent.EventId] = tenant.TenantId;
@@ -178,11 +179,11 @@ public sealed class OutboxProcessorTests(DatabaseFixture fixture)
         }
     }
 
-    /// <summary>Fails for the test's own treasury only; every other deactivation in the shared queue is handled normally.</summary>
-    private sealed class ThrowingPolicy(Recorder recorder) : IDomainEventHandler<TreasuryDeactivated>
+    /// <summary>Fails for the test's own method only; every other deactivation in the shared queue is handled normally.</summary>
+    private sealed class ThrowingPolicy(Recorder recorder) : IDomainEventHandler<PaymentMethodDeactivated>
     {
-        public Task HandleAsync(TreasuryDeactivated domainEvent, CancellationToken cancellationToken) =>
-            domainEvent.TreasuryId == recorder.FailingTreasuryId
+        public Task HandleAsync(PaymentMethodDeactivated domainEvent, CancellationToken cancellationToken) =>
+            domainEvent.MethodId == recorder.FailingMethodId
                 ? throw new InvalidOperationException("deliberate failure")
                 : Task.CompletedTask;
     }

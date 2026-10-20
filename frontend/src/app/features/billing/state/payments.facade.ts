@@ -5,7 +5,6 @@ import type { PageRequest } from '../../../core/api/paging';
 import { mutation } from '../../../core/state/mutation';
 import { BillingApi, type DownloadedFile } from '../data/billing.api';
 import { type MovementInput, methodCodeOf } from '../ui/movement-form.component';
-import { CashDeskFacade } from './cash-desk.facade';
 
 /** How a page asks for a visit account: by accession (the search box) or by id (a link from Registration, BR-26). */
 export interface VisitLookup {
@@ -13,13 +12,12 @@ export interface VisitLookup {
   readonly value: string;
 }
 
-export const DEFAULT_PAYMENT_FILTER: PaymentRegisterFilter = { accession: null, fromUtc: null, toUtc: null, treasuryId: null, method: null, status: null, page: 1, pageSize: 50 };
+export const DEFAULT_PAYMENT_FILTER: PaymentRegisterFilter = { accession: null, fromUtc: null, toUtc: null, method: null, status: null, page: 1, pageSize: 50 };
 
 /** CP-23 Payments (01 §6.3): the account of one visit, the pay and void mutations, and the payments register. Provided at the route. */
 @Injectable()
 export class PaymentsFacade {
   private readonly api = inject(BillingApi);
-  private readonly desk = inject(CashDeskFacade);
 
   readonly lookup = signal<VisitLookup | null>(null);
 
@@ -32,7 +30,7 @@ export class PaymentsFacade {
 
   readonly pay = mutation(
     (input: MovementInput & { readonly visitId: string }): Promise<PaymentCreated> =>
-      this.api.recordPayment({ visitId: input.visitId, amount: input.amount, method: input.method, ...methodCodeOf(input), reference: input.reference, treasuryId: input.treasuryId, deviceId: this.desk.deviceId() }),
+      this.api.recordPayment({ visitId: input.visitId, amount: input.amount, method: input.method, ...methodCodeOf(input), reference: input.reference }),
     { then: () => this.refresh() },
   );
 
@@ -48,14 +46,9 @@ export class PaymentsFacade {
     loader: ({ params, abortSignal }) => this.api.listPayments(params, abortSignal),
   });
 
-  readonly branchTreasuries = resource({
-    params: () => (this.registerOpen() ? true : undefined),
-    loader: ({ abortSignal }) => this.api.branchTreasuries(abortSignal),
-  });
-
   readonly exportCsv = mutation<void, DownloadedFile>(() => this.api.exportPayments(this.filter()));
 
-  // ---- collections (treasury) report, change request 2026-10-13 item 2 ------------------------------------------
+  // ---- collections report, change request 2026-10-13 item 2 ------------------------------------------
 
   /** The report dialog is open: its rights are read when it opens (a role change since the last visit shows at once). */
   readonly collectionsOpen = signal(false);
@@ -111,6 +104,5 @@ export class PaymentsFacade {
   refresh(): void {
     this.account.reload();
     this.register.reload();
-    this.branchTreasuries.reload();
   }
 }

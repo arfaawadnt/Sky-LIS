@@ -36,8 +36,6 @@
   "group.platform": "Platform",
   "nav.home": "Dashboard",
   "nav.adminHome": "Home",
-  "nav.treasuries": "Treasuries",
-  "nav.treasuryAccess": "Treasury access",
   "nav.registration": "Registration",
   "nav.searchRegistrations": "Search registrations",
   "nav.priceQuery": "Price query",

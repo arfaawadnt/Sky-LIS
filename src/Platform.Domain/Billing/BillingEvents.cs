@@ -12,7 +12,6 @@ public sealed record PaymentRecorded(
     string ReceiptNumber,
     decimal Amount,
     string Method,
-    Guid TreasuryId,
     Guid CashierUserId,
     Guid BranchId,
     Guid? BatchId,
@@ -29,17 +28,16 @@ public sealed record RefundRecorded(
     decimal Amount,
     string Method,
     Guid ReasonId,
-    Guid TreasuryId,
     Guid CashierUserId,
     Guid BranchId,
     string? Comment,
     DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
-/// <summary>The drawer of a treasury reconciled for a cashier scope and period (T5, BR-16); the period is frozen afterwards.</summary>
+/// <summary>The drawer of a branch reconciled for a cashier scope and period (T5, BR-16); the period is frozen afterwards.</summary>
 public sealed record CashClosingClosed(
     Guid ClosingId,
     string Number,
-    Guid TreasuryId,
+    Guid BranchId,
     Guid? CashierUserId,
     DateTimeOffset PeriodFromUtc,
     DateTimeOffset PeriodToUtc,

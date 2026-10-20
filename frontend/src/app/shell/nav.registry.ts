@@ -70,8 +70,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 
 export const NAV_REGISTRY: readonly NavEntry[] = [
   { portal: 'client', group: 'shell.group.overview', path: '/account/dashboard', permission: 'dashboard.view', i18nKey: 'shell.nav.home', release: 'R1', icon: 'grid' },
-  { portal: 'client', group: 'shell.group.finance', path: '/treasury/treasuries', permission: 'treasury.view', i18nKey: 'shell.nav.treasuries', release: 'R1', menu: false, icon: 'vault' },
-  { portal: 'client', group: 'shell.group.finance', path: '/treasury/access', permission: 'treasury.view', i18nKey: 'shell.nav.treasuryAccess', release: 'R1', menu: false, icon: 'shield' },
   { portal: 'admin', group: 'shell.group.overview', path: '/admin', permission: null, i18nKey: 'shell.nav.adminHome', release: 'R1', icon: 'home' },
   { portal: 'client', group: 'shell.group.reception', path: '/registration/new', permission: 'registration.create', i18nKey: 'shell.nav.registration', release: 'R1', icon: 'clipboard' },
   { portal: 'client', group: 'shell.group.reception', path: '/registration/visits', permission: 'registration.view', i18nKey: 'shell.nav.searchRegistrations', release: 'R1', icon: 'search' },
@@ -133,7 +131,7 @@ export const NAV_REGISTRY: readonly NavEntry[] = [
   { portal: 'admin', group: 'shell.group.masterData', path: '/admin/catalogue/patient-conditions', permission: 'catalogue.view', i18nKey: 'shell.nav.patientConditions', release: 'R1', icon: 'user' },
   { portal: 'client', group: 'shell.group.setup', path: '/catalogue/additional-services', permission: 'catalogue.view', i18nKey: 'shell.nav.additionalServices', release: 'R2', icon: 'plus' },
   { portal: 'admin', group: 'shell.group.masterData', path: '/admin/catalogue/additional-services', permission: 'catalogue.view', i18nKey: 'shell.nav.additionalServices', release: 'R1', icon: 'plus' },
-  { portal: 'client', group: 'shell.group.finance', path: '/billing/payments', permission: 'billing.view', i18nKey: 'shell.nav.payments', release: 'R1', menu: false, icon: 'coins' },
+  { portal: 'client', group: 'shell.group.finance', path: '/billing/payments', permission: 'billing.view', i18nKey: 'shell.nav.payments', release: 'R1', icon: 'coins' },
   { portal: 'client', group: 'shell.group.finance', path: '/billing/refunds', permission: 'billing.view', i18nKey: 'shell.nav.refunds', release: 'R1', menu: 'R2', icon: 'arrow-down' },
   { portal: 'client', group: 'shell.group.finance', path: '/billing/batch-payment', permission: 'billing.view', i18nKey: 'shell.nav.batchPayment', release: 'R2', icon: 'layers' },
   { portal: 'client', group: 'shell.group.finance', path: '/reports/work-amount', permission: 'reporting.view', i18nKey: 'shell.nav.workAmountReport', release: 'R1', icon: 'trending-up' },

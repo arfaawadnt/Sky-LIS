@@ -17,13 +17,11 @@ namespace Platform.Application.UnitTests.Billing;
 /// </summary>
 public sealed class PaymentMethodUseCaseTests
 {
-    private const string Device = "device-reception-1";
-
     private static RecordPaymentHandler PaymentHandler(BillingWorld world) =>
-        new(world.Visits, world.Stations, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        new(world.Visits, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
     private static RecordRefundHandler RefundHandler(BillingWorld world) =>
-        new(world.Visits, world.Stations, world.Reasons, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        new(world.Visits, world.Reasons, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
     [Fact]
     public async Task T10_Define_upper_cases_the_code_orders_after_the_last_option_and_refuses_a_duplicate_BIL_121()
@@ -91,23 +89,23 @@ public sealed class PaymentMethodUseCaseTests
         var visit = world.AddVisit(300m, "ACC-2026-00010");
 
         // a card definition without the reference rule: the request's kind "Cash" is ignored, the definition's Card is stored
-        var noSlip = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Cash", null, world.TreasuryId, Device, "cardnr"), CancellationToken.None);
+        var noSlip = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Cash", null, "cardnr"), CancellationToken.None);
         var payment = world.Accounts.Items.Single().Payments.Single(candidate => candidate.Id == noSlip.Id);
         Assert.Equal((PaymentMethod.Card, "CARDNR", null), (payment.Method, payment.MethodCode, payment.Reference));
 
         // a cash definition that demands a voucher number
-        var refusal = await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 50m, "Cash", null, world.TreasuryId, Device, "CASHREF"), CancellationToken.None));
+        var refusal = await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 50m, "Cash", null, "CASHREF"), CancellationToken.None));
         Assert.Equal(BillingCodes.ReferenceRequired, refusal.Code);
         Assert.Equal(1, world.Numbers.Drawn);   // refused before a receipt number is drawn
 
         // an unknown or inactive code
-        var unknown = await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 50m, "Cash", null, world.TreasuryId, Device, "WALLET"), CancellationToken.None));
+        var unknown = await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 50m, "Cash", null, "WALLET"), CancellationToken.None));
         Assert.Equal((BillingCodes.MethodUnknownOrInactive, DomainFault.Validation), (unknown.Code, unknown.Fault));
 
         // a legacy request without a code keeps the kind rule: card needs a reference, cash does not
-        var legacy = await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 50m, "Card", null, world.TreasuryId, Device), CancellationToken.None));
+        var legacy = await Assert.ThrowsAsync<DomainException>(() => PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 50m, "Card", null), CancellationToken.None));
         Assert.Equal(BillingCodes.ReferenceRequired, legacy.Code);
-        var cash = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 50m, "Cash", null, world.TreasuryId, Device), CancellationToken.None);
+        var cash = await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 50m, "Cash", null), CancellationToken.None);
         Assert.Null(world.Accounts.Items.Single().Payments.Single(candidate => candidate.Id == cash.Id).MethodCode);
     }
 
@@ -117,13 +115,13 @@ public sealed class PaymentMethodUseCaseTests
         var world = new BillingWorld();
         world.Methods.Items.AddRange(PaymentMethodDefinition.Defaults(BillingWorld.Now));
         var visit = world.AddVisit(100m, "ACC-2026-00011");
-        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Cash", null, world.TreasuryId, Device, "CASH"), CancellationToken.None);
+        await PaymentHandler(world).Handle(new RecordPaymentCommand(visit.VisitId, 100m, "Cash", null, "CASH"), CancellationToken.None);
         world.Visits.Items[0] = visit with { PatientShareTotal = 60m };
 
-        var refusal = await Assert.ThrowsAsync<DomainException>(() => RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 40m, "Cash", null, world.RefundReasonId, null, world.TreasuryId, Device, "TRANSFER"), CancellationToken.None));
+        var refusal = await Assert.ThrowsAsync<DomainException>(() => RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 40m, "Cash", null, world.RefundReasonId, null, "TRANSFER"), CancellationToken.None));
         Assert.Equal(BillingCodes.ReferenceRequired, refusal.Code);
 
-        var refunded = await RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 40m, "Cash", "TRX-1", world.RefundReasonId, null, world.TreasuryId, Device, "TRANSFER"), CancellationToken.None);
+        var refunded = await RefundHandler(world).Handle(new RecordRefundCommand(visit.VisitId, 40m, "Cash", "TRX-1", world.RefundReasonId, null, "TRANSFER"), CancellationToken.None);
         var refund = world.Accounts.Items.Single().Refunds.Single(candidate => candidate.Id == refunded.Id);
         Assert.Equal((PaymentMethod.Transfer, "TRANSFER", "TRX-1"), (refund.Method, refund.MethodCode, refund.Reference));
     }

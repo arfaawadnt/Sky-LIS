@@ -17,8 +17,6 @@ public sealed class DefaultNotificationTemplateSource : INotificationTemplateSou
         new NotificationTemplate(NotificationTemplateCodes.PasswordRecovery, "ar", "استعادة كلمة المرور", "استخدم الرمز {code} لإعادة تعيين كلمة مرور Sky LIS. ينتهي الرمز خلال {minutes} دقائق. تجاهل هذه الرسالة إن لم تطلبها."),
         new NotificationTemplate(NotificationTemplateCodes.PortalUrl, "en", "Your Sky LIS portal", "{labName}: your portal is ready at {url}. Sign in with the username {username}."),
         new NotificationTemplate(NotificationTemplateCodes.PortalUrl, "ar", "بوابة Sky LIS الخاصة بك", "{labName}: بوابتك جاهزة على {url}. سجّل الدخول باسم المستخدم {username}."),
-        new NotificationTemplate(NotificationTemplateCodes.TreasuryRequest, "en", "Treasury access request", "Request {number}: {requester} asks for access to treasury {treasury}."),
-        new NotificationTemplate(NotificationTemplateCodes.TreasuryRequest, "ar", "طلب صلاحية خزينة", "الطلب {number}: يطلب {requester} صلاحية على الخزينة {treasury}."),
         new NotificationTemplate(NotificationTemplateCodes.PanicValue, "en", "Panic value", "Panic value for {patient} ({accession}): {test} = {value}."),
         new NotificationTemplate(NotificationTemplateCodes.PanicValue, "ar", "قيمة حرجة", "قيمة حرجة للمريض {patient} ({accession}): {test} = {value}."),
     }.ToDictionary(template => (template.Code, template.Language));

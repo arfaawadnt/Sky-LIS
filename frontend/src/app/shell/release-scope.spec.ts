@@ -11,7 +11,7 @@ describe('release scope (R1 prototype builds)', () => {
 
   it('keeps the release 1 client menu of the prototype and hides the deferred modules', () => {
     const r1Client = NAV_REGISTRY.filter((entry) => entry.portal === 'client' && inReleaseScope(entry.release)).map((entry) => entry.path);
-    for (const path of ['/account/dashboard', '/patients', '/billing/payments', '/treasury/treasuries', '/treasury/access', '/pricing/payers', '/pricing/base-price-lists', '/organization/roles', '/organization/users', '/organization/branches', '/catalogue/services', '/catalogue/tests', '/account/profile']) {
+    for (const path of ['/account/dashboard', '/patients', '/billing/payments', '/pricing/payers', '/pricing/base-price-lists', '/organization/roles', '/organization/users', '/organization/branches', '/catalogue/services', '/catalogue/tests', '/account/profile']) {
       expect(r1Client).toContain(path);
     }
 

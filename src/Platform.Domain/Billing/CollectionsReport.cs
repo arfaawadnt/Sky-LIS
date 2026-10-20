@@ -2,7 +2,7 @@ using Platform.SharedKernel.Primitives;
 
 namespace Platform.Domain.Billing;
 
-// The treasury (collections) report of the Payments register (change request 2026-10-13, item 2; LDM "Total Daily
+// The collections report of the Payments register (change request 2026-10-13, item 2; LDM "Total Daily
 // Income" §10.11): the posted payments and the refunds of a period of whole laboratory-calendar days, grouped by
 // branch, cashier or payment method, with the amount per method and the net. Pure arithmetic over the cells the read
 // port returns; the handler decides the scope (own movements or the whole branch) and the period.

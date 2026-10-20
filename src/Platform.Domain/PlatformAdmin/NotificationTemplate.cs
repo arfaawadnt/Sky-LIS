@@ -6,7 +6,7 @@ namespace Platform.Domain.PlatformAdmin;
 /// <summary>
 /// An editable SMS or e-mail text (SA-20) in English and Arabic with <c>{placeholder}</c> tokens. Platform reference
 /// data (<c>saas.notification_templates</c>); the code is unique (INV-PLT-040) and is what senders ask for
-/// (<c>otp</c>, <c>password-recovery</c>, <c>portal-url</c>, <c>treasury-request</c>, <c>panic-value</c> …). Only the
+/// (<c>otp</c>, <c>password-recovery</c>, <c>portal-url</c>, <c>panic-value</c> …). Only the
 /// placeholders of <see cref="Placeholders"/> are accepted (NTF-003). An inactive template is not used: the sender
 /// falls back to the platform's built-in text for the code.
 /// </summary>

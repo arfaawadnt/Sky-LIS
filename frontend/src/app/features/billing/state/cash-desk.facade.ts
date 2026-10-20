@@ -1,14 +1,15 @@
-import { Injectable, computed, inject, linkedSignal, resource, type ResourceRef } from '@angular/core';
+import { Injectable, computed, inject, resource, type ResourceRef } from '@angular/core';
 
-import type { BillingTreasuryItem, PaymentMethodOption } from '../../../core/api/billing.contracts';
+import type { PaymentMethodOption } from '../../../core/api/billing.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { DeviceIdentityService } from '../../../core/device/device-identity.service';
+import { displayNameFor } from '../../../core/auth/display-name';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import { BillingApi } from '../data/billing.api';
 
 /**
  * Re-reads a resource that already settled (resolved or failed) and leaves a load in flight alone. The billing facades
  * live as long as the module's route, so a page that opens again must not keep the answer of an earlier visit
- * (UAT D-08: an approval granted since the last read, or a 403 of a role that has changed since, stayed on screen).
+ * (UAT D-08: a 403 of a role that has changed since, or a parameter changed since, stayed on screen).
  */
 export function reloadWhenSettled<T>(target: ResourceRef<T>): void {
   const status = target.status();
@@ -18,23 +19,24 @@ export function reloadWhenSettled<T>(target: ResourceRef<T>): void {
 }
 
 /**
- * The cash desk of this browser (BR-27), shared by the pages of the module (provided at the billing route): the device
- * id, the treasuries of the session branch approved for the user on this device, the treasury in use, and whether a
- * receipt prints after a payment or a refund (`autoPrintReceipt`, CP-57, read through billing: UAT A-05). The approved
- * list is keyed by the signed-in user and the session branch, so a sign-in as someone else or a branch change on the
- * same browser never shows the previous list.
+ * The cash desk shared by the pages of the module (provided at the billing route): whether a receipt prints after a
+ * payment or a refund (`autoPrintReceipt`, CP-57, read through billing: UAT A-05) and the laboratory's payment methods.
+ * A movement is posted by the signed-in cashier on the session branch (LIS-CR-004: no treasury, no device); the server
+ * takes both from the session, so nothing here chooses them.
  */
 @Injectable()
 export class CashDeskFacade {
   private readonly api = inject(BillingApi);
-  private readonly device = inject(DeviceIdentityService);
   private readonly auth = inject(AuthStore);
+  private readonly i18n = inject(I18nService);
 
-  readonly deviceId = computed(() => this.device.deviceId());
+  /** The signed-in cashier, in the page language: the money forms say who the movement is posted for. */
+  readonly cashierName = computed(() => displayNameFor(this.auth.profile(), this.i18n.lang()));
 
-  readonly treasuries = resource({
-    params: () => ({ deviceId: this.deviceId(), userId: this.auth.currentUser()?.id ?? '', branchId: this.auth.currentBranch() ?? '' }),
-    loader: ({ params, abortSignal }) => this.api.myTreasuries(params.deviceId, abortSignal),
+  /** "Cashier: …" under the title of a money form; null without a profile. */
+  readonly cashierLine = computed<string | null>(() => {
+    const name = this.cashierName();
+    return name === '' ? null : this.i18n.tf('billing.pay.cashier', { name });
   });
 
   readonly autoPrintReceipt = resource({
@@ -44,33 +46,18 @@ export class CashDeskFacade {
 
   /**
    * The laboratory's active payment methods in pick-list order (CP-30b, change request 2026-10-19): the movement form
-   * offers them and asks for a reference only when the chosen one requires it. Keyed by the signed-in user like the
-   * treasuries. An empty answer (no definitions yet, or a refused read) leaves the form on the four kinds.
+   * offers them and asks for a reference only when the chosen one requires it. Keyed by the signed-in user so a sign-in as
+   * someone else re-reads them. An empty answer (no definitions yet, or a refused read) leaves the form on the four kinds.
    */
   readonly methods = resource({
     params: () => ({ userId: this.auth.currentUser()?.id ?? '' }),
     loader: ({ abortSignal }) => this.api.paymentMethodOptions(abortSignal),
   });
 
-  readonly approved = computed<readonly BillingTreasuryItem[]>(() => (this.treasuries.hasValue() ? this.treasuries.value() : []));
-
   readonly methodOptions = computed<readonly PaymentMethodOption[]>(() => (this.methods.hasValue() ? this.methods.value() : []));
 
-  /** No approved treasury on this device: the pages point the cashier to the treasury-access request (CP-29). */
-  readonly hasStation = computed(() => this.approved().length > 0);
-
-  /** The treasury in use: kept while it stays approved, otherwise the first approved one. */
-  readonly treasuryId = linkedSignal<readonly BillingTreasuryItem[], string>({
-    source: this.approved,
-    computation: (items, previous) => (previous !== undefined && items.some((item) => item.id === previous.value) ? previous.value : (items[0]?.id ?? '')),
-  });
-
-  /**
-   * Called when a page of the module opens: an approval granted since the last read (CP-29) and a print parameter changed
-   * since show without a manual Refresh.
-   */
+  /** Called when a page of the module opens: a print parameter or a payment method changed since shows without a manual Refresh. */
   refresh(): void {
-    reloadWhenSettled(this.treasuries);
     reloadWhenSettled(this.autoPrintReceipt);
     reloadWhenSettled(this.methods);
   }

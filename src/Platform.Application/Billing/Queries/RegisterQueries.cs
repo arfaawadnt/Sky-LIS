@@ -53,7 +53,7 @@ internal static class RegisterRules
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.View)]
-public sealed record ListPaymentsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? TreasuryId, Guid? CashierUserId, string? Method, string? Status, int? Page, int? PageSize)
+public sealed record ListPaymentsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? BranchId, Guid? CashierUserId, string? Method, string? Status, int? Page, int? PageSize)
     : IQuery<Paged<PaymentListItem>>;
 
 public sealed class ListPaymentsValidator : AbstractValidator<ListPaymentsQuery>
@@ -77,7 +77,7 @@ public sealed class ListPaymentsHandler(IVisitAccountRepository accounts, IBilla
             return Paged<PaymentListItem>.Empty(page);
         }
 
-        var filter = new PaymentFilter(visitId, query.FromUtc, query.ToUtc, query.TreasuryId, query.CashierUserId, BillingNames.OptionalMethod(query.Method), BillingNames.OptionalStatus(query.Status));
+        var filter = new PaymentFilter(visitId, query.FromUtc, query.ToUtc, query.BranchId, query.CashierUserId, BillingNames.OptionalMethod(query.Method), BillingNames.OptionalStatus(query.Status));
         var result = await accounts.ListPaymentsAsync(filter, page, cancellationToken);
         return result with { Items = await BillingAccessions.FillAsync(visits, result.Items, cancellationToken) };
     }
@@ -85,7 +85,7 @@ public sealed class ListPaymentsHandler(IVisitAccountRepository accounts, IBilla
 
 /// <summary>CSV of the payments register (<c>billing.export</c>, at most 10,000 rows: BIL-050).</summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Export)]
-public sealed record ExportPaymentsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? TreasuryId, Guid? CashierUserId, string? Method, string? Status, string? TimeZone = null)
+public sealed record ExportPaymentsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? BranchId, Guid? CashierUserId, string? Method, string? Status, string? TimeZone = null)
     : IQuery<BillingExportFile>;
 
 public sealed class ExportPaymentsValidator : AbstractValidator<ExportPaymentsQuery>
@@ -100,7 +100,7 @@ public sealed class ExportPaymentsValidator : AbstractValidator<ExportPaymentsQu
 
 public sealed class ExportPaymentsHandler(IVisitAccountRepository accounts, IBillableVisitLookup visits, IClock clock) : IQueryHandler<ExportPaymentsQuery, BillingExportFile>
 {
-    private static readonly string[] Header = ["Receipt", "Paid at (UTC)", "Accession", "Amount", "Method", "Method code", "Reference", "Treasury", "Cashier", "Device", "Status", "Void reason", "Voided by", "Voided at (UTC)"];
+    private static readonly string[] Header = ["Receipt", "Paid at (UTC)", "Accession", "Amount", "Method", "Method code", "Reference", "Cashier", "Status", "Void reason", "Voided by", "Voided at (UTC)"];
 
     public async Task<BillingExportFile> Handle(ExportPaymentsQuery query, CancellationToken cancellationToken)
     {
@@ -108,7 +108,7 @@ public sealed class ExportPaymentsHandler(IVisitAccountRepository accounts, IBil
         IReadOnlyList<PaymentListItem> rows = [];
         if (matches)
         {
-            var filter = new PaymentFilter(visitId, query.FromUtc, query.ToUtc, query.TreasuryId, query.CashierUserId, BillingNames.OptionalMethod(query.Method), BillingNames.OptionalStatus(query.Status));
+            var filter = new PaymentFilter(visitId, query.FromUtc, query.ToUtc, query.BranchId, query.CashierUserId, BillingNames.OptionalMethod(query.Method), BillingNames.OptionalStatus(query.Status));
             rows = await accounts.SearchPaymentsAsync(filter, BillingCsv.MaxRows + 1, cancellationToken);
             BillingCsv.RequireWithinLimit(rows.Count);
             rows = await BillingAccessions.FillAsync(visits, rows, cancellationToken);
@@ -116,7 +116,7 @@ public sealed class ExportPaymentsHandler(IVisitAccountRepository accounts, IBil
 
         return BillingCsv.Build("payments", clock.UtcNow, Header, rows.Select(row => (IReadOnlyList<object?>)
         [
-            row.ReceiptNumber, row.PaidAtUtc, row.Accession, row.Amount, row.Method, row.MethodCode, row.Reference, row.TreasuryCode, row.CashierName, row.DeviceId, row.Status,
+            row.ReceiptNumber, row.PaidAtUtc, row.Accession, row.Amount, row.Method, row.MethodCode, row.Reference, row.CashierName, row.Status,
             row.VoidReason, row.VoidedByName, row.VoidedAtUtc,
         ]), BillingCsv.Zone(query.TimeZone));
     }
@@ -163,9 +163,6 @@ public sealed class GetPaymentReceiptHandler(
             payment.Amount,
             payment.Method,
             payment.Reference,
-            payment.TreasuryCode,
-            payment.TreasuryNameEn,
-            payment.TreasuryNameAr,
             payment.CashierName,
             visit.PatientShareTotal,
             balance?.Paid ?? 0m,
@@ -183,7 +180,7 @@ public sealed class GetPaymentReceiptHandler(
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.View)]
-public sealed record ListRefundsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? TreasuryId, Guid? CashierUserId, string? Method, int? Page, int? PageSize)
+public sealed record ListRefundsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? BranchId, Guid? CashierUserId, string? Method, int? Page, int? PageSize)
     : IQuery<Paged<RefundListItem>>;
 
 public sealed class ListRefundsValidator : AbstractValidator<ListRefundsQuery>
@@ -206,14 +203,14 @@ public sealed class ListRefundsHandler(IVisitAccountRepository accounts, IBillab
             return Paged<RefundListItem>.Empty(page);
         }
 
-        var filter = new RefundFilter(visitId, query.FromUtc, query.ToUtc, query.TreasuryId, query.CashierUserId, BillingNames.OptionalMethod(query.Method));
+        var filter = new RefundFilter(visitId, query.FromUtc, query.ToUtc, query.BranchId, query.CashierUserId, BillingNames.OptionalMethod(query.Method));
         var result = await accounts.ListRefundsAsync(filter, page, cancellationToken);
         return result with { Items = await BillingAccessions.FillAsync(visits, reasons, result.Items, cancellationToken) };
     }
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Export)]
-public sealed record ExportRefundsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? TreasuryId, Guid? CashierUserId, string? Method, string? TimeZone = null)
+public sealed record ExportRefundsQuery(Guid? VisitId, string? Accession, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, Guid? BranchId, Guid? CashierUserId, string? Method, string? TimeZone = null)
     : IQuery<BillingExportFile>;
 
 public sealed class ExportRefundsValidator : AbstractValidator<ExportRefundsQuery>
@@ -227,7 +224,7 @@ public sealed class ExportRefundsValidator : AbstractValidator<ExportRefundsQuer
 
 public sealed class ExportRefundsHandler(IVisitAccountRepository accounts, IBillableVisitLookup visits, IRefundReasonLookup reasons, IClock clock) : IQueryHandler<ExportRefundsQuery, BillingExportFile>
 {
-    private static readonly string[] Header = ["Number", "Refunded at (UTC)", "Accession", "Amount", "Method", "Method code", "Reference", "Reason", "Reason (Arabic)", "Note", "Treasury", "Cashier", "Device"];
+    private static readonly string[] Header = ["Number", "Refunded at (UTC)", "Accession", "Amount", "Method", "Method code", "Reference", "Reason", "Reason (Arabic)", "Note", "Cashier"];
 
     public async Task<BillingExportFile> Handle(ExportRefundsQuery query, CancellationToken cancellationToken)
     {
@@ -235,7 +232,7 @@ public sealed class ExportRefundsHandler(IVisitAccountRepository accounts, IBill
         IReadOnlyList<RefundListItem> rows = [];
         if (matches)
         {
-            var filter = new RefundFilter(visitId, query.FromUtc, query.ToUtc, query.TreasuryId, query.CashierUserId, BillingNames.OptionalMethod(query.Method));
+            var filter = new RefundFilter(visitId, query.FromUtc, query.ToUtc, query.BranchId, query.CashierUserId, BillingNames.OptionalMethod(query.Method));
             rows = await accounts.SearchRefundsAsync(filter, BillingCsv.MaxRows + 1, cancellationToken);
             BillingCsv.RequireWithinLimit(rows.Count);
             rows = await BillingAccessions.FillAsync(visits, reasons, rows, cancellationToken);
@@ -243,7 +240,7 @@ public sealed class ExportRefundsHandler(IVisitAccountRepository accounts, IBill
 
         return BillingCsv.Build("refunds", clock.UtcNow, Header, rows.Select(row => (IReadOnlyList<object?>)
         [
-            row.Number, row.RefundedAtUtc, row.Accession, row.Amount, row.Method, row.MethodCode, row.Reference, row.ReasonNameEn, row.ReasonNameAr, row.Note, row.TreasuryCode, row.CashierName, row.DeviceId,
+            row.Number, row.RefundedAtUtc, row.Accession, row.Amount, row.Method, row.MethodCode, row.Reference, row.ReasonNameEn, row.ReasonNameAr, row.Note, row.CashierName,
         ]), BillingCsv.Zone(query.TimeZone));
     }
 }
@@ -292,9 +289,6 @@ public sealed class GetRefundReceiptHandler(
             reason?.NameEn,
             reason?.NameAr,
             refund.Note,
-            refund.TreasuryCode,
-            refund.TreasuryNameEn,
-            refund.TreasuryNameAr,
             refund.CashierName,
             currency,
             user.DisplayName ?? string.Empty,

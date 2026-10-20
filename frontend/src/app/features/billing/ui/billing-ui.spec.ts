@@ -25,9 +25,6 @@ const receipt: PaymentReceiptDocument = {
   amount: 1234.5,
   method: 'Card',
   reference: 'SLIP-77',
-  treasuryCode: 'MAIN',
-  treasuryNameEn: 'Main drawer',
-  treasuryNameAr: 'الخزينة الرئيسية',
   cashierName: 'Cashier One',
   patientShareTotal: 1500,
   paid: 1234.5,
@@ -85,6 +82,8 @@ describe('Billing UI helpers and documents', () => {
     expect(posted).toContain('1,234.50');
     expect(posted).toContain('SLIP-77');
     expect(posted).not.toContain('void-banner');
+    expect(posted).toContain('Cashier One');
+    expect(posted).not.toContain('billing.field.treasury');   // LIS-CR-004: no treasury line on the receipt
 
     // F-09: the receipt printed from an Arabic screen keeps Latin digits
     TestBed.inject(I18nService).setLanguage('ar');

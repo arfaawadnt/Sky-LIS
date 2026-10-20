@@ -84,44 +84,24 @@ public sealed record VisitBalanceFigures(decimal PatientShareTotal, decimal Paid
 }
 
 /// <summary>
-/// The BR-27 facts of one money movement, resolved by the handler: the treasury (Treasury module) with its branch and
-/// active flag, whether a live Approved access request exists for the cashier on this device, and the session branch
-/// (CP-04). The aggregate decides with them (pitfall P-10).
+/// Who moves the money and where (change request LIS-CR-004, 2026-10-20: the treasury is removed): the cashier is the
+/// session user and the branch is the session branch (CP-04), both resolved by the handler, never request fields
+/// (pitfall P-30). The aggregate stamps them on the payment or refund.
 /// </summary>
-public sealed record CashierStation(Guid TreasuryId, Guid TreasuryBranchId, bool TreasuryIsActive, bool ApprovedForDevice, string DeviceId, Guid CashierUserId, Guid SessionBranchId)
+public sealed record Cashier(Guid UserId, Guid BranchId)
 {
-    public const int MaxDeviceIdLength = 128;
-
-    /// <summary>The cleaned device id, or the coded refusal: device (BIL-006), active (BIL-021), branch (BIL-022), approval (BIL-020) — in that order.</summary>
-    public string RequireUsable()
+    /// <summary>AUTH-001 without an authenticated cashier, TENANT-004 without a session branch.</summary>
+    public void RequireKnown()
     {
-        var device = (DeviceId ?? string.Empty).Trim();
-        if (device.Length is < 1 or > MaxDeviceIdLength)
-        {
-            throw new DomainException(BillingCodes.DeviceRequired, $"A device identifier of 1 to {MaxDeviceIdLength} characters is required.", DomainFault.Validation);
-        }
-
-        if (CashierUserId == Guid.Empty)
+        if (UserId == Guid.Empty)
         {
             throw new DomainException(ProblemCodesForBilling.ActorRequired, "An authenticated cashier is required.", DomainFault.Unauthenticated);
         }
 
-        if (!TreasuryIsActive)
+        if (BranchId == Guid.Empty)
         {
-            throw new DomainException(BillingCodes.TreasuryInactive, "The treasury is inactive.", DomainFault.Conflict);
+            throw new DomainException(ProblemCodesForBilling.BranchRequired, "Select a branch before moving money.", DomainFault.Refused);
         }
-
-        if (TreasuryBranchId != SessionBranchId)
-        {
-            throw new DomainException(BillingCodes.TreasuryOfAnotherBranch, "The treasury belongs to another branch than the session's.", DomainFault.Refused);
-        }
-
-        if (!ApprovedForDevice)
-        {
-            throw new DomainException(BillingCodes.TreasuryNotApproved, "The treasury is not approved for you on this device (BR-27).", DomainFault.Refused);
-        }
-
-        return device;
     }
 }
 
@@ -130,6 +110,9 @@ internal static class ProblemCodesForBilling
 {
     /// <summary>Same value as <c>ProblemCodes.AuthenticatedActorRequired</c>.</summary>
     public const string ActorRequired = "AUTH-001";
+
+    /// <summary>Same value as <c>ProblemCodes.BranchRequired</c>.</summary>
+    public const string BranchRequired = "TENANT-004";
 }
 
 /// <summary>

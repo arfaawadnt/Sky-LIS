@@ -60,7 +60,7 @@ Modules in the code (backend `src/Platform.*/<Module>`, frontend `frontend/src/a
 | `src/Platform.Infrastructure` | EF Core persistence, migrations, row-level security, security services, outbox, audit |
 | `src/Platform.WebApi` | ASP.NET Core host: middleware pipeline, controllers (`/api/v1/...`), health and JWKS endpoints |
 | `tests/` | `Platform.ArchitectureTests`, `Platform.Domain.UnitTests`, `Platform.Application.UnitTests`, `Platform.IntegrationTests`, `Platform.WebApi.FunctionalTests` |
-| `tools/Platform.DevTools` | Development seeding: `seed-user`, `grant-role`, `seed-treasury`, `seed-platform-admin`, `seed-demo-lab`, `seed-reasons` |
+| `tools/Platform.DevTools` | Development seeding: `seed-user`, `grant-role`, `seed-platform-admin`, `seed-demo-lab`, `seed-reasons` |
 | `frontend/` | Angular workspace `platform-web` (both portals in one single-page app) |
 | `deploy/` | PostgreSQL roles, schemas and idempotent migration script, Docker Compose variant, secrets guide (`SECRETS.md`); `windows/`: publish, service, IIS site, backup/restore and smoke-test scripts, `web.config` and production configuration templates |
 | `scripts/` | Development scripts (secrets, build slots, release) |
@@ -147,8 +147,8 @@ A first administrator (connection string in `LIS_DEVTOOLS_CONNECTION`):
 dotnet run --project tools/Platform.DevTools -- seed-platform-admin <username> <password>
 ```
 
-A demo laboratory for a browser walk-through (branch, catalogue with prices, treasury, a role with every permission, users
-`<username>` and `<username>.manager`; request treasury access as the first and approve it as the second):
+A demo laboratory for a browser walk-through (branch, catalogue with prices, payment methods, a role with every permission,
+users `<username>` and `<username>.manager`):
 
 ```bash
 dotnet run --project tools/Platform.DevTools -- seed-demo-lab <username> <password>
@@ -234,7 +234,25 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+Change request LIS-CR-004 (2026-10-20, `docs/build/CR-2026-10-20_Treasury-Removal.md`): business owner decision after the first use
+of 0.15.2 — *Payments* back in the menu and **the treasury removed from the system**. Migration `TreasuryRemoved`.
+
+- **Payments is back in the sidebar** (Finance › Payments), with the collections report (*Print collections*) inside it.
+- **No treasury anywhere.** Payments, refunds and batch payments are recorded for the signed-in cashier on the session branch:
+  no treasury to choose, no device, no access request, no approval (BR-27 withdrawn). The registration payment panel takes the money
+  at once; typing 0 saves the visit unpaid. Receipts, refund receipts, closing sheets, the registers and their CSV files no longer
+  show a treasury or a device. An old browser tab that still sends `treasuryId` / `deviceId` keeps working (the fields are ignored).
+- **Cash closing (Release 2) per cashier and branch:** preview, close and the cashier list read the session branch; one cashier or
+  all cashiers of the branch over a period. The dashboard's *cash of the day* counts payments and refunds by their own branch.
+- **Removed:** the Treasuries and Treasury access pages, `/api/v1/treasuries`, `/api/v1/treasury-access-requests`,
+  `/api/v1/billing/my-treasuries` and `/api/v1/billing/treasuries` (404), the `treasury` permission group (purged from every role
+  and user override by the migration), the `treasury-request` notification code, DevTools `seed-treasury`, and the SPA device
+  identity (the SPA now uses no browser storage at all). Codes BIL-006, BIL-020, BIL-021, BIL-022, BIL-409 are retired.
+- **History kept:** `app.treasuries` and `app.treasury_access_requests` stay in the database; the `treasury_id` / `device_id` columns
+  of payments, refunds and cash closings become nullable without foreign keys; old payments keep their values.
+- **Documents:** Business SRS 1.2 (CP-28, CP-29 and BR-27 withdrawn, WF-09 without the treasury step), UAT scripts 0.6 (six treasury
+  scripts withdrawn, CSH-08 and REG-09 rewritten), intakes TRS-001 1.2 (withdrawn), BIL-001 1.4, REG-001 1.5; the module pattern now
+  points at the payment-methods slice as its reference.
 
 ### v0.15.3 — 2026-10-20
 

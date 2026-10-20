@@ -51,33 +51,33 @@ public sealed class VisitAccount : AggregateRoot, ITenantScoped
 
     /// <summary>
     /// The guards of T1 without recording anything, so a handler can refuse before it draws a receipt number (numbers
-    /// are never reused, P-12): not billed through claims (BIL-015), station usable (BR-27: BIL-006/021/022/020), amount
+    /// are never reused, P-12): not billed through claims (BIL-015), a known cashier and branch (AUTH-001 / TENANT-004), amount
     /// valid (BIL-001/002) and within the remaining balance (BIL-010, BR-26), reference for non-cash methods (BIL-003).
     /// </summary>
-    public void CheckPayment(decimal amount, PaymentMethod method, string? reference, CashierStation station, VisitCharge charge) =>
-        CheckPayment(amount, PaymentMethodUse.Legacy(method), reference, station, charge);
+    public void CheckPayment(decimal amount, PaymentMethod method, string? reference, Cashier cashier, VisitCharge charge) =>
+        CheckPayment(amount, PaymentMethodUse.Legacy(method), reference, cashier, charge);
 
     /// <summary>The guards of T1 with the laboratory's payment method definition (change request 2026-10-19): the reference rule is the definition's.</summary>
-    public void CheckPayment(decimal amount, PaymentMethodUse method, string? reference, CashierStation station, VisitCharge charge) =>
-        GuardPayment(amount, method, reference, station, charge);
+    public void CheckPayment(decimal amount, PaymentMethodUse method, string? reference, Cashier cashier, VisitCharge charge) =>
+        GuardPayment(amount, method, reference, cashier, charge);
 
     /// <summary>
     /// T1 Record payment (<c>billing.create</c>; T4 per member with <paramref name="batchId"/>): the guards of
     /// <see cref="CheckPayment"/>, then the Posted payment; raises <see cref="PaymentRecorded"/>.
     /// </summary>
-    public Payment RecordPayment(string receiptNumber, decimal amount, PaymentMethod method, string? reference, CashierStation station, VisitCharge charge, DateTimeOffset nowUtc, Guid? batchId = null) =>
-        RecordPayment(receiptNumber, amount, PaymentMethodUse.Legacy(method), reference, station, charge, nowUtc, batchId);
+    public Payment RecordPayment(string receiptNumber, decimal amount, PaymentMethod method, string? reference, Cashier cashier, VisitCharge charge, DateTimeOffset nowUtc, Guid? batchId = null) =>
+        RecordPayment(receiptNumber, amount, PaymentMethodUse.Legacy(method), reference, cashier, charge, nowUtc, batchId);
 
     /// <summary>T1 with a payment method definition (change request 2026-10-19): the movement stores the definition's kind and code.</summary>
-    public Payment RecordPayment(string receiptNumber, decimal amount, PaymentMethodUse method, string? reference, CashierStation station, VisitCharge charge, DateTimeOffset nowUtc, Guid? batchId = null)
+    public Payment RecordPayment(string receiptNumber, decimal amount, PaymentMethodUse method, string? reference, Cashier cashier, VisitCharge charge, DateTimeOffset nowUtc, Guid? batchId = null)
     {
-        var (device, cleanedReference) = GuardPayment(amount, method, reference, station, charge);
+        var cleanedReference = GuardPayment(amount, method, reference, cashier, charge);
         var number = RequireNumber(receiptNumber, Payment.MaxNumberLength);
 
-        var payment = new Payment(Id, number, amount, method, cleanedReference, station, device, batchId, nowUtc);
+        var payment = new Payment(Id, number, amount, method, cleanedReference, cashier, batchId, nowUtc);
         _payments.Add(payment);
         PaidTotal += amount;
-        Raise(new PaymentRecorded(payment.Id, Id, number, amount, method.Kind.ToString(), station.TreasuryId, station.CashierUserId, station.SessionBranchId, batchId, nowUtc));
+        Raise(new PaymentRecorded(payment.Id, Id, number, amount, method.Kind.ToString(), cashier.UserId, cashier.BranchId, batchId, nowUtc));
         return payment;
     }
 
@@ -105,53 +105,53 @@ public sealed class VisitAccount : AggregateRoot, ITenantScoped
     }
 
     /// <summary>
-    /// The guards of T3 without recording anything: station usable (BR-27), amount valid and within the refundable amount
+    /// The guards of T3 without recording anything: a known cashier and branch, amount valid and within the refundable amount
     /// (BIL-011, BR-14), a reason (BIL-004; its kind is checked by the handler, BIL-016), reference for non-cash (BIL-003).
     /// </summary>
-    public void CheckRefund(decimal amount, PaymentMethod method, string? reference, Guid reasonId, string? note, CashierStation station, VisitCharge charge) =>
-        CheckRefund(amount, PaymentMethodUse.Legacy(method), reference, reasonId, note, station, charge);
+    public void CheckRefund(decimal amount, PaymentMethod method, string? reference, Guid reasonId, string? note, Cashier cashier, VisitCharge charge) =>
+        CheckRefund(amount, PaymentMethodUse.Legacy(method), reference, reasonId, note, cashier, charge);
 
     /// <summary>The guards of T3 with a payment method definition (change request 2026-10-19).</summary>
-    public void CheckRefund(decimal amount, PaymentMethodUse method, string? reference, Guid reasonId, string? note, CashierStation station, VisitCharge charge) =>
-        GuardRefund(amount, method, reference, reasonId, note, station, charge);
+    public void CheckRefund(decimal amount, PaymentMethodUse method, string? reference, Guid reasonId, string? note, Cashier cashier, VisitCharge charge) =>
+        GuardRefund(amount, method, reference, reasonId, note, cashier, charge);
 
-    /// <summary>T3 Record refund (<c>billing.approve</c>): the guards of <see cref="CheckRefund(decimal, PaymentMethod, string?, Guid, string?, CashierStation, VisitCharge)"/>, then the refund; raises <see cref="RefundRecorded"/>.</summary>
-    public Refund RecordRefund(string number, decimal amount, PaymentMethod method, string? reference, Guid reasonId, string? note, CashierStation station, VisitCharge charge, DateTimeOffset nowUtc) =>
-        RecordRefund(number, amount, PaymentMethodUse.Legacy(method), reference, reasonId, note, station, charge, nowUtc);
+    /// <summary>T3 Record refund (<c>billing.approve</c>): the guards of <see cref="CheckRefund(decimal, PaymentMethod, string?, Guid, string?, Cashier, VisitCharge)"/>, then the refund; raises <see cref="RefundRecorded"/>.</summary>
+    public Refund RecordRefund(string number, decimal amount, PaymentMethod method, string? reference, Guid reasonId, string? note, Cashier cashier, VisitCharge charge, DateTimeOffset nowUtc) =>
+        RecordRefund(number, amount, PaymentMethodUse.Legacy(method), reference, reasonId, note, cashier, charge, nowUtc);
 
     /// <summary>T3 with a payment method definition (change request 2026-10-19): the refund stores the definition's kind and code.</summary>
-    public Refund RecordRefund(string number, decimal amount, PaymentMethodUse method, string? reference, Guid reasonId, string? note, CashierStation station, VisitCharge charge, DateTimeOffset nowUtc)
+    public Refund RecordRefund(string number, decimal amount, PaymentMethodUse method, string? reference, Guid reasonId, string? note, Cashier cashier, VisitCharge charge, DateTimeOffset nowUtc)
     {
-        var (device, cleanedReference, cleanedNote) = GuardRefund(amount, method, reference, reasonId, note, station, charge);
+        var (cleanedReference, cleanedNote) = GuardRefund(amount, method, reference, reasonId, note, cashier, charge);
         var cleanedNumber = RequireNumber(number, Refund.MaxNumberLength);
 
-        var refund = new Refund(Id, cleanedNumber, amount, method, cleanedReference, reasonId, cleanedNote, station, device, nowUtc);
+        var refund = new Refund(Id, cleanedNumber, amount, method, cleanedReference, reasonId, cleanedNote, cashier, nowUtc);
         _refunds.Add(refund);
         RefundedTotal += amount;
-        Raise(new RefundRecorded(refund.Id, Id, cleanedNumber, amount, method.Kind.ToString(), reasonId, station.TreasuryId, station.CashierUserId, station.SessionBranchId, cleanedNote, nowUtc));
+        Raise(new RefundRecorded(refund.Id, Id, cleanedNumber, amount, method.Kind.ToString(), reasonId, cashier.UserId, cashier.BranchId, cleanedNote, nowUtc));
         return refund;
     }
 
-    private (string Device, string? Reference) GuardPayment(decimal amount, PaymentMethodUse method, string? reference, CashierStation station, VisitCharge charge)
+    private string? GuardPayment(decimal amount, PaymentMethodUse method, string? reference, Cashier cashier, VisitCharge charge)
     {
         ArgumentNullException.ThrowIfNull(method);
-        ArgumentNullException.ThrowIfNull(station);
+        ArgumentNullException.ThrowIfNull(cashier);
         ArgumentNullException.ThrowIfNull(charge);
         Require(!charge.BilledThroughClaims, BillingCodes.BilledThroughClaims, "This visit belongs to a lab-to-lab batch and is billed to the sending laboratory through claims.", DomainFault.Conflict);
-        var device = station.RequireUsable();
+        cashier.RequireKnown();
         BillingAmounts.RequireValid(amount);
         var cleanedReference = RequireReference(method, reference);
         var remaining = BillingAmounts.Round(BalanceFor(charge.PatientShareTotal).Remaining);
         Require(amount <= remaining, BillingCodes.AmountExceedsRemaining, $"The amount exceeds the remaining balance ({Math.Max(remaining, 0m)}).", DomainFault.Conflict);
-        return (device, cleanedReference);
+        return cleanedReference;
     }
 
-    private (string Device, string? Reference, string? Note) GuardRefund(decimal amount, PaymentMethodUse method, string? reference, Guid reasonId, string? note, CashierStation station, VisitCharge charge)
+    private (string? Reference, string? Note) GuardRefund(decimal amount, PaymentMethodUse method, string? reference, Guid reasonId, string? note, Cashier cashier, VisitCharge charge)
     {
         ArgumentNullException.ThrowIfNull(method);
-        ArgumentNullException.ThrowIfNull(station);
+        ArgumentNullException.ThrowIfNull(cashier);
         ArgumentNullException.ThrowIfNull(charge);
-        var device = station.RequireUsable();
+        cashier.RequireKnown();
         BillingAmounts.RequireValid(amount);
         var cleanedReference = RequireReference(method, reference);
         Require(reasonId != Guid.Empty, BillingCodes.RefundReasonRequired, "A refund needs a reason.", DomainFault.Validation);
@@ -159,7 +159,7 @@ public sealed class VisitAccount : AggregateRoot, ITenantScoped
         Require(cleanedNote is null || cleanedNote.Length <= Refund.MaxNoteLength, BillingCodes.TextTooLong, $"The note may have at most {Refund.MaxNoteLength} characters.", DomainFault.Validation);
         var refundable = BillingAmounts.Round(BalanceFor(charge.PatientShareTotal).Refundable);
         Require(amount <= refundable, BillingCodes.AmountExceedsRefundable, $"The amount exceeds the refundable balance ({refundable}).", DomainFault.Conflict);
-        return (device, cleanedReference, cleanedNote);
+        return (cleanedReference, cleanedNote);
     }
 
     private static string RequireNumber(string number, int maxLength)

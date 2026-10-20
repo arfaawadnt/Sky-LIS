@@ -323,9 +323,9 @@ public sealed class OrganizationFlowTests(ApiFactory factory) : IClassFixture<Ap
 
         var platform = await SignedInClientAsync(username);
         var roleId = await CreateRoleAsync(platform, $"Exporters {Suffix()}", ["organization.view"]);
-        var granted = await platform.PutAsJsonAsync($"{Roles}/{roleId}/permissions", new SetRolePermissionsRequest(["organization.view", "organization.export", "treasury.export"]));
+        var granted = await platform.PutAsJsonAsync($"{Roles}/{roleId}/permissions", new SetRolePermissionsRequest(["organization.view", "organization.export", "billing.export"]));
         Assert.Equal(HttpStatusCode.NoContent, granted.StatusCode);
-        Assert.Equal(["organization.export", "organization.view", "treasury.export"], (await platform.GetFromJsonAsync<RoleDetail>($"{Roles}/{roleId}"))!.PermissionKeys.Order(StringComparer.Ordinal));
+        Assert.Equal(["billing.export", "organization.export", "organization.view"], (await platform.GetFromJsonAsync<RoleDetail>($"{Roles}/{roleId}"))!.PermissionKeys.Order(StringComparer.Ordinal));
 
         var (supervisor, _, _) = await factory.SeedUserAsync(tenantId: TenantIds.Platform, permissions: ["organization.view", "organization.edit", "organization.manage"], displayName: "Platform Supervisor");
         var otherRoleId = await CreateRoleAsync(platform, $"Viewers {Suffix()}", ["organization.view"]);

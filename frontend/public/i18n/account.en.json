@@ -222,7 +222,7 @@
   "audit.allUsers": "All users",
   "audit.inactive": "inactive",
   "audit.entity": "Entity",
-  "audit.entityHint": "For example Treasury, Visit, Patient",
+  "audit.entityHint": "For example Payment, Visit, Patient",
   "audit.entityHintPlatform": "For example Tenant, Plan, Wallet, Role",
   "audit.entityId": "Entity id",
   "audit.reset": "Reset",

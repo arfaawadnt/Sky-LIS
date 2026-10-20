@@ -3,10 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Audit;
-using Platform.Application.Treasury;
+using Platform.Application.Billing;
 using Platform.Contracts.Audit;
 using Platform.Contracts.Common;
-using Platform.Domain.Treasury;
+using Platform.Domain.Billing;
 using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Persistence.Audit;
 using Platform.IntegrationTests.Support;
@@ -29,48 +29,48 @@ public sealed class AuditLedgerTests(DatabaseFixture fixture)
     {
         var tenant = Guid.CreateVersion7();
         var actor = Guid.CreateVersion7();
-        var treasuryId = await CreateTreasuryAsync(tenant, actor, "AUD1");
+        var methodId = await CreateMethodAsync(tenant, actor, "AUD1");
 
         using (var scope = fixture.AppScope(tenant, actor, "Mona Adel", correlationId: "corr-1"))
         {
-            var treasuries = scope.ServiceProvider.GetRequiredService<ITreasuryRepository>();
-            var treasury = (await treasuries.GetForUpdateAsync(treasuryId, CancellationToken.None))!;
-            treasury.Rename(new LocalizedText("Main drawer", "الخزينة الرئيسية"), Now.AddMinutes(4));
-            treasury.Deactivate(Now.AddMinutes(5));
+            var methods = scope.ServiceProvider.GetRequiredService<IPaymentMethodRepository>();
+            var method = (await methods.GetForUpdateAsync(methodId, CancellationToken.None))!;
+            method.Update(new LocalizedText("Main card", "البطاقة الرئيسية"), PaymentMethod.Card, true, 1, otherActiveCashExists: true, Now.AddMinutes(4));
+            method.Deactivate(otherActiveCashExists: true, Now.AddMinutes(5));
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
         }
 
         using var reader = fixture.AppScope(tenant, actor);
         var context = reader.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var changes = await context.Set<FieldChange>().Where(change => change.EntityId == treasuryId.ToString()).OrderBy(change => change.AtUtc).ToListAsync();
+        var changes = await context.Set<FieldChange>().Where(change => change.EntityId == methodId.ToString()).OrderBy(change => change.AtUtc).ToListAsync();
         Assert.Equal(2, changes.Count);
         Assert.Equal(FieldChangeAction.Created, changes[0].Action);
         var created = Fields(changes[0]);
         Assert.Equal((null, "AUD1"), (created["Code"].Before, created["Code"].After));
-        Assert.Equal("Drawer AUD1", created["Name.En"].After);
+        Assert.Equal("Card AUD1", created["Name.En"].After);
         Assert.DoesNotContain("RowVersion", created.Keys);
         Assert.DoesNotContain("CreatedAtUtc", created.Keys);
         Assert.DoesNotContain("TenantId", created.Keys);
         Assert.Equal(FieldChangeAction.Modified, changes[1].Action);
         var modified = Fields(changes[1]);
         Assert.Equal(("true", "false"), (modified["IsActive"].Before, modified["IsActive"].After));
-        Assert.Equal(("Drawer AUD1", "Main drawer"), (modified["Name.En"].Before, modified["Name.En"].After));
+        Assert.Equal(("Card AUD1", "Main card"), (modified["Name.En"].Before, modified["Name.En"].After));
         Assert.DoesNotContain("Code", modified.Keys);
         Assert.Equal(("Mona Adel", actor, "corr-1"), (changes[1].ActorName, changes[1].ActorUserId, changes[1].CorrelationId));
 
         var trail = await context.Set<AuditTrailEntry>().OrderBy(entry => entry.Sequence).ToListAsync();
-        // the rename is an event of its own (validation v0.5.0 O-5), so the edit is in the trail beside its field changes
+        // the edit is an event of its own (validation v0.5.0 O-5), so it is in the trail beside its field changes
         Assert.Equal([1L, 2L, 3L], trail.Select(entry => entry.Sequence).ToArray());
-        Assert.Equal(typeof(TreasuryCreated).FullName, trail[0].EventType);
-        Assert.Equal(typeof(TreasuryUpdated).FullName, trail[1].EventType);
-        Assert.Equal(typeof(TreasuryDeactivated).FullName, trail[2].EventType);
+        Assert.Equal(typeof(PaymentMethodDefined).FullName, trail[0].EventType);
+        Assert.Equal(typeof(PaymentMethodUpdated).FullName, trail[1].EventType);
+        Assert.Equal(typeof(PaymentMethodDeactivated).FullName, trail[2].EventType);
         Assert.Null(trail[0].PrevHash);
         Assert.Equal(trail[0].EntryHash, trail[1].PrevHash);
         Assert.Equal(trail[1].EntryHash, trail[2].PrevHash);
         Assert.Equal("corr-1", trail[2].CorrelationId);
-        Assert.Equal(nameof(Domain.Treasury.Treasury), trail[2].AggregateType);
-        Assert.Equal(treasuryId.ToString(), trail[2].AggregateId);
+        Assert.Equal(nameof(PaymentMethodDefinition), trail[2].AggregateType);
+        Assert.Equal(methodId.ToString(), trail[2].AggregateId);
 
         var verified = await reader.ServiceProvider.GetRequiredService<IAuditReader>().VerifyChainAsync(CancellationToken.None);
         Assert.Equal(new ChainVerificationResult(true, 3, null), verified);
@@ -81,9 +81,9 @@ public sealed class AuditLedgerTests(DatabaseFixture fixture)
     {
         var tenant = Guid.CreateVersion7();
         var actor = Guid.CreateVersion7();
-        await CreateTreasuryAsync(tenant, actor, "TMP1");
-        await CreateTreasuryAsync(tenant, actor, "TMP2");
-        await CreateTreasuryAsync(tenant, actor, "TMP3");
+        await CreateMethodAsync(tenant, actor, "TMP1");
+        await CreateMethodAsync(tenant, actor, "TMP2");
+        await CreateMethodAsync(tenant, actor, "TMP3");
 
         // An attacker with the owner role and DDL rights disables the append-only trigger and edits history.
         await using var owner = DatabaseFixture.CreateOwnerProvider();
@@ -121,7 +121,7 @@ public sealed class AuditLedgerTests(DatabaseFixture fixture)
     {
         var tenant = Guid.CreateVersion7();
         var actor = Guid.CreateVersion7();
-        await CreateTreasuryAsync(tenant, actor, "RO1");
+        await CreateMethodAsync(tenant, actor, "RO1");
 
         using var scope = fixture.AppScope(tenant, actor);
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -182,8 +182,8 @@ public sealed class AuditLedgerTests(DatabaseFixture fixture)
     {
         var tenant = Guid.CreateVersion7();
         var actor = Guid.CreateVersion7();
-        var id = await CreateTreasuryAsync(tenant, actor, "LOG1");
-        await CreateTreasuryAsync(tenant, Guid.CreateVersion7(), "LOG2");
+        var id = await CreateMethodAsync(tenant, actor, "LOG1");
+        await CreateMethodAsync(tenant, Guid.CreateVersion7(), "LOG2");
 
         using var scope = fixture.AppScope(tenant, actor);
         var reader = scope.ServiceProvider.GetRequiredService<IAuditReader>();
@@ -191,9 +191,9 @@ public sealed class AuditLedgerTests(DatabaseFixture fixture)
         var all = await reader.ListAsync(new AuditEntryFilter(null, null, null, null, null), PageRequest.Normalized(1, 10), CancellationToken.None);
         Assert.Equal(4, all.TotalCount);   // two creations: one field change + one event each
         Assert.Contains(all.Items, item => item.Kind == AuditEntryItem.KindFieldChange && item.Action == "Created");
-        Assert.Contains(all.Items, item => item.Kind == AuditEntryItem.KindEvent && item.Action == nameof(TreasuryCreated) && item.Sequence is not null);
+        Assert.Contains(all.Items, item => item.Kind == AuditEntryItem.KindEvent && item.Action == nameof(PaymentMethodDefined) && item.Sequence is not null);
 
-        var mine = await reader.ListAsync(new AuditEntryFilter(null, null, actor, nameof(Domain.Treasury.Treasury), id.ToString()), PageRequest.Normalized(1, 10), CancellationToken.None);
+        var mine = await reader.ListAsync(new AuditEntryFilter(null, null, actor, nameof(PaymentMethodDefinition), id.ToString()), PageRequest.Normalized(1, 10), CancellationToken.None);
         Assert.Equal(2, mine.TotalCount);
         Assert.All(mine.Items, item => Assert.Equal(id.ToString(), item.EntityId));
 
@@ -209,12 +209,13 @@ public sealed class AuditLedgerTests(DatabaseFixture fixture)
         System.Text.Json.JsonSerializer.Deserialize<List<FieldChangeItem>>(change.Changes, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!
             .ToDictionary(item => item.Field, StringComparer.Ordinal);
 
-    private async Task<Guid> CreateTreasuryAsync(Guid tenantId, Guid actor, string code)
+    /// <summary>One aggregate with a create / edit / deactivate life (a payment method definition; the treasury served before LIS-CR-004).</summary>
+    private async Task<Guid> CreateMethodAsync(Guid tenantId, Guid actor, string code)
     {
         using var scope = fixture.AppScope(tenantId, actor, "Mona Adel");
-        var treasury = Domain.Treasury.Treasury.Create(code, new LocalizedText("Drawer " + code, "خزينة " + code), Guid.CreateVersion7(), Now);
-        scope.ServiceProvider.GetRequiredService<ITreasuryRepository>().Add(treasury);
+        var method = PaymentMethodDefinition.Define(code, new LocalizedText("Card " + code, "بطاقة " + code), PaymentMethod.Card, true, 1, Now);
+        scope.ServiceProvider.GetRequiredService<IPaymentMethodRepository>().Add(method);
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
-        return treasury.Id;
+        return method.Id;
     }
 }

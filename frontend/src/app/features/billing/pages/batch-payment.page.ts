@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked, viewChildren } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 
 import { BILLING_PERMISSIONS, type BalanceStatus, type BatchAccountView, type BatchMemberView } from '../../../core/api/billing.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
@@ -36,7 +35,6 @@ import { MovementFormComponent, type MovementInput } from '../ui/movement-form.c
   selector: 'app-billing-batch-payment-page',
   imports: [
     ReactiveFormsModule,
-    RouterLink,
     CanDirective,
     PageHeaderComponent,
     SectionCardComponent,
@@ -96,8 +94,8 @@ export class BatchPaymentPage {
 
   constructor() {
     void this.i18n.load('billing');
-    // UAT D-08: the cash desk is shared by the module's pages for the life of the route; re-read the approved treasuries
-    // (and the refund reasons) each time a page opens so an approval or a role change since the last read shows at once.
+    // UAT D-08: the cash desk is shared by the module's pages for the life of the route; re-read the print parameter
+    // and the payment methods each time a page opens so a change since the last read shows at once.
     this.desk.refresh();
     this.facade.refresh();   // the page's facade outlives the page too: re-read on open (UAT D-14, A-01)
 
@@ -117,7 +115,7 @@ export class BatchPaymentPage {
   }
 
   protected reload(): void {
-    this.desk.treasuries.reload();
+    this.desk.refresh();
     if (this.facade.number() !== null) {
       this.facade.batch.reload();
     }

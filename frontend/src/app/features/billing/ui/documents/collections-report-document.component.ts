@@ -8,7 +8,7 @@ import { collectionsRowLabel, collectionsSubtitle } from '../collections-report-
 import { branchOf } from './receipt-document.component';
 
 /**
- * The treasury (collections) report (A4, change request 2026-10-13, item 2; LDM "Total Daily Income"): one row per
+ * The collections report (A4, change request 2026-10-13, item 2; LDM "Total Daily Income"): one row per
  * branch, cashier or payment method with the payments in, refunds out and net per method, and the grand total.
  */
 @Component({

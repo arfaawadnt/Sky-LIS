@@ -51,7 +51,6 @@ const PSQL = 'C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe';
 const PLATFORM_TENANT = '00000000-0000-0000-0000-000000000001';
 const DEMO_TENANT = '01a12494-7ca8-75a8-873d-645d12599db7';
 const DEMO_MAIN_BRANCH = '01a12494-8a11-70e5-a5b7-58214118cca7';
-const DEVICE = 'v11-api-device';
 const OUTBOX_WAIT_MS = 20_000;
 
 // ---- small utilities ------------------------------------------------------------------------------------------------
@@ -648,7 +647,7 @@ async function fullCycle(api) {
 
   // ---- reduced role + second user
   await step('O-01', 'Role "V11 Technician" with a reduced permission set, result rights on V11G, special right ModifyVerified', async (s) => {
-    const keys = ['treasury.view', 'treasury.approve', 'results.view', 'results.create', 'results.edit', 'results.approve', 'registration.view', 'patients.view'];
+    const keys = ['billing.view', 'catalogue.view', 'results.view', 'results.create', 'results.edit', 'results.approve', 'registration.view', 'patients.view'];
     s.req('POST /organization/roles; PUT roles/{id}/result-rights; PUT roles/{id}/special-rights');
     s.expect('201 + 204 + 204; app.roles (8 keys) + app.role_result_rights (V11G, S R V E P) + special_can_modify_verified_result');
     const role = await admin.post('/api/v1/organization/roles', { nameEn: 'V11 Technician', nameAr: 'فني في11', description: 'Validation role (tester D)', permissionKeys: keys });
@@ -671,7 +670,7 @@ async function fullCycle(api) {
     s.expect('201; platform_users + tenant_memberships (role V11 Technician, branch_ids [MAIN])');
     const response = await admin.postSealed('/api/v1/organization/users', { username: ctx.techUsername, password: ctx.techPassword, mustChangePassword: false, fullNameEn: 'V11 Technician', fullNameAr: 'فني', email: `${ctx.techUsername}@v11.example`, mobile: null, designation: 'Technician', shifts: null, roleId: ctx.techRole, branchIds: [ctx.mainBranch], passwordExpiresAtUtc: null, employeeCode: null, preferredLanguage: 'en' }, ['password']);
     s.status(response, 201);
-    recordCredentials([{ username: ctx.techUsername, password: ctx.techPassword, role: 'V11 Technician (treasury approve, results; script)', tenant: `${ctx.clientName} (${ctx.tenant})` }]);
+    recordCredentials([{ username: ctx.techUsername, password: ctx.techPassword, role: 'V11 Technician (billing view, results; script)', tenant: `${ctx.clientName} (${ctx.tenant})` }]);
     const user = one(`select id, is_active, must_change_password from identity.platform_users where username = ${lit(ctx.techUsername)}`);
     ctx.techUserId = user?.id;
     const membership = one(`select * from app.tenant_memberships where tenant_id = ${lit(ctx.tenant)} and platform_user_id = ${lit(user?.id)}`);
@@ -725,43 +724,22 @@ async function fullCycle(api) {
     await verifyAuditAndOutbox(s, tier.correlation, ctx.tenant, { events: ['ContractTierAdded'] });
   });
 
-  // ---- treasury (BR-27) with SoD
-  await step('T-01', 'Treasury V11CASH on MAIN; access request by the administrator', async (s) => {
-    s.req('POST /api/v1/treasuries; POST /api/v1/treasury-access-requests');
-    s.expect('201 + 201; treasuries row; request Pending with TRQ-yyyy-nnnnn, requested_by = admin');
-    const treasury = await admin.post('/api/v1/treasuries', { code: 'v11cash', nameEn: 'V11 Cash desk', nameAr: 'خزينة في11', branchId: ctx.mainBranch });
-    s.status(treasury, 201, 'treasury');
-    ctx.treasury = treasury.json?.id;
-    const request = await admin.post('/api/v1/treasury-access-requests', { treasuryId: ctx.treasury, deviceId: DEVICE, deviceLabel: 'V11 validation script' });
-    s.status(request, 201, 'access request');
-    ctx.accessRequest = request.json?.id;
-    const t = one(`select * from app.treasuries where id = ${lit(ctx.treasury)}`);
-    s.dbCheck(t?.tenant_id === ctx.tenant && t?.code === 'V11CASH' && t?.branch_id === ctx.mainBranch && t?.is_active, 'treasuries row (V11CASH, MAIN)', t && [t.code, t.branch_id]);
-    const r = one(`select * from app.treasury_access_requests where id = ${lit(ctx.accessRequest)}`);
-    s.dbCheck(r?.status === 'Pending' && /^TRQ-\d{4}-\d{5}$/.test(r?.number ?? '') && r?.requested_by_user_id === ctx.adminUserId && r?.treasury_id === ctx.treasury && r?.device_id === DEVICE && r?.tenant_id === ctx.tenant, `request Pending ${r?.number}`, r && [r.status, r.number, r.device_id]);
-    ctx.trqNumber = r?.number;
-    const counter = one(`select * from app.reference_counters where tenant_id = ${lit(ctx.tenant)} and kind ilike '%treasury%'`);
-    s.dbCheck(counter !== null && num(counter.last_value) >= 1, 'reference_counters row for the tenant', counter);
-    await verifyAuditAndOutbox(s, request.correlation, ctx.tenant, { fieldChanges: ['TreasuryAccessRequest:Created'], events: ['TreasuryAccessRequested'] });
+  // ---- the treasury is withdrawn (LIS-CR-004, 2026-10-20): money is taken by the session user on the session branch
+  await step('T-01', 'No treasury: the treasury endpoints are gone', async (s) => {
+    s.req('GET /api/v1/treasuries; GET /api/v1/treasury-access-requests; GET /api/v1/billing/my-treasuries');
+    s.expect('404 on each (the module is removed; the tables stay as history)');
+    for (const route of ['/api/v1/treasuries', '/api/v1/treasury-access-requests', '/api/v1/billing/my-treasuries?deviceId=any']) {
+      const response = await admin.get(route);
+      s.status(response, 404, route);
+    }
   });
 
-  await step('T-02', 'SoD: the requester cannot approve; the technician approves', async (s) => {
-    s.req('POST /treasury-access-requests/{id}/approve as admin, then as tech');
-    s.expect('403 SOD-TRS-001 (nothing written); 204 → Approved, approved_by = tech');
-    const self = await admin.post(`/api/v1/treasury-access-requests/${ctx.accessRequest}/approve`, { comment: 'self' });
-    s.status(self, 403, 'self-approve');
-    s.code(self, 'SOD-TRS-001');
-    const still = one(`select status, approved_by_user_id from app.treasury_access_requests where id = ${lit(ctx.accessRequest)}`);
-    s.dbCheck(still?.status === 'Pending' && still?.approved_by_user_id === null, 'still Pending after the refused self-approval', still);
-    s.dbCheck(rows(`select 1 from audit.field_changes where correlation_id = ${lit(self.correlation)}`).length === 0, 'no audit row for the refused call');
+  await step('T-02', 'The technician signs in; the session is bound to its only branch', async (s) => {
+    s.req('POST /api/v1/auth/sign-in as tech');
+    s.expect('200; profile.branchId = MAIN');
     const signIn = await tech.signIn(ctx.techUsername, ctx.techPassword);
     s.status(signIn, 200, 'tech sign-in');
     s.check(tech.profile?.branchId === ctx.mainBranch, 'tech session auto-bound to its only branch MAIN', tech.profile?.branchId);
-    const approve = await tech.post(`/api/v1/treasury-access-requests/${ctx.accessRequest}/approve`, { comment: 'approved by V11 tech' });
-    s.status(approve, 204, 'approve');
-    const row = one(`select * from app.treasury_access_requests where id = ${lit(ctx.accessRequest)}`);
-    s.dbCheck(row?.status === 'Approved' && row?.approved_by_user_id === ctx.techUserId && row?.approval_comment === 'approved by V11 tech', 'Approved by the technician with comment', row && [row.status, row.approved_by_user_id]);
-    await verifyAuditAndOutbox(s, approve.correlation, ctx.tenant, { fieldChanges: ['TreasuryAccessRequest:Modified'], events: ['TreasuryAccessApproved'], actor: ctx.techUserId });
   });
 
   await step('T-03', 'Refund reason "V11 Overpayment" (kind Refund)', async (s) => {
@@ -820,14 +798,14 @@ async function fullCycle(api) {
 
   // ---- billing
   await step('B-01', 'Partial payment 100 EGP cash at registration', async (s) => {
-    s.req(`POST /api/v1/billing/payments {visit, 100, Cash, treasury V11CASH, device ${DEVICE}}`);
-    s.expect('201 RCT-…; payments row Posted (cashier admin, branch MAIN, treasury, device); visit_accounts paid 100 → Partial');
-    const response = await admin.post('/api/v1/billing/payments', { visitId: ctx.visit, amount: 100, method: 'Cash', reference: null, treasuryId: ctx.treasury, deviceId: DEVICE });
+    s.req('POST /api/v1/billing/payments {visit, 100, Cash}');
+    s.expect('201 RCT-…; payments row Posted (cashier admin, branch MAIN, no treasury, no device); visit_accounts paid 100 → Partial');
+    const response = await admin.post('/api/v1/billing/payments', { visitId: ctx.visit, amount: 100, method: 'Cash', reference: null });
     s.status(response, 201);
     ctx.payment1 = response.json?.id;
     s.check(/^RCT-/.test(response.json?.receiptNumber ?? ''), 'receipt RCT-…', response.json?.receiptNumber);
     const row = one(`select * from app.payments where id = ${lit(ctx.payment1)}`);
-    s.dbCheck(row?.tenant_id === ctx.tenant && row?.visit_id === ctx.visit && num(row?.amount) === 100 && row?.method === 'Cash' && row?.status === 'Posted' && row?.cashier_user_id === ctx.adminUserId && row?.branch_id === ctx.mainBranch && row?.treasury_id === ctx.treasury && row?.device_id === DEVICE && row?.receipt_number === response.json?.receiptNumber, 'payments row (100 Cash Posted, cashier, branch, treasury, device, receipt)', row && [row.amount, row.status, row.receipt_number]);
+    s.dbCheck(row?.tenant_id === ctx.tenant && row?.visit_id === ctx.visit && num(row?.amount) === 100 && row?.method === 'Cash' && row?.status === 'Posted' && row?.cashier_user_id === ctx.adminUserId && row?.branch_id === ctx.mainBranch && row?.treasury_id === null && row?.device_id === null && row?.receipt_number === response.json?.receiptNumber, 'payments row (100 Cash Posted, cashier, branch, no treasury, no device, receipt)', row && [row.amount, row.status, row.receipt_number]);
     const account = one(`select * from app.visit_accounts where id = ${lit(ctx.visit)}`);
     s.dbCheck(num(account?.paid_total) === 100 && num(account?.refunded_total) === 0 && account?.tenant_id === ctx.tenant, 'visit_accounts paid_total 100', account && [account.paid_total, account.refunded_total]);
     const view = await admin.get(`/api/v1/billing/visits/${ctx.visit}/account`);
@@ -838,7 +816,7 @@ async function fullCycle(api) {
   await step('B-02', 'Second payment 150 EGP card → Paid', async (s) => {
     s.req('POST /api/v1/billing/payments {150, Card, SLIP-V11}');
     s.expect('201; paid_total 250, remaining 0, Paid');
-    const response = await admin.post('/api/v1/billing/payments', { visitId: ctx.visit, amount: 150, method: 'Card', reference: 'SLIP-V11', treasuryId: ctx.treasury, deviceId: DEVICE });
+    const response = await admin.post('/api/v1/billing/payments', { visitId: ctx.visit, amount: 150, method: 'Card', reference: 'SLIP-V11' });
     s.status(response, 201);
     ctx.payment2 = response.json?.id;
     const row = one(`select amount, method, reference, status from app.payments where id = ${lit(ctx.payment2)}`);
@@ -926,18 +904,18 @@ async function fullCycle(api) {
 
   await step('B-03', 'Refund the negative balance: 100 EGP cash with reason', async (s) => {
     s.req('POST /api/v1/billing/refunds {100, Cash, reason V11 Overpayment}');
-    s.expect('201 RFD-…; refunds row (reason FK, cashier, treasury, device); refunded_total 100 → Paid, remaining 0');
-    const response = await admin.post('/api/v1/billing/refunds', { visitId: ctx.visit, amount: 100, method: 'Cash', reference: null, reasonId: ctx.refundReason, note: 'V11 refund after cancellation', treasuryId: ctx.treasury, deviceId: DEVICE });
+    s.expect('201 RFD-…; refunds row (reason FK, cashier, branch, no treasury); refunded_total 100 → Paid, remaining 0');
+    const response = await admin.post('/api/v1/billing/refunds', { visitId: ctx.visit, amount: 100, method: 'Cash', reference: null, reasonId: ctx.refundReason, note: 'V11 refund after cancellation' });
     s.status(response, 201);
     ctx.refund = response.json?.id;
     s.check(/^RFD-/.test(response.json?.number ?? ''), 'number RFD-…', response.json?.number);
     const row = one(`select * from app.refunds where id = ${lit(ctx.refund)}`);
-    s.dbCheck(row?.tenant_id === ctx.tenant && row?.visit_id === ctx.visit && num(row?.amount) === 100 && row?.reason_id === ctx.refundReason && row?.note === 'V11 refund after cancellation' && row?.cashier_user_id === ctx.adminUserId && row?.treasury_id === ctx.treasury && row?.device_id === DEVICE && row?.number === response.json?.number, 'refunds row (100, reason FK, note, cashier, treasury, device)', row && [row.amount, row.number]);
+    s.dbCheck(row?.tenant_id === ctx.tenant && row?.visit_id === ctx.visit && num(row?.amount) === 100 && row?.reason_id === ctx.refundReason && row?.note === 'V11 refund after cancellation' && row?.cashier_user_id === ctx.adminUserId && row?.branch_id === ctx.mainBranch && row?.treasury_id === null && row?.device_id === null && row?.number === response.json?.number, 'refunds row (100, reason FK, note, cashier, branch, no treasury)', row && [row.amount, row.number]);
     const account = one(`select paid_total, refunded_total from app.visit_accounts where id = ${lit(ctx.visit)}`);
     s.dbCheck(num(account?.paid_total) === 250 && num(account?.refunded_total) === 100, 'visit_accounts paid 250, refunded 100', account);
     const view = await admin.get(`/api/v1/billing/visits/${ctx.visit}/account`);
     s.check(view.json?.balanceStatus === 'Paid' && num(view.json?.remaining) === 0, 'account Paid, remaining 0', view.json && [view.json.balanceStatus, view.json.remaining]);
-    const over = await admin.post('/api/v1/billing/refunds', { visitId: ctx.visit, amount: 1, method: 'Cash', reference: null, reasonId: ctx.refundReason, note: null, treasuryId: ctx.treasury, deviceId: DEVICE });
+    const over = await admin.post('/api/v1/billing/refunds', { visitId: ctx.visit, amount: 1, method: 'Cash', reference: null, reasonId: ctx.refundReason, note: null });
     s.status(over, 409, 'refund beyond the refundable');
     s.code(over, 'BIL-011');
     await verifyAuditAndOutbox(s, response.correlation, ctx.tenant, { fieldChanges: ['Refund:Created'], events: ['RefundRecorded'], actor: ctx.adminUserId });
@@ -1019,14 +997,13 @@ async function fullCycle(api) {
     }
     // Ids are global; accession and patient numbers are per-tenant counters (the demo laboratory has its own
     // ACC-2026-00001), so leakage is judged on the V11 ids and the unique V11 patient name, never on the numbers.
-    const leaks = (text) => [ctx.patient, ctx.visit, ctx.resultK, ctx.resultL, ctx.testK, ctx.accessRequest, ctx.tenant, 'V11 Mona Validation'].filter((needle) => needle && text.includes(needle));
+    const leaks = (text) => [ctx.patient, ctx.visit, ctx.resultK, ctx.resultL, ctx.testK, ctx.tenant, 'V11 Mona Validation'].filter((needle) => needle && text.includes(needle));
     for (const [route, label] of [
       [`/api/v1/patients/${ctx.patient}`, 'patient'],
       [`/api/v1/registration/visits/${ctx.visit}`, 'visit'],
       [`/api/v1/billing/visits/${ctx.visit}/account`, 'account'],
       [`/api/v1/results/${ctx.resultK}/log`, 'result log'],
       [`/api/v1/catalogue/tests/${ctx.testK}`, 'test'],
-      [`/api/v1/treasury-access-requests/${ctx.accessRequest}`, 'treasury request'],
     ]) {
       const response = await lab.get(route);
       s.status(response, 404, label);
@@ -1141,7 +1118,7 @@ async function fullCycle(api) {
   saveState({
     run: RUN, base: BASE, tenant: ctx.tenant, clientName: ctx.clientName, adminUsername: ctx.adminUsername, adminPassword: ctx.adminPassword,
     techUsername: ctx.techUsername, mainBranch: ctx.mainBranch, patient: ctx.patient, patientNumber: ctx.patientNumber, visit: ctx.visit, accession: ctx.accession,
-    payments: [ctx.payment1, ctx.payment2], refund: ctx.refund, treasury: ctx.treasury, accessRequest: ctx.accessRequest, trqNumber: ctx.trqNumber, uniqueObserved: ctx.uniqueObserved,
+    payments: [ctx.payment1, ctx.payment2], refund: ctx.refund, uniqueObserved: ctx.uniqueObserved,
   });
 }
 

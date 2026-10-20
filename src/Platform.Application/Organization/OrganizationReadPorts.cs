@@ -11,7 +11,7 @@ namespace Platform.Application.Organization;
 /// <summary>A branch as other modules see it.</summary>
 public sealed record BranchSummary(Guid Id, string Code, string NameEn, string NameAr, string Currency, bool IsActive);
 
-/// <summary>Branches of the current tenant (treasuries, registration, results, the branch-selection page).</summary>
+/// <summary>Branches of the current tenant (registration, results, the branch-selection page).</summary>
 public interface IBranchLookup
 {
     Task<BranchSummary?> FindAsync(Guid branchId, CancellationToken cancellationToken);

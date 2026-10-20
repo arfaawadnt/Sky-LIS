@@ -6,7 +6,6 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
 import { BILLING_API, type CollectionsReportDocument, type CollectionsReportRequest, type PaymentListItem, type VisitAccountView } from '../../../core/api/billing.contracts';
-import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
@@ -38,14 +37,9 @@ const posted: PaymentListItem = {
   amount: 100,
   method: 'Cash',
   reference: null,
-  treasuryId: 't-1',
-  treasuryCode: 'MAIN',
-  treasuryNameEn: 'Main drawer',
-  treasuryNameAr: 'الخزينة الرئيسية',
   cashierUserId: 'u-1',
   cashierName: 'Cashier One',
   branchId: 'b-1',
-  deviceId: 'device-test',
   batchId: null,
   paidAtUtc: '2026-10-09T09:00:00Z',
   status: 'Posted',
@@ -85,7 +79,6 @@ describe('PaymentsPage (CP-23)', () => {
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
-        { provide: DeviceIdentityService, useValue: { deviceId: () => 'device-test' } satisfies Pick<DeviceIdentityService, 'deviceId'> },
         { provide: PermissionsService, useValue: { can: () => true } satisfies Pick<PermissionsService, 'can'> },
         { provide: BillingPrinter, useValue: printer },
         { provide: ConfirmService, useValue: { promptReason: () => Promise.resolve('wrong visit'), confirm: () => Promise.resolve(true) } satisfies Pick<ConfirmService, 'promptReason' | 'confirm'> },
@@ -115,11 +108,11 @@ describe('PaymentsPage (CP-23)', () => {
     await settle();
 
     await Promise.all([
-      page.pay(account(), { treasuryId: 't-1', amount: 200, method: 'Cash', reference: null, reasonId: null, note: null }),
+      page.pay(account(), { amount: 200, method: 'Cash', reference: null, reasonId: null, note: null }),
       (async () => {
         await settle();
         const post = backend.expectOne(BILLING_API.payments);
-        expect(post.request.body).toEqual({ visitId: 'v-1', amount: 200, method: 'Cash', reference: null, treasuryId: 't-1', deviceId: 'device-test' });
+        expect(post.request.body).toEqual({ visitId: 'v-1', amount: 200, method: 'Cash', reference: null });
         post.flush({ id: 'pay-2', receiptNumber: 'RCT-2026-00002' }, { status: 201, statusText: 'Created' });
       })(),
     ]);
@@ -130,6 +123,33 @@ describe('PaymentsPage (CP-23)', () => {
     backend.expectOne(`${BILLING_API.visits}/v-1/account`).flush(account({ paid: 300, remaining: 0, balanceStatus: 'Paid' }));
   });
 
+  it('offers the pay form with no treasury to choose and no access request, and lists no treasury in the register (LIS-CR-004)', async () => {
+    const page = await open('/billing/payments?visitId=v-1');
+    backend.expectOne(`${BILLING_API.visits}/v-1/account`).flush(account({ payments: [posted] }));
+    TestBed.tick();
+    await settle();
+    harness.detectChanges();
+
+    const root = harness.routeNativeElement as HTMLElement;
+    expect(root.querySelector('select[formcontrolname=methodKey]')).not.toBeNull();
+    expect(root.querySelector('select[formcontrolname=treasuryId]')).toBeNull();
+    expect(root.querySelector('a[href="/treasury/access"]')).toBeNull();
+    expect(root.textContent).not.toContain('billing.field.treasury');
+
+    page.onTab('register');
+    TestBed.tick();
+    await settle();
+    const list = backend.expectOne((request) => request.url === BILLING_API.payments);
+    expect(list.request.params.has('treasuryId')).toBe(false);
+    list.flush({ items: [posted], page: 1, pageSize: 50, totalCount: 1, totalPages: 1 });
+    backend.expectNone('/api/v1/billing/treasuries');
+    TestBed.tick();
+    await settle();
+    harness.detectChanges();
+    expect(root.textContent).not.toContain('billing.column.treasury');
+    expect(root.textContent).toContain('Cashier One');
+  });
+
   it('does not print the receipt when the laboratory turned autoPrintReceipt off (UAT A-05)', async () => {
     const page = await open('/billing/payments?visitId=v-1', false);
     backend.expectOne(`${BILLING_API.visits}/v-1/account`).flush(account({ payments: [posted] }));
@@ -137,7 +157,7 @@ describe('PaymentsPage (CP-23)', () => {
     await settle();
 
     await Promise.all([
-      page.pay(account(), { treasuryId: 't-1', amount: 200, method: 'Cash', reference: null, reasonId: null, note: null }),
+      page.pay(account(), { amount: 200, method: 'Cash', reference: null, reasonId: null, note: null }),
       (async () => {
         await settle();
         backend.expectOne(BILLING_API.payments).flush({ id: 'pay-3', receiptNumber: 'RCT-2026-00003' }, { status: 201, statusText: 'Created' });
@@ -184,15 +204,14 @@ describe('PaymentsPage (CP-23)', () => {
     backend.verify();
   });
 
-  // ---- collections (treasury) report, change request 2026-10-13 item 2 ---------------------------------------------
+  // ---- collections report, change request 2026-10-13 item 2 ---------------------------------------------
 
-  /** Opens the register tab (its list and treasuries load) and the collections dialog; answers the register's own reads. */
+  /** Opens the register tab (its list loads) and the collections dialog; answers the register's own reads. */
   async function openCollectionsDialog(page: PaymentsPageInternals): Promise<void> {
     page.onTab('register');
     TestBed.tick();
     await settle();
     backend.expectOne((request) => request.url === BILLING_API.payments).flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 0 });
-    backend.expectOne(BILLING_API.treasuries).flush([]);
     page.openCollections();
     TestBed.tick();
     await settle();

@@ -385,3 +385,56 @@ in the receipt, refund receipt, invoice and register rows, or the kind on a lega
 | Q25 | Who reads the pick list? | Every holder of `billing.view` (as `my-treasuries`): the reception role holds it to pay from the registration page. No second permission path was needed. |
 | Q26 | A request with a `methodCode` whose kind differs from the request's `method` | The definition wins (its kind is stored); the request's kind is only the legacy path. |
 | Q27 | Delete a method? | Never: deactivate (the code lives on posted movements). A deactivated definition still names its history. |
+
+## 18. Change request 2026-10-20 — Treasury removed (LIS-CR-004, package P-API)
+
+The business owner removed the treasury concept from the system (2026-10-20, after the first use of 0.15.2): no cash drawers,
+no device-bound access, no approval, no BR-27 (intake LIS-INT-TRS-001 is withdrawn). This section supersedes every treasury and
+BR-27 statement of §1–§17.
+
+**Facts of a movement.** A payment, a refund and a batch payment record the visit, `Amount`, `Method` (kind), `MethodCode?`,
+`Reference?`, the **cashier = the session user** (AUTH-001 without one) and the **branch = the session branch** (`BranchScope.Require`,
+TENANT-004 without one), and the posted time. Nothing about the cashier or the branch is read from the request (pitfall P-30).
+The domain value `CashierStation` is replaced by `Cashier(UserId, BranchId)`; `Payment` / `Refund` keep `TreasuryId?` and
+`DeviceId?` as history only (null on every new row). Events: `PaymentRecorded` and `RefundRecorded` lose `TreasuryId`;
+`CashClosingClosed` carries `BranchId` instead of `TreasuryId` (no policy consumes them).
+
+**Cash closing (T5, CP-30).** Scope = the **session branch** + `CashierUserId?` (one cashier, or every cashier of the branch with
+null) + a half-open period. `CashClosing.TreasuryId` is nullable history (null on new closings); `RequireScope(sessionBranch, from,
+to, now)`, `CheckClose` / `Close` take no treasury. Unchanged: the period rules (BIL-030/031/033), counted cash (BIL-032), a
+difference explained by a note (BIL-034), no overlap for intersecting scopes of the same branch (INV-BIL-005, BIL-120: a cashier's
+closing and an "all cashiers" closing of the same branch intersect; two different cashiers do not), a closed period freezes the
+payments it covers (INV-BIL-006, BIL-013: same branch, cashier in scope, time in period), the closing number `CLS-yyyy-nnnnn`.
+Preview and close keep `billing.manage`; the cashiers list (`GET …/cash-closings/cashiers?from&to`) reads the session branch. The
+sheet of a closing made before the change narrows its movement list to that closing's treasury, so history prints as it was.
+
+**Registers and reports.** The payments, refunds and closings registers, their CSV files, the receipts, the refund receipt and the
+closing sheet lose the treasury columns (code and names) and the device id; the registers filter by `branchId` instead of
+`treasuryId`; a closing list item carries its `BranchId`. Rows posted under the treasury stay listed (no join on
+`app.treasuries`). The dashboard's *cash of the day* sums posted payments and refunds by their own `branch_id`. The collections
+report is unchanged (it never had a treasury column).
+
+**Codes removed** (retired, never reused): BIL-006 device id required, BIL-020 treasury not approved for the device, BIL-021
+treasury inactive, BIL-022 treasury of another branch, BIL-409 treasury not found.
+
+**Endpoints.** Changed bodies: `POST /api/v1/billing/payments` `{visitId, amount, method, reference?, methodCode?}`;
+`POST /api/v1/billing/refunds` `{visitId, amount, method, reference?, reasonId, note?, methodCode?}`;
+`POST /api/v1/billing/batches/{batchId}/pay-all` `{amount, method, reference?, methodCode?}`; `POST /api/v1/billing/cash-closings`
+`{cashierUserId?, periodFromUtc, periodToUtc, countedCash?, note?}`; `GET …/cash-closings/preview?cashierUserId&from&to`;
+`GET …/cash-closings/cashiers?from&to`; register filters `branchId` (payments, refunds, closings and their exports). Removed (404):
+`GET /api/v1/billing/my-treasuries`, `GET /api/v1/billing/treasuries`, `/api/v1/treasuries/**`, `/api/v1/treasury-access-requests/**`.
+
+**Compatibility.** A body that still carries `treasuryId` / `deviceId` is accepted and those members are ignored (System.Text.Json
+skips unknown members; the host does not disallow them), so a browser tab opened before the swap keeps working; a query string
+with `treasuryId` is ignored too. History is kept: `app.treasuries` and `app.treasury_access_requests` stay as orphan tables,
+`treasury_id` / `device_id` stay on the old rows of `app.payments`, `app.refunds` and `app.cash_closings` (now nullable, foreign
+keys to `app.treasuries` dropped, the treasury indexes replaced by `(tenant_id, branch_id, …)` ones), and the payment guard trigger
+already compares those columns with `IS DISTINCT FROM`, so nothing in it changes. Migration `TreasuryRemoved` (integrator); the
+`treasury.*` keys are purged from `app.roles.permission_keys`.
+
+**Open questions and the assumptions built on.**
+
+| # | Question | Assumption |
+| --- | --- | --- |
+| Q28 | May a cashier without `billing.manage` preview or close their own drawer? | No (unchanged): preview, close and the cashiers list stay under `billing.manage`; the cashier's own figures are in the collections report (`billing.view`). |
+| Q29 | Does a closing made under a treasury block a new per-cashier closing of the same branch and period? | Yes: closings now overlap by branch, so an old "all cashiers of treasury X" closing intersects any new closing of its branch for that period (no double count across drawers of the same branch). |

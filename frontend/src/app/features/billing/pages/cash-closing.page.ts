@@ -6,7 +6,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { BILLING_PERMISSIONS, type CashClosingListItem, type CashClosingPreview, type DrawerMovement, type PaymentMethod } from '../../../core/api/billing.contracts';
 import type { PageRequest } from '../../../core/api/paging';
 import { I18nService } from '../../../core/i18n/i18n.service';
-import { localizedPick } from '../../../shared/forms/localized-text';
+import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
@@ -31,7 +31,7 @@ import { dayEndIso, dayStartIso, paymentTone, problemOf } from '../ui/billing-vi
 import { saveFile } from '../ui/save-file';
 
 /**
- * Cash closing (SRS CP-30, BR-16, WF-09): choose a treasury of the session branch, one cashier or all, and a period;
+ * Cash closing (SRS CP-30, BR-16, WF-09; LIS-CR-004): on the session branch, choose one cashier or all and a period;
  * preview the drawer (payments and refunds per method, expected cash = cash payments − cash refunds, outstanding balances,
  * discounts, movements); count the cash, explain a difference, close with confirmation and print the handover sheet.
  * The register lists the closings with their sheets and a CSV export.
@@ -65,11 +65,11 @@ export class CashClosingPage {
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly document = inject(DOCUMENT);
+  private readonly can = inject(PermissionsService);
 
   protected readonly permissions = BILLING_PERMISSIONS;
 
   protected readonly scopeForm = new FormGroup({
-    treasuryId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     cashierUserId: new FormControl('', { nonNullable: true }),
     from: new FormControl(toLocalInputValue(startOfDay(new Date())), { nonNullable: true, validators: [Validators.required] }),
     to: new FormControl(toLocalInputValue(new Date()), { nonNullable: true, validators: [Validators.required] }),
@@ -111,7 +111,6 @@ export class CashClosingPage {
 
   protected readonly closingColumns: readonly TableColumn<CashClosingListItem>[] = [
     { key: 'number', header: 'billing.column.number', mono: true, width: '150px' },
-    { key: 'treasury', header: 'billing.column.treasury', value: (row) => row.treasuryCode },
     { key: 'cashierName', header: 'billing.column.cashier', value: (row) => row.cashierName ?? this.i18n.t('billing.closing.allCashiers') },
     { key: 'period', header: 'billing.column.period', secondary: true, value: (row) => `${formatDateTime(row.periodFromUtc, this.i18n.lang())} → ${formatDateTime(row.periodToUtc, this.i18n.lang())}` },
     { key: 'expectedCash', header: 'billing.column.expectedCash', align: 'end', value: (row) => this.money(row.expectedCash) },
@@ -127,19 +126,17 @@ export class CashClosingPage {
   constructor() {
     void this.i18n.load('billing');
     this.facade.refresh();   // the page's facade outlives the page too: re-read on open (UAT D-14, A-01)
-  }
-
-  protected onTreasuryChange(): void {
-    this.scopeForm.controls.cashierUserId.setValue('');
-    this.loadCashiers();
+    if (this.can.can(this.permissions.close)) {
+      this.loadCashiers();   // the cashiers of the session branch over the default period (today so far)
+    }
   }
 
   protected loadCashiers(): void {
-    const { treasuryId, from, to } = this.scopeForm.getRawValue();
+    const { from, to } = this.scopeForm.getRawValue();
     const fromUtc = localInputToIso(from);
     const toUtc = localInputToIso(to);
-    if (treasuryId !== '' && fromUtc !== null && toUtc !== null && fromUtc < toUtc) {
-      this.facade.cashierQuery.set({ treasuryId, fromUtc, toUtc });
+    if (fromUtc !== null && toUtc !== null && fromUtc < toUtc) {
+      this.facade.cashierQuery.set({ fromUtc, toUtc });
     }
   }
 
@@ -148,7 +145,7 @@ export class CashClosingPage {
       return;
     }
 
-    const { treasuryId, cashierUserId, from, to } = this.scopeForm.getRawValue();
+    const { cashierUserId, from, to } = this.scopeForm.getRawValue();
     const fromUtc = localInputToIso(from);
     const toUtc = localInputToIso(to);
     if (fromUtc === null || toUtc === null) {
@@ -158,7 +155,7 @@ export class CashClosingPage {
     this.facade.close.reset();
     this.countForm.reset({ countedCash: null, note: '' });
     this.loadCashiers();
-    this.facade.scope.set({ treasuryId, cashierUserId: cashierUserId === '' ? null : cashierUserId, fromUtc, toUtc });
+    this.facade.scope.set({ cashierUserId: cashierUserId === '' ? null : cashierUserId, fromUtc, toUtc });
   }
 
   private readonly noteText = toSignal(this.countForm.controls.note.valueChanges, { initialValue: '' });
@@ -182,7 +179,7 @@ export class CashClosingPage {
     const confirmed = await this.confirm.confirm({
       title: this.i18n.t('billing.closing.confirmTitle'),
       message: this.i18n.tf('billing.closing.confirmMessage', {
-        treasury: preview.treasuryCode,
+        cashier: this.cashierOf(preview),
         expected: this.money(preview.totals.expectedCash),
         counted: this.money(counted),
       }),
@@ -194,7 +191,6 @@ export class CashClosingPage {
 
     const note = this.countForm.controls.note.value.trim();
     const created = await this.facade.close.execute({
-      treasuryId: preview.treasuryId,
       cashierUserId: preview.cashierUserId,
       periodFromUtc: preview.periodFromUtc,
       periodToUtc: preview.periodToUtc,
@@ -224,11 +220,6 @@ export class CashClosingPage {
     this.toast.success(this.i18n.t('billing.exported'));
   }
 
-  protected onRegisterTreasury(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
-    this.facade.setFilter({ treasuryId: value === '' ? null : value });
-  }
-
   protected onRegisterFrom(event: Event): void {
     this.facade.setFilter({ fromUtc: dayStartIso((event.target as HTMLInputElement).value) });
   }
@@ -242,15 +233,16 @@ export class CashClosingPage {
   }
 
   protected reload(): void {
-    this.facade.treasuries.reload();
     this.facade.closings.reload();
+    this.facade.cashiers.reload();
     if (this.facade.scope() !== null) {
       this.facade.preview.reload();
     }
   }
 
-  protected treasuryName(item: { nameEn: string; nameAr: string }): string {
-    return localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang());
+  /** The cashier of the drawer, or "All cashiers" for the whole session branch. */
+  protected cashierOf(preview: CashClosingPreview): string {
+    return preview.cashierName ?? this.i18n.t('billing.closing.allCashiers');
   }
 
   protected methodLabel(method: PaymentMethod): string {

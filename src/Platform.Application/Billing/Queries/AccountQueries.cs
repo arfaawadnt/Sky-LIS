@@ -11,7 +11,7 @@ using Platform.SharedKernel.Abstractions;
 
 namespace Platform.Application.Billing.Queries;
 
-// Visit and batch accounts, the invoice and the treasuries a cashier may use (intake §14). Queries carry a policy like
+// Visit and batch accounts, the invoice and the cash desk's print parameters (intake §14). Queries carry a policy like
 // commands (D-04) and never commit.
 
 /// <summary>The account of a visit by id or by accession (CP-23 "visit search").</summary>
@@ -236,35 +236,6 @@ public sealed class GetBatchAccountHandler(IBillableVisitLookup visits, IVisitBa
             views.Sum(view => view.Remaining),
             currency);
     }
-}
-
-/// <summary>The active treasuries of the session branch approved for the current user on this device (BR-27; the pay forms' choice).</summary>
-[RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.View)]
-public sealed record ListMyTreasuriesQuery(string DeviceId) : IQuery<IReadOnlyList<BillingTreasuryItem>>;
-
-public sealed class ListMyTreasuriesValidator : AbstractValidator<ListMyTreasuriesQuery>
-{
-    public ListMyTreasuriesValidator() => RuleFor(query => query.DeviceId).NotEmpty().MaximumLength(CashierStation.MaxDeviceIdLength);
-}
-
-public sealed class ListMyTreasuriesHandler(ITreasuryStationLookup stations, ICurrentUser user) : IQueryHandler<ListMyTreasuriesQuery, IReadOnlyList<BillingTreasuryItem>>
-{
-    public Task<IReadOnlyList<BillingTreasuryItem>> Handle(ListMyTreasuriesQuery query, CancellationToken cancellationToken)
-    {
-        var actor = BillingActor.Of(user);
-        var branch = BranchScope.Require(user);
-        return stations.ApprovedAsync(actor, query.DeviceId.Trim(), branch, cancellationToken);
-    }
-}
-
-/// <summary>Every treasury of the session branch (the closing page and the register filters).</summary>
-[RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.View)]
-public sealed record ListBillingTreasuriesQuery : IQuery<IReadOnlyList<BillingTreasuryItem>>;
-
-public sealed class ListBillingTreasuriesHandler(ITreasuryStationLookup stations, ICurrentUser user) : IQueryHandler<ListBillingTreasuriesQuery, IReadOnlyList<BillingTreasuryItem>>
-{
-    public Task<IReadOnlyList<BillingTreasuryItem>> Handle(ListBillingTreasuriesQuery query, CancellationToken cancellationToken) =>
-        stations.OfBranchAsync(BranchScope.Require(user), cancellationToken);
 }
 
 /// <summary>

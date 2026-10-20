@@ -7,7 +7,6 @@ using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Contracts.Billing;
 using Platform.Contracts.Common;
-using Platform.Contracts.Treasury;
 using Platform.Domain.Organization;
 using Platform.Domain.Tenancy;
 using Platform.Infrastructure.Persistence;
@@ -25,12 +24,10 @@ public sealed class PaymentMethodsFlowTests(ApiFactory factory) : IClassFixture<
 {
     private const string Methods = "/api/v1/billing/payment-methods";
     private const string Payments = "/api/v1/billing/payments";
-    private const string Device = "device-methods-1";
 
     private static readonly string[] ManagerPermissions = ["billing.view", "billing.manage", "billing.export"];
     private static readonly string[] ViewerPermissions = ["billing.view"];
-    private static readonly string[] CashierPermissions = ["billing.view", "billing.create", "treasury.view", "treasury.create", "treasury.manage"];
-    private static readonly string[] ApproverPermissions = ["treasury.view", "treasury.approve"];
+    private static readonly string[] CashierPermissions = ["billing.view", "billing.create"];
 
     [DatabaseFact]
     public async Task A_laboratory_seeds_the_defaults_defines_its_own_methods_and_every_refusal_has_its_code()
@@ -123,20 +120,20 @@ public sealed class PaymentMethodsFlowTests(ApiFactory factory) : IClassFixture<
         var walletId = (await (await desk.Manager.PostAsJsonAsync(Methods, new PaymentMethodRequest("WALLET", "Wallet", "محفظة", "Card", false, null))).Content.ReadFromJsonAsync<CreatedResource>())!.Id;
 
         // The definition's kind (Card) replaces the request's kind and its rule needs no reference.
-        var wallet = await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 100m, "Cash", null, desk.TreasuryId, Device, "wallet"));
+        var wallet = await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 100m, "Cash", null, "wallet"));
         Assert.Equal(HttpStatusCode.Created, wallet.StatusCode);
         var receipt = (await wallet.Content.ReadFromJsonAsync<PaymentCreated>())!;
 
         // CARD requires a reference (BIL-003); an unknown code is refused (BIL-053); so is a deactivated one.
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", null, desk.TreasuryId, Device, "CARD")), HttpStatusCode.UnprocessableEntity, "BIL-003");
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", "SLIP-1", desk.TreasuryId, Device, "CHEQUE")), HttpStatusCode.UnprocessableEntity, "BIL-053");
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", "SLIP-1", desk.TreasuryId, Device, new string('X', 21))), HttpStatusCode.BadRequest, ProblemCodes.ValidationFailed);
+        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", null, "CARD")), HttpStatusCode.UnprocessableEntity, "BIL-003");
+        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", "SLIP-1", "CHEQUE")), HttpStatusCode.UnprocessableEntity, "BIL-053");
+        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", "SLIP-1", new string('X', 21))), HttpStatusCode.BadRequest, ProblemCodes.ValidationFailed);
         Assert.Equal(HttpStatusCode.NoContent, (await desk.Manager.PostAsync($"{Methods}/{walletId}/deactivate", null)).StatusCode);
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", null, desk.TreasuryId, Device, "WALLET")), HttpStatusCode.UnprocessableEntity, "BIL-053");
+        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", null, "WALLET")), HttpStatusCode.UnprocessableEntity, "BIL-053");
 
         // Without a code the legacy rule still applies (an older client): every kind but cash needs a reference.
-        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", null, desk.TreasuryId, Device)), HttpStatusCode.UnprocessableEntity, "BIL-003");
-        Assert.Equal(HttpStatusCode.Created, (await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", "SLIP-2", desk.TreasuryId, Device, "CARD"))).StatusCode);
+        await ExpectAsync(desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", null)), HttpStatusCode.UnprocessableEntity, "BIL-003");
+        Assert.Equal(HttpStatusCode.Created, (await desk.Cashier.PostAsJsonAsync(Payments, new RecordPaymentRequest(visitId, 50m, "Card", "SLIP-2", "CARD"))).StatusCode);
 
         // The receipt, the register, the account and the invoice carry the method's code and names; a deactivated definition still names history.
         var document = await desk.Cashier.GetFromJsonAsync<PaymentReceiptDocument>($"{Payments}/{receipt.Id}/documents/receipt");
@@ -159,29 +156,19 @@ public sealed class PaymentMethodsFlowTests(ApiFactory factory) : IClassFixture<
         Assert.Contains("WALLET", await export.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
-    private sealed record Desk(Guid Tenant, Guid TreasuryId, HttpClient Cashier, HttpClient Manager);
+    private sealed record Desk(Guid Tenant, HttpClient Cashier, HttpClient Manager);
 
-    /// <summary>A branch with a treasury approved for the cashier on <see cref="Device"/> (BR-27) and a billing manager who defines the methods.</summary>
+    /// <summary>A branch with a cashier signed in on it and a billing manager who defines the methods (no treasury since LIS-CR-004).</summary>
     private async Task<Desk> DeskAsync()
     {
         var tenant = Guid.CreateVersion7();
         var branch = Guid.CreateVersion7();
         var (cashierName, _, cashierId) = await factory.SeedUserAsync(tenantId: tenant, permissions: CashierPermissions, displayName: "Cashier One", branchIds: [branch]);
         await GrantAsync(tenant, cashierId, new SpecialRights(null, canPay: true, canRefund: false, canTransfer: false, canCancel: false, canModifyVerifiedResult: false, canPreviewWithoutVerify: false, canPrintInvoice: true, canSeeVip: false));
-        var (approverName, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ApproverPermissions, displayName: "Branch Manager", branchIds: [branch]);
         var cashier = await SignedInClientAsync(cashierName);
-        var approver = await SignedInClientAsync(approverName);
         var manager = await SignedInClientAsync(tenant, ManagerPermissions, branch);
 
-        var created = await cashier.PostAsJsonAsync("/api/v1/treasuries", new CreateTreasuryRequest("DESK1", "Cash desk 1", "خزينة 1", branch));
-        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        var treasuryId = (await created.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
-        var requested = await cashier.PostAsJsonAsync("/api/v1/treasury-access-requests", new RequestTreasuryAccessRequest(treasuryId, Device, "Cash desk PC"));
-        Assert.Equal(HttpStatusCode.Created, requested.StatusCode);
-        var requestId = (await requested.Content.ReadFromJsonAsync<CreatedResource>())!.Id;
-        Assert.Equal(HttpStatusCode.NoContent, (await approver.PostAsync($"/api/v1/treasury-access-requests/{requestId}/approve", null)).StatusCode);
-
-        return new Desk(tenant, treasuryId, cashier, manager);
+        return new Desk(tenant, cashier, manager);
     }
 
     private static async Task ExpectAsync(Task<HttpResponseMessage> call, HttpStatusCode status, string code)

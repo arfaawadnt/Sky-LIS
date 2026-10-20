@@ -88,7 +88,7 @@ describe('route guards composed on the shell (R1-01, R1-04, R2-01)', () => {
     await signIn({ permissions: ['billing.view'] }, false);
 
     expect(await open('/billing/refunds?visitId=v1')).toBe('/billing/refunds?visitId=v1');
-    expect(await open('/billing/cash-closing')).toBe('/billing/payment-methods'); // refused → home → first menu entry (Payments left the sidebar, C11)
+    expect(await open('/billing/cash-closing')).toBe('/billing/payments'); // refused → home → first menu entry
   });
 
   it('lands a user without the dashboard on their first menu entry when a URL is refused (R1-04)', async () => {

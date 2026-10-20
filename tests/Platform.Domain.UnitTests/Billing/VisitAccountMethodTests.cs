@@ -14,10 +14,9 @@ public sealed class VisitAccountMethodTests
     private static readonly DateTimeOffset Now = FixedClock.Instant;
     private static readonly Guid Cashier = Guid.CreateVersion7();
     private static readonly Guid Branch = Guid.CreateVersion7();
-    private static readonly Guid Treasury = Guid.CreateVersion7();
     private static readonly Guid Reason = Guid.CreateVersion7();
 
-    private static CashierStation Station() => new(Treasury, Branch, true, true, "device-1", Cashier, Branch);
+    private static Cashier Desk() => new(Cashier, Branch);
 
     private static VisitCharge Charge(decimal share) => new(share, false);
 
@@ -38,7 +37,7 @@ public sealed class VisitAccountMethodTests
         var account = Account();
         var method = new PaymentMethodUse(PaymentMethod.Card, "CARDNR", RequiresReference: false);
 
-        var payment = account.RecordPayment("RCT-2026-00001", 100m, method, " ", Station(), Charge(300m), Now);
+        var payment = account.RecordPayment("RCT-2026-00001", 100m, method, " ", Desk(), Charge(300m), Now);
 
         Assert.Equal((PaymentMethod.Card, "CARDNR", null), (payment.Method, payment.MethodCode, payment.Reference));
         var recorded = Assert.IsType<PaymentRecorded>(Assert.Single(account.DomainEvents));
@@ -51,13 +50,13 @@ public sealed class VisitAccountMethodTests
         var account = Account();
         var method = new PaymentMethodUse(PaymentMethod.Cash, "CASHREF", RequiresReference: true);
 
-        var refusal = Assert.Throws<DomainException>(() => account.RecordPayment("RCT-2026-00001", 100m, method, null, Station(), Charge(300m), Now));
+        var refusal = Assert.Throws<DomainException>(() => account.RecordPayment("RCT-2026-00001", 100m, method, null, Desk(), Charge(300m), Now));
 
         Assert.Equal((BillingCodes.ReferenceRequired, DomainFault.Validation), (refusal.Code, refusal.Fault));
         Assert.Empty(account.Payments);
         Assert.Equal(0m, account.PaidTotal);
 
-        var payment = account.RecordPayment("RCT-2026-00001", 100m, method, " V-12 ", Station(), Charge(300m), Now);
+        var payment = account.RecordPayment("RCT-2026-00001", 100m, method, " V-12 ", Desk(), Charge(300m), Now);
         Assert.Equal((PaymentMethod.Cash, "CASHREF", "V-12"), (payment.Method, payment.MethodCode, payment.Reference));
     }
 
@@ -66,17 +65,17 @@ public sealed class VisitAccountMethodTests
     {
         var account = Account();
 
-        var refusal = Assert.Throws<DomainException>(() => account.CheckPayment(100m, new PaymentMethodUse(PaymentMethod.Transfer, "TRANSFER", true), "", Station(), Charge(300m)));
+        var refusal = Assert.Throws<DomainException>(() => account.CheckPayment(100m, new PaymentMethodUse(PaymentMethod.Transfer, "TRANSFER", true), "", Desk(), Charge(300m)));
 
         Assert.Equal(BillingCodes.ReferenceRequired, refusal.Code);
-        account.CheckPayment(100m, new PaymentMethodUse(PaymentMethod.Transfer, "TRANSFER", true), "TRX-1", Station(), Charge(300m));
+        account.CheckPayment(100m, new PaymentMethodUse(PaymentMethod.Transfer, "TRANSFER", true), "TRX-1", Desk(), Charge(300m));
         Assert.Empty(account.Payments);
     }
 
     [Fact]
     public void T1_The_legacy_overload_still_records_a_payment_without_a_code()
     {
-        var payment = Account().RecordPayment("RCT-2026-00001", 10m, PaymentMethod.Cash, null, Station(), Charge(100m), Now);
+        var payment = Account().RecordPayment("RCT-2026-00001", 10m, PaymentMethod.Cash, null, Desk(), Charge(100m), Now);
 
         Assert.Equal((PaymentMethod.Cash, null), (payment.Method, payment.MethodCode));
     }
@@ -85,19 +84,19 @@ public sealed class VisitAccountMethodTests
     public void T3_A_refund_with_a_definition_applies_its_reference_rule_and_stores_its_code()
     {
         var account = Account();
-        account.RecordPayment("RCT-2026-00001", 100m, PaymentMethod.Cash, null, Station(), Charge(100m), Now);
+        account.RecordPayment("RCT-2026-00001", 100m, PaymentMethod.Cash, null, Desk(), Charge(100m), Now);
         var transfer = new PaymentMethodUse(PaymentMethod.Transfer, "TRANSFER", RequiresReference: true);
 
-        Assert.Equal(BillingCodes.ReferenceRequired, Assert.Throws<DomainException>(() => account.CheckRefund(40m, transfer, null, Reason, null, Station(), Charge(60m))).Code);
-        Assert.Equal(BillingCodes.ReferenceRequired, Assert.Throws<DomainException>(() => account.RecordRefund("RFD-1", 40m, transfer, null, Reason, null, Station(), Charge(60m), Now)).Code);
+        Assert.Equal(BillingCodes.ReferenceRequired, Assert.Throws<DomainException>(() => account.CheckRefund(40m, transfer, null, Reason, null, Desk(), Charge(60m))).Code);
+        Assert.Equal(BillingCodes.ReferenceRequired, Assert.Throws<DomainException>(() => account.RecordRefund("RFD-1", 40m, transfer, null, Reason, null, Desk(), Charge(60m), Now)).Code);
         Assert.Empty(account.Refunds);
 
-        var refund = account.RecordRefund("RFD-1", 40m, transfer, "TRX-9", Reason, null, Station(), Charge(60m), Now);
+        var refund = account.RecordRefund("RFD-1", 40m, transfer, "TRX-9", Reason, null, Desk(), Charge(60m), Now);
         Assert.Equal((PaymentMethod.Transfer, "TRANSFER", "TRX-9", 40m), (refund.Method, refund.MethodCode, refund.Reference, account.RefundedTotal));
         Assert.Equal("Transfer", Assert.IsType<RefundRecorded>(account.DomainEvents.Last()).Method);
 
         var noReference = new PaymentMethodUse(PaymentMethod.Card, "CARDNR", RequiresReference: false);
-        var second = account.RecordRefund("RFD-2", 20m, noReference, null, Reason, null, Station(), Charge(40m), Now);
+        var second = account.RecordRefund("RFD-2", 20m, noReference, null, Reason, null, Desk(), Charge(40m), Now);
         Assert.Equal((PaymentMethod.Card, "CARDNR", null), (second.Method, second.MethodCode, second.Reference));
     }
 }

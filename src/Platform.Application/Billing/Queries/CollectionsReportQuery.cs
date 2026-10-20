@@ -12,7 +12,7 @@ using Platform.SharedKernel.Abstractions;
 namespace Platform.Application.Billing.Queries;
 
 /// <summary>
-/// The treasury (collections) report printed from the Payments register (change request 2026-10-13, item 2; intake §14,
+/// The collections report printed from the Payments register (change request 2026-10-13, item 2; intake §14,
 /// §16 Q20–Q22). The period is whole laboratory-calendar days (default: today) converted with the laboratory's zone
 /// (<see cref="ILaboratoryTimeZone"/>); <paramref name="Scope"/> <c>User</c> = the current user's own posted payments and
 /// refunds (every branch), <c>Branch</c> = every cashier of the session branch (TENANT-004 without a branch, BIL-044 without

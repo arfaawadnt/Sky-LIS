@@ -32,7 +32,7 @@ export interface AuthProfile {
   readonly sessionTimeoutMinutes?: number | null;
   /** CP-19 (results page, 2026-10-14): the member's row density of the results grid; absent or null = comfortable. */
   readonly resultsDensity?: ResultsDensity | null;
-  /** CP-38: the session's membership is the primary administrator of its laboratory — may approve its own treasury request (SOD-TRS-001 exception, 2026-10-14). */
+  /** CP-38: the session's membership is the primary administrator of its laboratory (the account that subscribed or was provisioned as the main administrator). */
   readonly isPrimaryAdministrator?: boolean;
 }
 

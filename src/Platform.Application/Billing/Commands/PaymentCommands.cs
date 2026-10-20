@@ -12,9 +12,9 @@ namespace Platform.Application.Billing.Commands;
 // Payments (intake LIS-INT-BIL-001 T1, T2, T4). Validators check shape; the aggregate decides (pitfall P-10). A refused
 // movement is decided before a receipt number is drawn (CheckPayment), so refusals leave no gaps in the sequence.
 
-/// <summary>T1 Record payment (CP-23; BR-26: the registration page calls it right after saving the visit).</summary>
+/// <summary>T1 Record payment (CP-23; BR-26: the registration page calls it right after saving the visit); cashier and branch from the session.</summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Create)]
-public sealed record RecordPaymentCommand(Guid VisitId, decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId, string? MethodCode = null) : ICommand<PaymentCreated>;
+public sealed record RecordPaymentCommand(Guid VisitId, decimal Amount, string Method, string? Reference, string? MethodCode = null) : ICommand<PaymentCreated>;
 
 public sealed class RecordPaymentValidator : AbstractValidator<RecordPaymentCommand>
 {
@@ -24,14 +24,11 @@ public sealed class RecordPaymentValidator : AbstractValidator<RecordPaymentComm
         RuleFor(command => command.Method).NotEmpty().IsEnumName(typeof(PaymentMethod), caseSensitive: false);
         RuleFor(command => command.MethodCode).MaximumLength(Payment.MaxMethodCodeLength);
         RuleFor(command => command.Reference).MaximumLength(Payment.MaxReferenceLength);
-        RuleFor(command => command.TreasuryId).NotEmpty();
-        RuleFor(command => command.DeviceId).NotEmpty().MaximumLength(CashierStation.MaxDeviceIdLength);
     }
 }
 
 public sealed class RecordPaymentHandler(
     IBillableVisitLookup visits,
-    ITreasuryStationLookup stations,
     IPaymentMethodRepository methods,
     IVisitAccountRepository accounts,
     IReferenceNumbers numbers,
@@ -44,18 +41,17 @@ public sealed class RecordPaymentHandler(
     {
         var actor = BillingActor.Of(user);
         BillingRights.RequirePay(privileges);
-        var branch = BranchScope.Require(user);
+        var cashier = BillingCashier.Of(actor, user);
         var visit = await visits.GetAsync(command.VisitId, cancellationToken) ?? throw BillingNotFound.Visit();
-        var station = await BillingStations.ResolveAsync(stations, command.TreasuryId, actor, command.DeviceId, branch, cancellationToken);
         var method = await BillingMethods.ResolveAsync(methods, command.Method, command.MethodCode, cancellationToken);
 
         var existing = await accounts.GetForUpdateAsync(visit.VisitId, cancellationToken);
         var account = existing ?? VisitAccount.Open(visit.VisitId);
-        account.CheckPayment(command.Amount, method, command.Reference, station, visit.Charge);
+        account.CheckPayment(command.Amount, method, command.Reference, cashier, visit.Charge);
 
         var now = clock.UtcNow;
         var number = await numbers.NextAsync(Payment.NumberKind, Payment.NumberPrefix, now, cancellationToken);
-        var payment = account.RecordPayment(number, command.Amount, method, command.Reference, station, visit.Charge, now);
+        var payment = account.RecordPayment(number, command.Amount, method, command.Reference, cashier, visit.Charge, now);
         if (existing is null)
         {
             accounts.Add(account);
@@ -87,7 +83,7 @@ public sealed class VoidPaymentHandler(IVisitAccountRepository accounts, ICashCl
         BillingRights.RequireCancel(privileges);
         var account = await accounts.GetByPaymentIdForUpdateAsync(command.PaymentId, cancellationToken) ?? throw BillingNotFound.Payment();
         var payment = account.Payments.First(candidate => candidate.Id == command.PaymentId);
-        var frozen = await closings.CoversAsync(payment.TreasuryId, payment.CashierUserId, payment.PaidAtUtc, cancellationToken);
+        var frozen = await closings.CoversAsync(payment.BranchId, payment.CashierUserId, payment.PaidAtUtc, cancellationToken);
 
         account.VoidPayment(command.PaymentId, actor, command.Reason, frozen, clock.UtcNow);   // state guard, frozen guard, reason, event
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -96,7 +92,7 @@ public sealed class VoidPaymentHandler(IVisitAccountRepository accounts, ICashCl
 
 /// <summary>T4 Pay all (CP-27): the amount is distributed across the members in accession order (one receipt per member).</summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Create)]
-public sealed record PayBatchCommand(Guid BatchId, decimal Amount, string Method, string? Reference, Guid TreasuryId, string DeviceId, string? MethodCode = null) : ICommand<BatchPaymentResult>;
+public sealed record PayBatchCommand(Guid BatchId, decimal Amount, string Method, string? Reference, string? MethodCode = null) : ICommand<BatchPaymentResult>;
 
 public sealed class PayBatchValidator : AbstractValidator<PayBatchCommand>
 {
@@ -106,14 +102,11 @@ public sealed class PayBatchValidator : AbstractValidator<PayBatchCommand>
         RuleFor(command => command.Method).NotEmpty().IsEnumName(typeof(PaymentMethod), caseSensitive: false);
         RuleFor(command => command.MethodCode).MaximumLength(Payment.MaxMethodCodeLength);
         RuleFor(command => command.Reference).MaximumLength(Payment.MaxReferenceLength);
-        RuleFor(command => command.TreasuryId).NotEmpty();
-        RuleFor(command => command.DeviceId).NotEmpty().MaximumLength(CashierStation.MaxDeviceIdLength);
     }
 }
 
 public sealed class PayBatchHandler(
     IBillableVisitLookup visits,
-    ITreasuryStationLookup stations,
     IPaymentMethodRepository methods,
     IVisitAccountRepository accounts,
     IReferenceNumbers numbers,
@@ -126,9 +119,8 @@ public sealed class PayBatchHandler(
     {
         var actor = BillingActor.Of(user);
         BillingRights.RequirePay(privileges);
-        var branch = BranchScope.Require(user);
+        var cashier = BillingCashier.Of(actor, user);
         var batch = await visits.GetBatchAsync(command.BatchId, cancellationToken) ?? throw BillingNotFound.Batch();
-        var station = await BillingStations.ResolveAsync(stations, command.TreasuryId, actor, command.DeviceId, branch, cancellationToken);
         var method = await BillingMethods.ResolveAsync(methods, command.Method, command.MethodCode, cancellationToken);
 
         var members = await visits.BatchMembersAsync(batch.BatchId, cancellationToken);
@@ -144,7 +136,7 @@ public sealed class PayBatchHandler(
             var member = byVisit[share.VisitId];
             var isNew = !existing.TryGetValue(share.VisitId, out var account);
             account ??= VisitAccount.Open(share.VisitId);
-            account.CheckPayment(share.Amount, method, command.Reference, station, member.Charge);
+            account.CheckPayment(share.Amount, method, command.Reference, cashier, member.Charge);
             return (Share: share, Member: member, Account: account, IsNew: isNew);
         }).ToList();
 
@@ -153,7 +145,7 @@ public sealed class PayBatchHandler(
         foreach (var (share, member, account, isNew) in plan)
         {
             var number = await numbers.NextAsync(Payment.NumberKind, Payment.NumberPrefix, now, cancellationToken);
-            var payment = account.RecordPayment(number, share.Amount, method, command.Reference, station, member.Charge, now, batch.BatchId);
+            var payment = account.RecordPayment(number, share.Amount, method, command.Reference, cashier, member.Charge, now, batch.BatchId);
             if (isNew)
             {
                 accounts.Add(account);

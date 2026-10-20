@@ -22,8 +22,6 @@ export interface RecordPaymentRequest {
   readonly amount: number;
   readonly method: PaymentMethod;
   readonly reference: string | null;
-  readonly treasuryId: string;
-  readonly deviceId: string;
   /** The laboratory's payment method definition (CP-30b); its kind and reference rule apply when present. */
   readonly methodCode?: string | null;
 }
@@ -39,8 +37,6 @@ export interface RecordRefundRequest {
   readonly reference: string | null;
   readonly reasonId: string;
   readonly note: string | null;
-  readonly treasuryId: string;
-  readonly deviceId: string;
   readonly methodCode?: string | null;
 }
 
@@ -48,13 +44,14 @@ export interface PayBatchRequest {
   readonly amount: number;
   readonly method: PaymentMethod;
   readonly reference: string | null;
-  readonly treasuryId: string;
-  readonly deviceId: string;
   readonly methodCode?: string | null;
 }
 
+/**
+ * Closes a cashier's drawer on the session branch (LIS-CR-004): `cashierUserId` null = every cashier of the branch
+ * (`billing.manage`); the server takes the branch from the session.
+ */
 export interface CloseCashDrawerRequest {
-  readonly treasuryId: string;
   readonly cashierUserId: string | null;
   readonly periodFromUtc: string;
   readonly periodToUtc: string;
@@ -103,14 +100,9 @@ export interface PaymentListItem {
   readonly amount: number;
   readonly method: PaymentMethod;
   readonly reference: string | null;
-  readonly treasuryId: string;
-  readonly treasuryCode: string;
-  readonly treasuryNameEn: string;
-  readonly treasuryNameAr: string;
   readonly cashierUserId: string;
   readonly cashierName: string;
   readonly branchId: string;
-  readonly deviceId: string;
   readonly batchId: string | null;
   readonly paidAtUtc: string;
   readonly status: PaymentStatus;
@@ -136,14 +128,9 @@ export interface RefundListItem {
   readonly reasonNameEn: string | null;
   readonly reasonNameAr: string | null;
   readonly note: string | null;
-  readonly treasuryId: string;
-  readonly treasuryCode: string;
-  readonly treasuryNameEn: string;
-  readonly treasuryNameAr: string;
   readonly cashierUserId: string;
   readonly cashierName: string;
   readonly branchId: string;
-  readonly deviceId: string;
   readonly refundedAtUtc: string;
   readonly methodCode?: string | null;
   readonly methodNameEn?: string | null;
@@ -172,10 +159,6 @@ export interface CashClosingTotals {
 export interface CashClosingListItem {
   readonly id: string;
   readonly number: string;
-  readonly treasuryId: string;
-  readonly treasuryCode: string;
-  readonly treasuryNameEn: string;
-  readonly treasuryNameAr: string;
   readonly cashierUserId: string | null;
   readonly cashierName: string | null;
   readonly periodFromUtc: string;
@@ -209,15 +192,6 @@ export interface DrawerMovement {
 export interface DrawerCashier {
   readonly userId: string;
   readonly name: string;
-}
-
-export interface BillingTreasuryItem {
-  readonly id: string;
-  readonly code: string;
-  readonly nameEn: string;
-  readonly nameAr: string;
-  readonly branchId: string;
-  readonly isActive: boolean;
 }
 
 // ---- accounts ------------------------------------------------------------------------------------------------------------
@@ -288,10 +262,6 @@ export interface BatchAccountView {
 }
 
 export interface CashClosingPreview {
-  readonly treasuryId: string;
-  readonly treasuryCode: string;
-  readonly treasuryNameEn: string;
-  readonly treasuryNameAr: string;
   readonly cashierUserId: string | null;
   readonly cashierName: string | null;
   readonly periodFromUtc: string;
@@ -325,9 +295,6 @@ export interface PaymentReceiptDocument {
   readonly amount: number;
   readonly method: PaymentMethod;
   readonly reference: string | null;
-  readonly treasuryCode: string;
-  readonly treasuryNameEn: string;
-  readonly treasuryNameAr: string;
   readonly cashierName: string;
   readonly patientShareTotal: number;
   readonly paid: number;
@@ -405,9 +372,6 @@ export interface RefundReceiptDocument {
   readonly reasonNameEn: string | null;
   readonly reasonNameAr: string | null;
   readonly note: string | null;
-  readonly treasuryCode: string;
-  readonly treasuryNameEn: string;
-  readonly treasuryNameAr: string;
   readonly cashierName: string;
   readonly currency: string;
   readonly printedBy: string;
@@ -421,9 +385,6 @@ export interface CashClosingSheetDocument {
   readonly letterhead: DocumentLetterhead;
   readonly closingId: string;
   readonly number: string;
-  readonly treasuryCode: string;
-  readonly treasuryNameEn: string;
-  readonly treasuryNameAr: string;
   readonly cashierUserId: string | null;
   readonly cashierName: string | null;
   readonly periodFromUtc: string;
@@ -441,7 +402,7 @@ export interface CashClosingSheetDocument {
   readonly printedAtUtc: string;
 }
 
-// ---- collections (treasury) report (change request 2026-10-13, item 2) ------------------------------------------------------
+// ---- collections report (change request 2026-10-13, item 2) ------------------------------------------------------
 
 /** Own posted payments and refunds, or every cashier of the session branch (needs the special right `canViewBranchCollections`). */
 export type CollectionsReportScope = 'User' | 'Branch';
@@ -510,7 +471,6 @@ export interface PaymentRegisterFilter {
   readonly accession: string | null;
   readonly fromUtc: string | null;
   readonly toUtc: string | null;
-  readonly treasuryId: string | null;
   readonly method: PaymentMethod | null;
   readonly status: PaymentStatus | null;
   readonly page: number;
@@ -521,22 +481,20 @@ export interface RefundRegisterFilter {
   readonly accession: string | null;
   readonly fromUtc: string | null;
   readonly toUtc: string | null;
-  readonly treasuryId: string | null;
   readonly method: PaymentMethod | null;
   readonly page: number;
   readonly pageSize: number;
 }
 
 export interface CashClosingRegisterFilter {
-  readonly treasuryId: string | null;
   readonly fromUtc: string | null;
   readonly toUtc: string | null;
   readonly page: number;
   readonly pageSize: number;
 }
 
+/** The preview scope: the session branch (server side), one cashier or every cashier (null), and the period. */
 export interface DrawerScopeFilter {
-  readonly treasuryId: string;
   readonly cashierUserId: string | null;
   readonly fromUtc: string;
   readonly toUtc: string;
@@ -565,8 +523,6 @@ export const BILLING_API = {
   visits: '/api/v1/billing/visits',
   batches: '/api/v1/billing/batches',
   cashClosings: '/api/v1/billing/cash-closings',
-  myTreasuries: '/api/v1/billing/my-treasuries',
-  treasuries: '/api/v1/billing/treasuries',
   printSettings: '/api/v1/billing/print-settings',
   collectionsReport: '/api/v1/billing/collections-report',
   refundReasons: '/api/v1/catalogue/reasons',
@@ -638,8 +594,4 @@ export interface PaymentMethodFilter {
   readonly pageSize?: number;
   readonly sort?: string | null;
   readonly direction?: 'asc' | 'desc' | null;
-}
-
-export interface CreatedResource {
-  readonly id: string;
 }

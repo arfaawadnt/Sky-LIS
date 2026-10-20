@@ -40,10 +40,6 @@ export function account(overrides: Partial<VisitAccountView> = {}): VisitAccount
 
 export function preview(overrides: Partial<CashClosingPreview> = {}): CashClosingPreview {
   return {
-    treasuryId: 't-1',
-    treasuryCode: 'MAIN',
-    treasuryNameEn: 'Main drawer',
-    treasuryNameAr: 'الخزينة الرئيسية',
     cashierUserId: null,
     cashierName: null,
     periodFromUtc: '2026-10-09T00:00:00.000Z',
@@ -147,12 +143,8 @@ export function flushReportPrivileges(backend: HttpTestingController, canViewBra
   });
 }
 
-/** Answers the two loads of the cash desk (approved treasuries of this device, the billing print parameters) when they are pending. */
+/** Answers the loads of the cash desk (the billing print parameters, the payment methods) when they are pending. */
 export function flushCashDesk(backend: HttpTestingController, autoPrintReceipt = true): void {
-  for (const request of backend.match((candidate) => candidate.url === BILLING_API.myTreasuries)) {
-    request.flush([{ id: 't-1', code: 'MAIN', nameEn: 'Main drawer', nameAr: 'الخزينة الرئيسية', branchId: 'b-1', isActive: true }]);
-  }
-
   for (const request of backend.match((candidate) => candidate.url === BILLING_API.printSettings)) {
     request.flush({ autoPrintReceipt });
   }

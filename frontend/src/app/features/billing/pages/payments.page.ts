@@ -15,7 +15,6 @@ import {
 } from '../../../core/api/billing.contracts';
 import type { PageRequest } from '../../../core/api/paging';
 import { I18nService } from '../../../core/i18n/i18n.service';
-import { localizedPick } from '../../../shared/forms/localized-text';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CanDirective } from '../../../shared/ui/can.directive';
@@ -45,8 +44,8 @@ import { saveFile } from '../ui/save-file';
 type PaymentsTab = 'collect' | 'register';
 
 /**
- * Payments (SRS CP-23, BR-26, BR-27): find a visit by accession, see its account (total, discount, patient share, paid,
- * refunded, remaining), pay in full or in part on a treasury approved for this device, reprint or void receipts, print
+ * Payments (SRS CP-23, BR-26; LIS-CR-004): find a visit by accession, see its account (total, discount, patient share, paid,
+ * refunded, remaining), pay in full or in part as the signed-in cashier on the session branch, reprint or void receipts, print
  * the invoice, jump to the refund when the balance is negative; the "Register" tab lists every payment with filters
  * and CSV export. Receipts print after a payment when `autoPrintReceipt` is on.
  */
@@ -119,7 +118,6 @@ export class PaymentsPage {
     { key: 'accession', header: 'billing.column.accession', mono: true },
     { key: 'amount', header: 'billing.column.amount', align: 'end', value: (row) => formatMoney(row.amount, this.i18n.lang()) },
     { key: 'method', header: 'billing.column.method' },
-    { key: 'treasury', header: 'billing.column.treasury', secondary: true, value: (row) => row.treasuryCode },
     { key: 'cashierName', header: 'billing.column.cashier', secondary: true },
     { key: 'status', header: 'billing.column.status', width: '110px' },
   ];
@@ -128,8 +126,6 @@ export class PaymentsPage {
 
   protected readonly registerTotal = computed(() => (this.facade.register.hasValue() ? this.facade.register.value().totalCount : 0));
 
-  protected readonly branchTreasuries = computed(() => (this.facade.branchTreasuries.hasValue() ? this.facade.branchTreasuries.value() : []));
-
   protected readonly lookupProblem = computed(() => problemOf(this.facade.account.error()));
 
   /** The member's report rights once the collections dialog has read them (null while loading: the branch option stays hidden). */
@@ -137,8 +133,8 @@ export class PaymentsPage {
 
   constructor() {
     void this.i18n.load('billing');
-    // UAT D-08: the cash desk is shared by the module's pages for the life of the route; re-read the approved treasuries
-    // (and the refund reasons) each time a page opens so an approval or a role change since the last read shows at once.
+    // UAT D-08: the cash desk is shared by the module's pages for the life of the route; re-read the print parameter and the
+    // payment methods each time a page opens so a parameter or a role change since the last read shows at once.
     this.desk.refresh();
     this.facade.refresh();   // the page's facade outlives the page too: re-read on open (UAT D-14, A-01)
 
@@ -166,7 +162,7 @@ export class PaymentsPage {
   }
 
   protected reload(): void {
-    this.desk.treasuries.reload();
+    this.desk.refresh();
     if (this.facade.lookup() !== null) {
       this.facade.account.reload();
     }
@@ -240,7 +236,7 @@ export class PaymentsPage {
     this.tab.set(id === 'register' ? 'register' : 'collect');
   }
 
-  // ---- collections (treasury) report, change request 2026-10-13 item 2 ---------------------------------------------
+  // ---- collections report, change request 2026-10-13 item 2 ---------------------------------------------
 
   protected openCollections(): void {
     this.facade.openCollections();
@@ -276,11 +272,6 @@ export class PaymentsPage {
     this.facade.setFilter({ toUtc: dayEndIso((event.target as HTMLInputElement).value) });
   }
 
-  protected onTreasury(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
-    this.facade.setFilter({ treasuryId: value === '' ? null : value });
-  }
-
   protected onMethod(event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
     this.facade.setFilter({ method: this.methods.find((method) => method === value) ?? null });
@@ -310,10 +301,6 @@ export class PaymentsPage {
 
   protected tone(status: PaymentStatus): ReturnType<typeof paymentTone> {
     return paymentTone(status);
-  }
-
-  protected treasuryName(item: { nameEn: string; nameAr: string }): string {
-    return localizedPick({ en: item.nameEn, ar: item.nameAr }, this.i18n.lang());
   }
 
   protected money(value: number): string {

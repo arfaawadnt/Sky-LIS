@@ -6,7 +6,6 @@ import { TestBed } from '@angular/core/testing';
 import { BILLING_API } from '../../../core/api/billing.contracts';
 import { REGISTRATION_API, type RegisterVisitRequest } from '../../../core/api/registration.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { checkResult, flushReferenceLists, insurerTier, line, patient, settings, settle, visitDetail } from '../testing/registration.fixtures';
 import { RegistrationFacade } from './registration.facade';
@@ -22,7 +21,6 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
         { provide: AuthStore, useValue: { currentBranch: signal<string | null>('b-1'), hasPermission: () => true } satisfies Pick<AuthStore, 'currentBranch' | 'hasPermission'> },
-        { provide: DeviceIdentityService, useValue: { deviceId: () => 'device-test' } satisfies Pick<DeviceIdentityService, 'deviceId'> },
         RegistrationFacade,
       ],
     });
@@ -41,18 +39,17 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     flushReferenceLists(backend);
     await runEffects();
     facade.defaultTier();
-    facade.defaultTreasury();
     facade.setPatient(patient);
     await runEffects();
   }
 
-  it('reads the parameters and reference lists on start and chooses the cash default tier and the first treasury', async () => {
+  it('reads the parameters and reference lists on start and chooses the cash default tier', async () => {
     await startNewVisit();
 
     expect(facade.settings.value()?.discountCapPercent).toBe(20);
     expect(facade.header().tierId).toBe('tier-cash');
     expect(facade.contract()).toEqual({ payerId: 'payer-cash', tierId: 'tier-cash' });
-    expect(facade.payment().treasuryId).toBe('t-1');
+    expect(facade.payment()).toEqual({ method: 'Cash', amount: null, reference: '' });
     expect(facade.canPay()).toBe(true);
     backend.expectNone(REGISTRATION_API.check);
     backend.verify();
@@ -87,9 +84,10 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     backend.verify();
   });
 
-  it('records no payment and asks for no treasury when none is approved on the device (BR-27, UAT-REG-09)', async () => {
+  it('offers the payment of the amount due with no treasury and no device (LIS-CR-004: cashier and branch come from the session)', async () => {
     await runEffects();
-    flushReferenceLists(backend, { treasuries: [] });
+    expect(backend.match((request) => request.url.includes('treasur') || request.params.has('deviceId'))).toEqual([]);
+    flushReferenceLists(backend);
     await runEffects();
     facade.defaultTier();
     facade.setPatient(patient);
@@ -99,9 +97,10 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     backend.expectOne(REGISTRATION_API.check).flush(checkResult());
     await runEffects();
 
-    expect(facade.hasTreasury()).toBe(false);
-    expect(facade.paymentAmount()).toBe(0);
+    expect(facade.canPay()).toBe(true);
+    expect(facade.paymentAmount()).toBe(100);
     expect(facade.blockers()).toEqual([]);
+    expect(facade.payment()).not.toHaveProperty('treasuryId');
     backend.verify();
   });
 
@@ -145,7 +144,7 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     expect(facade.registerRequest(false).discount).toEqual({ kind: 'Amount', value: 25, reasonId: 'r-disc' });
   });
 
-  it('blocks the save when the payment needs a reference, a treasury or exceeds the due amount', async () => {
+  it('blocks the save when the payment needs a reference or exceeds the due amount', async () => {
     await startNewVisit();
     facade.addServices([{ serviceId: 's-cbc', code: 'CBC', nameEn: '', nameAr: '' }]);
     await runEffects();
@@ -156,9 +155,7 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     expect(facade.blockers()).toEqual(['paymentReference']);
     facade.patchPayment({ reference: 'SLIP-1', amount: 150 });
     expect(facade.blockers()).toEqual(['paymentAmount']);
-    facade.patchPayment({ amount: 40, treasuryId: '' });
-    expect(facade.blockers()).toEqual(['paymentTreasury']);
-    facade.patchPayment({ treasuryId: 't-1' });
+    facade.patchPayment({ amount: 40 });
     expect(facade.blockers()).toEqual([]);
     expect(facade.paymentAmount()).toBe(40);
   });
@@ -210,7 +207,7 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     const paying = facade.pay.execute('v-9');
     await settle();
     const pay = backend.expectOne(BILLING_API.payments);
-    expect(pay.request.body).toEqual({ visitId: 'v-9', amount: 100, method: 'Cash', reference: null, treasuryId: 't-1', deviceId: 'device-test' });
+    expect(pay.request.body).toEqual({ visitId: 'v-9', amount: 100, method: 'Cash', reference: null });
     pay.flush({ id: 'pay-1', receiptNumber: 'RCT-2026-00001' }, { status: 201, statusText: 'Created' });
     expect(await paying).toEqual({ id: 'pay-1', receiptNumber: 'RCT-2026-00001' });
     backend.verify();
@@ -231,7 +228,7 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     expect(facade.register.problem()?.code).toBe('REG-102');
   });
 
-  it('clears the visit but keeps the contract and the treasury for the next patient', async () => {
+  it('clears the visit but keeps the contract for the next patient and resets the payment', async () => {
     await startNewVisit();
     facade.addServices([{ serviceId: 's-cbc', code: 'CBC', nameEn: '', nameAr: '' }]);
     facade.patchDiscount({ value: 5, reasonId: 'r' });
@@ -244,7 +241,7 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     expect(facade.lines()).toEqual([]);
     expect(facade.discount().value).toBeNull();
     expect(facade.header().tierId).toBe('tier-cash');
-    expect(facade.payment()).toEqual({ method: 'Cash', amount: null, reference: '', treasuryId: 't-1' });
+    expect(facade.payment()).toEqual({ method: 'Cash', amount: null, reference: '' });
   });
 
   it('nets refunds out of the remaining balance of a saved visit (UAT R3-01)', async () => {
@@ -279,7 +276,7 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     expect(facade.totals()).toEqual(expect.objectContaining({ patient: 100, discount: 10, due: 90, paid: 100, remaining: -10 }));
     expect(facade.detailsChanged()).toBe(false);
     expect(facade.discountChanged()).toBe(false);
-    backend.expectNone((request) => request.url === BILLING_API.myTreasuries);
+    backend.expectNone((request) => request.url === BILLING_API.paymentMethodOptions);
 
     expect(facade.addServices([{ serviceId: 's-cbc', code: 'CBC', nameEn: '', nameAr: '' }])).toEqual(['CBC']);
     facade.addServices([{ serviceId: 's-glu', code: 'GLU', nameEn: 'Glucose', nameAr: '' }]);

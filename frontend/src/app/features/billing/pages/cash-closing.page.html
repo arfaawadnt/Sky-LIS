@@ -5,15 +5,7 @@
 <app-section-card *appCan="permissions.close" [title]="i18n.t('billing.closing.scopeTitle')">
   <form [formGroup]="scopeForm" (ngSubmit)="preview()" novalidate>
     <div class="form-grid">
-      <app-form-field [label]="i18n.t('billing.field.treasury')">
-        <select formControlName="treasuryId" (change)="onTreasuryChange()">
-          <option value="">{{ i18n.t('billing.pay.chooseTreasury') }}</option>
-          @for (treasury of facade.treasuryList(); track treasury.id) {
-            <option [value]="treasury.id">{{ treasury.code }} · {{ treasuryName(treasury) }}{{ treasury.isActive ? '' : ' (' + i18n.t('billing.closing.inactive') + ')' }}</option>
-          }
-        </select>
-      </app-form-field>
-      <app-form-field [label]="i18n.t('billing.field.cashier')">
+      <app-form-field [label]="i18n.t('billing.field.cashier')" [hint]="i18n.t('billing.closing.cashierHint')">
         <select formControlName="cashierUserId">
           <option value="">{{ i18n.t('billing.closing.allCashiers') }}</option>
           @for (cashier of cashierList(); track cashier.userId) {
@@ -39,7 +31,7 @@
 }
 
 @if (facade.currentPreview(); as preview) {
-  <app-section-card [title]="i18n.t('billing.closing.totals')" [subtitle]="preview.treasuryCode + ' · ' + (preview.cashierName ?? i18n.t('billing.closing.allCashiers'))">
+  <app-section-card [title]="i18n.t('billing.closing.totals')" [subtitle]="cashierOf(preview)">
     <div class="stack">
       @if (preview.overlapsClosedPeriod) {
         <p class="warn-strip">{{ i18n.t('billing.closing.overlaps') }}</p>
@@ -96,15 +88,6 @@
 
 <app-section-card [title]="i18n.t('billing.closing.register')" [padded]="false">
   <app-toolbar>
-    <label toolbarFilters class="filter">
-      <span>{{ i18n.t('billing.field.treasury') }}</span>
-      <select class="inp" (change)="onRegisterTreasury($event)">
-        <option value="">{{ i18n.t('billing.filter.all') }}</option>
-        @for (treasury of facade.treasuryList(); track treasury.id) {
-          <option [value]="treasury.id">{{ treasury.code }} · {{ treasuryName(treasury) }}</option>
-        }
-      </select>
-    </label>
     <label toolbarFilters class="filter">
       <span>{{ i18n.t('billing.filter.from') }}</span>
       <input class="inp" type="date" (change)="onRegisterFrom($event)" />

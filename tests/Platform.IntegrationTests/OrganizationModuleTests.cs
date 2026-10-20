@@ -281,7 +281,7 @@ public sealed class OrganizationModuleTests(DatabaseFixture fixture)
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
         }
 
-        // UAT A-04: the treasury list reads the names of its branches through this port
+        // UAT A-04: the registers read the names of their branches through this port
         using var reader = fixture.AppScope(tenantA);
         var names = await reader.ServiceProvider.GetRequiredService<IBranchLookup>().GetManyAsync([open, closed, foreign, open], CancellationToken.None);
 

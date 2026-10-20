@@ -8,7 +8,7 @@ import { abortable } from './registration.api';
 /**
  * The laboratory's active payment methods for the payment panel of the registration page (CP-30b, change request
  * 2026-10-19 P-C10): read through Billing's options endpoint with `billing.view`, the key the reception role already
- * holds to pay (BR-26). Tolerant like `myTreasuries`: a refused or failed read answers an empty list and the panel
+ * holds to pay (BR-26). Tolerant like the reference lists: a refused or failed read answers an empty list and the panel
  * falls back to the four kinds with the legacy reference rule.
  */
 @Injectable({ providedIn: 'root' })

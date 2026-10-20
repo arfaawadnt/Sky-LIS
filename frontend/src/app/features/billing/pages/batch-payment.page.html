@@ -41,18 +41,11 @@
   <div class="columns">
     @if (!batch.billedThroughClaims) {
       <app-section-card class="pay-card" *appCan="permissions.pay" [title]="i18n.t('billing.batch.payAll')" [subtitle]="i18n.t('billing.batch.payAllHint')">
-        @if (!desk.hasStation()) {
-          <p class="warn-strip">
-            {{ i18n.t('billing.pay.noTreasury') }}
-            <a routerLink="/treasury/access">{{ i18n.t('billing.pay.requestAccess') }}</a>
-          </p>
-        } @else if (payable() <= 0) {
+        @if (payable() <= 0) {
           <p class="info-strip">{{ i18n.t('billing.pay.nothingDue') }}</p>
         } @else {
           <app-billing-movement-form
-            [treasuries]="desk.approved()"
             [methods]="desk.methodOptions()"
-            [(treasuryId)]="desk.treasuryId"
             [dueAmount]="payable()"
             [currency]="batch.currency"
             [pending]="facade.payAll.pending()"
@@ -70,7 +63,7 @@
           <app-badge [tone]="tone(row.balanceStatus)">{{ statusLabel(row.balanceStatus) }}</app-badge>
         </ng-template>
         <ng-template appRowActions [appRowActionsOf]="members()" let-row>
-          @if (canPay(batch, row) && desk.hasStation()) {
+          @if (canPay(batch, row)) {
             <button type="button" class="btn sm primary" *appCan="permissions.pay" (click)="openMember(row)">{{ i18n.t('billing.batch.payMember') }}</button>
           }
         </ng-template>
@@ -86,9 +79,7 @@
     <div class="member-pay">
       <p class="muted">{{ current.patientName ?? current.patientNumber ?? '—' }}</p>
       <app-billing-movement-form
-        [treasuries]="desk.approved()"
         [methods]="desk.methodOptions()"
-        [(treasuryId)]="desk.treasuryId"
         [dueAmount]="current.remaining"
         [currency]="facade.current()?.currency ?? ''"
         [pending]="facade.payMember.pending()"

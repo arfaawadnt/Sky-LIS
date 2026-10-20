@@ -4,7 +4,7 @@ using Platform.SharedKernel.Primitives;
 namespace Platform.Domain.Billing;
 
 /// <summary>
-/// A payment on a visit (SRS CP-23, BR-26, BR-27): an entity of <see cref="VisitAccount"/>, stored in <c>app.payments</c>
+/// A payment on a visit (SRS CP-23, BR-26): an entity of <see cref="VisitAccount"/>, stored in <c>app.payments</c>
 /// (the MODULES.md §5 contract). Created by <see cref="VisitAccount.RecordPayment"/>; the only later change is the void
 /// (T2), so the row is otherwise immutable (INV-BIL-004, enforced again by a trigger).
 /// </summary>
@@ -20,10 +20,9 @@ public sealed class Payment : Entity, ITenantScoped
     private Payment()
     {
         ReceiptNumber = string.Empty;
-        DeviceId = string.Empty;
     }
 
-    internal Payment(Guid visitId, string receiptNumber, decimal amount, PaymentMethodUse method, string? reference, CashierStation station, string deviceId, Guid? batchId, DateTimeOffset nowUtc)
+    internal Payment(Guid visitId, string receiptNumber, decimal amount, PaymentMethodUse method, string? reference, Cashier cashier, Guid? batchId, DateTimeOffset nowUtc)
         : base(Guid.CreateVersion7())
     {
         VisitId = visitId;
@@ -32,10 +31,8 @@ public sealed class Payment : Entity, ITenantScoped
         Method = method.Kind;
         MethodCode = method.Code;
         Reference = reference;
-        TreasuryId = station.TreasuryId;
-        DeviceId = deviceId;
-        CashierUserId = station.CashierUserId;
-        BranchId = station.SessionBranchId;
+        CashierUserId = cashier.UserId;
+        BranchId = cashier.BranchId;
         BatchId = batchId;
         PaidAtUtc = nowUtc;
         Status = PaymentStatus.Posted;
@@ -59,9 +56,11 @@ public sealed class Payment : Entity, ITenantScoped
     /// <summary>Card slip, POS or transfer number; mandatory when the method requires it: every kind except cash without a definition (BIL-003).</summary>
     public string? Reference { get; private set; }
 
-    public Guid TreasuryId { get; private set; }
+    /// <summary>The treasury of a movement posted before the treasury was removed (LIS-CR-004, 2026-10-20); null on every new payment, kept as history.</summary>
+    public Guid? TreasuryId { get; private set; }
 
-    public string DeviceId { get; private set; }
+    /// <summary>The browser device of a movement posted under BR-27 (withdrawn 2026-10-20); null on every new payment, kept as history.</summary>
+    public string? DeviceId { get; private set; }
 
     public Guid CashierUserId { get; private set; }
 

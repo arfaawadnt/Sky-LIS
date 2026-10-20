@@ -8,7 +8,6 @@ import {
   type BatchPaymentResult,
   type BillingPrintSettings,
   type BillingReasonOption,
-  type BillingTreasuryItem,
   type CashClosingCreated,
   type CashClosingListItem,
   type CashClosingPreview,
@@ -18,7 +17,6 @@ import {
   type CollectionsReportDocument,
   type CollectionsReportPrivileges,
   type CollectionsReportRequest,
-  type CreatedResource,
   type DrawerCashier,
   type DrawerScopeFilter,
   type InvoiceDocument,
@@ -42,6 +40,7 @@ import {
   type UpdatePaymentMethodRequest,
   type VisitAccountView,
 } from '../../../core/api/billing.contracts';
+import type { CreatedResource } from '../../../core/api/created-resource';
 import { type MyPrivileges, ORGANIZATION_API } from '../../../core/api/organization.contracts';
 import { emptyPage } from '../../../core/api/paging';
 import { toHttpParams } from '../../../shared/forms/paging';
@@ -57,17 +56,7 @@ export interface DownloadedFile {
 export class BillingApi {
   private readonly http = inject(HttpClient);
 
-  // ---- treasuries and parameters ------------------------------------------------------------------------------
-
-  /** The active treasuries of the session branch approved for the current user on this device (BR-27). */
-  myTreasuries(deviceId: string, signal?: AbortSignal): Promise<readonly BillingTreasuryItem[]> {
-    return this.get<readonly BillingTreasuryItem[]>(BILLING_API.myTreasuries, new HttpParams({ fromObject: { deviceId } }), [], signal);
-  }
-
-  /** Every treasury of the session branch (closing page, register filters). */
-  branchTreasuries(signal?: AbortSignal): Promise<readonly BillingTreasuryItem[]> {
-    return this.get<readonly BillingTreasuryItem[]>(BILLING_API.treasuries, new HttpParams(), [], signal);
-  }
+  // ---- parameters ---------------------------------------------------------------------------------------------
 
   /**
    * `autoPrintReceipt` (CP-57) through the module's own `GET /api/v1/billing/print-settings` (`billing.view`): a cashier holds
@@ -155,13 +144,15 @@ export class BillingApi {
 
   // ---- cash closing -----------------------------------------------------------------------------------------------
 
+  /** The drawer of one cashier (or every cashier: null) on the session branch over the period (LIS-CR-004: no treasury). */
   previewClosing(scope: DrawerScopeFilter, signal?: AbortSignal): Promise<CashClosingPreview> {
-    const params = toHttpParams({ treasuryId: scope.treasuryId, cashierUserId: scope.cashierUserId, from: scope.fromUtc, to: scope.toUtc });
+    const params = toHttpParams({ cashierUserId: scope.cashierUserId, from: scope.fromUtc, to: scope.toUtc });
     return firstValueFrom(this.http.get<CashClosingPreview>(`${BILLING_API.cashClosings}/preview`, { params })).then(abortable(signal));
   }
 
-  drawerCashiers(treasuryId: string, fromUtc: string, toUtc: string, signal?: AbortSignal): Promise<readonly DrawerCashier[]> {
-    return this.get<readonly DrawerCashier[]>(`${BILLING_API.cashClosings}/cashiers`, toHttpParams({ treasuryId, from: fromUtc, to: toUtc }), [], signal);
+  /** The cashiers who moved money on the session branch over the period (the scope choice of `billing.manage`). */
+  drawerCashiers(fromUtc: string, toUtc: string, signal?: AbortSignal): Promise<readonly DrawerCashier[]> {
+    return this.get<readonly DrawerCashier[]>(`${BILLING_API.cashClosings}/cashiers`, toHttpParams({ from: fromUtc, to: toUtc }), [], signal);
   }
 
   closeDrawer(request: CloseCashDrawerRequest): Promise<CashClosingCreated> {
@@ -182,7 +173,7 @@ export class BillingApi {
 
   // ---- collections report (change request 2026-10-13, item 2) --------------------------------------------------
 
-  /** The treasury (collections) report: whole laboratory days, own or branch scope, one row per branch / cashier / method. */
+  /** The collections report: whole laboratory days, own or branch scope, one row per branch / cashier / method. */
   collectionsReport(request: CollectionsReportRequest, signal?: AbortSignal): Promise<CollectionsReportDocument> {
     const params = toHttpParams({ from: request.fromDay, to: request.toDay, scope: request.scope, groupBy: request.groupBy });
     return firstValueFrom(this.http.get<CollectionsReportDocument>(BILLING_API.collectionsReport, { params })).then(abortable(signal));
@@ -199,7 +190,7 @@ export class BillingApi {
 
   // ---- payment method definitions (set-up list CP-30b, change request 2026-10-19) ------------------------------------
 
-  /** The active methods in pick-list order (`billing.view`); an empty list when the read fails, like the treasuries. */
+  /** The active methods in pick-list order (`billing.view`); an empty list when the read fails. */
   paymentMethodOptions(signal?: AbortSignal): Promise<readonly PaymentMethodOption[]> {
     return this.get<readonly PaymentMethodOption[]>(BILLING_API.paymentMethodOptions, new HttpParams(), [], signal);
   }
@@ -261,7 +252,6 @@ function paymentParams(filter: PaymentRegisterFilter, paged: boolean): HttpParam
     accession: filter.accession,
     from: filter.fromUtc,
     to: filter.toUtc,
-    treasuryId: filter.treasuryId,
     method: filter.method,
     status: filter.status,
     page: paged ? filter.page : null,
@@ -275,7 +265,6 @@ function refundParams(filter: RefundRegisterFilter, paged: boolean): HttpParams 
     accession: filter.accession,
     from: filter.fromUtc,
     to: filter.toUtc,
-    treasuryId: filter.treasuryId,
     method: filter.method,
     page: paged ? filter.page : null,
     pageSize: paged ? filter.pageSize : null,
@@ -285,7 +274,6 @@ function refundParams(filter: RefundRegisterFilter, paged: boolean): HttpParams 
 
 function closingParams(filter: CashClosingRegisterFilter, paged: boolean): HttpParams {
   return toHttpParams({
-    treasuryId: filter.treasuryId,
     from: filter.fromUtc,
     to: filter.toUtc,
     page: paged ? filter.page : null,

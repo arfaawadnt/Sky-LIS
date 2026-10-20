@@ -10,7 +10,6 @@ import { PATIENTS_API } from '../../../core/api/patients.contracts';
 import { REGISTRATION_API, type RegisterVisitRequest } from '../../../core/api/registration.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { I18nService } from '../../../core/i18n/i18n.service';
-import { DeviceIdentityService } from '../../../core/device/device-identity.service';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
@@ -69,7 +68,6 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
         provideHttpClient(withInterceptors([problemDetailsInterceptor])),
         provideHttpClientTesting(),
         { provide: AuthStore, useValue: { currentBranch: signal<string | null>('b-1'), hasPermission: (key: string) => !denied.has(key) } satisfies Pick<AuthStore, 'currentBranch' | 'hasPermission'> },
-        { provide: DeviceIdentityService, useValue: { deviceId: () => 'device-test' } satisfies Pick<DeviceIdentityService, 'deviceId'> },
         { provide: PermissionsService, useValue: { can: (key: string) => !denied.has(key) } satisfies Pick<PermissionsService, 'can'> },
         { provide: RegistrationPrinter, useValue: printer },
         { provide: ConfirmService, useValue: { confirm: () => Promise.resolve(confirmAnswer), promptReason: () => Promise.resolve(null) } satisfies Pick<ConfirmService, 'confirm' | 'promptReason'> },
@@ -193,6 +191,13 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
     const page = await open('/registration/new');
     await typedVisit(page);
 
+    // LIS-CR-004: the panel takes the money at once — no treasury choice, no access-request pointer
+    harness.detectChanges();
+    const view = harness.routeNativeElement;
+    expect(view?.querySelector('#reg-pay-amount')).not.toBeNull();
+    expect(view?.querySelector('#reg-pay-treasury')).toBeNull();
+    expect(view?.querySelector('a[href*="treasury"]')).toBeNull();
+
     await Promise.all([
       page.save(),
       (async () => {
@@ -203,7 +208,7 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
         post.flush({ id: 'v-9', accession: 'ACC-2026-00009', tubeCount: 1, warnings: [] }, { status: 201, statusText: 'Created' });
         await settle();
         const pay = backend.expectOne(BILLING_API.payments);
-        expect(pay.request.body).toEqual({ visitId: 'v-9', amount: 100, method: 'Cash', reference: null, treasuryId: 't-1', deviceId: 'device-test' });
+        expect(pay.request.body).toEqual({ visitId: 'v-9', amount: 100, method: 'Cash', reference: null });
         pay.flush({ id: 'pay-1', receiptNumber: 'RCT-2026-00001' }, { status: 201, statusText: 'Created' });
       })(),
     ]);
@@ -268,13 +273,13 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
         await settle();
         backend.expectOne(REGISTRATION_API.visits).flush({ id: 'v-9', accession: 'ACC-2026-00009', tubeCount: 1, warnings: [] }, { status: 201, statusText: 'Created' });
         await settle();
-        backend.expectOne(BILLING_API.payments).flush({ type: 'about:blank', title: 'Treasury', status: 403, code: 'BIL-020' }, { status: 403, statusText: 'Forbidden' });
+        backend.expectOne(BILLING_API.payments).flush({ type: 'about:blank', title: 'Payment right', status: 403, code: 'BIL-040' }, { status: 403, statusText: 'Forbidden' });
       })(),
     ]);
 
     expect(page.successOpen()).toBe(true);
     expect(page.success()?.payment).toBeNull();
-    expect(page.success()?.paymentProblem?.code).toBe('BIL-020');
+    expect(page.success()?.paymentProblem?.code).toBe('BIL-040');
     expect(printer.printed).toEqual(['labels:v-9']);
     harness.detectChanges();
     expect(harness.routeNativeElement?.querySelector('app-dialog [role="alert"]')).not.toBeNull();

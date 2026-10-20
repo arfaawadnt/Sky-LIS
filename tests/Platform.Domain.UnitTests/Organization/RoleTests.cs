@@ -13,9 +13,9 @@ public sealed class RoleTests
     [Fact]
     public void A_role_keeps_catalogued_keys_only_sorted_and_distinct()
     {
-        var role = Role.Create(Name, [" treasury.create", "treasury.view", "treasury.view"], FixedClock.Instant);
+        var role = Role.Create(Name, [" billing.create", "billing.view", "billing.view"], FixedClock.Instant);
 
-        Assert.Equal(["treasury.create", "treasury.view"], role.PermissionKeys);
+        Assert.Equal(["billing.create", "billing.view"], role.PermissionKeys);
         Assert.True(role.IsActive);
         Assert.IsType<RoleCreated>(Assert.Single(role.DomainEvents));
     }
@@ -23,7 +23,7 @@ public sealed class RoleTests
     [Fact]
     public void An_unknown_permission_is_a_validation_refusal()
     {
-        var refusal = Assert.Throws<DomainException>(() => Role.Create(Name, ["treasury.fly"], FixedClock.Instant));
+        var refusal = Assert.Throws<DomainException>(() => Role.Create(Name, ["billing.fly"], FixedClock.Instant));
 
         Assert.Equal(OrganizationCodes.UnknownPermission, refusal.Code);
         Assert.Equal(DomainFault.Validation, refusal.Fault);
@@ -63,7 +63,7 @@ public sealed class RoleTests
     {
         var tenant = Guid.CreateVersion7();
         var membership = TenantMembership.Create(tenant, Guid.CreateVersion7(), "E-1", new LocalizedText("Mona", "منى"), "en", FixedClock.Instant);
-        var role = Role.Create(Name, ["treasury.view"], FixedClock.Instant);
+        var role = Role.Create(Name, ["billing.view"], FixedClock.Instant);
 
         var crossTenant = Assert.Throws<DomainException>(() => membership.AssignRole(role, FixedClock.Instant));
         Assert.Equal(TenancyCodes.RoleOfAnotherTenant, crossTenant.Code);

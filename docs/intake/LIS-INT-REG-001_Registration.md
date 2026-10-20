@@ -500,3 +500,11 @@ the earliest of its members; Cancelled results never hide a live one.
   right) answers the server's refusal. Assumed acceptable, as on the results page.
 - Q33 — The search opens a single match at once, including a single name match. Assumed wanted (the desk types an accession most of
   the time); the list can be forced by widening the text.
+
+## 19. Change request 2026-10-20 (LIS-CR-004) — payment on CP-06 without a treasury
+
+Backend facts only (the SPA side is package P-SPA-REG): the payment captured on the registration page (BR-26) posts
+`POST /api/v1/billing/payments {visitId, amount, method, reference?, methodCode?}`; the cashier is the session user and the branch the
+session branch, so no treasury, device id or approved access is needed any more (BR-27 withdrawn, intake LIS-INT-TRS-001). The
+accession details page (CP-10b, §18) lists the payments and refunds of the visit without a treasury column; rows posted before the
+change keep their treasury id in the database only. `GET /api/v1/billing/my-treasuries` is gone (404).

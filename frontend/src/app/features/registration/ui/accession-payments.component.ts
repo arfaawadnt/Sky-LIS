@@ -8,7 +8,7 @@ import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
-import { dateTime, money, pick } from '../data/registration-format';
+import { dateTime, money } from '../data/registration-format';
 
 /**
  * The *Payments* card of Accession details (CP-10b; C11 menu change): the balance figures (Billing's account when it
@@ -61,7 +61,7 @@ import { dateTime, money, pick } from '../data/registration-format';
                   <td><span class="mono">{{ row.number }}</span>@if (row.kind === 'refund') { <span class="small muted"> · {{ i18n.t('registration.accession.payments.refundRow') }}</span> }</td>
                   <td>{{ i18n.t('registration.payment.methods.' + row.method) }}@if (row.reference) { <span class="small muted mono"> {{ row.reference }}</span> }</td>
                   <td class="num" [class.minus]="row.kind === 'refund'">{{ row.kind === 'refund' ? '−' : '' }}{{ amount(row.amount) }}</td>
-                  <td class="small">{{ row.cashier }}<span class="muted block">{{ row.treasury }}</span></td>
+                  <td class="small">{{ row.cashier }}</td>
                   <td class="small">{{ when(row.atUtc) }}</td>
                   <td class="actions">
                     @if (row.voided) {
@@ -91,7 +91,6 @@ import { dateTime, money, pick } from '../data/registration-format';
     .grid th { color: var(--ink-2); font-weight: 600; white-space: nowrap; }
     .num { text-align: end !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .minus { color: var(--bad); }
-    .block { display: block; }
     .voided td { color: var(--muted); text-decoration: line-through; }
     .voided td.actions { text-decoration: none; }
     .actions { white-space: nowrap; text-align: end; }
@@ -122,10 +121,9 @@ export class AccessionPaymentsComponent {
       return [];
     }
 
-    const lang = this.i18n.lang();
     const rows: MoneyRow[] = [
-      ...account.payments.map((p: PaymentListItem): MoneyRow => ({ kind: 'payment', id: p.id, number: p.receiptNumber, method: p.method, reference: p.reference, amount: p.amount, cashier: p.cashierName, treasury: pick(p.treasuryNameEn, p.treasuryNameAr, lang), atUtc: p.paidAtUtc, voided: p.status === 'Voided' })),
-      ...account.refunds.map((r: RefundListItem): MoneyRow => ({ kind: 'refund', id: r.id, number: r.number, method: r.method, reference: r.reference, amount: r.amount, cashier: r.cashierName, treasury: pick(r.treasuryNameEn, r.treasuryNameAr, lang), atUtc: r.refundedAtUtc, voided: false })),
+      ...account.payments.map((p: PaymentListItem): MoneyRow => ({ kind: 'payment', id: p.id, number: p.receiptNumber, method: p.method, reference: p.reference, amount: p.amount, cashier: p.cashierName, atUtc: p.paidAtUtc, voided: p.status === 'Voided' })),
+      ...account.refunds.map((r: RefundListItem): MoneyRow => ({ kind: 'refund', id: r.id, number: r.number, method: r.method, reference: r.reference, amount: r.amount, cashier: r.cashierName, atUtc: r.refundedAtUtc, voided: false })),
     ];
     return rows.sort((a, b) => b.atUtc.localeCompare(a.atUtc));
   });
@@ -147,7 +145,6 @@ interface MoneyRow {
   readonly reference: string | null;
   readonly amount: number;
   readonly cashier: string;
-  readonly treasury: string;
   readonly atUtc: string;
   readonly voided: boolean;
 }

@@ -1,25 +1,22 @@
 import { ChangeDetectionStrategy, Component, provideZonelessChangeDetection, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import type { BillingReasonOption, BillingTreasuryItem, PaymentMethodOption } from '../../../core/api/billing.contracts';
+import type { BillingReasonOption, PaymentMethodOption } from '../../../core/api/billing.contracts';
 import { methodOptions } from '../testing/billing.fixtures';
 import { MovementFormComponent, type MovementInput, type MovementMode } from './movement-form.component';
 
-const treasuries: BillingTreasuryItem[] = [{ id: 't-1', code: 'MAIN', nameEn: 'Main drawer', nameAr: 'الخزينة', branchId: 'b-1', isActive: true }];
 const reasons: BillingReasonOption[] = [{ id: 'r-1', kind: 'Refund', nameEn: 'Overpayment', nameAr: 'مبلغ زائد', isActive: true }];
 
 @Component({
   selector: 'app-movement-form-host',
   imports: [MovementFormComponent],
-  template: `<app-billing-movement-form [mode]="mode()" [treasuries]="treasuries" [methods]="methods()" [(treasuryId)]="treasuryId" [dueAmount]="due()" [reasons]="reasons" submitLabel="Pay" (submitted)="submitted.push($event)" />`,
+  template: `<app-billing-movement-form [mode]="mode()" [methods]="methods()" [dueAmount]="due()" [reasons]="reasons" submitLabel="Pay" (submitted)="submitted.push($event)" />`,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 class HostComponent {
   readonly mode = signal<MovementMode>('payment');
   readonly due = signal(150);
-  readonly treasuryId = signal('t-1');
   readonly methods = signal<readonly PaymentMethodOption[]>([]);
-  readonly treasuries = treasuries;
   readonly reasons = reasons;
   readonly submitted: MovementInput[] = [];
   readonly form = viewChild.required(MovementFormComponent);
@@ -59,6 +56,7 @@ describe('MovementFormComponent (pay and refund form)', () => {
 
   it('proposes what is due, refuses more than that and a non-cash payment without reference', async () => {
     const { host, root, submit } = await render();
+    expect(root.querySelector('select[formcontrolname=treasuryId]')).toBeNull();   // LIS-CR-004: no treasury to choose
     expect(field<HTMLInputElement>(root, 'input[type=number]').value).toBe('150');
 
     set(root, 'input[type=number]', '151');
@@ -72,7 +70,7 @@ describe('MovementFormComponent (pay and refund form)', () => {
 
     set(root, 'input[formcontrolname=reference]', ' SLIP-1 ');
     await submit();
-    expect(host.submitted).toEqual([{ treasuryId: 't-1', amount: 100, method: 'Card', methodCode: null, reference: 'SLIP-1', reasonId: null, note: null }]);
+    expect(host.submitted).toEqual([{ amount: 100, method: 'Card', methodCode: null, reference: 'SLIP-1', reasonId: null, note: null }]);
   });
 
   it('requires a reason in refund mode and passes the note', async () => {
@@ -87,7 +85,7 @@ describe('MovementFormComponent (pay and refund form)', () => {
     set(root, 'select[formcontrolname=reasonId]', 'r-1');
     set(root, 'textarea', ' contract transfer ');
     await submit();
-    expect(host.submitted).toEqual([{ treasuryId: 't-1', amount: 40, method: 'Cash', methodCode: null, reference: null, reasonId: 'r-1', note: 'contract transfer' }]);
+    expect(host.submitted).toEqual([{ amount: 40, method: 'Cash', methodCode: null, reference: null, reasonId: 'r-1', note: 'contract transfer' }]);
   });
 
   it('starts the next movement from a fresh form after a save: no previous note, reason, method or reference (UAT A-06)', async () => {
@@ -116,7 +114,7 @@ describe('MovementFormComponent (pay and refund form)', () => {
 
     set(root, 'select[formcontrolname=reasonId]', 'r-1');
     await submit();
-    expect(host.submitted[1]).toEqual({ treasuryId: 't-1', amount: 400, method: 'Cash', methodCode: null, reference: null, reasonId: 'r-1', note: null });
+    expect(host.submitted[1]).toEqual({ amount: 400, method: 'Cash', methodCode: null, reference: null, reasonId: 'r-1', note: null });
   });
 
   it("offers the laboratory's payment methods by name, asks for the reference only when the chosen one requires it and sends kind and code (CP-30b)", async () => {
@@ -129,14 +127,14 @@ describe('MovementFormComponent (pay and refund form)', () => {
     const select = field<HTMLSelectElement>(root, 'select[formcontrolname=methodKey]');
     expect(Array.from(select.options).map((option) => option.value)).toEqual(['CASH', 'CARD', 'POS', 'TRANSFER', 'WALLET']);
     expect(select.options[1]?.textContent?.trim()).toBe('Card');
-    expect(host.submitted).toEqual([{ treasuryId: 't-1', amount: 150, method: 'Cash', methodCode: 'CASH', reference: null, reasonId: null, note: null }]);
+    expect(host.submitted).toEqual([{ amount: 150, method: 'Cash', methodCode: 'CASH', reference: null, reasonId: null, note: null }]);
 
     // a Card-kind definition without the rule: no reference field, the kind travels with the code
     set(root, 'select[formcontrolname=methodKey]', 'WALLET');
     TestBed.tick();
     expect(root.querySelector('input[formcontrolname=reference]')).toBeNull();
     await submit();
-    expect(host.submitted[1]).toEqual({ treasuryId: 't-1', amount: 150, method: 'Card', methodCode: 'WALLET', reference: null, reasonId: null, note: null });
+    expect(host.submitted[1]).toEqual({ amount: 150, method: 'Card', methodCode: 'WALLET', reference: null, reasonId: null, note: null });
 
     // CARD requires the reference (BIL-003): blocked until typed
     set(root, 'select[formcontrolname=methodKey]', 'CARD');
@@ -145,7 +143,7 @@ describe('MovementFormComponent (pay and refund form)', () => {
     expect(host.submitted.length).toBe(2);
     set(root, 'input[formcontrolname=reference]', 'SLIP-9');
     await submit();
-    expect(host.submitted[2]).toEqual({ treasuryId: 't-1', amount: 150, method: 'Card', methodCode: 'CARD', reference: 'SLIP-9', reasonId: null, note: null });
+    expect(host.submitted[2]).toEqual({ amount: 150, method: 'Card', methodCode: 'CARD', reference: 'SLIP-9', reasonId: null, note: null });
 
     // the definitions vanish (a refused re-read): the form falls back to the kinds and the legacy rule
     host.methods.set([]);

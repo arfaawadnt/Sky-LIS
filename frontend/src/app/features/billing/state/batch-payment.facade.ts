@@ -4,13 +4,11 @@ import type { BatchAccountView, BatchPaymentResult, PaymentCreated } from '../..
 import { mutation } from '../../../core/state/mutation';
 import { BillingApi } from '../data/billing.api';
 import { type MovementInput, methodCodeOf } from '../ui/movement-form.component';
-import { CashDeskFacade } from './cash-desk.facade';
 
 /** CP-27 Batch payment: the account of a batch by number, pay one member (T1) or pay all (T4). */
 @Injectable()
 export class BatchPaymentFacade {
   private readonly api = inject(BillingApi);
-  private readonly desk = inject(CashDeskFacade);
 
   readonly number = signal<string | null>(null);
 
@@ -23,13 +21,13 @@ export class BatchPaymentFacade {
 
   readonly payMember = mutation(
     (input: MovementInput & { readonly visitId: string }): Promise<PaymentCreated> =>
-      this.api.recordPayment({ visitId: input.visitId, amount: input.amount, method: input.method, ...methodCodeOf(input), reference: input.reference, treasuryId: input.treasuryId, deviceId: this.desk.deviceId() }),
+      this.api.recordPayment({ visitId: input.visitId, amount: input.amount, method: input.method, ...methodCodeOf(input), reference: input.reference }),
     { then: () => this.batch.reload() },
   );
 
   readonly payAll = mutation(
     (input: MovementInput & { readonly batchId: string }): Promise<BatchPaymentResult> =>
-      this.api.payBatch(input.batchId, { amount: input.amount, method: input.method, ...methodCodeOf(input), reference: input.reference, treasuryId: input.treasuryId, deviceId: this.desk.deviceId() }),
+      this.api.payBatch(input.batchId, { amount: input.amount, method: input.method, ...methodCodeOf(input), reference: input.reference }),
     { then: () => this.batch.reload() },
   );
 

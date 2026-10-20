@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Platform.ArchitectureTests.Support;
 using Platform.Domain.Billing;
@@ -52,5 +53,48 @@ public sealed class BillingGateTests
         Assert.Contains("CREATE TRIGGER cash_closings_immutable BEFORE UPDATE OR DELETE ON app.cash_closings", sql, StringComparison.Ordinal);
         Assert.Contains("IF OLD.status = 'Voided' THEN", sql, StringComparison.Ordinal);
         Assert.DoesNotContain("bypass_rls", sql, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// LIS-CR-004 (2026-10-20): the treasury is removed. No request, command, query or contract of the solution names a
+    /// treasury or a device (the cashier and the branch come from the session), and no namespace of the module survives.
+    /// </summary>
+    [Fact]
+    public void No_request_or_contract_names_a_treasury_or_a_device()
+    {
+        var assemblies = new[] { SolutionAssemblies.ContractsAssembly, SolutionAssemblies.ApplicationAssembly, SolutionAssemblies.WebApiAssembly };
+        var offenders = assemblies
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type.IsPublic || type.IsNestedPublic)
+            .SelectMany(type => type.GetProperties().Select(property => (type, property)))
+            .Where(pair => pair.property.Name.Contains("Treasury", StringComparison.Ordinal) || pair.property.Name is "DeviceId")
+            .Where(pair => pair.property.Name != "LegacyTreasuryId")   // the sheet of a closing made before the change narrows to its drawer
+            .Select(pair => $"{pair.type.FullName}.{pair.property.Name}")
+            .ToList();
+        Assert.True(offenders.Count == 0, "Treasury or device members: " + string.Join(", ", offenders));
+
+        var namespaces = new[] { SolutionAssemblies.DomainAssembly, SolutionAssemblies.ContractsAssembly, SolutionAssemblies.ApplicationAssembly, SolutionAssemblies.InfrastructureAssembly, SolutionAssemblies.WebApiAssembly }
+            .SelectMany(assembly => assembly.GetTypes())
+            .Select(type => type.Namespace ?? string.Empty)
+            .Where(name => name.Split('.').Contains("Treasury", StringComparer.Ordinal))
+            .Distinct()
+            .ToList();
+        Assert.True(namespaces.Count == 0, "Treasury namespaces: " + string.Join(", ", namespaces));
+    }
+
+    /// <summary>LIS-CR-004: the treasury and device columns of the money tables are nullable history without a foreign key.</summary>
+    [Fact]
+    public void The_treasury_columns_of_the_money_tables_are_nullable_history_without_a_foreign_key()
+    {
+        foreach (var type in new[] { typeof(Payment), typeof(Refund), typeof(CashClosing) })
+        {
+            var entity = Model.FindEntityType(type)!;
+            Assert.True(entity.FindProperty("TreasuryId")!.IsNullable, $"{type.Name}.TreasuryId must be nullable");
+            Assert.True(entity.FindProperty("DeviceId")?.IsNullable ?? true, $"{type.Name}.DeviceId must be nullable");
+            Assert.DoesNotContain(entity.GetForeignKeys(), foreignKey => foreignKey.Properties.Any(property => property.Name == "TreasuryId"));
+            Assert.DoesNotContain(entity.GetIndexes(), index => index.Properties.Any(property => property.Name == "TreasuryId"));
+        }
+
+        Assert.DoesNotContain(Model.GetEntityTypes(), type => type.GetTableName() is "treasuries" or "treasury_access_requests");
     }
 }

@@ -11,6 +11,12 @@ namespace Platform.IntegrationTests;
 [Collection(DatabaseCollection.Name)]
 public sealed class MigrationRoundTripTests
 {
+    /// <summary>
+    /// Tables of a removed module kept as history: no entity maps them any more, and no migration drops them (the treasury,
+    /// change request LIS-CR-004 of 2026-10-20, migration <c>TreasuryRemoved</c>). Add a table here only with such a decision.
+    /// </summary>
+    private static readonly string[] RetiredTables = ["app.treasuries", "app.treasury_access_requests"];
+
     [DatabaseFact]
     public async Task The_migrations_apply_revert_and_reapply_and_the_model_matches_the_snapshot()
     {
@@ -34,7 +40,8 @@ public sealed class MigrationRoundTripTests
             .Distinct()
             .Order(StringComparer.Ordinal)
             .ToList();
-        Assert.Equal(modelTables, tables);
+        Assert.Equal(modelTables, tables.Except(RetiredTables, StringComparer.Ordinal).ToList());
+        Assert.Subset(tables.ToHashSet(StringComparer.Ordinal), RetiredTables.ToHashSet(StringComparer.Ordinal));   // kept as history, never dropped
 
         await DatabaseFixture.TruncateAsync(context);
     }

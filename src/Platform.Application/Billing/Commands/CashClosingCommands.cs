@@ -12,16 +12,16 @@ namespace Platform.Application.Billing.Commands;
 
 /// <summary>
 /// T5 Close cash drawer (CP-30, BR-16, WF-09): the totals are computed from the movements at the moment of the close and
-/// stored as the closing's snapshot; overlapping closed periods are refused first (BIL-120).
+/// stored as the closing's snapshot; overlapping closed periods are refused first (BIL-120). The scope is the session branch
+/// and one cashier (or every cashier of the branch with <paramref name="CashierUserId"/> null) — LIS-CR-004, 2026-10-20.
 /// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Billing, PermissionAction.Manage)]
-public sealed record CloseCashDrawerCommand(Guid TreasuryId, Guid? CashierUserId, DateTimeOffset PeriodFromUtc, DateTimeOffset PeriodToUtc, decimal? CountedCash, string? Note) : ICommand<CashClosingCreated>;
+public sealed record CloseCashDrawerCommand(Guid? CashierUserId, DateTimeOffset PeriodFromUtc, DateTimeOffset PeriodToUtc, decimal? CountedCash, string? Note) : ICommand<CashClosingCreated>;
 
 public sealed class CloseCashDrawerValidator : AbstractValidator<CloseCashDrawerCommand>
 {
     public CloseCashDrawerValidator()
     {
-        RuleFor(command => command.TreasuryId).NotEmpty();
         RuleFor(command => command.CashierUserId).NotEqual(Guid.Empty).When(command => command.CashierUserId is not null);
         RuleFor(command => command.PeriodFromUtc).NotEmpty();
         RuleFor(command => command.PeriodToUtc).NotEmpty();
@@ -30,7 +30,6 @@ public sealed class CloseCashDrawerValidator : AbstractValidator<CloseCashDrawer
 }
 
 public sealed class CloseCashDrawerHandler(
-    ITreasuryStationLookup stations,
     ICashClosingRepository closings,
     ICashDrawerQueries drawer,
     IReferenceNumbers numbers,
@@ -42,21 +41,20 @@ public sealed class CloseCashDrawerHandler(
     {
         var actor = BillingActor.Of(user);
         var branch = BranchScope.Require(user);
-        var treasury = await stations.GetTreasuryAsync(command.TreasuryId, cancellationToken) ?? throw BillingNotFound.Treasury();
         var now = clock.UtcNow;
-        CashClosing.RequireScope(treasury.BranchId, branch, command.PeriodFromUtc, command.PeriodToUtc, now);
+        CashClosing.RequireScope(branch, command.PeriodFromUtc, command.PeriodToUtc, now);
 
         // INV-BIL-005 decided here with its code; nothing else can close the same drawer twice.
-        if (await closings.OverlapsAsync(treasury.Id, command.CashierUserId, command.PeriodFromUtc, command.PeriodToUtc, cancellationToken))
+        if (await closings.OverlapsAsync(branch, command.CashierUserId, command.PeriodFromUtc, command.PeriodToUtc, cancellationToken))
         {
-            throw new DomainException(BillingCodes.ClosingOverlaps, "A closed period of this treasury overlaps the requested period.", DomainFault.Conflict);
+            throw new DomainException(BillingCodes.ClosingOverlaps, "A closed period of this branch overlaps the requested period for this cashier.", DomainFault.Conflict);
         }
 
-        var totals = await drawer.TotalsAsync(new DrawerScope(treasury.Id, command.CashierUserId, command.PeriodFromUtc, command.PeriodToUtc), cancellationToken);
-        CashClosing.CheckClose(treasury.Id, treasury.BranchId, branch, command.PeriodFromUtc, command.PeriodToUtc, totals, command.CountedCash, command.Note, now);
+        var totals = await drawer.TotalsAsync(new DrawerScope(branch, command.CashierUserId, command.PeriodFromUtc, command.PeriodToUtc), cancellationToken);
+        CashClosing.CheckClose(branch, command.PeriodFromUtc, command.PeriodToUtc, totals, command.CountedCash, command.Note, now);
 
         var number = await numbers.NextAsync(CashClosing.NumberKind, CashClosing.NumberPrefix, now, cancellationToken);
-        var closing = CashClosing.Close(number, treasury.Id, treasury.BranchId, branch, command.CashierUserId, command.PeriodFromUtc, command.PeriodToUtc, totals, command.CountedCash, command.Note, actor, now);
+        var closing = CashClosing.Close(number, branch, command.CashierUserId, command.PeriodFromUtc, command.PeriodToUtc, totals, command.CountedCash, command.Note, actor, now);
         closings.Add(closing);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);

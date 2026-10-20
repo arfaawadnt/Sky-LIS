@@ -3,7 +3,6 @@ using Platform.Application.Billing;
 using Platform.Application.Registration;
 using Platform.Contracts.Billing;
 using Platform.Domain.Billing;
-using Platform.Domain.Treasury;
 
 namespace Platform.Infrastructure.Persistence.Billing;
 
@@ -228,58 +227,6 @@ internal sealed class BillableVisitLookup(AppDbContext context) : IBillableVisit
     }
 }
 
-/// <summary>
-/// BR-27 over the Treasury module's tables (an earlier module: its entity types are used directly): a treasury is usable
-/// by a user on a device while a live Approved access request exists for (user, treasury, device).
-/// </summary>
-internal sealed class TreasuryStationLookup(AppDbContext context) : ITreasuryStationLookup
-{
-    public Task<TreasuryStationView?> GetAsync(Guid treasuryId, Guid userId, string deviceId, CancellationToken cancellationToken) =>
-        context.Treasuries.AsNoTracking()
-            .Where(treasury => treasury.Id == treasuryId)
-            .Select(treasury => new TreasuryStationView(
-                treasury.Id,
-                treasury.Code,
-                treasury.Name.En,
-                treasury.Name.Ar,
-                treasury.BranchId,
-                treasury.IsActive,
-                context.TreasuryAccessRequests.Any(request =>
-                    request.TreasuryId == treasury.Id
-                    && request.RequestedByUserId == userId
-                    && request.DeviceId == deviceId
-                    && request.Status == TreasuryAccessStatus.Approved)))
-            .FirstOrDefaultAsync(cancellationToken);
-
-    public async Task<IReadOnlyList<BillingTreasuryItem>> ApprovedAsync(Guid userId, string deviceId, Guid branchId, CancellationToken cancellationToken) =>
-        await context.Treasuries.AsNoTracking()
-            .Where(treasury => treasury.IsActive
-                               && treasury.BranchId == branchId
-                               && context.TreasuryAccessRequests.Any(request =>
-                                   request.TreasuryId == treasury.Id
-                                   && request.RequestedByUserId == userId
-                                   && request.DeviceId == deviceId
-                                   && request.Status == TreasuryAccessStatus.Approved))
-            .OrderBy(treasury => treasury.Code)
-            .Select(treasury => new BillingTreasuryItem(treasury.Id, treasury.Code, treasury.Name.En, treasury.Name.Ar, treasury.BranchId, treasury.IsActive))
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-    public async Task<IReadOnlyList<BillingTreasuryItem>> OfBranchAsync(Guid branchId, CancellationToken cancellationToken) =>
-        await context.Treasuries.AsNoTracking()
-            .Where(treasury => treasury.BranchId == branchId)
-            .OrderBy(treasury => treasury.Code)
-            .Select(treasury => new BillingTreasuryItem(treasury.Id, treasury.Code, treasury.Name.En, treasury.Name.Ar, treasury.BranchId, treasury.IsActive))
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-    public Task<BillingTreasuryItem?> GetTreasuryAsync(Guid treasuryId, CancellationToken cancellationToken) =>
-        context.Treasuries.AsNoTracking()
-            .Where(treasury => treasury.Id == treasuryId)
-            .Select(treasury => new BillingTreasuryItem(treasury.Id, treasury.Code, treasury.Name.En, treasury.Name.Ar, treasury.BranchId, treasury.IsActive))
-            .FirstOrDefaultAsync(cancellationToken);
-}
-
 /// <summary>The drawer figures of CP-30 (BR-16): sums per method of posted payments and refunds, the visits touched and their outstanding balance and discounts.</summary>
 internal sealed class CashDrawerQueries(AppDbContext context) : ICashDrawerQueries
 {
@@ -367,9 +314,9 @@ internal sealed class CashDrawerQueries(AppDbContext context) : ICashDrawerQueri
             .ToList();
     }
 
-    public async Task<IReadOnlyList<DrawerCashier>> CashiersAsync(Guid treasuryId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<DrawerCashier>> CashiersAsync(Guid branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken)
     {
-        var scope = new DrawerScope(treasuryId, null, fromUtc, toUtc);
+        var scope = new DrawerScope(branchId, null, fromUtc, toUtc);
         var ids = Payments(scope).Select(payment => payment.CashierUserId).Union(Refunds(scope).Select(refund => refund.CashierUserId));
         return await context.PlatformUsers.AsNoTracking()
             .Where(user => ids.Contains(user.Id))
@@ -397,14 +344,24 @@ internal sealed class CashDrawerQueries(AppDbContext context) : ICashDrawerQueri
     private IQueryable<Payment> Payments(DrawerScope scope)
     {
         var query = context.Set<Payment>().AsNoTracking()
-            .Where(payment => payment.TreasuryId == scope.TreasuryId && payment.PaidAtUtc >= scope.FromUtc && payment.PaidAtUtc < scope.ToUtc);
+            .Where(payment => payment.BranchId == scope.BranchId && payment.PaidAtUtc >= scope.FromUtc && payment.PaidAtUtc < scope.ToUtc);
+        if (scope.LegacyTreasuryId is { } treasuryId)
+        {
+            query = query.Where(payment => payment.TreasuryId == treasuryId);
+        }
+
         return scope.CashierUserId is { } cashier ? query.Where(payment => payment.CashierUserId == cashier) : query;
     }
 
     private IQueryable<Refund> Refunds(DrawerScope scope)
     {
         var query = context.Set<Refund>().AsNoTracking()
-            .Where(refund => refund.TreasuryId == scope.TreasuryId && refund.RefundedAtUtc >= scope.FromUtc && refund.RefundedAtUtc < scope.ToUtc);
+            .Where(refund => refund.BranchId == scope.BranchId && refund.RefundedAtUtc >= scope.FromUtc && refund.RefundedAtUtc < scope.ToUtc);
+        if (scope.LegacyTreasuryId is { } treasuryId)
+        {
+            query = query.Where(refund => refund.TreasuryId == treasuryId);
+        }
+
         return scope.CashierUserId is { } cashier ? query.Where(refund => refund.CashierUserId == cashier) : query;
     }
 

@@ -20,13 +20,8 @@
 
 @if (facade.current(); as account) {
   <div class="columns">
-    <app-section-card class="pay-card" *appCan="permissions.refund" [title]="i18n.t('billing.refund.title')" [subtitle]="i18n.t('billing.pay.device') + ': ' + desk.deviceId()">
-      @if (!desk.hasStation()) {
-        <p class="warn-strip">
-          {{ i18n.t('billing.pay.noTreasury') }}
-          <a routerLink="/treasury/access">{{ i18n.t('billing.pay.requestAccess') }}</a>
-        </p>
-      } @else if (account.refundable <= 0) {
+    <app-section-card class="pay-card" *appCan="permissions.refund" [title]="i18n.t('billing.refund.title')" [subtitle]="desk.cashierLine()">
+      @if (account.refundable <= 0) {
         <p class="info-strip">{{ i18n.t('billing.refund.nothingRefundable') }}</p>
       } @else {
         @if (facade.reasons.error()) {
@@ -34,9 +29,7 @@
         }
         <app-billing-movement-form
           mode="refund"
-          [treasuries]="desk.approved()"
           [methods]="desk.methodOptions()"
-          [(treasuryId)]="desk.treasuryId"
           [dueAmount]="account.refundable"
           [currency]="account.currency"
           [reasons]="reasons()"
