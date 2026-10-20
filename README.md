@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.15.1** · released 2026-10-19 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.15.2** · released 2026-10-20 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.15.2 — 2026-10-20
 
 - **Accession details: no *Cancel* on a verified line.** A line — or a package through any of its members — with a verified or printed result shows "Verified — cannot be cancelled" instead of the *Cancel services* button (the server already refused the cancellation with `REG-106`; the page no longer offers it). Lines whose results are still in entry, review or without a result keep the button. Reported on 2026-10-20 on the installed 0.15.0.
 
