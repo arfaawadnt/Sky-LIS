@@ -22,7 +22,7 @@
 } @else if (visit(); as v) {
   <app-reg-accession-header [visit]="v" [neighbours]="neighbours()" (move)="move($event)" (patient)="openPatient()" (edit)="edit()" />
 
-  <app-reg-accession-lines [lines]="v.lines" [tubes]="v.tubes" [resultStatus]="facade.lineResults()" (cancelLine)="openCancel($event)" />
+  <app-reg-accession-lines [lines]="v.lines" [tubes]="v.tubes" [resultStatus]="facade.lineResults()" [lockedLines]="facade.lockedLines()" (cancelLine)="openCancel($event)" />
 
   <div class="pair">
     <app-reg-accession-samples

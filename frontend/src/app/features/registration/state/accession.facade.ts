@@ -90,6 +90,35 @@ export class AccessionFacade {
     return byLine;
   });
 
+  /**
+   * The lines the server will not let reception cancel (REG-106): a line — or a package through any member — with a
+   * live Verified or Printed result. The page hides *Cancel* for them; the server still decides.
+   */
+  readonly lockedLines = computed<ReadonlySet<string>>(() => {
+    const view = this.results.hasValue() ? this.results.value() : null;
+    const detail = this.detail.hasValue() ? this.detail.value() : null;
+    const locked = new Set<string>();
+    if (view === null || detail === null) {
+      return locked;
+    }
+
+    for (const unit of view.units) {
+      for (const row of unit.results) {
+        if (row.status === 'Verified' || row.status === 'Printed') {
+          locked.add(row.lineId);
+        }
+      }
+    }
+
+    for (const member of detail.lines) {
+      if (member.parentLineId !== null && locked.has(member.id)) {
+        locked.add(member.parentLineId);
+      }
+    }
+
+    return locked;
+  });
+
   // ---- search strip ----------------------------------------------------------------------------------------------------
 
   readonly searchText = signal('');

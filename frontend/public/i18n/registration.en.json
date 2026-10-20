@@ -359,6 +359,7 @@
   "accession.lines.title": "Ordered tests",
   "accession.lines.count": "{count} lines",
   "accession.lines.empty": "No services on this visit.",
+  "accession.lines.locked": "Verified — cannot be cancelled",
   "accession.samples.title": "Samples",
   "accession.samples.collect": "Collect",
   "accession.samples.collecting": "Collecting…",

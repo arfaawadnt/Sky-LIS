@@ -7,7 +7,7 @@
 | Workflows / rules | WF-02 (walk-in), WF-03 (home visit), WF-04 (batch and lab-to-lab, registration steps), WF-09 (transfer and cancellation steps), WF-10 (price query side); BR-01, BR-02, BR-05, BR-06, BR-12, BR-13, BR-15, BR-24, BR-26 |
 | Domain reference | LDM synthesis `docs/knowledge/ldm/LDM_Business_Knowledge.md` §2.1 (identifiers), §2.2 (tube generation), §2.3 (Reserved), §2.4 (Rank/Relative), §3.4 (duration, frequency check, test days), §3.8 (panels, test rules, shortcuts, diagnosis), §4.1–§4.9 (registration family), §7.2 (Query, Money Transfer, Delete Patient), §13 (weaknesses) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), MODULES.md and the LDM synthesis. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.3 — 2026-10-19 (change request LIS-CR-003 P-C9: Accession details page CP-10b and the C11 menu links, §18); 1.2 — 2026-10-12 (validation LIS-VR-002 open points: test-level duplicates Q23, labels Q13, VIP on the worklist Q12; v0.5.0: VIP on the opened result case Q12, Latin digits on the job order and counted wording Q13, mobile search with the trunk 0) |
+| Version | 1.4 — 2026-10-20 (CP-10b: no Cancel on a line with a verified or printed result); 1.3 — 2026-10-19 (change request LIS-CR-003 P-C9: Accession details page CP-10b and the C11 menu links, §18); 1.2 — 2026-10-12 (validation LIS-VR-002 open points: test-level duplicates Q23, labels Q13, VIP on the worklist Q12; v0.5.0: VIP on the opened result case Q12, Latin digits on the job order and counted wording Q13, mobile search with the trunk 0) |
 | Implemented in | `src/Platform.Domain/Registration`, `src/Platform.Contracts/Registration`, `src/Platform.Application/Registration` (commands, queries, `OrderPlanner`, read ports, policies), `src/Platform.Infrastructure/Persistence/Registration` (+ `Registration.migration.sql`), `src/Platform.WebApi/Controllers/Registration`, `frontend/src/app/features/registration`, `frontend/src/app/core/api/registration.contracts.ts`, `frontend/public/i18n/registration.{en,ar}.json` |
 | Codes | `REG-001`…`REG-099` validation and privilege refusals, `REG-100`…`REG-199` conflicts, `REG-201`…`REG-299` advisory warnings (never thrown), `REG-404`/`405`/`406` not found |
 
@@ -477,6 +477,9 @@ client · reception · `registration.view`) shows one visit with the actions rec
   `/billing/refunds?visitId=`, *Receipt* prints a payment's receipt through the existing receipt document, *All payments* → the
   payments register (C11). When Billing refuses the account, the visit's own balance (`VisitDetail.balance`) gives the figures.
 - *Documents* — labels, job order (print and on screen).
+- *Cancel* is offered only while the server would accept it: a line (or a package through any member) with a verified or printed
+  result shows "Verified — cannot be cancelled" instead of the button (`AccessionFacade.lockedLines`, REG-106; fix of 2026-10-20 after
+  the first use on the installed 0.15.0). The server stays the judge: a cancellation the page offers can still be refused.
 - Keyboard: Enter in the search box runs it, Esc closes the match list and the dialogs.
 
 Entry points: the visits register (CP-10) row action *Details*; the registration success panel's *Accession details* button

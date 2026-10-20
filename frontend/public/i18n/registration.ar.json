@@ -367,6 +367,7 @@
   "accession.lines.title": "الفحوصات المطلوبة",
   "accession.lines.count": "{count} بند",
   "accession.lines.empty": "لا توجد خدمات في هذه الزيارة.",
+  "accession.lines.locked": "معتمدة — لا يمكن إلغاؤها",
   "accession.samples.title": "العينات",
   "accession.samples.collect": "سحب",
   "accession.samples.collecting": "جارٍ السحب…",

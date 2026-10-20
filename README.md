@@ -234,7 +234,7 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Accession details: no *Cancel* on a verified line.** A line — or a package through any of its members — with a verified or printed result shows "Verified — cannot be cancelled" instead of the *Cancel services* button (the server already refused the cancellation with `REG-106`; the page no longer offers it). Lines whose results are still in entry, review or without a result keep the button. Reported on 2026-10-20 on the installed 0.15.0.
 
 ### v0.15.1 — 2026-10-19
 

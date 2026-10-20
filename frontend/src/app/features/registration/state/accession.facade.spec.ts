@@ -119,6 +119,7 @@ describe('AccessionFacade (CP-10b)', () => {
     expect(facade.account.value()?.remaining).toBe(60);
     expect(facade.lineResults().get('l-1')).toBe('Verified');   // the cancelled result never hides the live one
     expect(facade.lineResults().get('l-2')).toBe('Ordered');
+    expect([...facade.lockedLines()]).toEqual(['l-1']);   // verified → no Cancel on the page (REG-106); l-2 stays cancellable
   });
 
   it('asks no card of a module the user may not read, and a refused account is an empty card', async () => {

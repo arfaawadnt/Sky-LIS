@@ -72,7 +72,9 @@ import { dateTime, money, pick } from '../data/registration-format';
                     }
                   </td>
                   <td class="actions">
-                    @if (line.kind !== 'PackageMember' && line.status !== 'Cancelled') {
+                    @if (line.kind !== 'PackageMember' && line.status !== 'Cancelled' && lockedLines().has(line.id)) {
+                      <span class="small muted" [attr.data-locked]="line.id">{{ i18n.t('registration.accession.lines.locked') }}</span>
+                    } @else if (line.kind !== 'PackageMember' && line.status !== 'Cancelled') {
                       <button type="button" class="btn sm danger" *appCan="permissions.cancel" (click)="cancelLine.emit(line)" [attr.aria-label]="i18n.t('registration.cancel.action') + ' ' + line.code"><app-icon name="x" [size]="14" />{{ i18n.t('registration.cancel.action') }}</button>
                     }
                   </td>
@@ -107,6 +109,8 @@ export class AccessionLinesComponent {
   readonly lines = input<readonly VisitLineItem[]>([]);
   readonly tubes = input<readonly VisitTubeItem[]>([]);
   readonly resultStatus = input<ReadonlyMap<string, ResultStatus>>(new Map());
+  /** Lines with a verified or printed result: no *Cancel* (REG-106), a note instead. */
+  readonly lockedLines = input<ReadonlySet<string>>(new Set());
   readonly cancelLine = output<VisitLineItem>();
 
   protected readonly permissions = REGISTRATION_PERMISSIONS;

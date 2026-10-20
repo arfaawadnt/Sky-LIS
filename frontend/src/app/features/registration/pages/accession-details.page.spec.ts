@@ -186,7 +186,8 @@ describe('AccessionDetailsPage (CP-10b)', () => {
     expect(host.querySelector('app-reg-accession-header .btn')).not.toBeNull();   // edit registration
     expect(host.querySelector('app-reg-accession-lines tr[data-line="l-1"]')?.textContent).toContain('CBC');
     expect(host.querySelector('app-reg-accession-lines tr[data-line="l-1"]')?.textContent).toContain('shared.status.Verified');
-    expect(host.querySelector('app-reg-accession-lines .btn.danger')).not.toBeNull();   // cancel the line
+    expect(host.querySelector('app-reg-accession-lines tr[data-line="l-1"] .btn.danger')).toBeNull();   // a verified result locks the line (REG-106)
+    expect(host.querySelector('app-reg-accession-lines tr[data-line="l-1"] [data-locked]')?.textContent).toContain('registration.accession.lines.locked');
     expect(host.querySelector('app-reg-accession-samples tr[data-sample="SMP-2026-00001"] .btn.primary')).not.toBeNull();   // collect
     expect(text).toContain('Haematology');
     expect(text).toContain('registration.accession.results.hidden');
