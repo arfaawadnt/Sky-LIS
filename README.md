@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.16.1** · released 2026-10-20 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.17.0** · released 2026-10-20 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.17.0 — 2026-10-20
 
 - **New sign-in page (design 5c "light premium", chosen 2026-10-20).** The login screen is redesigned: the brand light ground (soft blue and violet light, a fine dot grid, the brand gradient line on top), the Sky LIS logo large at the top, a welcome headline ("Welcome back to the bench." / "مرحبًا بعودتك إلى المختبر.") beside a white sign-in card, and a footer with the public site and *Subscribe now*. Everything the page did is kept: language switch, show / hide password, forgot password, the laboratory choice for multi-laboratory users, the idle-session notice, the sealed-password note. Fully mirrored in Arabic, single column on a phone. Uses the app's own fonts (the site policy allows only self-hosted fonts).
 
