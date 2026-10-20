@@ -248,6 +248,58 @@ public static class ConfigGuard
         }
     }
 
+    /// <summary>LIS-CR-005: the base of every laboratory's sign-in address (<c>{base}/lab/{slug}</c>), sent by SMS and shown on SA-04 and CP-65.</summary>
+    public const string PortalBaseUrlKey = "Lis:Platform:PortalBaseUrl";
+
+    /// <summary>The development value when <see cref="PortalBaseUrlKey"/> is unset (the dev SPA); never accepted in Production.</summary>
+    public const string DefaultPortalBaseUrl = "http://127.0.0.1:4300";
+
+    /// <summary>
+    /// LIS-CR-005: <c>Lis:Platform:PortalBaseUrl</c> is an absolute URL without user information, path, query, fragment or trailing
+    /// slash. In Production it is required and https; elsewhere it may be unset (<see cref="DefaultPortalBaseUrl"/>) or http.
+    /// Pure, like <see cref="InspectNotifications"/>: the only environment input is <paramref name="production"/>.
+    /// </summary>
+    public static IReadOnlyList<string> InspectPortalBaseUrl(string? value, bool production)
+    {
+        var violations = new List<string>();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            if (production)
+            {
+                violations.Add($"{PortalBaseUrlKey} is required in Production (the laboratories' sign-in addresses are built from it)");
+            }
+
+            return violations;
+        }
+
+        var text = value.Trim();
+        if (!Uri.TryCreate(text, UriKind.Absolute, out var url)
+            || !(url.Scheme == Uri.UriSchemeHttps || url.Scheme == Uri.UriSchemeHttp)
+            || !string.IsNullOrEmpty(url.UserInfo)
+            || url.AbsolutePath != "/"
+            || text.EndsWith('/')
+            || text.Contains('?', StringComparison.Ordinal)
+            || text.Contains('#', StringComparison.Ordinal))
+        {
+            violations.Add($"{PortalBaseUrlKey} must be an absolute http(s) URL without path, query, fragment or trailing slash, like https://lis.example.com");
+        }
+        else if (production && url.Scheme != Uri.UriSchemeHttps)
+        {
+            violations.Add($"{PortalBaseUrlKey} must be an https URL in Production");
+        }
+
+        return violations;
+    }
+
+    public static void EnforcePortalBaseUrl(string? value, bool production)
+    {
+        var violations = InspectPortalBaseUrl(value, production);
+        if (violations.Count > 0)
+        {
+            throw new SecurityConfigurationException(violations);
+        }
+    }
+
     private static bool IsStrictlyUnder(string path, string root)
     {
         var full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);

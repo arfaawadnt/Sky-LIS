@@ -43,14 +43,14 @@ public sealed class AuthController(ISender sender) : ControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
         // R2-04: the cookie this browser still holds is about to be overwritten; the handler ends the session it names.
-        var result = await sender.Send(new SignInCommand(request.Tenant, request.Username, request.Password, ClientIp(), UserAgent(), RefreshCookie.Read(HttpContext)), cancellationToken);
+        var result = await sender.Send(new SignInCommand(request.Laboratory, request.Admin, request.Username, request.Password, ClientIp(), UserAgent(), RefreshCookie.Read(HttpContext)), cancellationToken);
 
         if (result.Step == AuthResponse.StepSignedIn && result.RefreshToken is not null && result.Kind == SessionKind.Browser)
         {
             RefreshCookie.Write(HttpContext, result.RefreshToken);
         }
 
-        return Ok(new AuthResponse(result.Step, result.AccessToken?.Token, result.AccessToken?.ExpiresAtUtc, null, result.Profile, result.Tenants));
+        return Ok(new AuthResponse(result.Step, result.AccessToken?.Token, result.AccessToken?.ExpiresAtUtc, null, result.Profile));
     }
 
     [HttpPost("refresh")]
@@ -70,10 +70,10 @@ public sealed class AuthController(ISender sender) : ControllerBase
                 RefreshCookie.Write(HttpContext, result.RefreshToken);
             }
 
-            return Ok(new AuthResponse(AuthResponse.StepSignedIn, result.AccessToken.Token, result.AccessToken.ExpiresAtUtc, null, result.Profile, null));
+            return Ok(new AuthResponse(AuthResponse.StepSignedIn, result.AccessToken.Token, result.AccessToken.ExpiresAtUtc, null, result.Profile));
         }
 
-        return Ok(new AuthResponse(AuthResponse.StepSignedIn, result.AccessToken.Token, result.AccessToken.ExpiresAtUtc, result.RefreshToken, result.Profile, null));
+        return Ok(new AuthResponse(AuthResponse.StepSignedIn, result.AccessToken.Token, result.AccessToken.ExpiresAtUtc, result.RefreshToken, result.Profile));
     }
 
     [HttpPost("sign-out")]

@@ -41,7 +41,7 @@ public sealed class WorkAmountReportFlowTests(ApiFactory factory) : IClassFixtur
         var row = Assert.Single(report.Rows);
         Assert.Equal((payer.ToString(), 1, 1, 100m, 0m, 70m, 30m, 100m), (row.Key, row.Visits, row.Services, row.Gross, row.Discount, row.CashIncome, row.CreditIncome, row.Net));
         Assert.Equal((1, 1, 100m), (report.Totals.Visits, report.Totals.Services, report.Totals.Net));
-        Assert.Equal("Laboratory", report.Letterhead.LabNameEn);
+        Assert.Equal("Functional Laboratory", report.Letterhead.LabNameEn);   // LIS-CR-005: the test host gives every seeded laboratory a client record
 
         // by day: one row keyed by the report's own day
         var byDay = await client.GetFromJsonAsync<WorkAmountReport>($"{ReportPath}?groupBy=Day");

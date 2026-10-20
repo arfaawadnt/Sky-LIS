@@ -49,7 +49,7 @@ public sealed class ClientLoginLogsFlowTests(ApiFactory factory) : IClassFixture
         Assert.Equal(("SignedOut", 7, "Computer", "Windows 10", "Chrome 129", receptionist, "Noor Reception", tenant), (signedOut.Status, signedOut.DurationMinutes, signedOut.Device, signedOut.Os, signedOut.Browser, signedOut.Username, signedOut.DisplayName, signedOut.TenantId));
         Assert.Equal(loginAt, signedOut.LoginAtUtc, TimeSpan.FromMilliseconds(1));   // the column keeps microseconds
         Assert.Equal(logoutAt, signedOut.LogoutAtUtc!.Value, TimeSpan.FromMilliseconds(1));
-        Assert.Null(signedOut.ClientNameEn);   // a tenant seeded without a client record
+        Assert.Equal("Functional Laboratory", signedOut.ClientNameEn);   // LIS-CR-005: the client record the test host gives every seeded laboratory
         Assert.Null(signedOut.RevocationReason);
         var active = Assert.Single(page.Items, item => item.Username == cashier);
         Assert.Equal(("Active", "Mobile", "iOS 17.5", "Safari 17", null), (active.Status, active.Device, active.Os, active.Browser, active.LogoutAtUtc));

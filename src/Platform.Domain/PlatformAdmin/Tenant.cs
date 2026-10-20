@@ -21,9 +21,10 @@ public sealed class Tenant : AggregateRoot
     public const int MaxReasonLength = 500;
     public const int MinSlugLength = 3;
     public const int MaxSlugLength = 40;
-    public const string DefaultPortalDomain = "skylis.app";
+    /// <summary>LIS-CR-005: the path segment of a laboratory's sign-in address (<c>{base}/lab/{slug}</c>).</summary>
+    public const string LaboratoryPathSegment = "lab";
 
-    /// <summary>Sub-domains the platform keeps for itself.</summary>
+    /// <summary>Addresses the platform keeps for itself (formerly sub-domains; still refused as laboratory addresses).</summary>
     public static readonly IReadOnlySet<string> ReservedSlugs = new HashSet<string>(StringComparer.Ordinal)
     {
         "www", "api", "app", "admin", "portal", "platform", "mail", "smtp", "static", "cdn", "status", "help", "support", "login", "auth", "docs", "test", "demo",
@@ -77,7 +78,7 @@ public sealed class Tenant : AggregateRoot
 
     public Guid PlanId { get; private set; }
 
-    /// <summary>The sub-domain of the portal (<c>https://{slug}.{domain}</c>); unique (INV-PLT-001).</summary>
+    /// <summary>The laboratory address (LIS-CR-005: sign-in at <c>{base}/lab/{slug}</c>); unique (INV-PLT-001).</summary>
     public string PortalSlug { get; private set; }
 
     public TenantSource Source { get; private set; }
@@ -204,11 +205,55 @@ public sealed class Tenant : AggregateRoot
     public bool IsUsableAt(DateTimeOffset nowUtc) =>
         Status == TenantStatus.Active || (Status == TenantStatus.Trial && (TrialEndsAtUtc is null || TrialEndsAtUtc > nowUtc));
 
-    /// <summary><c>https://{slug}.{domain}</c>.</summary>
-    public string PortalUrl(string portalDomain) => BuildPortalUrl(PortalSlug, portalDomain);
+    /// <summary>LIS-CR-005: the laboratory's sign-in address, <c>{portalBaseUrl}/lab/{slug}</c>.</summary>
+    public string PortalUrl(string portalBaseUrl) => PortalUrlOf(PortalSlug, portalBaseUrl);
 
-    public static string BuildPortalUrl(string slug, string portalDomain) =>
-        $"https://{slug}.{(string.IsNullOrWhiteSpace(portalDomain) ? DefaultPortalDomain : portalDomain.Trim().Trim('.'))}";
+    /// <summary>
+    /// LIS-CR-005: <c>{portalBaseUrl}/lab/{slug}</c>. The base is the configured <c>Lis:Platform:PortalBaseUrl</c> (an absolute
+    /// URL without path; a trailing slash is tolerated here, the start-up guard refuses it in configuration).
+    /// </summary>
+    public static string PortalUrlOf(string slug, string portalBaseUrl)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(slug);
+        ArgumentException.ThrowIfNullOrWhiteSpace(portalBaseUrl);
+        return $"{portalBaseUrl.Trim().TrimEnd('/')}/{LaboratoryPathSegment}/{slug}";
+    }
+
+    /// <summary>
+    /// LIS-CR-005: the shape of a laboratory address as typed or sent at sign-in (trimmed, lower-cased): 3–40 characters of
+    /// <c>a-z 0-9 -</c>. Shape only (no reserved-word or hyphen-placement rule): an address that passes and names no
+    /// laboratory is answered like a wrong password, never as a different refusal.
+    /// </summary>
+    public static bool IsAddressShape(string? slug)
+    {
+        var value = NormaliseAddress(slug);
+        return value.Length is >= MinSlugLength and <= MaxSlugLength && value.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-');
+    }
+
+    /// <summary>LIS-CR-005: a laboratory address as compared with the stored slug (trimmed, lower-cased).</summary>
+    public static string NormaliseAddress(string? slug) => (slug ?? string.Empty).Trim().ToLowerInvariant();
+
+    /// <summary>
+    /// LIS-CR-005 (development tooling): the client record of a tenant that already exists without one (a laboratory seeded
+    /// before client records, e.g. the demo laboratory), so it gets a sign-in address. Active at once, source Manual; the
+    /// country, governorate and plan must exist and match but need not be active (placeholders). Raises no event: nothing is
+    /// provisioned (no wallet, no administrator, no catalogue copy).
+    /// </summary>
+    public static Tenant RegisterExisting(Guid tenantId, ClientProfile profile, Country country, Governorate governorate, Plan plan, string portalSlug, string language, DateTimeOffset nowUtc)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(country);
+        ArgumentNullException.ThrowIfNull(governorate);
+        ArgumentNullException.ThrowIfNull(plan);
+        Require(tenantId != Guid.Empty && !TenantIds.IsPlatform(tenantId), PlatformAdminCodes.ClientDetailsInvalid, "The platform tenant is not a client.", DomainFault.Refused);
+        Require(country.Id == profile.CountryId && governorate.Id == profile.GovernorateId && governorate.CountryId == country.Id, PlatformAdminCodes.ClientDetailsInvalid, "The country and governorate do not match the profile.", DomainFault.Validation);
+        var tenant = new Tenant(tenantId, profile, plan.Id, CleanSlug(portalSlug), TenantSource.Manual, CleanLanguage(language))
+        {
+            Status = TenantStatus.Active,
+            ActivatedAtUtc = nowUtc,
+        };
+        return tenant;
+    }
 
     /// <summary>INV-PLT-001: 3–40 characters of <c>a-z 0-9 -</c>, not starting or ending with '-', not reserved (CLI-001).</summary>
     public static string CleanSlug(string? slug)

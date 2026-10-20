@@ -1,6 +1,6 @@
 # Sky LIS — Release 1 User Acceptance Test Scripts (LIS-UAT-001)
 
-Version 0.6 · 2026-10-20 · Status: draft for review by the business owner (0.6: treasury removed, LIS-CR-004 — see the revision history).
+Version 0.7 · 2026-10-20 · Status: draft for review by the business owner (0.7: sign-in by address, LIS-CR-005; 0.6: treasury removed, LIS-CR-004 — see the revision history).
 
 Sources: business SRS LIS-SRS-001 (`docs/srs`, page ids CP-nn / SA-nn, workflows WF-nn, rules BR-nn), the module intakes
 (`docs/intake`, acceptance scenario ids and refusal codes), the Release-1 scope record (`docs/build/MODULES.md` §6, wave 4),
@@ -59,8 +59,9 @@ priced **120 / 120 / 90 / 150** EGP on the active base list **CASH-2026**; the e
 reasons of `seed-reasons` (cancellation "Patient declined" / "Ordered by mistake", refund "Service cancelled" /
 "Overpayment", discount "Staff and relatives" / "Management approval", rejection ×2); the role **Laboratory
 Administrator** (every permission, every special right, every result right) assigned to **lab.admin** and
-**lab.admin.manager** (the shift manager). Each user signs in with the laboratory
-selected on the sign-in page.
+**lab.admin.manager** (the shift manager). Every laboratory user signs in at the **laboratory address** `<base>/lab/demo-lab` (the demo laboratory; another laboratory at
+`<base>/lab/<its slug>`), every Super Admin persona at **`<base>/admin/login`** (BR-28, change request LIS-CR-005); `<base>` is the
+`Lis:Platform:PortalBaseUrl` of the lane.
 
 The remaining UAT users and roles are **created during the UAT itself** by the laboratory administrator scripts
 (UAT-ADM-02, UAT-ADM-03) and the Super Admin scripts (UAT-SUP-01, UAT-SUP-02); section 4 lists what each persona's role
@@ -117,7 +118,7 @@ viewConfidential; Organization intake A4). `approve` on results covers review, v
 
 #### UAT-ADM-01 — Branches · critical
 Refs: CP-36 · WF-01 step 3 · ORG AS-B1, AS-B2, AS-B3.
-Sign in as `lab.admin` (laboratory selected on the sign-in page). Setup › Branches (`/organization/branches`).
+Sign in as `lab.admin` at `<base>/lab/demo-lab`. Setup › Branches (`/organization/branches`).
 1. `Add branch`: code `north`, name EN "North Branch" / AR "الفرع الشمالي", country Egypt, governorate, phone, e-mail, currency `EGP`. Save.
 2. `Add branch` again with code `NORTH`.
 3. Edit NORTH: currency `EG`. Save.
@@ -387,13 +388,14 @@ Sign in as `uat.reception`; branch MAIN.
 
 #### UAT-REG-01 — Sign in, branch, dashboard · critical
 Refs: CP-03, CP-04, CP-05 · ACC S-D1 · ORG AS-S1.
-1. Open the portal address; sign in with a wrong password; then with `<pw>`.
+1. Open `<base>/lab/demo-lab` (the laboratory name and logo show on the card); sign in with a wrong password; then with `<pw>`.
+1a. Open `<base>/lab/uatlabb` (another laboratory) and sign in as `uat.reception` with `<pw>`; open `<base>/admin/login` and do the same; open `<base>/lab/no-such-lab`; open `<base>/` signed out.
 2. Precondition variant: a user assigned MAIN and NORTH (use `uat.cashier` after UAT-CSH-08) sees the branch selection page; `Continue` with MAIN.
 3. Dashboard (`/account/dashboard`): key figures of the day, 7-day chart, delayed tests, quick actions.
 4. Click `Price query`, `New registration`, `Search registrations`, `Worklist`, `Payments`, `Results by accession` in turn.
 5. Leave the browser idle past the session timeout (default parameter) and act.
 6. Arabic check.
-Expected: (1) `AUTH-002` "The username or password is incorrect."; after five failures the account is locked for 30 minutes and the next attempt — even with the right password — answers `AUTH-003` "The account is locked. Try again later." (an administrator unlocks it on Users › Security, UAT-ADM-04; the `RATE-429` limit is 20 attempts per 10 minutes and is independent); the correct password opens the portal. (2) only assigned branches listed; the session shows the branch in the top bar. (3) the KPIs count the session branch and day (registrations, collected today, pending results, unverified backlog, delayed tests; samples tiles are Release 2 and absent). (4) each quick action opens its page. (5) the session is renewed silently (refresh cookie) while the refresh session lives; after the sign-out the page returns to sign-in.
+Expected: (1a) both refused with `AUTH-002` exactly like a wrong password (the user is not a member of UAT Lab B, not platform staff); the unknown address shows "This laboratory address was not found" with a link to *Find your laboratory*, no form; the bare address shows *Find your laboratory* (one box for the laboratory address, *Continue* opens `<base>/lab/<address>`). (5) the idle sign-out returns to `<base>/lab/demo-lab` with the inactivity notice. (1) `AUTH-002` "The username or password is incorrect."; after five failures the account is locked for 30 minutes and the next attempt — even with the right password — answers `AUTH-003` "The account is locked. Try again later." (an administrator unlocks it on Users › Security, UAT-ADM-04; the `RATE-429` limit is 20 attempts per 10 minutes and is independent); the correct password opens the portal. (2) only assigned branches listed; the session shows the branch in the top bar. (3) the KPIs count the session branch and day (registrations, collected today, pending results, unverified backlog, delayed tests; samples tiles are Release 2 and absent). (4) each quick action opens its page. (5) the session is renewed silently (refresh cookie) while the refresh session lives; after the sign-out the page returns to sign-in.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-02 — Password recovery with OTP · standard · *gateway*
@@ -724,7 +726,7 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 ### 5.8 Operations Admin — Super Admin portal (UAT-OPS)
 
-Sign in at the Super Admin portal as `uat.ops` (created in UAT-SUP-02).
+Sign in at the Super Admin address `<base>/admin/login` as `uat.ops` (created in UAT-SUP-02); a laboratory user there is refused with `AUTH-002`.
 
 #### UAT-OPS-01 — Sign in, home, platform dashboard · critical
 Refs: SA-01, SA-02, SA-03 · WF-12.
@@ -743,7 +745,7 @@ SA › Administration › Clients (`/admin/clients`).
 3. Sign in to the client portal as `labb.admin` (laboratory UAT Lab B): Setup › Tests, Clinical groups, Reasons (as far as Release 1 exposes them), Finance › Payers.
 4. Back in SA: the client row.
 5. Arabic check.
-Expected: (1) "The client was created. Portal https://uatlabb.skylis.app, administrator labb.admin; the address was sent by SMS." — status **Active**, source **Manual**, wallet 0, one branch, one user. (2) refused `CLI-100` "This portal address is already taken." (inline in the form). (3) the laboratory holds an **independent copy** of the global master data (clinical groups, sample types, units, tests, services, preparations, comments, reasons, microbiology — everything active in the platform tenant; on a database whose global catalogue is still empty the copy is empty and UAT-MDR-01 proves it), its own branch and the Laboratory Administrator role; no record of the UAT laboratory is visible (tenant isolation). (4) branches 1, users 1, created today.
+Expected: (1) "The client was created. Portal <base>/lab/uatlabb, administrator labb.admin; the address was sent by SMS." — status **Active**, source **Manual**, wallet 0, one branch, one user. (2) refused `CLI-100` "This portal address is already taken." (inline in the form). (3) the laboratory holds an **independent copy** of the global master data (clinical groups, sample types, units, tests, services, preparations, comments, reasons, microbiology — everything active in the platform tenant; on a database whose global catalogue is still empty the copy is empty and UAT-MDR-01 proves it), its own branch and the Laboratory Administrator role; no record of the UAT laboratory is visible (tenant isolation). (4) branches 1, users 1, created today.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-OPS-03 — Deactivate and activate a client · critical
@@ -792,7 +794,7 @@ Public site (`/welcome`), no sign-in.
 2. Mobile with 10 digits. Next (code sent to the manager mobile).
 3. Step "Verify code": a wrong code; then the received code.
 4. Step "Create account": username `labc.admin`, password 6 characters; then a valid password. `Create account`.
-5. Step "Sign in": follow the portal address received by SMS and sign in.
+5. Step "Sign in": follow the portal address received by SMS (`<base>/lab/<slug>`, the username prefilled) and sign in.
 6. Arabic check (the public site in Arabic).
 Expected: (1) refused `GEO-010` (mobile length by country). (2) OTP sent. (3) `SUB-010`; the fifth wrong code closes the challenge; the right code advances. (4) `CLI-040` "too short", then the client is created: status **Trial**, source **Subscription**, wallet, default branch, administrator, master-data copy; SA › Clients lists it; the dashboard's trial count rises. (5) the administrator reaches the client portal.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
@@ -1052,3 +1054,4 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 0.4 | 2026-10-10 | Claude Code (UAT dry-run agent) | Corrections from the automated dry run of UAT-OPS-01/02/03/05, UAT-MDR-01 and UAT-SUP-01/02/04/05/08 (`results/2026-10-10_dry-run_super-admin.md`): §4 Operations Admin keys (`wallet.view/create/manage`); expected texts aligned with the built screens (page refusals for the deactivation reason, top-up reference and amount, empty role, username format, parameter range; rows offering only the opposite life-cycle action; disabled Lock / Reset on the main administrator; no Privileges tab in the platform user editor; the global catalogue preconditions and the age band of MDR-01; trial only for wizard clients; the audit chain message; client creation audited in the laboratory's trail); open points 11–13. Ids unchanged. |
 | 0.5 | 2026-10-14 | Claude Code | UAT-ADM-08 gains step 13 (the parent-services block of the test editor, change request 2026-10-14: leave and rejoin a profile, locked chip on a test service); the Arabic check becomes step 14. Ids unchanged. |
 | 0.6 | 2026-10-20 | Claude Code | Treasury removed from the system (change request LIS-CR-004): UAT-ADM-06, UAT-ADM-07, UAT-CSH-01, UAT-CSH-02, UAT-CSH-09 and UAT-CSH-10 withdrawn (ids reserved); UAT-CSH-08 becomes "Payment stamped with the session branch"; UAT-REG-09 becomes "Registration saved without a payment" (amount 0); payment steps, personas (no `treasury.*` keys), run order, coverage and open point 8 updated. |
+| 0.7 | 2026-10-20 | Claude Code | Sign-in by address (change request LIS-CR-005, BR-28): set-up note (laboratory users at `<base>/lab/<slug>`, Super Admin personas at `<base>/admin/login`), UAT-REG-01 step 1a and expectations (another laboratory, admin address, unknown address, bare address; idle return), UAT-OPS intro (admin address, laboratory user refused), UAT-ADM-01 and the provisioning / subscription expectations print the new address. |

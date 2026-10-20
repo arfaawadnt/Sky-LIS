@@ -5,7 +5,7 @@
 | Slot / modules | `found` — `platform`, `identity`, `audit`, `notifications`, `settings` (MODULES.md §2) |
 | SRS pages | CP-03 (login & password recovery with OTP), CP-04 (branch selection), CP-57 / SA-19 (parameters), CP-68 / SA-09 (audit log), cross-cutting "Audit & notifications" |
 | Status | Derived by the development team from the Business SRS and the architecture pack (01 §4.5–4.8, §7; 02 §4–§7; 03 §7–§8). **For review by the business owner**; assumptions in §8. |
-| Version | 1.1 — 2026-10-12 (§6 `SET-003` unknown time zone; §6a lockout rule SEC-LOCK-01/02 and assumption A9, after validation LIS-VR-002; §6b idle timeout SEC-IDLE-01…05 and A10, validation F-01) · 1.0 — 2026-10-09 |
+| Version | 1.2 — 2026-10-20 (§9 change request LIS-CR-005: sign-in by address, `laboratory` / `admin` targets, `select-tenant` removed, `AuthProfile.portalSlug`) · 1.1 — 2026-10-12 (§6 `SET-003` unknown time zone; §6a lockout rule SEC-LOCK-01/02 and assumption A9, after validation LIS-VR-002; §6b idle timeout SEC-IDLE-01…05 and A10, validation F-01) · 1.0 — 2026-10-09 |
 | Implemented in | `src/Platform.Domain/{Identity,Settings}`, `src/Platform.Application/{Abstractions,Identity,Audit,Settings}`, `src/Platform.Infrastructure/{Persistence/Audit,Persistence/Settings,Persistence/Outbox,Persistence/Identity,Notifications,Security,Audit}`, `src/Platform.WebApi/Controllers/{Identity,Audit,Settings}`, `tools/Platform.DevTools`, `frontend/src/app/core/{auth,api}` |
 | Migration | `20261009100252_Foundation` (`deploy/postgres/migrations.sql` regenerated) |
 
@@ -101,3 +101,38 @@ Domain: `SessionBranchTests`, `PlatformUserRecoveryTests`, `SettingKeysTests`. A
 | A8 | The audit log of SA-09 is the same endpoint under the platform tenant; platform administrators do not see other tenants' audit rows (RLS). A cross-tenant platform view would need an elevated read port. | Is a cross-tenant audit view required for SA-09? |
 | A9 | **Decided 2026-10-12** (validation LIS-VR-002, open point "failed attempts on change password"; the security spec did not say): a wrong current password on Change password counts toward the sign-in lockout (SEC-LOCK-02). | Confirm; the alternative (a separate, unlimited counter) would let a stolen session guess the password. |
 | A10 | Idle timeout (§6b, validation F-01): the idle end reuses the revocation reason `Expired` (no migration); the client renews an active session at most once a minute, so the effective idle period is between the timeout minus that interval and the timeout; the warning needs an explicit answer (movement in the same tab does not close it). | Confirm; should an idle end lock the screen (re-enter the password in place) instead of signing out? |
+
+## 9. Change request 2026-10-20 — sign-in by address (LIS-CR-005, package P-API)
+
+Decision of the business owner (2026-10-20, `docs/build/CR-2026-10-20_Portal-Addresses.md`): every laboratory signs in at its own
+address and the Super Admin at its own; the address decides where one signs in and returns, never the tenant of a later request
+(that stays the session's).
+
+| Address (SPA) | Sign-in body target | Accepts |
+| --- | --- | --- |
+| `/lab/{slug}` | `laboratory: "<slug>"` | active members of that laboratory |
+| `/admin/login` | `admin: true` | active members of the platform tenant |
+| `/login` | — (the "find your laboratory" page, no form) | — |
+
+- **Request** `POST /api/v1/auth/sign-in`: `{ username, password (envelope), laboratory?: string, admin?: bool }`. **Exactly one**
+  target (`laboratory`, or `admin: true`); neither, both, or a `laboratory` that is not 3–40 of `a-z 0-9 -` after trim + lower-case
+  is `400 VALIDATION-400` (shape, decided before any credential check). The former `tenant` (Guid) field is ignored and, alone,
+  is now a 400; the `select-tenant` step and `TenantChoice` are **removed** (`AuthResponse` has no `tenants`): a user with
+  memberships in several laboratories signs in at each laboratory's address.
+- **Order of checks** (unchanged except the target): the address is resolved first (`ILaboratoryAddresses`, `saas.tenants`, no
+  RLS, no elevation), then the account (unknown → decoy hash, `AUTH-002`), inactive, locked, password (wrong → counted, `AUTH-002`),
+  access end date, and only then the target: unknown address → `AUTH-002` (`unknown_laboratory`); laboratory not usable
+  (deactivated, trial ended) → `CLI-020` for its members, `AUTH-002` (`not_a_member`) for anyone else; not a member →
+  `AUTH-002` (`not_a_member`); `admin: true` without the platform membership → `AUTH-002` (`not_platform_staff`). The reasons are
+  the `SIGN_IN_FAILED` security event's detail; the response never tells them apart. The former `AUTH-005` "no active
+  membership" answer of sign-in is gone (the code stays defined). Trial laboratories sign in like Active ones (INV-PLT-003).
+- **Rate limit**: the `credential-account` partition is keyed on the username alone (`sha256(":" + lower(username))`), so cycling
+  addresses buys no extra guesses.
+- **Profile**: `AuthProfile.portalSlug` (sign-in, refresh) = the session's laboratory address, `null` for the platform tenant; read
+  in the session principal's one query (scalar subquery on `saas.tenants`).
+- **Tooling**: DevTools `register-tenant-client <tenantId> <slug> <nameEn> <nameAr>` gives a tenant without a client record one
+  (placeholders for address, manager and mobiles; first active country with an active governorate; subscription default plan);
+  `seed-demo-lab` registers its tenant as `demo-lab` (else the suggestion rule). The functional test host gives every seeded
+  laboratory a record with slug `t<tenant id N>`.
+- **Assumption A11**: a tenant without a client record (pre-CR development data) can no longer be signed into until it is
+  registered (decision of the integrator, 2026-10-20).

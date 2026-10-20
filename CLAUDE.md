@@ -478,6 +478,19 @@ QMS source is never read or copied (section 1); everything here is written from 
   `features/treasury`, `core/device` and `core/api/treasury.contracts.ts` (`CreatedResource` lives in `core/api/created-resource.ts`).
   Kept as history: `app.treasuries`, `app.treasury_access_requests` and the now nullable `treasury_id` / `device_id` columns (no FK).
   SRS 1.2 marks CP-28, CP-29 and BR-27 withdrawn (ids reserved).
+- Change request LIS-CR-005 (2026-10-20, `docs/build/CR-2026-10-20_Portal-Addresses.md`; no migration): **sign-in by address** (BR-28).
+  SPA routes before the shell: `/login` = `FindLaboratoryPage`, `/lab/:slug` (+ `/recover`) = `LoginPage` mode laboratory, `/admin/login`
+  (+ `/recover`) = mode admin (`features/auth/auth.routes.ts`: `FIND_LABORATORY_ROUTES`, `LAB_SIGN_IN_ROUTES`, `ADMIN_SIGN_IN_ROUTES`; the 5c
+  ground is `features/auth/ui/auth-frame.component`). `signInUrl(returnUrl, profile)` / `idleSignInUrl(profile)` in
+  `core/auth/session-navigation.ts` send a session back to `/lab/<slug>` or `/admin/login` (`/login` when unknown); `authGuard` sends an
+  anonymous `/admin/…` request to `/admin/login`. API: `SignInRequest { username, password, laboratory?, admin? }` (exactly one target;
+  `ILaboratoryAddresses` resolves the slug; every miss is `AUTH-002` with the reason `unknown_laboratory` / `not_a_member` /
+  `not_platform_staff` in `SIGN_IN_FAILED`; `CLI-020` only to a member of an inactive laboratory), `AuthProfile.PortalSlug`, public
+  `GET /api/v1/public/laboratories/{slug}[/logo]` (`IPublicLaboratoryDirectory`; the logo answer keeps `Cache-Control: public` through
+  `SecurityHeadersMiddleware.PublicCacheItem`), `Lis:Platform:PortalBaseUrl` (`ConfigGuard.InspectPortalBaseUrl`) replaces `PortalDomain`,
+  `Tenant.PortalUrl(base)` = `{base}/lab/{slug}`. A tenant without a `saas.tenants` client record cannot be signed into: DevTools
+  `register-tenant-client` (the dev demo laboratory is `demo-lab`). Test host: `AuthClient` takes a `SignInTarget` (null = resolved from the
+  user's one membership, `Support/SignInTargets.cs`) and `ApiFactory.SeedUserAsync` gives every seeded laboratory a client record (slug `t<id:N>`).
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

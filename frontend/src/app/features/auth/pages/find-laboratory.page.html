@@ -1,0 +1,37 @@
+<app-auth-frame
+  [eyebrow]="i18n.t('auth.hero.eyebrow')"
+  [heroTitle]="i18n.t('auth.find.heroTitle')"
+  [lead]="i18n.t('auth.find.heroLead')"
+  labelledBy="find-title"
+>
+  <h2 id="find-title">{{ i18n.t('auth.find.title') }}</h2>
+
+  @if (endedIdle()) {
+    <p class="info-strip" role="status">{{ i18n.t('auth.sessionEndedIdle') }}</p>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="continue()" novalidate>
+    <div class="field">
+      <label for="laboratory-address">{{ i18n.t('auth.find.address') }}</label>
+      <div class="address" dir="ltr">
+        <span class="prefix">{{ prefix }}</span>
+        <input
+          id="laboratory-address"
+          type="text"
+          formControlName="address"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          [attr.aria-invalid]="invalid()"
+          aria-describedby="laboratory-address-hint"
+        />
+      </div>
+      @if (invalid()) {
+        <p class="problem" role="alert">{{ i18n.t('auth.find.invalid') }}</p>
+      }
+      <p id="laboratory-address-hint" class="hint">{{ i18n.t('auth.find.hint') }}</p>
+    </div>
+
+    <button type="submit" class="submit">{{ i18n.t('auth.find.continue') }}</button>
+  </form>
+</app-auth-frame>

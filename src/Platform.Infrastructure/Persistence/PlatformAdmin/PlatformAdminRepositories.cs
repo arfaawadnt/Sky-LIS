@@ -27,7 +27,7 @@ internal sealed class TenantRepository(AppDbContext context) : Repository<Tenant
         return Set.AnyAsync(tenant => tenant.PortalSlug == value, cancellationToken);
     }
 
-    public async Task<Paged<ClientListItem>> ListAsync(ClientFilter filter, PageRequest page, string portalDomain, CancellationToken cancellationToken)
+    public async Task<Paged<ClientListItem>> ListAsync(ClientFilter filter, PageRequest page, string portalBaseUrl, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(filter);
         var query = Set.AsNoTracking();
@@ -100,7 +100,7 @@ internal sealed class TenantRepository(AppDbContext context) : Repository<Tenant
         var items = rows
             .OrderBy(row => position[row.Id])
             .Select(row => new ClientListItem(
-                row.Id, row.NameEn, row.NameAr, row.PortalSlug, Tenant.BuildPortalUrl(row.PortalSlug, portalDomain), row.CountryId, row.CountryEn, row.CountryAr,
+                row.Id, row.NameEn, row.NameAr, row.PortalSlug, Tenant.PortalUrlOf(row.PortalSlug, portalBaseUrl), row.CountryId, row.CountryEn, row.CountryAr,
                 row.GovernorateId, row.GovernorateEn, row.GovernorateAr, row.ManagerName, row.ManagerMobile, row.PlanId, row.PlanCode, row.PlanEn, row.PlanAr,
                 row.Balance, row.Currency.Trim(), 0, 0, row.CreatedAtUtc, row.Source.ToString(), row.Status.ToString(), row.TrialEndsAtUtc))
             .ToList();
@@ -116,7 +116,7 @@ internal sealed class TenantRepository(AppDbContext context) : Repository<Tenant
         .Column("createdAtUtc", tenant => tenant.CreatedAtUtc)
         .ThenBy(tenant => tenant.Id);
 
-    public async Task<ClientDetail?> GetDetailAsync(Guid id, string portalDomain, CancellationToken cancellationToken)
+    public async Task<ClientDetail?> GetDetailAsync(Guid id, string portalBaseUrl, CancellationToken cancellationToken)
     {
         var row = await (
             from tenant in Set.AsNoTracking().Where(tenant => tenant.Id == id)
@@ -132,7 +132,7 @@ internal sealed class TenantRepository(AppDbContext context) : Repository<Tenant
         var t = row.Tenant;
         return new ClientDetail(
             t.Id, t.Name.En, t.Name.Ar, t.CountryId, t.GovernorateId, t.Address, t.Mobile, t.LicenceNo, t.ManagerName, t.ManagerMobile, t.Email, t.PlanId,
-            t.PortalSlug, t.PortalUrl(portalDomain), t.PreferredLanguage, t.Source.ToString(), t.Status.ToString(), t.CreatedAtUtc, t.TrialEndsAtUtc, t.ActivatedAtUtc,
+            t.PortalSlug, t.PortalUrl(portalBaseUrl), t.PreferredLanguage, t.Source.ToString(), t.Status.ToString(), t.CreatedAtUtc, t.TrialEndsAtUtc, t.ActivatedAtUtc,
             t.DeactivatedAtUtc, t.DeactivationReason, t.AdministratorUserId, t.AdministratorUsername, row.Balance, (row.WalletCurrency ?? row.CountryCurrency).Trim(), 0, 0);
     }
 

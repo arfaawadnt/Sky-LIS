@@ -324,7 +324,7 @@ public sealed partial class DeploymentPackageTests
 
         // Evidence that the derivation looked at the right places (pitfall P-71).
         Assert.True(keys.Count >= 40, $"only {keys.Count} keys were derived from the source: {string.Join(", ", keys)}");
-        foreach (var expected in new[] { "Lis:Database:ConnectionString", "Lis:Jwt:SigningKey", "Lis:DataProtection:MasterKey", "Lis:Security:Session:AccessTokenLifetime", "Lis:Security:RateLimits:GlobalPerMinute", "Lis:Security:Envelope:RsaKeySize", "Lis:Outbox:Enabled", "Lis:Files:Root", "Lis:Platform:PortalDomain", "Lis:Security:AllowInsecureLocalDevelopment", "Lis:Notifications:PickupDirectory", "Lis:Notifications:Smtp:Host", "Lis:Notifications:Smtp:Password", "Lis:Notifications:Sms:Url", "Lis:Notifications:Sms:ApiKey", "Lis:Notifications:Sms:BodyTemplate" })
+        foreach (var expected in new[] { "Lis:Database:ConnectionString", "Lis:Jwt:SigningKey", "Lis:DataProtection:MasterKey", "Lis:Security:Session:AccessTokenLifetime", "Lis:Security:RateLimits:GlobalPerMinute", "Lis:Security:Envelope:RsaKeySize", "Lis:Outbox:Enabled", "Lis:Files:Root", "Lis:Platform:PortalBaseUrl", "Lis:Security:AllowInsecureLocalDevelopment", "Lis:Notifications:PickupDirectory", "Lis:Notifications:Smtp:Host", "Lis:Notifications:Smtp:Password", "Lis:Notifications:Sms:Url", "Lis:Notifications:Sms:ApiKey", "Lis:Notifications:Sms:BodyTemplate" })
         {
             Assert.Contains(expected, keys);
         }

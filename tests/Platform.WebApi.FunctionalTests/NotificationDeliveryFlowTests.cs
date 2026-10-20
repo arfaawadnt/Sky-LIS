@@ -101,7 +101,7 @@ public sealed partial class NotificationDeliveryFlowTests : IClassFixture<ApiFac
         Assert.Contains(result!.PortalUrl, portal.Body, StringComparison.Ordinal);
         Assert.Contains(username, portal.Body, StringComparison.Ordinal);
 
-        await new AuthClient(_factory.CreateClient()).SignInExpectingSuccessAsync(username, "a long enough password", result.TenantId);
+        await new AuthClient(_factory.CreateClient()).SignInExpectingSuccessAsync(username, "a long enough password");   // LIS-CR-005: at the laboratory address the user belongs to
     }
 
     [DatabaseFact]

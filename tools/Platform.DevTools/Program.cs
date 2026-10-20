@@ -5,20 +5,25 @@ using Platform.Application.Identity;
 using Platform.Application.Catalogue;
 using Platform.Application.Organization;
 using Platform.Application.Pricing;
+using Platform.Application.PlatformAdmin;
 using Platform.Application.Tenancy;
 using Platform.Domain.Authorization;
 using Platform.Domain.Catalogue;
 using Platform.Domain.Identity;
 using Platform.Domain.Organization;
+using Platform.Domain.PlatformAdmin;
 using Platform.Domain.Pricing;
 using Platform.Domain.Tenancy;
 using Platform.Infrastructure;
 using Platform.Infrastructure.Configuration;
+using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Security;
 using Platform.Infrastructure.Security.Hashing;
 using Platform.SharedKernel.Abstractions;
 using Platform.SharedKernel.Localization;
 using Platform.SharedKernel.MultiTenancy;
+using Platform.SharedKernel.Primitives;
+using Microsoft.EntityFrameworkCore;
 
 // Development-only seeding through the production services (same guards, same tenant stamping, same outbox).
 //   seed-user  <username> <password> [tenantId]                        a platform user with one active membership
@@ -28,11 +33,17 @@ using Platform.SharedKernel.MultiTenancy;
 //   seed-reasons <tenantId>                                             cancellation, refund, discount and rejection reasons (idempotent by name)
 //   seed-platform-admin <username> <password>                           a National Technology administrator of the platform tenant
 //                                                                       (user + membership in TenantIds.Platform + role "Platform Administrator" with every permission)
+//   register-tenant-client <tenantId> <slug> <nameEn> <nameAr>          LIS-CR-005: the client record (saas.tenants) of an existing tenant that has none, so its
+//                                                                       users can sign in at <base>/lab/<slug>; refused when one exists or the slug is taken.
+//                                                                       Country/governorate/plan: the first active country (by English name) with an active
+//                                                                       governorate, the subscription default plan (else any plan); address, manager and mobiles
+//                                                                       are placeholders (ClientRecordRegistrar), corrected later on SA-04
+// seed-demo-lab also registers the client record of its tenant (slug demo-lab, else the suggestion rule), when one is missing.
 // Connection string from LIS_DEVTOOLS_CONNECTION (an lis_* role on an lis* database; anything else is refused).
 
 if (args.Length == 0)
 {
-    Console.Error.WriteLine("usage: seed-user | grant-role | seed-demo-lab | seed-reasons | seed-platform-admin (see the header of Program.cs)");
+    Console.Error.WriteLine("usage: seed-user | grant-role | seed-demo-lab | seed-reasons | seed-platform-admin | register-tenant-client (see the header of Program.cs)");
     return 2;
 }
 
@@ -50,6 +61,7 @@ await using var provider = new ServiceCollection()
     .AddSingleton<IPasswordHasher, Argon2idHasher>()
     .AddInfrastructure(connectionString)
     .AddScoped<PlatformAdministratorSeeder>()
+    .AddScoped<ClientRecordRegistrar>()
     .BuildServiceProvider();
 using var scope = provider.CreateScope();
 var services = scope.ServiceProvider;
@@ -239,6 +251,28 @@ switch (args[0])
         Console.WriteLine($"  branch {branch.Code} ({branch.Id}); price list {priceList.Code}");
         Console.WriteLine($"  users {args[1]} and {managerUsername} (same password), role '{role.Name.En}' with every permission, all special and result rights");
         Console.WriteLine($"  services {string.Join(", ", tests.Select(test => test.Code))}; {reasonsSeeded} reasons");
+
+        // LIS-CR-005: sign-in is by laboratory address, so the demo laboratory needs a client record (and with it a slug).
+        var registered = await RegisterClientRecordAsync(services, tenantId, "demo-lab", "Demo Laboratory", "مختبر تجريبي", suggestWhenTaken: true);
+        if (registered is null)
+        {
+            return 5;
+        }
+
+        Console.WriteLine($"  client record: address /lab/{registered.PortalSlug} (placeholders for address, manager and mobiles; correct them on SA-04)");
+        return 0;
+    }
+
+    case "register-tenant-client" when args.Length >= 5 && Guid.TryParse(args[1], out var clientTenant):
+    {
+        var registered = await RegisterClientRecordAsync(services, clientTenant, args[2], args[3], args[4], suggestWhenTaken: false);
+        if (registered is null)
+        {
+            return 5;
+        }
+
+        Console.WriteLine($"registered client record of tenant {clientTenant}: '{registered.Name.En}' at /lab/{registered.PortalSlug}, status {registered.Status}, country {registered.CountryId}, plan {registered.PlanId} on {DatabaseRoleGuard.Describe(connectionString)}");
+        Console.WriteLine($"  placeholders: address and manager name '{ClientRecordRegistrar.PlaceholderText}', mobiles {registered.Mobile}; correct them on SA-04");
         return 0;
     }
 
@@ -260,8 +294,46 @@ switch (args[0])
     }
 
     default:
-        Console.Error.WriteLine("usage: seed-user | grant-role | seed-demo-lab | seed-reasons | seed-platform-admin (see the header of Program.cs)");
+        Console.Error.WriteLine("usage: seed-user | grant-role | seed-demo-lab | seed-reasons | seed-platform-admin | register-tenant-client (see the header of Program.cs)");
         return 2;
+}
+
+// LIS-CR-005: the client record of an existing tenant. Reference data: the first active country (by English name) with an active
+// governorate, that governorate (first by English name), the subscription default plan, else any plan. Null (with a message) when
+// the tenant already has a record, the slug is taken or invalid, or no country, governorate or plan exists yet.
+static async Task<Tenant?> RegisterClientRecordAsync(IServiceProvider services, Guid tenantId, string slug, string nameEn, string nameAr, bool suggestWhenTaken)
+{
+    var context = services.GetRequiredService<AppDbContext>();
+    if (await context.Set<Tenant>().AsNoTracking().AnyAsync(tenant => tenant.Id == tenantId))
+    {
+        var existing = await context.Set<Tenant>().AsNoTracking().Where(tenant => tenant.Id == tenantId).Select(tenant => tenant.PortalSlug).SingleAsync();
+        Console.Error.WriteLine($"tenant {tenantId} already has a client record (address /lab/{existing})");
+        return suggestWhenTaken ? await context.Set<Tenant>().AsNoTracking().SingleAsync(tenant => tenant.Id == tenantId) : null;
+    }
+
+    var place = await (
+        from country in context.Set<Country>().AsNoTracking()
+        join governorate in context.Set<Governorate>().AsNoTracking() on country.Id equals governorate.CountryId
+        where country.IsActive && governorate.IsActive
+        orderby country.Name.En, governorate.Name.En
+        select new { CountryId = country.Id, GovernorateId = governorate.Id }).FirstOrDefaultAsync();
+    var plan = await services.GetRequiredService<IPlanRepository>().FindDefaultForSubscriptionAsync(CancellationToken.None)
+        ?? await context.Set<Plan>().AsNoTracking().OrderBy(candidate => candidate.Code).FirstOrDefaultAsync();
+    if (place is null || plan is null)
+    {
+        Console.Error.WriteLine("refused: no active country with an active governorate, or no plan; create them in the Super Admin portal first (SA-10, SA-11, SA-05)");
+        return null;
+    }
+
+    try
+    {
+        return await services.GetRequiredService<ClientRecordRegistrar>().RegisterAsync(tenantId, slug, nameEn, nameAr, place.CountryId, place.GovernorateId, plan.Id, suggestWhenTaken, CancellationToken.None);
+    }
+    catch (DomainException exception)
+    {
+        Console.Error.WriteLine($"refused: {exception.Code} {exception.Message}");
+        return null;
+    }
 }
 
 static async Task<int> SeedReasonsAsync(IServiceProvider services, IUnitOfWork unitOfWork, DateTimeOffset now)

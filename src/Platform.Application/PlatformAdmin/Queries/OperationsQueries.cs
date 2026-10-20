@@ -89,7 +89,7 @@ public sealed class GetPlatformDashboardHandler(
         var adminUsers = await reader.CountAdminUsersAsync(cancellationToken);
         var atZero = await reader.CountWalletsAtOrBelowZeroAsync(cancellationToken);
         var plans = await reader.PlanDistributionAsync(cancellationToken);
-        var recent = await reader.RecentClientsAsync(RecentClients, portal.PortalDomain, cancellationToken);
+        var recent = await reader.RecentClientsAsync(RecentClients, portal.PortalBaseUrl, cancellationToken);
         var snapshot = await activity.ReadAsync(from, to, cancellationToken);
 
         var top = snapshot.ByClient.OrderByDescending(item => item.Registrations).Take(TopClients).ToList();

@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
 import type { ProblemDetails } from '../../../core/api/problem-details';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { ADMIN_SIGN_IN_PATH, LABORATORY_PATH_PREFIX, SIGN_IN_PATH, isLaboratorySlug, normaliseLaboratorySlug } from '../../../core/auth/session-navigation';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { mutation } from '../../../core/state/mutation';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
@@ -13,6 +14,7 @@ import { requiredText } from '../../../shared/forms/validators';
 import { FormFieldComponent } from '../../../shared/ui/form-field/form-field.component';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
+import type { SignInMode } from './login.page';
 
 type RecoveryStep = 1 | 2 | 3;
 
@@ -30,7 +32,8 @@ export const OTP_REJECTED = 'AUTH-013';
  * Password recovery (SRS CP-03): username or mobile → one-time code (six digits, sent to the registered mobile) →
  * new password and confirmation → back to the sign-in page with a success toast. The server never says whether the
  * account exists (always 202) and refuses every failure of the last step as `AUTH-013`, shown as "the code is invalid
- * or expired"; the new password is sealed by the credential envelope interceptor (D-03).
+ * or expired"; the new password is sealed by the credential envelope interceptor (D-03). LIS-CR-005: started from a
+ * laboratory address (`/lab/<slug>/recover`) or the Super Admin sign-in (`/admin/login/recover`), it returns to that sign-in.
  */
 @Component({
   selector: 'app-recovery-page',
@@ -45,6 +48,22 @@ export class RecoveryPage {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private tick: ReturnType<typeof setInterval> | null = null;
+
+  /** Route data: which sign-in the recovery was started from; absent = the find page. */
+  readonly mode = input<SignInMode | undefined>();
+
+  /** The `:slug` of `/lab/:slug/recover`. */
+  readonly slug = input<string | undefined>();
+
+  /** The sign-in page the recovery returns to (LIS-CR-005). */
+  protected readonly signInLink = computed<readonly string[]>(() => {
+    if (this.mode() === 'admin') {
+      return [ADMIN_SIGN_IN_PATH];
+    }
+
+    const slug = normaliseLaboratorySlug(this.slug() ?? '');
+    return this.mode() === 'laboratory' && isLaboratorySlug(slug) ? [LABORATORY_PATH_PREFIX, slug] : [SIGN_IN_PATH];
+  });
 
   protected readonly rule = RECOVERY_PASSWORD_RULE;
   protected readonly step = signal<RecoveryStep>(1);
@@ -137,7 +156,7 @@ export class RecoveryPage {
     if (done !== null) {
       this.stopTicking();
       this.toast.success(this.i18n.t('auth.recovery.done'));
-      await this.router.navigate(['/login'], { queryParams: MOBILE_LIKE.test(identifier) ? {} : { username: identifier } });
+      await this.router.navigate([...this.signInLink()], { queryParams: MOBILE_LIKE.test(identifier) ? {} : { username: identifier } });
       return;
     }
 

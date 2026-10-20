@@ -111,4 +111,7 @@ public static class PlatformAdminCodes
     /// <summary>Platform administration is reachable only from the platform tenant (MODULES.md §1), whatever permissions a client role holds.</summary>
     public const string PlatformTenantRequired = "PLT-403";
     public const string OwnSessionTermination = "PLT-010";
+
+    /// <summary>LIS-CR-005: no usable laboratory has this address (unknown, inactive, trial ended, the platform tenant or a malformed address): 404 of the public laboratory card and logo.</summary>
+    public const string LaboratoryAddressNotFound = "PLT-404";
 }

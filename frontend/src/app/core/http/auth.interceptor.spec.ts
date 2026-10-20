@@ -153,19 +153,19 @@ describe('authInterceptor + csrfInterceptor (01 §6.4)', () => {
 
   it('a 401 without a session routes to sign-in without a pointless return URL', async () => {
     const router = TestBed.inject(Router);
-    const navigate = vi.spyOn(router, 'navigate');
+    const navigate = vi.spyOn(router, 'navigateByUrl');
 
     const call = firstValueFrom(http.get('/api/v1/things'));
     backend.expectOne('/api/v1/things').flush(null, { status: 401, statusText: 'Unauthorized' });
     backend.expectOne(AUTH_API.refresh).flush(null, { status: 401, statusText: 'Unauthorized' });
 
     await expect(call).rejects.toMatchObject({ status: 401 });
-    expect(navigate).toHaveBeenCalledWith(['/login'], {});
+    expect(navigate).toHaveBeenCalledWith('/login');   // LIS-CR-005: the find page
     expect(navigation.loads).toEqual([]);
   });
 
   it('never retries the auth endpoints themselves', async () => {
-    const call = firstValueFrom(http.post(AUTH_API.signIn, { username: 'x', password: 'y', tenant: null }));
+    const call = firstValueFrom(http.post(AUTH_API.signIn, { username: 'x', password: 'y', laboratory: 'nile-lab' }));
     backend.expectOne(AUTH_API.signIn).flush({ code: 'AUTH-002', title: 'bad', status: 401 }, { status: 401, statusText: 'Unauthorized' });
 
     await expect(call).rejects.toMatchObject({ code: 'AUTH-002' });

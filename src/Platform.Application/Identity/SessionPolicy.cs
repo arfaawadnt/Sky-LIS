@@ -52,7 +52,7 @@ public sealed class SessionPolicy
     public const int PasswordMaxLength = 128;
 }
 
-/// <summary>A user's active memberships across tenants, listed at sign-in to select the tenant (D-06). Elevated read: the only consumer is the sign-in handler.</summary>
+/// <summary>A user's active memberships across tenants (D-06), in laboratories that are usable (INV-PLT-003). Elevated read: sign-in picks the membership of the tenant its address names (LIS-CR-005); Organization checks sole tenancy.</summary>
 public sealed record MembershipSummary(Guid TenantId, Guid MembershipId, string DisplayNameEn, string DisplayNameAr, string Language, IReadOnlyList<Guid> BranchIds);
 
 public interface IMembershipDirectory
@@ -61,8 +61,21 @@ public interface IMembershipDirectory
 
     /// <summary>
     /// Whether the user holds an active membership in a client laboratory that is not usable (deactivated, or trial
-    /// ended: INV-PLT-003). Sign-in names that refusal <c>CLI-020</c> instead of the generic "no membership"; when
-    /// <paramref name="tenantId"/> is given only that laboratory is considered (the tenant chosen on the sign-in page).
+    /// ended: INV-PLT-003). Sign-in names that refusal <c>CLI-020</c> to the laboratory's own members only; when
+    /// <paramref name="tenantId"/> is given only that laboratory is considered (the one the sign-in address names, LIS-CR-005).
     /// </summary>
     Task<bool> HasInactiveClientMembershipAsync(Guid platformUserId, Guid? tenantId, CancellationToken cancellationToken);
+}
+
+/// <summary>LIS-CR-005: the client tenant a laboratory address names, and whether its users may sign in now (Active, or Trial before its end: INV-PLT-003).</summary>
+public sealed record LaboratoryAddress(Guid TenantId, bool IsUsable);
+
+/// <summary>
+/// LIS-CR-005: resolves a laboratory address (<c>saas.tenants.portal_slug</c>) at sign-in, before any tenant is known. Reads the
+/// platform table only (no RLS, no elevation). <see langword="null"/> for an unknown address and for the platform tenant, which
+/// has no laboratory address (its staff sign in at the Super Admin address).
+/// </summary>
+public interface ILaboratoryAddresses
+{
+    Task<LaboratoryAddress?> FindAsync(string slug, CancellationToken cancellationToken);
 }

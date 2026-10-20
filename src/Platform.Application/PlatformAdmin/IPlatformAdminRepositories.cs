@@ -16,9 +16,9 @@ public interface ITenantRepository : IRepository<Tenant>
 {
     Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken);
 
-    Task<Paged<ClientListItem>> ListAsync(ClientFilter filter, PageRequest page, string portalDomain, CancellationToken cancellationToken);
+    Task<Paged<ClientListItem>> ListAsync(ClientFilter filter, PageRequest page, string portalBaseUrl, CancellationToken cancellationToken);
 
-    Task<ClientDetail?> GetDetailAsync(Guid id, string portalDomain, CancellationToken cancellationToken);
+    Task<ClientDetail?> GetDetailAsync(Guid id, string portalBaseUrl, CancellationToken cancellationToken);
 
     /// <summary>Read-only status for the sign-in port; <see langword="null"/> when the tenant has no client record.</summary>
     Task<(TenantStatus Status, DateTimeOffset? TrialEndsAtUtc)?> FindStatusAsync(Guid id, CancellationToken cancellationToken);
@@ -159,7 +159,7 @@ public interface IPlatformDashboardReader
 
     Task<IReadOnlyList<PlanShare>> PlanDistributionAsync(CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<RecentClient>> RecentClientsAsync(int take, string portalDomain, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RecentClient>> RecentClientsAsync(int take, string portalBaseUrl, CancellationToken cancellationToken);
 
     /// <summary>Names of the given clients, for the per-client activity list.</summary>
     Task<IReadOnlyDictionary<Guid, (string NameEn, string NameAr)>> ClientNamesAsync(IReadOnlyCollection<Guid> tenantIds, CancellationToken cancellationToken);
@@ -186,10 +186,14 @@ public sealed record AdminSessionRow(
     DateTimeOffset LastSeenAtUtc,
     DateTimeOffset ExpiresAtUtc);
 
-/// <summary>Where the laboratories' portals live: <c>Lis:Platform:PortalDomain</c>, default <c>skylis.app</c>.</summary>
+/// <summary>
+/// LIS-CR-005: where the laboratories sign in. <see cref="PortalBaseUrl"/> is <c>Lis:Platform:PortalBaseUrl</c> (absolute URL,
+/// no path, no trailing slash; required and https in Production, ConfigGuard); a laboratory's address is
+/// <c>{PortalBaseUrl}/lab/{slug}</c> (<see cref="Platform.Domain.PlatformAdmin.Tenant.PortalUrlOf"/>).
+/// </summary>
 public interface IPortalAddressOptions
 {
-    string PortalDomain { get; }
+    string PortalBaseUrl { get; }
 }
 
 // Location hierarchy under a governorate (change request 2026-10-19, A2): one repository per level, each listing its

@@ -96,8 +96,8 @@ public sealed class ProvisionClientHandler(
             await provisioner.CopyAfterFlushAsync(prepared, ct);
         }, cancellationToken);
 
-        await TenantProvisioner.AnnounceAsync(prepared, portal.PortalDomain, sender, events, cancellationToken);
-        return new ProvisionedClient(prepared.Tenant.Id, prepared.Tenant.PortalUrl(portal.PortalDomain), prepared.AdminUsername);
+        await TenantProvisioner.AnnounceAsync(prepared, portal.PortalBaseUrl, sender, events, cancellationToken);
+        return new ProvisionedClient(prepared.Tenant.Id, prepared.Tenant.PortalUrl(portal.PortalBaseUrl), prepared.AdminUsername);
     }
 }
 
@@ -292,7 +292,7 @@ public sealed class ResetClientAdminPasswordHandler(
         var placeholders = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["labName"] = tenant.Name.For(tenant.PreferredLanguage),
-            ["url"] = tenant.PortalUrl(portal.PortalDomain),
+            ["url"] = tenant.PortalUrl(portal.PortalBaseUrl),
             ["username"] = user.Username,
         };
         await sender.SendAsync(new NotificationMessage(NotificationChannel.Sms, user.Mobile ?? tenant.ManagerMobile, NotificationTemplateCodes.PortalUrl, tenant.PreferredLanguage, placeholders), cancellationToken);

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Identity;
 using Platform.Domain.Organization;
+using Platform.Domain.PlatformAdmin;
 using Platform.Domain.Settings;
 using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Persistence.Settings;
@@ -78,6 +79,8 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                     // F-01: the idle timeout of the session's tenant and the platform's, as two scalar subqueries of this one read
                     OwnTimeout = context.Set<TenantSetting>().Where(s => s.TenantId == session.TenantId && s.Key == timeoutKey).Select(s => s.Value).FirstOrDefault(),
                     PlatformTimeout = context.Set<TenantSetting>().Where(s => s.TenantId == platformTenant && s.Key == timeoutKey).Select(s => s.Value).FirstOrDefault(),
+                    // LIS-CR-005: the laboratory address of the session's tenant (none for the platform tenant), a scalar subquery of this one read
+                    PortalSlug = context.Set<Tenant>().Where(t => t.Id == session.TenantId && t.Id != platformTenant).Select(t => t.PortalSlug).FirstOrDefault(),
                 }).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
 
             if (row is null)
@@ -125,6 +128,7 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                     MustChangePassword = row.MustChangePassword,
                     PasswordExpiresAtUtc = row.PasswordExpiresAtUtc,
                     SessionTimeoutMinutes = SettingKeys.SessionTimeoutMinutes.Resolve(row.OwnTimeout, row.PlatformTimeout),
+                    PortalSlug = row.PortalSlug,
                 };
             }
         }
@@ -143,8 +147,8 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
 }
 
 /// <summary>
-/// Lists a user's active memberships across tenants for the tenant selection at sign-in (D-06). Elevated: an
-/// allow-listed site. <see cref="MembershipSummary.BranchIds"/> is the <b>selectable</b> list: the assigned branches,
+/// Lists a user's active memberships across tenants (D-06): sign-in picks the one of the tenant its address names
+/// (LIS-CR-005), Organization checks sole tenancy. Elevated: an allow-listed site. <see cref="MembershipSummary.BranchIds"/> is the <b>selectable</b> list: the assigned branches,
 /// or — for an unrestricted membership — every active branch of that tenant (intake LIS-INT-ORG-001 A1), so sign-in
 /// auto-selects the branch when exactly one is selectable (CP-04).
 /// </summary>

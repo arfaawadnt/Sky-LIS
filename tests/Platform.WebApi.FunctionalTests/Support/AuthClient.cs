@@ -53,12 +53,14 @@ internal sealed class AuthClient(HttpClient http)
         return (await response.Content.ReadFromJsonAsync<CredentialChallengeResponse>())!;
     }
 
+    /// <param name="target">LIS-CR-005: the sign-in address (laboratory or Super Admin); when null, the user's one active membership decides (<see cref="SignInTargets.ResolveAsync"/>).</param>
     /// <param name="cookie">The refresh cookie the browser still holds, sent with the sign-in like a real browser does (R2-04).</param>
-    public async Task<HttpResponseMessage> SignInRawAsync(string username, string sealedPassword, Guid? tenant = null, string? cookie = null)
+    public async Task<HttpResponseMessage> SignInRawAsync(string username, string sealedPassword, SignInTarget? target = null, string? cookie = null)
     {
+        target ??= await SignInTargets.ResolveAsync(username);
         var request = new HttpRequestMessage(HttpMethod.Post, SignInPath)
         {
-            Content = JsonContent.Create(new { tenant, username, password = sealedPassword }),
+            Content = JsonContent.Create(new { laboratory = target.Laboratory, admin = target.Admin, username, password = sealedPassword }),
         };
         request.Headers.Add("X-Requested-With", "Platform");
         if (cookie is not null)
@@ -69,15 +71,15 @@ internal sealed class AuthClient(HttpClient http)
         return await Http.SendAsync(request);
     }
 
-    public async Task<HttpResponseMessage> SignInAsync(string username, string password, Guid? tenant = null, string? cookie = null)
+    public async Task<HttpResponseMessage> SignInAsync(string username, string password, SignInTarget? target = null, string? cookie = null)
     {
         var challenge = await ChallengeAsync();
-        return await SignInRawAsync(username, TestSealer.Seal(challenge, "password", password, "POST " + SignInPath), tenant, cookie);
+        return await SignInRawAsync(username, TestSealer.Seal(challenge, "password", password, "POST " + SignInPath), target, cookie);
     }
 
-    public async Task<(AuthResponse Body, string Cookie, string SetCookie)> SignInExpectingSuccessAsync(string username, string password, Guid? tenant = null, string? cookie = null)
+    public async Task<(AuthResponse Body, string Cookie, string SetCookie)> SignInExpectingSuccessAsync(string username, string password, SignInTarget? target = null, string? cookie = null)
     {
-        var response = await SignInAsync(username, password, tenant, cookie);
+        var response = await SignInAsync(username, password, target, cookie);
         Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
         var body = (await response.Content.ReadFromJsonAsync<AuthResponse>())!;
         var setCookie = response.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("__Secure-rt=", StringComparison.Ordinal));

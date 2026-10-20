@@ -7,7 +7,8 @@ import { ACCOUNT_API } from '../api/account.contracts';
 import { AUTH_API, type AuthResponse } from '../api/auth.contracts';
 import { AuthStore } from './auth.store';
 import { broadcastSessionChannel, readSessionMessage } from './session-channel';
-import { meaningfulReturnUrl, signInUrl } from './session-navigation';
+import { PLATFORM_TENANT_ID } from '../tenancy/tenant-ids';
+import { idleSignInUrl, isLoginRoute, laboratorySlugOf, meaningfulReturnUrl, normaliseLaboratorySlug, signInUrl } from './session-navigation';
 import { FakeBrowserNavigation, FakeSessionChannel, provideSessionTesting } from './session-testing';
 
 function signedIn(token: string, branchId: string | null = null, userId = 'u1', tenantId = 't1'): AuthResponse {
@@ -52,9 +53,9 @@ describe('AuthStore (D-01, P-61)', () => {
   afterEach(() => http.verify());
 
   it('keeps the access token in memory only and exposes identity from the profile', async () => {
-    const pending = store.signIn('mona', 'secret', null);
+    const pending = store.signIn('mona', 'secret', { laboratory: 'nile-lab' });
     const request = http.expectOne(AUTH_API.signIn);
-    expect(request.request.body).toEqual({ tenant: null, username: 'mona', password: 'secret' });
+    expect(request.request.body).toEqual({ username: 'mona', password: 'secret', laboratory: 'nile-lab' });   // LIS-CR-005: no tenant id
     request.flush(signedIn('token-1'));
     await pending;
 
@@ -97,13 +98,39 @@ describe('AuthStore (D-01, P-61)', () => {
     expect(navigation.loads).toEqual([]); // no session to end: no reload loop at start-up
   });
 
-  it('a select-tenant answer leaves the store signed out until the choice is posted', async () => {
-    const pending = store.signIn('mona', 'secret', null);
-    http.expectOne(AUTH_API.signIn).flush({ step: 'select-tenant', accessToken: null, expiresAtUtc: null, refreshToken: null, profile: null, tenants: [{ tenantId: 't1', displayName: 'Lab 1' }] } satisfies AuthResponse);
+  it('posts admin: true from the Super Admin address and stays signed out on a step that is not signed-in (LIS-CR-005)', async () => {
+    const pending = store.signIn('root', 'secret', { admin: true });
+    const request = http.expectOne(AUTH_API.signIn);
+    expect(request.request.body).toEqual({ username: 'root', password: 'secret', admin: true });
+    request.flush({ step: 'mfa', accessToken: null, expiresAtUtc: null, refreshToken: null, profile: null } satisfies AuthResponse);
     const response = await pending;
 
-    expect(response.step).toBe('select-tenant');
+    expect(response.step).toBe('mfa');
     expect(store.isAuthenticated()).toBe(false);
+  });
+
+  it('ends a laboratory session on its own address, and an idle end there too (LIS-CR-005)', async () => {
+    const pending = store.signIn('mona', 'secret', { laboratory: 'nile-lab' });
+    const response = signedIn('token-1');
+    http.expectOne(AUTH_API.signIn).flush({ ...response, profile: response.profile === null ? null : { ...response.profile, portalSlug: 'nile-lab' } });
+    await pending;
+
+    const signOut = store.signOut('idle');
+    http.expectOne(AUTH_API.signOut).flush(null);
+    await signOut;
+    expect(navigation.loads).toEqual(['/lab/nile-lab?reason=idle']);
+  });
+
+  it('ends a platform session on the Super Admin sign-in, keeping a Super Admin return URL (LIS-CR-005)', async () => {
+    const pending = store.signIn('root', 'secret', { admin: true });
+    http.expectOne(AUTH_API.signIn).flush(signedIn('token-1', null, 'a1', PLATFORM_TENANT_ID));
+    await pending;
+    navigation.url = '/admin/clients';
+
+    const refresh = store.refresh();
+    http.expectOne(AUTH_API.refresh).flush({ code: 'AUTH-012', title: 'rejected', status: 401 }, { status: 401, statusText: 'Unauthorized' });
+    await refresh;
+    expect(navigation.loads).toEqual(['/admin/login?returnUrl=%2Fadmin%2Fclients']);
   });
 
   it('exposes the branch of the session and replaces the profile after selecting one (CP-04)', async () => {
@@ -407,6 +434,30 @@ describe('session channel and sign-in URL helpers', () => {
     expect(() => broadcastSessionChannel(null).post({ kind: 'signed-out' })).not.toThrow();
   });
 
+  it('chooses the sign-in address of the session: laboratory, Super Admin, or the find page (LIS-CR-005)', () => {
+    const lab = { tenantId: 't1', portalSlug: 'nile-lab' };
+    const platform = { tenantId: PLATFORM_TENANT_ID, portalSlug: null };
+    expect(signInUrl('/results/worklist', lab)).toBe('/lab/nile-lab?returnUrl=%2Fresults%2Fworklist');
+    expect(signInUrl('/admin/clients', lab)).toBe('/lab/nile-lab');   // a laboratory address never leads to a Super Admin page
+    expect(signInUrl('/admin/clients', platform)).toBe('/admin/login?returnUrl=%2Fadmin%2Fclients');
+    expect(signInUrl('/billing/payments', platform)).toBe('/admin/login');
+    expect(signInUrl('/billing/payments', null)).toBe('/login?returnUrl=%2Fbilling%2Fpayments');
+    expect(signInUrl('/admin/clients', null)).toBe('/admin/login?returnUrl=%2Fadmin%2Fclients');
+    expect(signInUrl(null, { tenantId: 't1', portalSlug: null })).toBe('/login');   // a profile without an address
+    expect(idleSignInUrl(lab)).toBe('/lab/nile-lab?reason=idle');
+    expect(idleSignInUrl(platform)).toBe('/admin/login?reason=idle');
+    expect(idleSignInUrl()).toBe('/login?reason=idle');
+    for (const url of ['/login', '/login/recover', '/lab/nile-lab', '/lab/nile-lab/recover?x=1', '/admin/login', '/admin/login/recover']) {
+      expect(isLoginRoute(url)).toBe(true);
+    }
+
+    expect(isLoginRoute('/admin/clients')).toBe(false);
+    expect(isLoginRoute('/laboratory')).toBe(false);
+    expect(normaliseLaboratorySlug('  https://sky.example.com/lab/Nile-Lab/recover ')).toBe('nile-lab');
+    expect(laboratorySlugOf('https://sky.example.com/lab/nile-lab')).toBe('nile-lab');
+    expect(laboratorySlugOf('https://nile-lab.sky.example.com')).toBeNull();
+  });
+
   it('carries a return URL only when it is meaningful (B-11)', () => {
     expect(signInUrl('/login')).toBe('/login');
     expect(signInUrl('/login?returnUrl=%2Fx')).toBe('/login');
@@ -415,5 +466,6 @@ describe('session channel and sign-in URL helpers', () => {
     expect(signInUrl(null)).toBe('/login');
     expect(signInUrl('/billing/payments')).toBe('/login?returnUrl=%2Fbilling%2Fpayments');
     expect(meaningfulReturnUrl('/login/recover')).toBeNull();
+    expect(meaningfulReturnUrl('/lab/nile-lab?returnUrl=%2Fx')).toBeNull();
   });
 });

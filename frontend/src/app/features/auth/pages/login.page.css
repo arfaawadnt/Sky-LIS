@@ -1,113 +1,28 @@
-/* Sign-in, design 5c "light premium" (2026-10-20): the brand light ground, the Sky LIS logo large, a white card. */
-:host {
-  display: block;
-}
-
-.page {
-  min-height: 100vh;
+/* The card of the sign-in, design 5c (2026-10-20); the ground is `ui/auth-frame`. */
+.title {
   display: flex;
-  flex-direction: column;
-  border-top: 4px solid transparent;
-  border-image: var(--grad) 1;
-  background-color: var(--bg);
-  background-image:
-    radial-gradient(900px 520px at 100% 0%, rgba(110, 59, 228, 0.1), transparent 65%),
-    radial-gradient(900px 600px at 0% 100%, rgba(42, 125, 245, 0.12), transparent 65%),
-    radial-gradient(rgba(11, 42, 91, 0.07) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 24px 24px;
-}
-
-.head,
-.foot {
-  display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  padding: var(--sp-6) 56px var(--sp-2);
+  gap: var(--sp-3);
+  margin-block-end: var(--sp-5);
 }
 
-.brand img {
-  display: block;
-  height: 112px;
-  width: auto;
-}
-
-.lang-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-height: 44px;
-  padding: 0 18px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  background: var(--surface);
-  color: var(--ink-2);
-  cursor: pointer;
-}
-
-.main {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 64px;
-  width: 100%;
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: var(--sp-6) 56px 56px;
-  box-sizing: border-box;
-}
-
-.hero {
-  flex: 1 1 420px;
-  min-width: 0;
-}
-
-.eyebrow {
-  margin: 0 0 var(--sp-4);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--violet-2);
-}
-
-h1 {
-  margin: 0 0 var(--sp-4);
-  font-size: clamp(36px, 4.4vw, 58px);
-  line-height: 1.08;
-  font-weight: 600;
-  color: var(--navy);
-}
-
-.lead {
-  margin: 0;
-  max-width: 460px;
-  font-size: 18px;
-  line-height: 1.6;
-  color: var(--ink-2);
-}
-
-.card {
-  flex: 0 1 420px;
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 36px;
+.lab-logo {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
   border: 1px solid var(--line-soft);
-  border-radius: 20px;
+  border-radius: var(--r);
   background: var(--surface);
-  box-shadow: 0 1px 2px rgba(11, 42, 91, 0.06), 0 30px 70px -30px rgba(11, 42, 91, 0.35);
 }
 
 h2 {
-  margin: 0 0 var(--sp-5);
+  margin: 0;
   font-size: 22px;
   color: var(--navy);
 }
 
-.field input,
-.field select {
+.field input {
   min-height: 48px;
   border-radius: var(--r);
   background: var(--surface-2);
@@ -138,20 +53,23 @@ h2 {
 
 .forgot {
   display: inline-block;
-  margin-top: var(--sp-2);
+  margin-block-start: var(--sp-2);
   font-size: 14px;
 }
 
 .submit {
+  display: grid;
+  place-items: center;
   width: 100%;
   height: 50px;
-  margin-top: var(--sp-2);
+  margin-block-start: var(--sp-2);
   border: 0;
   border-radius: var(--r);
   background: linear-gradient(90deg, var(--blue-2), var(--violet-2));
   color: #fff;
   font-size: 16px;
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
   box-shadow: 0 6px 16px -8px rgba(91, 42, 203, 0.8);
 }
@@ -161,7 +79,9 @@ h2 {
   cursor: progress;
 }
 
-.sealed {
+.sealed,
+.other,
+.loading {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -170,39 +90,20 @@ h2 {
   color: var(--muted);
 }
 
-.foot {
-  padding-block: 20px;
-  border-top: 1px solid var(--line-soft);
+.other {
+  display: block;
   font-size: 14px;
-  color: var(--muted);
 }
 
-.foot nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+.missing {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+  text-align: center;
+  color: var(--violet-2);
 }
 
-.strong {
-  font-weight: 600;
-}
-
-@media (max-width: 720px) {
-  .head,
-  .foot,
-  .main {
-    padding-inline: var(--sp-4);
-  }
-
-  .main {
-    gap: var(--sp-5);
-  }
-
-  .brand img {
-    height: 72px;
-  }
-
-  .card {
-    padding: var(--sp-5);
-  }
+.missing p {
+  margin: 0;
+  color: var(--ink-2);
 }

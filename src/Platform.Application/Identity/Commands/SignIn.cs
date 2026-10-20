@@ -10,6 +10,7 @@ using Platform.Contracts.Identity;
 using Platform.Domain.Identity;
 using Platform.Domain.PlatformAdmin;
 using Platform.SharedKernel.Abstractions;
+using Platform.SharedKernel.MultiTenancy;
 using Platform.SharedKernel.Primitives;
 
 namespace Platform.Application.Identity.Commands;
@@ -19,22 +20,37 @@ namespace Platform.Application.Identity.Commands;
 /// <paramref name="PresentedRefreshToken"/> is the refresh cookie the browser sent with the sign-in, if any (R2-04): the new
 /// cookie overwrites it, so the session it identifies — whoever it belonged to — is revoked in the same commit instead of
 /// staying active and unreachable on the server.
+/// LIS-CR-005: the sign-in address names the target — <paramref name="Laboratory"/> (a laboratory's address) or
+/// <paramref name="Admin"/> = true (the Super Admin address), exactly one. Only the membership of that tenant is considered;
+/// an unknown address, a user who is not a member and a laboratory user at the Super Admin address are all answered like a
+/// wrong password (<c>AUTH-002</c>), after the password was verified, with a distinct reason in the security event.
 /// </summary>
 [AllowUnauthenticated]
-public sealed record SignInCommand(Guid? Tenant, string Username, string Password, string? ClientIp, string? UserAgent, string? PresentedRefreshToken = null) : ICommand<SignInResult>;
+public sealed record SignInCommand(string? Laboratory, bool? Admin, string Username, string Password, string? ClientIp, string? UserAgent, string? PresentedRefreshToken = null) : ICommand<SignInResult>
+{
+    /// <summary>True when the request signs in at the Super Admin address.</summary>
+    public bool AtAdministration => Admin == true && Laboratory is null;
+}
 
 public sealed record SignInResult(
     string Step,
     IssuedAccessToken? AccessToken,
     string? RefreshToken,
     SessionKind Kind,
-    AuthProfile? Profile,
-    IReadOnlyList<TenantChoice>? Tenants);
+    AuthProfile? Profile);
 
 public sealed class SignInCommandValidator : AbstractValidator<SignInCommand>
 {
     public SignInCommandValidator()
     {
+        // LIS-CR-005: exactly one target; the shape of an address is checked here (a malformed one is 400, never AUTH-002).
+        RuleFor(command => command.Laboratory)
+            .Must((command, laboratory) => laboratory is not null ^ command.Admin == true)
+            .WithMessage("Send exactly one of 'laboratory' (the laboratory address) or 'admin': true (the Super Admin sign-in).");
+        RuleFor(command => command.Laboratory)
+            .Must(Tenant.IsAddressShape)
+            .When(command => command.Laboratory is not null)
+            .WithMessage($"The laboratory address is {Tenant.MinSlugLength} to {Tenant.MaxSlugLength} characters of a-z, 0-9 and '-'.");
         RuleFor(command => command.Username).NotEmpty().MaximumLength(PlatformUser.MaxUsernameLength);
         RuleFor(command => command.Password).NotEmpty().MaximumLength(1024);
         RuleFor(command => command.UserAgent).MaximumLength(RefreshSession.MaxUserAgentLength);
@@ -45,6 +61,7 @@ public sealed class SignInCommandHandler(
     IPlatformUserRepository users,
     IRefreshSessionRepository sessions,
     IMembershipDirectory memberships,
+    ILaboratoryAddresses laboratories,
     IPasswordHasher hasher,
     IRefreshTokenService refreshTokens,
     IAccessTokenService accessTokens,
@@ -60,6 +77,14 @@ public sealed class SignInCommandHandler(
     public async Task<SignInResult> Handle(SignInCommand command, CancellationToken cancellationToken)
     {
         var now = clock.UtcNow;
+
+        // LIS-CR-005: the target is resolved before the account, so every path below costs the same reads.
+        LaboratoryAddress? laboratory = null;
+        if (!command.AtAdministration)
+        {
+            laboratory = await laboratories.FindAsync(Tenant.NormaliseAddress(command.Laboratory), cancellationToken);
+        }
+
         var user = await users.FindByUsernameAsync(command.Username, cancellationToken);
 
         if (user is null)
@@ -113,28 +138,7 @@ public sealed class SignInCommandHandler(
             throw new DomainException(ProblemCodes.AccountExpired, "The account has expired.", DomainFault.Unauthenticated);
         }
 
-        var active = await memberships.ListActiveForUserAsync(user.Id, cancellationToken);
-        var membership = SelectMembership(active, command.Tenant);
-        if (membership is null)
-        {
-            if (active.Count > 1 && command.Tenant is null)
-            {
-                await unitOfWork.SaveChangesAsync(cancellationToken);
-                return new SignInResult(AuthResponse.StepSelectTenant, null, null, SessionKind.Browser, null,
-                    active.Select(m => new TenantChoice(m.TenantId, m.TenantId.ToString())).ToList());
-            }
-
-            // SA-04 / INV-PLT-003: a user whose laboratory was deactivated (or whose trial ended) is told so (CLI-020),
-            // not "no membership" — the membership exists; the laboratory is what blocks the sign-in.
-            if (await memberships.HasInactiveClientMembershipAsync(user.Id, command.Tenant, cancellationToken))
-            {
-                await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInFailed, SecurityEvent.Warning, ActorUserId: user.Id, Detail: "client_inactive"), cancellationToken);
-                throw new DomainException(PlatformAdminCodes.ClientInactive, "This laboratory's subscription is inactive. Contact National Technology.", DomainFault.Unauthenticated);
-            }
-
-            await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInFailed, SecurityEvent.Warning, ActorUserId: user.Id, Detail: "no_membership"), cancellationToken);
-            throw new DomainException(ProblemCodes.NoActiveMembership, "No active membership for this tenant.", DomainFault.Unauthenticated);
-        }
+        var membership = await SelectMembershipAsync(command, laboratory, user.Id, cancellationToken);
 
         // MFA is a capability whose policy is configuration (02 §4.5); until a policy requires it, sessions open with full scope.
         var secret = refreshTokens.NewSecret();
@@ -174,7 +178,52 @@ public sealed class SignInCommandHandler(
         var accessToken = accessTokens.Issue(new AccessTokenSubject(user.Id, session.Id, session.TenantId, session.Scope));
         var profile = Profiles.ToProfile(principal, session.Scope);
 
-        return new SignInResult(AuthResponse.StepSignedIn, accessToken, refreshTokens.Format(session.Id, secret.Secret), session.Kind, profile, null);
+        return new SignInResult(AuthResponse.StepSignedIn, accessToken, refreshTokens.Format(session.Id, secret.Secret), session.Kind, profile);
+    }
+
+    /// <summary>
+    /// LIS-CR-005: the one membership the sign-in address allows — the platform tenant's at the Super Admin address, the named
+    /// laboratory's otherwise. Called after the password was verified. A laboratory that is not usable keeps its own refusal
+    /// (<c>CLI-020</c>, SA-04 / INV-PLT-003) for its members only; every other miss is <c>AUTH-002</c> with a distinct reason.
+    /// </summary>
+    private async Task<MembershipSummary> SelectMembershipAsync(SignInCommand command, LaboratoryAddress? laboratory, Guid userId, CancellationToken cancellationToken)
+    {
+        Guid tenantId;
+        if (command.AtAdministration)
+        {
+            tenantId = TenantIds.Platform;
+        }
+        else if (laboratory is null)
+        {
+            await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInFailed, SecurityEvent.Warning, ActorUserId: userId, Detail: "unknown_laboratory"), cancellationToken);
+            throw InvalidCredentials();
+        }
+        else if (!laboratory.IsUsable)
+        {
+            // SA-04 / INV-PLT-003: a member of a deactivated laboratory (or one whose trial ended) is told so (CLI-020).
+            if (await memberships.HasInactiveClientMembershipAsync(userId, laboratory.TenantId, cancellationToken))
+            {
+                await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInFailed, SecurityEvent.Warning, ActorUserId: userId, Detail: "client_inactive"), cancellationToken);
+                throw new DomainException(PlatformAdminCodes.ClientInactive, "This laboratory's subscription is inactive. Contact National Technology.", DomainFault.Unauthenticated);
+            }
+
+            await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInFailed, SecurityEvent.Warning, ActorUserId: userId, Detail: "not_a_member"), cancellationToken);
+            throw InvalidCredentials();
+        }
+        else
+        {
+            tenantId = laboratory.TenantId;
+        }
+
+        var active = await memberships.ListActiveForUserAsync(userId, cancellationToken);
+        var membership = active.FirstOrDefault(m => m.TenantId == tenantId);
+        if (membership is null)
+        {
+            await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInFailed, SecurityEvent.Warning, ActorUserId: userId, Detail: command.AtAdministration ? "not_platform_staff" : "not_a_member"), cancellationToken);
+            throw InvalidCredentials();
+        }
+
+        return membership;
     }
 
     /// <summary>
@@ -203,16 +252,6 @@ public sealed class SignInCommandHandler(
         }
 
         return revoked ? previous : null;
-    }
-
-    private static MembershipSummary? SelectMembership(IReadOnlyList<MembershipSummary> active, Guid? requested)
-    {
-        if (requested is { } tenant)
-        {
-            return active.FirstOrDefault(m => m.TenantId == tenant);
-        }
-
-        return active.Count == 1 ? active[0] : null;
     }
 
     private static IPAddress? ParseIp(string? value) => IPAddress.TryParse(value, out var address) ? address : null;

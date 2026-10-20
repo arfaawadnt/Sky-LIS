@@ -118,7 +118,7 @@ public sealed class TenantProvisioner(
     }
 
     /// <summary>After the commit: the portal address to the manager (template <c>portal-url</c>) and the security event.</summary>
-    public static async Task AnnounceAsync(PreparedTenant prepared, string portalDomain, INotificationSender sender, ISecurityEventLog events, CancellationToken cancellationToken)
+    public static async Task AnnounceAsync(PreparedTenant prepared, string portalBaseUrl, INotificationSender sender, ISecurityEventLog events, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prepared);
         ArgumentNullException.ThrowIfNull(sender);
@@ -127,7 +127,7 @@ public sealed class TenantProvisioner(
         var placeholders = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["labName"] = tenant.Name.For(tenant.PreferredLanguage),
-            ["url"] = tenant.PortalUrl(portalDomain),
+            ["url"] = tenant.PortalUrl(portalBaseUrl),
             ["username"] = prepared.AdminUsername,
         };
         await sender.SendAsync(new NotificationMessage(NotificationChannel.Sms, tenant.ManagerMobile, NotificationTemplateCodes.PortalUrl, tenant.PreferredLanguage, placeholders), cancellationToken);

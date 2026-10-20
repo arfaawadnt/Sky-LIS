@@ -12,9 +12,11 @@ using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Identity;
 using Platform.Application.Organization;
+using Platform.Application.PlatformAdmin;
 using Platform.Application.Tenancy;
 using Platform.Domain.Identity;
 using Platform.Domain.Organization;
+using Platform.Domain.PlatformAdmin;
 using Platform.Domain.Tenancy;
 using Platform.Infrastructure;
 using Platform.Infrastructure.Notifications;
@@ -22,6 +24,7 @@ using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Security;
 using Platform.SharedKernel.Abstractions;
 using Platform.SharedKernel.Localization;
+using Platform.SharedKernel.MultiTenancy;
 
 namespace Platform.WebApi.FunctionalTests.Support;
 
@@ -209,6 +212,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
         scope.ServiceProvider.GetRequiredService<ITenantMembershipRepository>().Add(membership);
         await unitOfWork.SaveChangesAsync(CancellationToken.None);
+        if (!TenantIds.IsPlatform(tenant))
+        {
+            await EnsureClientRecordAsync(tenant);   // LIS-CR-005: sign-in is by laboratory address, so every seeded laboratory has one
+        }
 
         if (permissions is { Count: > 0 })
         {
@@ -220,6 +227,63 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         }
 
         return (username, tenant, user.Id);
+    }
+
+    /// <summary>
+    /// LIS-CR-005: the laboratory address of <paramref name="tenantId"/>; a tenant without a client record gets one (slug
+    /// <see cref="SlugOf"/>, placeholder country/governorate/plan created once per process: inactive, so no list or wizard offers
+    /// them; Egyptian dial code, 10-digit mobiles, Africa/Cairo like the defaults the tests were written against).
+    /// </summary>
+    public async Task<string> EnsureClientRecordAsync(Guid tenantId)
+    {
+        await ClientRecordLock.WaitAsync();
+        try
+        {
+            using var scope = Services.CreateScope();
+            var tenants = scope.ServiceProvider.GetRequiredService<ITenantRepository>();
+            if (await tenants.GetForUpdateAsync(tenantId, CancellationToken.None) is { } existing)
+            {
+                return existing.PortalSlug;
+            }
+
+            _placeholder ??= await CreatePlaceholderReferenceDataAsync(scope.ServiceProvider);
+            var (countryId, governorateId, planId) = _placeholder.Value;
+            var registrar = ActivatorUtilities.CreateInstance<ClientRecordRegistrar>(scope.ServiceProvider);
+            var record = await registrar.RegisterAsync(tenantId, SlugOf(tenantId), "Functional Laboratory", "مختبر وظيفي", countryId, governorateId, planId, suggestWhenTaken: false, CancellationToken.None);
+            return record.PortalSlug;
+        }
+        finally
+        {
+            ClientRecordLock.Release();
+        }
+    }
+
+    /// <summary>The laboratory address the factory gives a seeded tenant: <c>t</c> + the tenant id (33 characters).</summary>
+    public static string SlugOf(Guid tenantId) => "t" + tenantId.ToString("N");
+
+    private static readonly SemaphoreSlim ClientRecordLock = new(1, 1);
+
+    // One set per test process: the database is truncated once per process (TestDatabase.PrepareOnceAsync).
+    private static (Guid CountryId, Guid GovernorateId, Guid PlanId)? _placeholder;
+
+    private static async Task<(Guid, Guid, Guid)> CreatePlaceholderReferenceDataAsync(IServiceProvider services)
+    {
+        var suffix = Guid.CreateVersion7().ToString("N")[^8..].ToUpperInvariant();
+        var country = Country.Create(new CountryData("Placeholder country " + suffix, "دولة مؤقتة", Platform.TestSupport.TestCountryCodes.Next(), "+20", "Pound", "EGP", "en", "Africa/Cairo", 10, null, "LIS-CR-005 test placeholder"));
+        var governorate = Governorate.Create(country, "Placeholder governorate " + suffix, "محافظة مؤقتة", null, null);
+        var plan = Plan.Create("PH" + suffix, new PlanTerms(new LocalizedText("Placeholder plan " + suffix, "باقة مؤقتة"), 1m, "EGP", 1, 1, 0, 0));
+        country.Deactivate();
+        governorate.Deactivate();
+        plan.Deactivate();
+        using (services.GetRequiredService<ICurrentTenantSetter>().ForTenant(TenantIds.Platform))
+        {
+            services.GetRequiredService<ICountryRepository>().Add(country);
+            services.GetRequiredService<IGovernorateRepository>().Add(governorate);
+            services.GetRequiredService<IPlanRepository>().Add(plan);
+            await services.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        }
+
+        return (country.Id, governorate.Id, plan.Id);
     }
 
     public async Task<PlatformUser> LoadUserAsync(Guid userId)

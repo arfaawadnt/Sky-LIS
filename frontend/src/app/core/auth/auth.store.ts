@@ -9,6 +9,7 @@ import {
   type CompletePasswordRecoveryRequest,
   type SelectBranchRequest,
   type SignInRequest,
+  type SignInTarget,
   type StartPasswordRecoveryRequest,
 } from '../api/auth.contracts';
 import { ACCOUNT_API, type ResultsDensity } from '../api/account.contracts';
@@ -16,7 +17,7 @@ import { ProblemCodes, ProblemError, toProblemDetails } from '../api/problem-det
 import { I18nService } from '../i18n/i18n.service';
 import { REFRESH_LOCK } from './refresh-lock';
 import { SESSION_CHANNEL, type SessionMessage } from './session-channel';
-import { BROWSER_NAVIGATION, SIGN_IN_PATH, type SessionEndReason, idleSignInUrl, signInUrl } from './session-navigation';
+import { BROWSER_NAVIGATION, type SessionEndReason, idleSignInUrl, signInPathFor, signInUrl } from './session-navigation';
 
 export interface CurrentUser {
   readonly id: string;
@@ -172,9 +173,13 @@ export class AuthStore {
     }
   }
 
-  /** The password is sealed by the envelope interceptor before it leaves the browser (D-03). */
-  async signIn(username: string, password: string, tenant: string | null = null): Promise<AuthResponse> {
-    const body: SignInRequest = { tenant, username, password };
+  /**
+   * The password is sealed by the envelope interceptor before it leaves the browser (D-03). LIS-CR-005: the address the
+   * user signs in at decides the target — `{ laboratory: slug }` at `/lab/<slug>`, `{ admin: true }` at `/admin/login`.
+   * `null` posts neither (the server refuses it with VALIDATION-400); it only keeps older spec fixtures compiling.
+   */
+  async signIn(username: string, password: string, target: SignInTarget | null): Promise<AuthResponse> {
+    const body: SignInRequest = target === null ? { username, password } : { username, password, ...target };
     const response = await firstValueFrom(this.http.post<AuthResponse>(AUTH_API.signIn, body));
     this.apply(response);
     const profile = this.profileState();
@@ -233,7 +238,8 @@ export class AuthStore {
    * Ends the session on the server, tells the other tabs and reloads the sign-in page without a return URL (A-01, B-11).
    * The token goes at once; the profile stays until the page unloads (round 2 R2-05: clearing it re-ran the open page's
    * resources, keyed by the user or the branch, and each reload was refused with a 401 before `/login` arrived).
-   * `reason: 'idle'` (the idle watcher, F-01) lands every tab on `/login?reason=idle`, which says why.
+   * `reason: 'idle'` (the idle watcher, F-01) lands every tab on its sign-in page with `?reason=idle`, which says why.
+   * LIS-CR-005: the sign-in page is the session's own address (`/lab/<slug>`, `/admin/login`).
    */
   async signOut(reason: SessionEndReason | null = null): Promise<void> {
     try {
@@ -242,7 +248,8 @@ export class AuthStore {
       // the server clears the cookie either way; the token is dropped below
     } finally {
       this.channel.post(reason === 'idle' ? { kind: 'signed-out', reason } : { kind: 'signed-out' });
-      this.leave(reason === 'idle' ? idleSignInUrl() : SIGN_IN_PATH);
+      const profile = this.profileState();
+      this.leave(reason === 'idle' ? idleSignInUrl(profile) : signInPathFor(profile));
     }
   }
 
@@ -262,7 +269,7 @@ export class AuthStore {
       if (before !== null && problemCodeOf(error) === ProblemCodes.sessionIdleTimeout) {
         // F-01: the server ended the session after inactivity; every tab lands on the sign-in page that says so
         this.channel.post({ kind: 'signed-out', reason: 'idle' });
-        this.leave(idleSignInUrl());
+        this.leave(idleSignInUrl(before));
         return null;
       }
 
@@ -294,7 +301,7 @@ export class AuthStore {
   private endSession(before: AuthProfile | null, keepReturnUrl: boolean): void {
     this.clear();
     if (before !== null) {
-      this.navigation.load(signInUrl(keepReturnUrl ? this.navigation.currentUrl() : null));
+      this.navigation.load(signInUrl(keepReturnUrl ? this.navigation.currentUrl() : null, before));
     }
   }
 
@@ -322,7 +329,7 @@ export class AuthStore {
     }
 
     if (message.kind === 'signed-out' && message.reason === 'idle') {
-      this.leave(idleSignInUrl());
+      this.leave(idleSignInUrl(profile));
       return;
     }
 
@@ -347,7 +354,7 @@ export class AuthStore {
       return;
     }
 
-    this.leave(SIGN_IN_PATH);
+    this.leave(signInPathFor(profile));
   }
 
   /** The end of a session that this tab did not lose by itself: no token, nothing requested any more, then the full page load. */

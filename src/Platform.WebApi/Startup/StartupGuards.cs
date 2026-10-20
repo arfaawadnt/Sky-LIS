@@ -75,6 +75,7 @@ public static class StartupGuards
         ConfigGuard.Enforce(app.Services.GetRequiredService<SecurityOptions>(), app.Services.GetRequiredService<SessionPolicy>());
         var notifications = app.Services.GetRequiredService<NotificationOptions>();
         ConfigGuard.EnforceNotifications(notifications, app.Environment.IsProduction());
+        ConfigGuard.EnforcePortalBaseUrl(app.Configuration[ConfigGuard.PortalBaseUrlKey], app.Environment.IsProduction());   // LIS-CR-005
         if (notifications.RevealCodes)
         {
             app.Logger.LogWarning("{Key} is on: one-time codes of the subscription wizard are shown on the page (interim until an SMS gateway is configured)", NotificationOptions.RevealCodesKey);

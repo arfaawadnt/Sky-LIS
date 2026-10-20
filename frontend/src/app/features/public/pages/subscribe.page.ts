@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import type { ProblemDetails } from '../../../core/api/problem-details';
 import { SUBSCRIPTION_PASSWORD_RULE, type PublicCountry } from '../../../core/api/public-subscription.contracts';
+import { LABORATORY_PATH_PREFIX, SIGN_IN_PATH, laboratorySlugOf } from '../../../core/auth/session-navigation';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
@@ -195,9 +196,11 @@ export class SubscribePage {
     }
   }
 
+  /** LIS-CR-005: the new laboratory's own sign-in address (`/lab/<slug>`, the path of `portalUrl`), the username prefilled. */
   protected async signIn(): Promise<void> {
     const completed = this.facade.completed();
-    await this.router.navigate(['/login'], { queryParams: completed ? { username: completed.username } : {} });
+    const slug = laboratorySlugOf(completed?.portalUrl);
+    await this.router.navigate(slug === null ? [SIGN_IN_PATH] : [LABORATORY_PATH_PREFIX, slug], { queryParams: completed ? { username: completed.username } : {} });
   }
 
   protected problemText(problem: ProblemDetails | null): string {

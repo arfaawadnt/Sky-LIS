@@ -2,7 +2,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 
 import { PUBLIC_SUBSCRIPTION_API, type PublicCountry } from '../../../core/api/public-subscription.contracts';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
@@ -156,6 +156,19 @@ describe('Public pages (CP-01, CP-02)', () => {
       expect(reveal?.querySelector('.mono')?.textContent?.trim()).toBe('482913');
       // the code is shown, not typed in: the person still enters it
       expect(root.querySelector<HTMLInputElement>('input[formcontrolname=code]')?.value).toBe('');
+    });
+
+    it('opens the sign-in address of the new laboratory from the last step, the username prefilled (LIS-CR-005)', async () => {
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      const facade = TestBed.inject(SubscriptionFacade);
+      facade.completed.set({ tenantId: 't1', portalUrl: 'https://sky.example.com/lab/al-noor', username: 'noor.admin' });
+      facade.step.set(4);
+      await render();
+      expect(root.querySelector('.portal-url a')?.getAttribute('href')).toBe('https://sky.example.com/lab/al-noor');
+
+      (root.querySelector('.done button') as HTMLButtonElement).click();
+      await render();
+      expect(navigate).toHaveBeenCalledWith(['/lab', 'al-noor'], { queryParams: { username: 'noor.admin' } });
     });
   });
 });

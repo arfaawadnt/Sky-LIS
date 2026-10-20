@@ -240,10 +240,12 @@ public sealed class PatientsFlowTests : IClassFixture<ApiFactory>
     }
 
     [DatabaseFact]
-    public async Task A_laboratory_without_a_client_record_dates_by_its_time_zone_parameter_and_the_client_record_country_wins()
+    public async Task The_client_record_country_dates_the_laboratory_and_wins_over_the_time_zone_parameter()
     {
         // Round 2 R2-01, in order: the client record's country; the tenant parameter timeZone; the platform default Africa/Cairo.
-        var demoLab = Guid.CreateVersion7();
+        // LIS-CR-005: sign-in is by laboratory address, so every laboratory reachable over the API has a client record; the
+        // parameter's fallback (a tenant without one) is no longer reachable here.
+        var demoLab = await ProvisionLaboratoryAsync("America/New_York");
         var demoAdmin = await ClientAsync(demoLab, AdministratorPermissions);
         var cairoLab = await ProvisionLaboratoryAsync("Africa/Cairo");
         var cairoAdmin = await ClientAsync(cairoLab, AdministratorPermissions);

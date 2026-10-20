@@ -41,7 +41,7 @@ public sealed class ListClientsHandler(ITenantRepository tenants, IClientUsageCo
             query.PlanId,
             string.IsNullOrEmpty(query.Status) ? null : Enum.Parse<TenantStatus>(query.Status, ignoreCase: true),
             ListSort.Of(query.Sort, query.Direction));
-        var page = await tenants.ListAsync(filter, PageRequest.Normalized(query.Page, query.PageSize), portal.PortalDomain, cancellationToken);
+        var page = await tenants.ListAsync(filter, PageRequest.Normalized(query.Page, query.PageSize), portal.PortalBaseUrl, cancellationToken);
         if (page.Items.Count == 0)
         {
             return page;
@@ -61,7 +61,7 @@ public sealed class GetClientHandler(ITenantRepository tenants, IClientUsageCoun
     public async Task<ClientDetail> Handle(GetClientQuery query, CancellationToken cancellationToken)
     {
         PlatformAdminScope.Require(currentTenant);
-        var detail = await tenants.GetDetailAsync(query.ClientId, portal.PortalDomain, cancellationToken)
+        var detail = await tenants.GetDetailAsync(query.ClientId, portal.PortalBaseUrl, cancellationToken)
             ?? throw new DomainException(PlatformAdminCodes.ClientNotFound, "Client not found.", DomainFault.NotFound);
         var counts = await usage.GetAsync([detail.Id], cancellationToken);
         return counts.TryGetValue(detail.Id, out var count) ? detail with { Branches = count.Branches, Users = count.Users } : detail;

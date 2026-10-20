@@ -5,7 +5,7 @@
 | Slot / modules | `acc` — permission modules `support` (tickets), `wallet` (tenant view of the platform wallet), `dashboard` (CP-05), `audit` (CP-68 / SA-09 page and export) |
 | SRS pages | CP-01 Public website, CP-02 Subscription wizard (UI), CP-03 Login & password recovery (UI), CP-04 Branch selection (UI), CP-05 Dashboard, CP-65 Profile, CP-66 Wallet (UI), CP-67 Support, CP-68 Audit log; SA-09 Audit log, SA-21 Profile; the platform support desk (SA side of CP-67); workflow WF-01 (onboarding, steps 1 and 3) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), the prototypes and the architecture pack. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.0 — 2026-10-09 |
+| Version | 1.1 — 2026-10-20 (§17 change request LIS-CR-005: the wizard's result and SMS carry the laboratory address `{base}/lab/{slug}`; CP-65 shows it) · 1.0 — 2026-10-09 |
 | Implemented in | `src/Platform.Domain/Account`, `src/Platform.Contracts/Account`, `src/Platform.Application/Account`, `src/Platform.Infrastructure/Persistence/Account` (+ `Account.migration.sql`), `src/Platform.WebApi/Controllers/Account`, `frontend/src/app/features/{public,account}`, `frontend/src/app/features/auth` (recovery, links), `frontend/src/app/features/home` (dashboard redirect), `frontend/src/app/core/api/account.contracts.ts`, `frontend/public/i18n/{public,account}.{en,ar}.json` |
 
 > **Preferences (2026-10-14).** Beside the language (A1), the member's row density of the results grid — `resultsDensity`
@@ -233,3 +233,11 @@ Scenarios (tests named after them):
 | Q11 | Laboratory details on CP-65 (portal URL, plan, country) | Read by `LaboratoryProfileLookup` (this module's read port) from the platform's mapped `saas.tenants`/`plans`/`countries` (wave 1) with the portal domain of `IPortalAddressOptions`; no client record or no table yet (42P01) → the page shows the tenant id and a "not available" note. |
 | Q12 | The password change carries two credential fields sealed under one challenge (02 §3.3 "one challenge per request, the same nonce on every field"); the foundation's `CredentialTransportFilter` consumes the nonce once per field, so the second field is refused (CRED-003). | The endpoint follows the specification; the integrator fixes the filter to consume the nonce once per request (report). Until then the change fails with CRED-003. |
 | Q13 | Must-change at next sign-in (CP-38): where does the user land? | `passwordChangeGuard` sends the user to the profile (`?mustChange=1`) until the password is changed; it reads the own profile once per session. Exposing `mustChangePassword` on `AuthProfile` would save that call. |
+
+## 17. Change request 2026-10-20 — laboratory address in the wizard result (LIS-CR-005, package P-API)
+
+- The subscription wizard's result (`SubscriptionCompletedResponse.portalUrl`) and its `portal-url` SMS carry the laboratory's
+  sign-in address `{Lis:Platform:PortalBaseUrl}/lab/{slug}` (previously `https://{slug}.skylis.app`). The SPA's "Go to sign in"
+  opens `/lab/{slug}?username=…` (package P-SPA).
+- CP-65 (profile, laboratory card) shows the same address (`LaboratoryProfile.portalUrl`).
+- No new endpoint, code or setting in this module; the base URL and its ConfigGuard rule are PLT-001 §18.

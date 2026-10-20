@@ -102,11 +102,52 @@ public sealed class TenantTests
     }
 
     [Fact]
-    public void The_portal_url_uses_the_configured_domain()
+    public void The_portal_url_is_the_laboratory_address_under_the_configured_base_LIS_CR_005()
     {
         var client = Client();
-        Assert.Equal("https://al-noor.skylis.app", client.PortalUrl(""));
-        Assert.Equal("https://al-noor.lis.example", client.PortalUrl(".lis.example."));
+        Assert.Equal("https://lis.example.com/lab/al-noor", client.PortalUrl("https://lis.example.com"));
+        Assert.Equal("http://127.0.0.1:4300/lab/al-noor", client.PortalUrl("http://127.0.0.1:4300/"));   // a trailing slash is tolerated here (ConfigGuard refuses it)
+        Assert.Equal("https://10.0.0.5:5443/lab/demo-lab", Tenant.PortalUrlOf("demo-lab", " https://10.0.0.5:5443 "));
+        Assert.Throws<ArgumentException>(() => Tenant.PortalUrlOf("al-noor", " "));
+    }
+
+    [Theory]
+    [InlineData("al-noor", true)]
+    [InlineData("  Al-Noor ", true)]   // trimmed and lower-cased before the shape check
+    [InlineData("abc", true)]
+    [InlineData("demo", true)]         // reserved words and hyphen placement are not shape: such an address simply names no laboratory
+    [InlineData("-lab", true)]
+    [InlineData("ab", false)]
+    [InlineData("a_b_c", false)]
+    [InlineData("al noor", false)]
+    [InlineData("معمل", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void A_laboratory_address_is_three_to_forty_characters_of_a_z_0_9_and_hyphen(string? address, bool valid)
+    {
+        Assert.Equal(valid, Tenant.IsAddressShape(address));
+        Assert.False(Tenant.IsAddressShape(new string('a', Tenant.MaxSlugLength + 1)));
+        Assert.True(Tenant.IsAddressShape(new string('a', Tenant.MaxSlugLength)));
+        Assert.Equal("al-noor", Tenant.NormaliseAddress(" AL-noor "));
+    }
+
+    [Fact]
+    public void An_existing_tenant_gets_an_active_client_record_without_an_event_LIS_CR_005()
+    {
+        var egypt = Egypt();
+        var cairo = Cairo(egypt);
+        var tenantId = Guid.CreateVersion7();
+        egypt.Deactivate();   // placeholders need not be active
+
+        var record = Tenant.RegisterExisting(tenantId, Profile(egypt, cairo), egypt, cairo, Starter(), " Demo-Lab ", "ar", Now);
+
+        Assert.Equal((tenantId, "demo-lab", TenantStatus.Active, TenantSource.Manual, "ar"), (record.Id, record.PortalSlug, record.Status, record.Source, record.PreferredLanguage));
+        Assert.Equal(Now, record.ActivatedAtUtc);
+        Assert.True(record.IsUsableAt(Now));
+        Assert.Empty(record.DomainEvents);
+        Assert.Equal(PlatformAdminCodes.ClientDetailsInvalid, Assert.Throws<DomainException>(() => Tenant.RegisterExisting(Platform.SharedKernel.MultiTenancy.TenantIds.Platform, Profile(egypt, cairo), egypt, cairo, Starter(), "demo-lab", "en", Now)).Code);
+        Assert.Equal(PlatformAdminCodes.ClientDetailsInvalid, Assert.Throws<DomainException>(() => Tenant.RegisterExisting(tenantId, Profile(egypt, cairo), egypt, Cairo(Kuwait()), Starter(), "demo-lab", "en", Now)).Code);
+        Assert.Equal(PlatformAdminCodes.PortalSlugInvalid, Assert.Throws<DomainException>(() => Tenant.RegisterExisting(tenantId, Profile(egypt, cairo), egypt, cairo, Starter(), "admin", "en", Now)).Code);
     }
 
     [Fact]

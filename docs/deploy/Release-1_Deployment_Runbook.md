@@ -147,7 +147,7 @@ icacls E:\lis-data\postgres.env /inheritance:r /grant:r "SYSTEM:(R)" "BUILTIN\Ad
    | `Lis:Jwt:SigningKey` | a P-256 private key in PEM; in JSON the line breaks are written as `\n` |
    | `Lis:Jwt:SigningKeyId` | a short key id, e.g. `2026-10-k1` (changes with every signing-key rotation) |
    | `Lis:Jwt:SubjectEncryptionKey`, `Lis:DataProtection:MasterKey` | two different values of 32 random bytes, base64 |
-   | `Lis:Platform:PortalDomain` | the domain under which client portals are addressed (default `skylis.app`) |
+   | `Lis:Platform:PortalBaseUrl` | the absolute `https://` address users open, without path (e.g. `https://lis.example.net`): a laboratory signs in at `<PortalBaseUrl>/lab/<slug>`, the Super Admin at `<PortalBaseUrl>/admin/login`; the address is printed in the provisioning SMS and the subscription result (change request LIS-CR-005) |
    | `Lis:Notifications:*` | how one-time codes leave the host (§8.1): keep `PickupDirectory` = `E:\lis-data\mail-pickup` while there is no gateway; fill `Smtp:*` and `Sms:*` (password and API key included) only when a gateway contract exists, otherwise leave them empty |
 
    Generation commands are in `deploy/SECRETS.md` (Node one-liners, run on the build box). Without Node, 32 random
@@ -289,7 +289,7 @@ Every LIS key lives under `Lis`; the host reads no `ConnectionStrings`, `Jwt` or
 | `Lis:Outbox:*` | outbox worker: `Enabled`, poll 2 s, batch 50, lease 30 s, 10 attempts then dead letter | — |
 | `Lis:Jobs:WalletCharge:Enabled`, `PollInterval` | monthly subscription charge of the client wallets (W2, intake LIS-INT-PLT-001): every poll (default 1 h) charges each Active client whose next charge is due its plan's monthly fee once, then moves the date one month; trial and inactive clients are skipped; a plan currency other than the wallet's is not charged (`WALLET_CHARGE_FAILED` in the security ledger). SA-05 "Run charges now" runs the same pass | default `true`; safe with several instances (a period is charged once, guarded by the wallet's row version) |
 | `Lis:Files:Root` | uploaded files (`E:\lis-data\files`); created on demand | the service account needs modify rights (set by the install script) |
-| `Lis:Platform:PortalDomain` | domain of the client portals (`<tenant>.<domain>`) | default `skylis.app` |
+| `Lis:Platform:PortalBaseUrl` | base address of the sign-in pages (`<base>/lab/<slug>`, `<base>/admin/login`; LIS-CR-005) | absolute `https://` without path, query or trailing slash; required in Production |
 | `Lis:Notifications:PickupDirectory` | folder that receives one text file per SMS or e-mail without a gateway (`E:\lis-data\mail-pickup`; empty = log only) | absolute; in Production under `E:\lis-data`; the install script creates it readable by SYSTEM, Administrators and the service account only |
 | `Lis:Notifications:RevealCodes` | interim of a host without an SMS gateway: the subscription wizard shows the one-time code on the page (`true` on WIN-9S2KO4FA64L since 0.13.0); off by default | refused once `Lis:Notifications:Sms:Url` is configured; a warning is logged at start-up while it is on — turn it off together with connecting the gateway |
 | `Lis:Notifications:Smtp:Host`, `Port`, `EnableSsl`, `UserName`, `Password`, `From`, `Timeout` | e-mail through SMTP submission with STARTTLS (587; implicit TLS on 465 is not supported); empty `Host` = no SMTP | `From` an address; TLS may be off only for a loopback relay; a user name needs the password; timeout 1 s – 5 min |
@@ -372,5 +372,5 @@ old files removed from `E:\lis-data\mail-pickup`.
   possible (only the connection string changes).
 - **A5** The Node commands of `deploy/SECRETS.md` are the reference for key generation; OpenSSL is an alternative for
   the P-256 key. No key material is ever generated on the server by these scripts.
-- **A6** Public DNS name, certificate authority and the `PortalDomain` value are decisions of the business owner and
+- **A6** Public DNS name, certificate authority and the `PortalBaseUrl` value are decisions of the business owner and
   are not fixed here.

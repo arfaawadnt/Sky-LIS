@@ -5,7 +5,7 @@ import { catchError, from, switchMap, throwError } from 'rxjs';
 
 import { statusOf } from '../api/problem-details';
 import { AuthStore } from '../auth/auth.store';
-import { SIGN_IN_PATH, meaningfulReturnUrl } from '../auth/session-navigation';
+import { signInUrl } from '../auth/session-navigation';
 import { isApiRequest, isAuthEndpoint } from './api-url';
 
 function withBearer<T>(req: HttpRequest<T>, token: string | null): HttpRequest<T> {
@@ -50,8 +50,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         switchMap((token) => {
           if (token === null) {
             if (!hadSession) {
-              const returnUrl = meaningfulReturnUrl(router.url);
-              void router.navigate([SIGN_IN_PATH], returnUrl === null ? {} : { queryParams: { returnUrl } });
+              // LIS-CR-005: the find page, or the Super Admin sign-in for a Super Admin page
+              void router.navigateByUrl(signInUrl(router.url));
             }
 
             return throwError(() => error);

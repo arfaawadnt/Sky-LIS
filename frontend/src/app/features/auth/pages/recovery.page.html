@@ -84,5 +84,5 @@
     }
   }
 
-  <p class="foot"><a routerLink="/login">← {{ i18n.t('auth.recovery.backToLogin') }}</a></p>
+  <p class="foot"><a [routerLink]="signInLink()">← {{ i18n.t('auth.recovery.backToLogin') }}</a></p>
 </section>

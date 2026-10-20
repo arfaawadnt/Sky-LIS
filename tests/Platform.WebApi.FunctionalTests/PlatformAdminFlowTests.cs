@@ -48,7 +48,7 @@ public sealed class PlatformAdminFlowTests(ApiFactory factory) : IClassFixture<A
         var created = await ProvisionAsync(admin, place, slug, "noor.admin." + slug[^8..], manager);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var provisioned = (await created.Content.ReadFromJsonAsync<ProvisionedClient>())!;
-        Assert.Equal($"https://{slug}.skylis.app", provisioned.PortalUrl);
+        Assert.Equal($"{Platform.Infrastructure.Security.ConfigGuard.DefaultPortalBaseUrl}/lab/{slug}", provisioned.PortalUrl);   // LIS-CR-005: {Lis:Platform:PortalBaseUrl}/lab/{slug}
         Assert.Equal("portal-url", factory.Notifications.LastTo(Global(manager))!.TemplateCode);
 
         var taken = await ProvisionAsync(admin, place, slug, "other.admin." + slug[^8..], NewMobile());
@@ -170,7 +170,7 @@ public sealed class PlatformAdminFlowTests(ApiFactory factory) : IClassFixture<A
         var completed = await CompleteAsync(anonymous, started.SubscriptionId, username, "a long enough password");
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
         var result = (await completed.Content.ReadFromJsonAsync<SubscriptionCompletedResponse>())!;
-        Assert.StartsWith("https://", result.PortalUrl, StringComparison.Ordinal);
+        Assert.StartsWith($"{Platform.Infrastructure.Security.ConfigGuard.DefaultPortalBaseUrl}/lab/", result.PortalUrl, StringComparison.Ordinal);   // LIS-CR-005
         Assert.Equal("portal-url", factory.Notifications.LastTo(e164)!.TemplateCode);
 
         var availability = await anonymous.GetFromJsonAsync<UsernameAvailability>($"{Subscriptions}/check-username?username={username}");

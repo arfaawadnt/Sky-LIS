@@ -234,8 +234,10 @@ class Session {
     return line ?? null;
   }
 
-  async signIn(username, password) {
-    const response = await this.postSealed('/api/v1/auth/sign-in', { tenant: null, username, password }, ['password']);
+  // LIS-CR-005: the sign-in address names the target — { laboratory: '<slug>' } (/lab/<slug>) or { admin: true } (/admin/login).
+  async signIn(username, password, target) {
+    if (!target || (target.laboratory === undefined) === (target.admin !== true)) throw new Error('signIn needs exactly one target: { laboratory } or { admin: true }');
+    const response = await this.postSealed('/api/v1/auth/sign-in', { ...target, username, password }, ['password']);
     this.lastSetCookie = response.status === 200 ? this.captureCookie(response) : null;
     if (response.status === 200 && response.json?.step === 'signed-in') {
       this.token = response.json.accessToken;
@@ -437,7 +439,7 @@ async function fullCycle(api) {
   await step('P-01', 'platform.admin signs in (sealed password, refresh cookie)', async (s) => {
     s.req('GET credential-challenge; POST /api/v1/auth/sign-in {password: JWE}');
     s.expect('200 step=signed-in, scope platform, refresh cookie set');
-    const response = await platform.signIn('platform.admin', creds.platform);
+    const response = await platform.signIn('platform.admin', creds.platform, { admin: true });
     s.status(response, 200);
     s.check(response.json?.step === 'signed-in', 'step signed-in', response.json?.step);
     s.check(response.json?.profile?.tenantId === PLATFORM_TENANT, 'platform tenant', response.json?.profile?.tenantId);
@@ -515,7 +517,7 @@ async function fullCycle(api) {
     need(ctx.tenant, 'tenant');
     s.req('POST sign-in; POST /api/v1/auth/select-branch {MAIN}');
     s.expect('200 signed-in in the new tenant; branch bound to the refresh session');
-    const response = await admin.signIn(ctx.adminUsername, ctx.adminPassword);
+    const response = await admin.signIn(ctx.adminUsername, ctx.adminPassword, { laboratory: ctx.slug });
     s.status(response, 200, 'sign-in');
     s.check(admin.profile?.tenantId === ctx.tenant, 'profile tenant = new tenant', admin.profile?.tenantId);
     s.check(admin.profile?.mustChangePassword !== true, 'no forced password change for the provisioned administrator', admin.profile?.mustChangePassword);
@@ -737,7 +739,7 @@ async function fullCycle(api) {
   await step('T-02', 'The technician signs in; the session is bound to its only branch', async (s) => {
     s.req('POST /api/v1/auth/sign-in as tech');
     s.expect('200; profile.branchId = MAIN');
-    const signIn = await tech.signIn(ctx.techUsername, ctx.techPassword);
+    const signIn = await tech.signIn(ctx.techUsername, ctx.techPassword, { laboratory: ctx.slug });
     s.status(signIn, 200, 'tech sign-in');
     s.check(tech.profile?.branchId === ctx.mainBranch, 'tech session auto-bound to its only branch MAIN', tech.profile?.branchId);
   });
@@ -988,7 +990,8 @@ async function fullCycle(api) {
   await step('N-05', 'Cross-tenant: lab.admin (demo laboratory) cannot read V11 records', async (s) => {
     s.req('lab.admin: GET /patients/{id}, /registration/visits/{id}, /results?accession=…, /billing/visits/{id}/account, list searches');
     s.expect('404 on every direct read; searches return no V11 row');
-    const signIn = await lab.signIn('lab.admin', creds.lab);
+    const demoSlug = need(scalar(`select portal_slug from saas.tenants where id = ${lit(DEMO_TENANT)}`), 'demo laboratory address (DevTools register-tenant-client, LIS-CR-005)');
+    const signIn = await lab.signIn('lab.admin', creds.lab, { laboratory: demoSlug });
     s.status(signIn, 200, 'sign-in');
     s.check(lab.profile?.tenantId === DEMO_TENANT, 'lab.admin is in the demo laboratory', lab.profile?.tenantId);
     if (!lab.profile?.branchId) {
@@ -1116,7 +1119,7 @@ async function fullCycle(api) {
   });
 
   saveState({
-    run: RUN, base: BASE, tenant: ctx.tenant, clientName: ctx.clientName, adminUsername: ctx.adminUsername, adminPassword: ctx.adminPassword,
+    run: RUN, base: BASE, tenant: ctx.tenant, slug: ctx.slug, clientName: ctx.clientName, adminUsername: ctx.adminUsername, adminPassword: ctx.adminPassword,
     techUsername: ctx.techUsername, mainBranch: ctx.mainBranch, patient: ctx.patient, patientNumber: ctx.patientNumber, visit: ctx.visit, accession: ctx.accession,
     payments: [ctx.payment1, ctx.payment2], refund: ctx.refund, uniqueObserved: ctx.uniqueObserved,
   });
@@ -1132,7 +1135,7 @@ async function deployedRun(api) {
   await step('D-01', `Sign-in on the installed site as ${state.adminUsername}`, async (s) => {
     s.req(`POST ${api.base}/api/v1/auth/sign-in (sealed; audience = POST ${api.pathOf('/api/v1/auth/sign-in')})`);
     s.expect('200 signed-in in the V11 tenant; __Secure-rt cookie (Secure, HttpOnly, SameSite=Strict, Path=/api/v1/auth)');
-    const response = await admin.signIn(state.adminUsername, state.adminPassword);
+    const response = await admin.signIn(state.adminUsername, state.adminPassword, { laboratory: state.slug });
     s.status(response, 200);
     s.check(admin.profile?.tenantId === state.tenant, 'tenant = V11 tenant', admin.profile?.tenantId);
     const cookie = admin.lastSetCookie ?? '';
@@ -1189,7 +1192,7 @@ async function deployedRun(api) {
 async function smokeRun(api) {
   const platform = new Session(api, 'platform.admin');
   await step('S-00', 'Smoke: platform.admin sign-in, me, sign-out', async (s) => {
-    const response = await platform.signIn('platform.admin', platformCredentials().platform);
+    const response = await platform.signIn('platform.admin', platformCredentials().platform, { admin: true });
     s.status(response, 200, 'sign-in');
     s.status(await platform.get('/api/v1/auth/me'), 200, 'me');
     s.status(await platform.cookiePost('/api/v1/auth/sign-out'), 204, 'sign-out');

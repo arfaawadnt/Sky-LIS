@@ -2,17 +2,20 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 
 import { AuthStore } from './auth.store';
-import { SIGN_IN_PATH, meaningfulReturnUrl } from './session-navigation';
+import { signInUrl } from './session-navigation';
 
-/** Protected routes (01 §6.5). Affordance: the API refuses an unauthenticated request regardless (D-04). */
+/**
+ * Protected routes (01 §6.5). Affordance: the API refuses an unauthenticated request regardless (D-04). LIS-CR-005: an
+ * anonymous user goes to the find page `/login` with the return URL — or to the Super Admin sign-in when the page asked for
+ * is a Super Admin page (`/admin/…`), the only address that can lead back to it.
+ */
 export const authGuard: CanActivateFn = (_route, state) => {
   const store = inject(AuthStore);
   if (store.isAuthenticated()) {
     return true;
   }
 
-  const returnUrl = meaningfulReturnUrl(state.url);
-  return inject(Router).createUrlTree([SIGN_IN_PATH], returnUrl === null ? {} : { queryParams: { returnUrl } });
+  return inject(Router).parseUrl(signInUrl(state.url));
 };
 
 /** The sign-in page sends an authenticated user back to the application. */

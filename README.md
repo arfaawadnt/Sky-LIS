@@ -234,7 +234,24 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+Change request LIS-CR-005 (2026-10-20, `docs/build/CR-2026-10-20_Portal-Addresses.md`): the Super Admin and the laboratories no longer share
+one sign-in; every laboratory has its own address. No migration.
+
+- **Laboratory address.** Each laboratory signs in at `<base>/lab/<slug>` (its name and logo on the card) and only its own members can
+  sign in there; anyone else is refused exactly like a wrong password (`AUTH-002`, BR-28). An unknown or inactive address says
+  "This laboratory address was not found". Password recovery has its own address per context and returns to it.
+- **Super Admin address.** Platform staff sign in at `<base>/admin/login`; a laboratory user there is refused.
+- **Find your laboratory.** `<base>/login` and an anonymous `<base>/` ask only for the laboratory address and continue to it.
+- **Back to the right door.** Sign-out, the idle timeout and a lost session return to the session's own address; the subscription wizard's
+  *Sign in* opens the new laboratory's address with the administrator's username filled in.
+- **API.** `POST /api/v1/auth/sign-in` takes `laboratory` (a slug) or `admin: true` — exactly one; the `tenant` field and the laboratory
+  choice step are removed. The session profile carries `portalSlug`. New anonymous `GET /api/v1/public/laboratories/{slug}` and
+  `/{slug}/logo` (`PLT-404` otherwise). The sign-in rate limit is keyed on the username alone.
+- **Setting.** `Lis:Platform:PortalBaseUrl` (absolute URL; `https` and required in Production) replaces `Lis:Platform:PortalDomain`; every
+  portal address the system prints (provisioning SMS, subscription result, SA-04, dashboard, CP-65) is `{base}/lab/{slug}`.
+- **DevTools.** `register-tenant-client <tenantId> <slug> <nameEn> <nameAr>` gives a tenant seeded without a client record its record and
+  address; `seed-demo-lab` registers `demo-lab`.
+- **Documents.** SRS 1.3 (CP-03, SA-01, BR-28), UAT 0.7, intakes FND-001 1.2, PLT-001 1.3, ACC-001 1.1, runbook.
 
 ### v0.17.1 — 2026-10-20
 

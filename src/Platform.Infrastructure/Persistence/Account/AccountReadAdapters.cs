@@ -112,7 +112,7 @@ internal sealed class LaboratoryProfileLookup(AppDbContext context, IPortalAddre
                     tenantId,
                     row.NameEn,
                     row.NameAr,
-                    Tenant.BuildPortalUrl(row.PortalSlug, portal.PortalDomain),
+                    Tenant.PortalUrlOf(row.PortalSlug, portal.PortalBaseUrl),
                     row.CountryEn,
                     row.CountryAr,
                     row.PlanCode,

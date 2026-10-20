@@ -84,9 +84,12 @@ public static class RateLimiting
         return services;
     }
 
-    /// <summary><c>sha256(lower(tenant:username))</c>, never the username itself (02 §5.3).</summary>
-    public static string AccountKey(string? tenant, string? username) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(((tenant ?? string.Empty) + ":" + (username ?? string.Empty)).ToLowerInvariant()))).ToLowerInvariant();
+    /// <summary>
+    /// <c>sha256(lower(username))</c>, never the username itself (02 §5.3). LIS-CR-005: keyed on the account alone, whatever
+    /// laboratory address the request names, so cycling addresses never buys an account more guesses (the lockout is per user too).
+    /// </summary>
+    public static string AccountKey(string? username) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(":" + (username ?? string.Empty).ToLowerInvariant()))).ToLowerInvariant();
 
     public static bool IsCredentialEndpoint(HttpContext context) =>
         HttpMethods.IsPost(context.Request.Method)
@@ -154,11 +157,11 @@ public sealed class CredentialAccountKeyMiddleware(RequestDelegate next)
             }
             else if (context.Request.Path.Equals(SignInPath) || context.Request.Path.StartsWithSegments(RecoveryPath))
             {
-                // Sign-in keys on tenant:username; recovery (CP-03) on the identifier the caller presents (username or mobile).
+                // Sign-in keys on the username; recovery (CP-03) on the identifier the caller presents (username or mobile).
                 var body = await ReadBodyAsync(context);
-                if (body is not null && TryReadAccount(body.Value, out var tenant, out var username))
+                if (body is not null && TryReadAccount(body.Value, out var username))
                 {
-                    context.Items[RateLimiting.AccountKeyItem] = RateLimiting.AccountKey(tenant, username);
+                    context.Items[RateLimiting.AccountKeyItem] = RateLimiting.AccountKey(username);
                 }
             }
             else if (context.Request.Path.Equals(RefreshPath) || context.Request.Path.Equals(SignOutPath))
@@ -225,9 +228,8 @@ public sealed class CredentialAccountKeyMiddleware(RequestDelegate next)
         return key is null ? null : key.Length <= 80 ? key : key[..80];
     }
 
-    private static bool TryReadAccount(JsonElement root, out string? tenant, out string? username)
+    private static bool TryReadAccount(JsonElement root, out string? username)
     {
-        tenant = null;
         username = null;
         if (root.ValueKind != JsonValueKind.Object)
         {
@@ -239,10 +241,6 @@ public sealed class CredentialAccountKeyMiddleware(RequestDelegate next)
             if ((property.NameEquals("username") || property.NameEquals("usernameOrMobile")) && property.Value.ValueKind == JsonValueKind.String)
             {
                 username = property.Value.GetString();
-            }
-            else if (property.NameEquals("tenant") && property.Value.ValueKind == JsonValueKind.String)
-            {
-                tenant = property.Value.GetString();
             }
         }
 

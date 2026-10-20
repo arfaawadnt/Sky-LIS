@@ -5,11 +5,15 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using NpgsqlTypes;
 using Platform.Application.Abstractions.Notifications;
+using Platform.Application.Abstractions.Security;
+using Platform.Application.Account;
+using Platform.Application.Identity;
 using Platform.Application.PlatformAdmin;
 using Platform.Contracts.PlatformAdmin;
 using Platform.Domain.Identity;
 using Platform.Domain.PlatformAdmin;
 using Platform.Infrastructure.Notifications;
+using Platform.Infrastructure.Security;
 using Platform.SharedKernel.Abstractions;
 using Platform.SharedKernel.MultiTenancy;
 using DomainTemplate = Platform.Domain.PlatformAdmin.NotificationTemplate;
@@ -59,23 +63,74 @@ internal sealed class TenantStatusLookup(ITenantRepository tenants, IClock clock
         }
 
         var status = await tenants.FindStatusAsync(tenantId, cancellationToken).ConfigureAwait(false);
-        return status is not { } found
-               || found.Status == TenantStatus.Active
-               || (found.Status == TenantStatus.Trial && (found.TrialEndsAtUtc is null || found.TrialEndsAtUtc > clock.UtcNow));
+        return status is not { } found || IsUsable(found.Status, found.TrialEndsAtUtc, clock.UtcNow);
+    }
+
+    /// <summary>INV-PLT-003 (<see cref="Tenant.IsUsableAt"/> over the stored columns): Active, or Trial before its end. The one rule of sign-in, the principal and the public card.</summary>
+    internal static bool IsUsable(TenantStatus status, DateTimeOffset? trialEndsAtUtc, DateTimeOffset nowUtc) =>
+        status == TenantStatus.Active || (status == TenantStatus.Trial && (trialEndsAtUtc is null || trialEndsAtUtc > nowUtc));
+}
+
+/// <summary>
+/// LIS-CR-005: the laboratory address of sign-in, resolved on the platform table <c>saas.tenants</c> (no RLS: no elevation). The
+/// platform tenant has no laboratory address.
+/// </summary>
+internal sealed class LaboratoryAddresses(AppDbContext context, IClock clock) : ILaboratoryAddresses
+{
+    public async Task<LaboratoryAddress?> FindAsync(string slug, CancellationToken cancellationToken)
+    {
+        var value = Tenant.NormaliseAddress(slug);
+        var row = await context.Set<Tenant>().AsNoTracking()
+            .Where(tenant => tenant.PortalSlug == value && tenant.Id != TenantIds.Platform)
+            .Select(tenant => new { tenant.Id, tenant.Status, tenant.TrialEndsAtUtc })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return row is null ? null : new LaboratoryAddress(row.Id, TenantStatusLookup.IsUsable(row.Status, row.TrialEndsAtUtc, clock.UtcNow));
     }
 }
 
-/// <summary><c>Lis:Platform:PortalDomain</c> (default <c>skylis.app</c>), read lazily so a test host's configuration applies.</summary>
+/// <summary>
+/// LIS-CR-005: the anonymous card of a laboratory address. The client record comes from <c>saas.tenants</c> (no RLS); the logo
+/// row from <c>app.laboratory_logos</c> in the laboratory's own tenant scope (<see cref="ICurrentTenantSetter.ForTenant"/>, no
+/// elevation), through the Account module's repository.
+/// </summary>
+internal sealed class PublicLaboratoryDirectory(AppDbContext context, ILaboratoryLogoRepository logos, ICurrentTenantSetter tenantScope, IClock clock) : IPublicLaboratoryDirectory
+{
+    public async Task<PublicLaboratoryRecord?> FindUsableAsync(string slug, CancellationToken cancellationToken)
+    {
+        var value = Tenant.NormaliseAddress(slug);
+        var row = await context.Set<Tenant>().AsNoTracking()
+            .Where(tenant => tenant.PortalSlug == value && tenant.Id != TenantIds.Platform)
+            .Select(tenant => new { tenant.Id, tenant.PortalSlug, NameEn = tenant.Name.En, NameAr = tenant.Name.Ar, tenant.Status, tenant.TrialEndsAtUtc })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (row is null || !TenantStatusLookup.IsUsable(row.Status, row.TrialEndsAtUtc, clock.UtcNow))
+        {
+            return null;
+        }
+
+        LaboratoryLogoInfo? logo;
+        using (tenantScope.ForTenant(row.Id))
+        {
+            logo = await logos.FindActiveAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return new PublicLaboratoryRecord(row.Id, row.PortalSlug, row.NameEn, row.NameAr, logo is null ? null : new PublicLaboratoryLogo(logo.StorageKey, logo.ContentType, logo.Version));
+    }
+}
+
+/// <summary>
+/// LIS-CR-005: <c>Lis:Platform:PortalBaseUrl</c> (<see cref="ConfigGuard.PortalBaseUrlKey"/>), read lazily so a test host's
+/// configuration applies; <see cref="ConfigGuard.DefaultPortalBaseUrl"/> when unset (refused at start-up in Production).
+/// </summary>
 internal sealed class PortalAddressOptions(IServiceProvider services) : IPortalAddressOptions
 {
-    public const string ConfigurationKey = "Lis:Platform:PortalDomain";
-
-    public string PortalDomain
+    public string PortalBaseUrl
     {
         get
         {
-            var configured = services.GetService<IConfiguration>()?[ConfigurationKey];
-            return string.IsNullOrWhiteSpace(configured) ? Tenant.DefaultPortalDomain : configured.Trim().Trim('.');
+            var configured = services.GetService<IConfiguration>()?[ConfigGuard.PortalBaseUrlKey];
+            return string.IsNullOrWhiteSpace(configured) ? ConfigGuard.DefaultPortalBaseUrl : configured.Trim().TrimEnd('/');
         }
     }
 }
@@ -158,7 +213,7 @@ internal sealed class PlatformDashboardReader(AppDbContext context) : IPlatformD
             .Select(plan => new PlanShare(plan.Id, plan.Code, plan.Name.En, plan.Name.Ar, context.Set<Tenant>().Count(tenant => tenant.PlanId == plan.Id)))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
-    public async Task<IReadOnlyList<RecentClient>> RecentClientsAsync(int take, string portalDomain, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<RecentClient>> RecentClientsAsync(int take, string portalBaseUrl, CancellationToken cancellationToken)
     {
         var rows = await (
             from tenant in context.Set<Tenant>().AsNoTracking().OrderByDescending(tenant => tenant.CreatedAtUtc).Take(take)
@@ -182,7 +237,7 @@ internal sealed class PlatformDashboardReader(AppDbContext context) : IPlatformD
             }).ToListAsync(cancellationToken).ConfigureAwait(false);
 
         return rows.OrderByDescending(row => row.CreatedAtUtc)
-            .Select(row => new RecentClient(row.Id, row.NameEn, row.NameAr, Tenant.BuildPortalUrl(row.PortalSlug, portalDomain), row.CountryEn, row.CountryAr, row.Code, row.Balance, row.Currency.Trim(), row.CreatedAtUtc, row.Source.ToString(), row.Status.ToString()))
+            .Select(row => new RecentClient(row.Id, row.NameEn, row.NameAr, Tenant.PortalUrlOf(row.PortalSlug, portalBaseUrl), row.CountryEn, row.CountryAr, row.Code, row.Balance, row.Currency.Trim(), row.CreatedAtUtc, row.Source.ToString(), row.Status.ToString()))
             .ToList();
     }
 

@@ -15,10 +15,22 @@ export const routes: Routes = [
     path: 'welcome',
     loadChildren: () => import('./features/public/public.routes').then((m) => m.PUBLIC_ROUTES),
   },
+  // Sign-in by address (LIS-CR-005, BR-28): `/login` finds the laboratory, `/lab/<slug>` signs in to one laboratory,
+  // `/admin/login` signs in the Super Admin. All anonymous and declared before the shell, whose `admin` child is guarded.
   {
     path: 'login',
     canActivate: [anonymousGuard],
-    loadChildren: () => import('./features/auth/auth.routes').then((m) => m.AUTH_ROUTES),
+    loadChildren: () => import('./features/auth/auth.routes').then((m) => m.FIND_LABORATORY_ROUTES),
+  },
+  {
+    path: 'lab',
+    canActivate: [anonymousGuard],
+    loadChildren: () => import('./features/auth/auth.routes').then((m) => m.LAB_SIGN_IN_ROUTES),
+  },
+  {
+    path: 'admin/login',
+    canActivate: [anonymousGuard],
+    loadChildren: () => import('./features/auth/auth.routes').then((m) => m.ADMIN_SIGN_IN_ROUTES),
   },
   {
     path: '',

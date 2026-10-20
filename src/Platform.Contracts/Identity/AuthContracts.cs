@@ -2,11 +2,19 @@ using Platform.Contracts.Common;
 
 namespace Platform.Contracts.Identity;
 
-/// <summary>Browser or machine sign-in (02 §4.1). The password travels as a credential envelope (D-03); the edge filter opens it before binding completes.</summary>
+/// <summary>
+/// Browser sign-in (02 §4.1). The password travels as a credential envelope (D-03); the edge filter opens it before binding
+/// completes. LIS-CR-005: the address the user signs in at names the target — exactly one of <see cref="Laboratory"/> (the
+/// laboratory's address, <c>/lab/{slug}</c>) or <see cref="Admin"/> = true (the Super Admin sign-in, <c>/admin/login</c>);
+/// anything else is <c>VALIDATION-400</c>. A user with memberships in several laboratories signs in at each one's address.
+/// </summary>
 public sealed record SignInRequest
 {
-    /// <summary>The tenant to sign into, required only when the user holds several active memberships.</summary>
-    public Guid? Tenant { get; init; }
+    /// <summary>The laboratory address (slug, 3–40 of <c>a-z 0-9 -</c>; trimmed and lower-cased).</summary>
+    public string? Laboratory { get; init; }
+
+    /// <summary>True at the Super Admin sign-in: only platform staff (members of the platform tenant) are accepted.</summary>
+    public bool? Admin { get; init; }
 
     public string Username { get; init; } = string.Empty;
 
@@ -58,11 +66,9 @@ public sealed record AuthResponse(
     string? AccessToken,
     DateTimeOffset? ExpiresAtUtc,
     string? RefreshToken,
-    AuthProfile? Profile,
-    IReadOnlyList<TenantChoice>? Tenants)
+    AuthProfile? Profile)
 {
     public const string StepSignedIn = "signed-in";
-    public const string StepSelectTenant = "select-tenant";
     public const string StepMfa = "mfa";
 }
 
@@ -75,6 +81,8 @@ public sealed record AuthResponse(
 /// membership); <see cref="DisplayName"/> stays the name in the preferred language (validation v0.5.0 R-12).
 /// <see cref="SessionTimeoutMinutes"/> is the idle timeout of the session's tenant (validation F-01): the SPA's idle watcher
 /// warns a minute before it and signs out at it; the server refuses a refresh after it (<c>AUTH-017</c>).
+/// <see cref="PortalSlug"/> (LIS-CR-005) is the address of the session's laboratory (<c>/lab/{slug}</c>), null for the platform
+/// tenant (the Super Admin signs in at <c>/admin/login</c>): the SPA sends a signed-out or timed-out user back to it.
 /// </summary>
 public sealed record AuthProfile(
     Guid UserId,
@@ -92,9 +100,8 @@ public sealed record AuthProfile(
     string? DisplayNameAr = null,
     int? SessionTimeoutMinutes = null,
     string? ResultsDensity = null,
-    bool IsPrimaryAdministrator = false);
-
-public sealed record TenantChoice(Guid TenantId, string DisplayName);
+    bool IsPrimaryAdministrator = false,
+    string? PortalSlug = null);
 
 /// <summary>The current session as the server sees it (GET /api/v1/auth/me).</summary>
 public sealed record SessionResponse(

@@ -34,6 +34,11 @@ export interface AuthProfile {
   readonly resultsDensity?: ResultsDensity | null;
   /** CP-38: the session's membership is the primary administrator of its laboratory (the account that subscribed or was provisioned as the main administrator). */
   readonly isPrimaryAdministrator?: boolean;
+  /**
+   * LIS-CR-005: the slug of the session's laboratory (its sign-in address is `/lab/<slug>`); `null` for the platform tenant.
+   * The SPA sends a signed-out or timed-out user back to that address. Optional only until the generator lands.
+   */
+  readonly portalSlug?: string | null;
 }
 
 /** CP-04: binds the current session to one of `AuthProfile.branchIds`. */
@@ -54,12 +59,8 @@ export interface CompletePasswordRecoveryRequest {
   readonly newPassword: string;
 }
 
-export interface TenantChoice {
-  readonly tenantId: string;
-  readonly displayName: string;
-}
-
-export type AuthStep = 'signed-in' | 'select-tenant' | 'mfa';
+/** LIS-CR-005: the tenant choice of a multi-laboratory user is gone; a laboratory address names one tenant. */
+export type AuthStep = 'signed-in' | 'mfa';
 
 export interface AuthResponse {
   readonly step: AuthStep;
@@ -67,13 +68,22 @@ export interface AuthResponse {
   readonly expiresAtUtc: string | null;
   readonly refreshToken: string | null;
   readonly profile: AuthProfile | null;
-  readonly tenants: readonly TenantChoice[] | null;
+  /** No longer sent (LIS-CR-005 removed the tenant choice); optional only so older spec fixtures still type-check. */
+  readonly tenants?: null;
 }
 
+/**
+ * LIS-CR-005: where the user signs in. A laboratory address (`/lab/<slug>`) posts the laboratory's slug, the Super Admin
+ * address (`/admin/login`) posts `admin: true`; exactly one of the two (the server answers VALIDATION-400 otherwise). An
+ * unknown laboratory, another laboratory's member or a non-staff user at the admin address is refused like a wrong password (AUTH-002).
+ */
+export type SignInTarget = { readonly laboratory: string } | { readonly admin: true };
+
 export interface SignInRequest {
-  readonly tenant: string | null;
   readonly username: string;
   readonly password: string;
+  readonly laboratory?: string;
+  readonly admin?: true;
 }
 
 export interface RsaPublicJwk {

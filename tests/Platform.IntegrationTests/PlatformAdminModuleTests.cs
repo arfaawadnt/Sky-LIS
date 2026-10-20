@@ -59,12 +59,12 @@ public sealed class PlatformAdminModuleTests(DatabaseFixture fixture)
 
         using var scope = fixture.AppScope(TenantIds.Platform);
         var tenants = scope.ServiceProvider.GetRequiredService<ITenantRepository>();
-        var page = await tenants.ListAsync(new ClientFilter("listed", TenantSource.Manual, plan.Id, TenantStatus.Active), PageRequest.Normalized(1, 20), "lis.example", CancellationToken.None);
+        var page = await tenants.ListAsync(new ClientFilter("listed", TenantSource.Manual, plan.Id, TenantStatus.Active), PageRequest.Normalized(1, 20), "https://lis.example", CancellationToken.None);
         var item = Assert.Single(page.Items);
-        Assert.Equal((tenantId, "https://listed-lab.lis.example", country.Name.En, governorate.Name.En, plan.Code), (item.Id, item.PortalUrl, item.CountryNameEn, item.GovernorateNameEn, item.PlanCode));
+        Assert.Equal((tenantId, "https://lis.example/lab/listed-lab", country.Name.En, governorate.Name.En, plan.Code), (item.Id, item.PortalUrl, item.CountryNameEn, item.GovernorateNameEn, item.PlanCode));
         Assert.Equal((0m, "EGP"), (item.WalletBalance, item.WalletCurrency));
 
-        var detail = (await tenants.GetDetailAsync(tenantId, "lis.example", CancellationToken.None))!;
+        var detail = (await tenants.GetDetailAsync(tenantId, "https://lis.example", CancellationToken.None))!;
         Assert.Equal(("+201012345678", "Active", "Manual"), (detail.Mobile, detail.Status, detail.Source));
     }
 

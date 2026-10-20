@@ -5,7 +5,7 @@
 | Slot / modules | `plat` — permission modules `tenancy` (clients, plans, wallets), `platform` (dashboard, sessions), `notifications` (templates), `integration` (library), `wallet` (tenant-facing wallet), `settings` (SA-19 over the foundation's settings API) |
 | SRS pages | SA-03 Dashboard, SA-04 Clients, SA-05 Subscriptions & wallets, SA-08 Sessions, SA-10 Countries, SA-11 Governorates, SA-15 Analyser models, SA-16 PCR kits, SA-17 Code systems, SA-18 Rule templates, SA-19 Platform parameters, SA-20 Notification templates; CP-02 Subscription wizard (backend only), CP-66 Wallet (API only); workflows WF-01 (onboarding), WF-12 (platform operations); rule BR-25 |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001) and the architecture pack. **For review by the business owner**; assumptions in §16. |
-| Version | 1.2 — 2026-10-19 (change request LIS-CR-003: P-A1 client login logs, SA-08b; P-A2 location hierarchy under a governorate, SA-11b, §17) |
+| Version | 1.3 — 2026-10-20 (§18 change request LIS-CR-005: portal base URL `Lis:Platform:PortalBaseUrl`, addresses `{base}/lab/{slug}`, public laboratory card and logo, `PLT-404`) · 1.2 — 2026-10-19 (change request LIS-CR-003: P-A1 client login logs, SA-08b; P-A2 location hierarchy under a governorate, SA-11b, §17) |
 | Implemented in | `src/Platform.Domain/PlatformAdmin`, `src/Platform.Contracts/PlatformAdmin`, `src/Platform.Application/PlatformAdmin`, `src/Platform.Infrastructure/Persistence/PlatformAdmin` (+ `PlatformAdmin.migration.sql`), `src/Platform.WebApi/Controllers/PlatformAdmin`, `frontend/src/app/features/platform`, `frontend/src/app/core/api/{platform,public-subscription}.contracts.ts`, `frontend/public/i18n/platform.{en,ar}.json` |
 | Namespace | `PlatformAdmin`, not `Platform`: a namespace `Platform.Application.Platform` would capture every `Platform.*` qualified name written inside `Platform.Application.*` (C# resolves `Platform` to the nearest enclosing member first), breaking other modules' code. |
 
@@ -389,3 +389,25 @@ Scenario S-GEO-view: tenancy.view lists; create / rename / deactivate → 403; a
 | Q19 | Are deletes allowed? | No: like countries with governorates, rows are deactivated; an unreferenced row could be deleted later if the business owner asks (the countries' delete rule, SA-10). |
 | Q20 | Is the unique name per parent on the English name only? | Yes (as governorates within a country): the Arabic spelling may vary. |
 | Q21 | Does the client (tenant) address use the hierarchy? | Not in this change (LIS-CR-003 §3): the wizard and SA-04 keep free text; a later change may add the selects once the hierarchy is filled. |
+
+## 18. Change request 2026-10-20 — laboratory addresses and the public card (LIS-CR-005, package P-API)
+
+- **Portal address** of a laboratory = `{Lis:Platform:PortalBaseUrl}/lab/{slug}` (`Tenant.PortalUrl(baseUrl)`, `Tenant.PortalUrlOf`),
+  on SA-04 list and detail, the dashboard's recent clients, the provisioning response and its `portal-url` SMS, the wizard result,
+  the SA-04 password-reset SMS and CP-65. `Lis:Platform:PortalDomain`, `Tenant.DefaultPortalDomain` and `Tenant.BuildPortalUrl` are
+  removed. The `portal-url` template text is unchanged (`{url}`).
+- **Setting** `Lis:Platform:PortalBaseUrl` (ConfigGuard `InspectPortalBaseUrl`, enforced at start-up): an absolute http(s) URL
+  without user information, path, query, fragment or trailing slash; in Production required and `https`; elsewhere optional
+  (default `http://127.0.0.1:4300`, the development SPA) and `http` allowed.
+- **Public laboratory card** (anonymous, global rate limit chain, `GetPublicLaboratoryQuery` [AllowUnauthenticated]):
+  `GET /api/v1/public/laboratories/{slug}` → `200 { slug, nameEn, nameAr, logoVersion }` for a usable client laboratory (Active,
+  or Trial before its end — the statuses sign-in lets through); `404 PLT-404` otherwise (unknown, inactive, trial ended, the platform
+  tenant, malformed address). `GET /api/v1/public/laboratories/{slug}/logo` → the active logo's bytes with its content type,
+  `Cache-Control: public, max-age=300`, `ETag: "logo-v{version}"` (the only response exempt from the global `no-store`:
+  `SecurityHeadersMiddleware.PublicCacheItem`); `404 PLT-404` when the card would be 404 or there is no logo. Port
+  `IPublicLaboratoryDirectory` (Infrastructure `PublicLaboratoryDirectory`): the client record from `saas.tenants` (no RLS), the logo
+  row in the laboratory's own tenant scope (`ForTenant`, no elevation); the file is opened in the same scope.
+- **New code** `PLT-404` (laboratory address not found, 404).
+- **Elevation**: none added (the reads use the platform table and a tenant scope, not `Elevate()`).
+- **Tooling**: `ClientRecordRegistrar` (Application, not an endpoint) + `Tenant.RegisterExisting` create the client record of an
+  existing tenant (Active, Manual, no event, no wallet).

@@ -297,8 +297,9 @@ public sealed class AccountFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.Equal((userId, username, "Profile Person", "+201012345678"), (profile!.UserId, profile.Username, profile.DisplayName, profile.Mobile));
         Assert.Equal((tenant, false, "en"), (profile.TenantId, profile.IsPlatform, profile.Language));
         Assert.Equal((8, 128), (profile.PasswordPolicy.MinLength, profile.PasswordPolicy.MaxLength));
-        Assert.Equal(tenant, profile.Laboratory!.TenantId);   // no client record: the tenant id only (intake §16 Q11)
-        Assert.Null(profile.Laboratory.NameEn);
+        // LIS-CR-005: sign-in is by laboratory address, so every seeded laboratory has a client record (the test host's), and CP-65 shows its address
+        Assert.Equal((tenant, "Functional Laboratory"), (profile.Laboratory!.TenantId, profile.Laboratory.NameEn));
+        Assert.Equal($"{Platform.Infrastructure.Security.ConfigGuard.DefaultPortalBaseUrl}/lab/{ApiFactory.SlugOf(tenant)}", profile.Laboratory.PortalUrl);
         Assert.NotNull(profile.RoleNameEn);
 
         var (staff, _, _) = await factory.SeedUserAsync(tenantId: TenantIds.Platform, permissions: ["support.manage"]);

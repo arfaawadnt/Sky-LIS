@@ -208,9 +208,9 @@ public sealed class CompleteSubscriptionHandler(
             await provisioner.CopyAfterFlushAsync(prepared, ct);
         }, cancellationToken);
 
-        await TenantProvisioner.AnnounceAsync(prepared, portal.PortalDomain, sender, events, cancellationToken);
+        await TenantProvisioner.AnnounceAsync(prepared, portal.PortalBaseUrl, sender, events, cancellationToken);
         await events.WriteAsync(new SecurityEvent(PlatformAdminSecurityEvents.SubscriptionCompleted, SecurityEvent.Info, Detail: $"subscription:{request.Id} tenant:{prepared.Tenant.Id}"), cancellationToken);
-        return new SubscriptionCompletedResponse(prepared.Tenant.Id, prepared.Tenant.PortalUrl(portal.PortalDomain), prepared.AdminUsername);
+        return new SubscriptionCompletedResponse(prepared.Tenant.Id, prepared.Tenant.PortalUrl(portal.PortalBaseUrl), prepared.AdminUsername);
     }
 }
 

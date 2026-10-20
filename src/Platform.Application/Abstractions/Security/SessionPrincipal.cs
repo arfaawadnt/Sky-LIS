@@ -58,6 +58,9 @@ public sealed record SessionPrincipal(
 
     public bool IsPrimaryAdministrator { get; init; }
 
+    /// <summary>LIS-CR-005: the address of the session's laboratory (<c>saas.tenants.portal_slug</c>), read in the same query; null for the platform tenant or a tenant without a client record.</summary>
+    public string? PortalSlug { get; init; }
+
     /// <summary>The next sign-in must change the password (CP-38); the sign-in flow and the change-password page enforce it.</summary>
     public bool MustChangePassword { get; init; }
 

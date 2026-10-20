@@ -11,6 +11,12 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next, HostSecurity
     public const string ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
     public const string StrictTransportSecurity = "max-age=63072000; includeSubDomains";
 
+    /// <summary>
+    /// LIS-CR-005: set by an endpoint whose response is public by nature (a laboratory's logo on its sign-in page) to keep the
+    /// <c>Cache-Control</c> it wrote; every other response stays <c>no-store</c>.
+    /// </summary>
+    public const string PublicCacheItem = "platform.public-cache";
+
     public Task InvokeAsync(HttpContext context)
     {
         context.Response.OnStarting(static state =>
@@ -21,7 +27,11 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next, HostSecurity
             headers.XContentTypeOptions = "nosniff";
             headers.XFrameOptions = "DENY";
             headers["Referrer-Policy"] = "no-referrer";
-            headers.CacheControl = "no-store";
+            if (!response.HttpContext.Items.ContainsKey(PublicCacheItem) || response.StatusCode != StatusCodes.Status200OK)
+            {
+                headers.CacheControl = "no-store";
+            }
+
             headers.Remove("Server");
             headers.Remove("X-Powered-By");
             if (hsts)

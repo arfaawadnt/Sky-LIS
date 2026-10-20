@@ -4,12 +4,9 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 
-import { AUTH_API, type AuthResponse } from '../../../core/api/auth.contracts';
-import { AuthStore } from '../../../core/auth/auth.store';
-import { PLATFORM_TENANT_ID } from '../../../core/tenancy/tenant-ids';
+import { AUTH_API } from '../../../core/api/auth.contracts';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
-import { LoginPage, SELECT_BRANCH_PATH } from './login.page';
 import { RecoveryPage } from './recovery.page';
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -24,7 +21,7 @@ function type(root: HTMLElement, selector: string, value: string): void {
   input.dispatchEvent(new Event('input'));
 }
 
-describe('Sign-in and password recovery (CP-03, CP-04 entry)', () => {
+describe('Password recovery (CP-03)', () => {
   let backend: HttpTestingController;
   let router: Router;
 
@@ -136,76 +133,18 @@ describe('Sign-in and password recovery (CP-03, CP-04 entry)', () => {
     });
   });
 
-  it('lays out the 5c sign-in: the Sky LIS logo, the welcome hero, the card with its h2, and the footer links (2026-10-20)', async () => {
-    const fixture = TestBed.createComponent(LoginPage);
-    fixture.componentRef.setInput('reason', 'idle');
+  it('returns to the laboratory sign-in it was started from (LIS-CR-005)', async () => {
+    const fixture = TestBed.createComponent(RecoveryPage);
+    fixture.componentRef.setInput('mode', 'laboratory');
+    fixture.componentRef.setInput('slug', 'nile-lab');
     const root = fixture.nativeElement as HTMLElement;
     fixture.detectChanges();
     await settle();
     fixture.detectChanges();
+    expect(root.querySelector('.foot a')?.getAttribute('href')).toBe('/lab/nile-lab');
 
-    expect(root.querySelector('.head .brand img')?.getAttribute('src')).toBe('/brand/sky-lis-logo.png');
-    expect(root.querySelector('.hero h1')?.textContent).toContain('auth.hero.title');
-    expect(root.querySelector('.card h2')?.textContent).toContain('auth.title');
-    expect(root.querySelector('.card .info-strip')?.textContent).toContain('auth.sessionEndedIdle');
-    expect(root.querySelector('.card .forgot')?.getAttribute('href')).toBe('/login/recover');
-    expect([...root.querySelectorAll('.foot nav a')].map((link) => link.getAttribute('href'))).toEqual(['/welcome', '/welcome/subscribe']);
-
-    const eye = root.querySelector<HTMLButtonElement>('.card .eye');
-    eye?.click();
+    fixture.componentRef.setInput('mode', 'admin');
     fixture.detectChanges();
-    expect(root.querySelector<HTMLInputElement>('#password')?.type).toBe('text');
-    expect(eye?.getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('sends a laboratory session without a branch to branch selection after sign-in', async () => {
-    const fixture = TestBed.createComponent(LoginPage);
-    const root = fixture.nativeElement as HTMLElement;
-    fixture.detectChanges();
-    await settle();
-    type(root, '#username', 'lab.user');
-    type(root, '#password', 'secret-password');
-    (root.querySelector('button[type=submit]') as HTMLButtonElement).click();
-    await settle();
-
-    // The envelope interceptor is not installed here: the request goes out as the store sends it.
-    backend.expectOne(AUTH_API.signIn).flush({
-      step: 'signed-in',
-      accessToken: 't',
-      expiresAtUtc: null,
-      refreshToken: null,
-      profile: { userId: 'u1', displayName: 'Lab User', tenantId: '11111111-1111-1111-1111-111111111111', roleName: null, permissions: [], language: 'en', scope: 'full', branchId: null, branchIds: ['b1', 'b2'] },
-      tenants: null,
-    } satisfies AuthResponse);
-    await settle();
-    await settle();
-
-    expect(TestBed.inject(AuthStore).isAuthenticated()).toBe(true);
-    expect(router.navigate).toHaveBeenCalledWith([SELECT_BRANCH_PATH], { queryParams: { returnUrl: '/' } });
-  });
-
-  it('ignores a return URL of the other portal: a platform administrator lands on the admin home, not the client page', async () => {
-    const fixture = TestBed.createComponent(LoginPage);
-    fixture.componentRef.setInput('returnUrl', '/account/dashboard');
-    const root = fixture.nativeElement as HTMLElement;
-    fixture.detectChanges();
-    await settle();
-    type(root, '#username', 'platform.admin');
-    type(root, '#password', 'secret-password');
-    (root.querySelector('button[type=submit]') as HTMLButtonElement).click();
-    await settle();
-
-    backend.expectOne(AUTH_API.signIn).flush({
-      step: 'signed-in',
-      accessToken: 't',
-      expiresAtUtc: null,
-      refreshToken: null,
-      profile: { userId: 'a1', displayName: 'Platform Admin', tenantId: PLATFORM_TENANT_ID, roleName: null, permissions: [], language: 'en', scope: 'full', branchId: null, branchIds: [] },
-      tenants: null,
-    } satisfies AuthResponse);
-    await settle();
-    await settle();
-
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin');
+    expect(root.querySelector('.foot a')?.getAttribute('href')).toBe('/admin/login');
   });
 });
