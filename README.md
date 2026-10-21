@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.18.0** · released 2026-10-20 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.18.1** · released 2026-10-21 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.18.1 — 2026-10-21
 
 - **Installation record.** WIN-9S2KO4FA64L upgraded to 0.18.0 on 2026-10-21 (`docs/deploy/Installations.md`): configuration changed (`Lis:Platform:PortalBaseUrl` = `https://192.168.80.38:5443` replaces `PortalDomain`), the demo laboratory registered at `demo-lab`, clean-tag build, verified backup, nothing pending, smoke tests 20 / 20 by name and 20 / 20 by IP, the new addresses checked through IIS. Documentation only; the installed 0.18.0 build is the same code as this release.
 
