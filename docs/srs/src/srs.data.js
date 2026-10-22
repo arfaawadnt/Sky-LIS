@@ -2,13 +2,14 @@
 // (Client Portal v2 / v2.1 release-1 scope, Super Admin v3 / v3.1 release-1 scope).
 // page: [id, name, module, purpose, actors, keyData, actions, rules, dependencies, release]  release: 'R1' | 'R2' (+ note after '|')
 module.exports = {
-  meta: { title: 'Sky LIS — Business Software Requirements Specification', short: 'Sky LIS Business SRS', docId: 'LIS-SRS-001', version: '1.3', status: 'Draft for review', date: '2026-10-20', preparedFor: 'National Technology — LIS project', preparedBy: 'Claude Code (AI analyst), for review by Mohamed Hashem', classification: 'Internal — Confidential',
+  meta: { title: 'Sky LIS — Business Software Requirements Specification', short: 'Sky LIS Business SRS', docId: 'LIS-SRS-001', version: '1.4', status: 'Draft for review', date: '2026-10-22', preparedFor: 'National Technology — LIS project', preparedBy: 'Claude Code (AI analyst), for review by Mohamed Hashem', classification: 'Internal — Confidential',
     basis: ['Client Portal prototype v2 (full scope) and v2.1 (release-1 scope)', 'Super Admin Portal prototype v3 (full scope) and v3.1 (release-1 scope)', 'LIS Requirements Specification LIS-RS-001', 'Prototype comparison LIS-PC-001 and build plan LIS-BP-001', 'LDM 9.2/9.3 knowledge base (domain behaviour)'],
     history: [
       ['1.0', '2026-10-09', 'Claude Code', 'First complete business SRS covering both portals, all modules, pages and workflows, with the release-1 scope matrix.'],
       ['1.1', '2026-10-14', 'Claude Code', 'CP-41 Tests: parent services on the test page (the services carrying the test; join or leave profiles and cultures from the test, the other types set up from the service), as the Super Admin prototype shows. Page ids unchanged.'],
       ['1.2', '2026-10-20', 'Claude Code', 'Treasury removed from the system (change request LIS-CR-004, business owner decision of 2026-10-20): CP-28 Treasuries and CP-29 Treasury requests withdrawn; BR-27 withdrawn; CP-23 / CP-06 payments stamped with cashier, branch, method and reference only; CP-30 cash closing per cashier and branch; WF-09 without the treasury step; Payments back in the Finance menu; data model, status models, glossary and the security / audit summaries updated. Page and rule ids stay reserved.'],
       ['1.3', '2026-10-20', 'Claude Code', 'Sign-in by address (change request LIS-CR-005, business owner decision of 2026-10-20): every laboratory signs in at its own address <base>/lab/<slug> and the Super Admin at <base>/admin/login; the bare address asks for the laboratory address; CP-03 and SA-01 updated; new rule BR-28.'],
+      ['1.4', '2026-10-22', 'Claude Code', 'New page CP-69 Lab Tracker (change request LIS-CR-006): every visit of the day followed through registration, samples, results and payment, with a pipeline strip, attention filters and a table / board view; WF-02 and WF-06 reference it.'],
     ] },
 
   intro: {
@@ -138,7 +139,8 @@ module.exports = {
     ['CP-65', 'Profile', 'Account', 'Laboratory and credential details.', 'Lab administrator', 'Lab name, portal URL, country, plan, manager, mobile, email; username, password.', 'Save; update credentials via OTP.', '—', ['Subscriptions (SA)'], 'R1'],
     ['CP-66', 'Wallet', 'Account', 'Prepaid balance and usage.', 'Lab administrator', 'Balance, next charge, SMS used, transactions.', 'Request top-up.', 'Metered services pause at zero; the portal keeps working.', ['Subscriptions (SA)'], 'R2'],
     ['CP-67', 'Support', 'Account', 'Support tickets.', 'Lab administrator', 'Ticket no., subject, priority, status, created.', 'New ticket.', '—', ['—'], 'R2'],
-    ['CP-68', 'Audit log', 'Account', 'Tenant audit trail.', 'Lab administrator', 'Time, user, action, entity, details, branch.', 'Filter; export.', 'Immutable.', ['All pages'], 'R2']
+    ['CP-68', 'Audit log', 'Account', 'Tenant audit trail.', 'Lab administrator', 'Time, user, action, entity, details, branch.', 'Filter; export.', 'Immutable.', ['All pages'], 'R2'],
+    ['CP-69', 'Lab Tracker', 'Reception', 'Follows every visit of the day through registration, samples, results and payment on one page, so reception, the bench and the front desk see what is next and what is late.', 'Reception clerk, technician, unit head, cashier, lab administrator', 'Per visit: accession, patient (VIP masked), urgent, registered at / by, payer; samples collected / received / rejected; results ordered / complete / reviewed / verified / printed, panic; payment status and remaining; stage (Awaiting sample, In the lab, Awaiting verification, Ready, Delivered), next step, time left against the turnaround clock. Counters per stage and per attention flag (delayed, panic, rejected sample, ready but unpaid).', 'Pick the day; search or scan; filter by stage (pipeline strip), attention flag or view (Reception, Bench, Verification, Front desk); switch Table / Board; open the page of the next step (accession details, results by accession, payments); live refresh every 30 s.', 'Each stage column shows only with the right to view that module; results counted over the result rights of the user; delivered = printed; a verified visit not fully paid is flagged, not blocked; nothing is changed from this page.', ['Registration', 'Samples', 'Results by accession', 'Payments', 'Worklist'], 'R1']
   ],
 
   adminPages: [
@@ -205,7 +207,7 @@ module.exports = {
       ['Technician', 'Rejects an unfit tube with a reason.', 'Status Rejected; reception notified to recollect; tests take no results.'],
       ['Technician', 'Reinstates or replaces the tube.', 'Same barcode back to Received, or a new sample with a new barcode (BR-18).'],
       ['Anyone', 'Opens sample tracking.', 'Timeline, time between stages, test round times.']] },
-    { id: 'WF-06', name: 'Result entry, review, verification and printing', pages: ['CP-18', 'CP-19', 'CP-20', 'CP-21'], release: 'R1 (R2 for sample view and queue)', steps: [
+    { id: 'WF-06', name: 'Result entry, review, verification and printing', pages: ['CP-18', 'CP-19', 'CP-20', 'CP-21', 'CP-69'], release: 'R1 (R2 for sample view and queue)', steps: [
       ['Technician', 'Opens the worklist for the unit.', 'One row per test with expected result date and delay colour (BR-13).'],
       ['Technician', 'Opens the visit on Results by accession (or scans the tube).', 'Filters collapse; one tab per report unit with its sample IDs and status.'],
       ['Technician', 'Enters values, picks list values, leaves formulas to compute.', 'Ranges resolved by sex, age and condition (BR-08); flags and panic alerts; Restricted lists validated; delta flag against the previous result; status Complete on save.'],

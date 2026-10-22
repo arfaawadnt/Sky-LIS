@@ -12,6 +12,7 @@ using Platform.Application.PlatformAdmin;
 using Platform.Application.Pricing;
 using Platform.Application.Results;
 using Platform.Application.Samples;
+using Platform.Application.Tracker;
 using Platform.Contracts.Catalogue;
 using Platform.Contracts.Common;
 using Platform.Contracts.Identity;
@@ -233,6 +234,10 @@ public sealed class SetupListsAndAccessFlowTests(ApiFactory factory) : IClassFix
             ("/api/v1/integration/pcr-kits", IntegrationSortKeys.PcrKits),
             ("/api/v1/integration/site-agents", IntegrationSortKeys.SiteAgents),
         ]);
+
+        // The Lab Tracker (LIS-CR-006) reads the session branch: a reader assigned to one branch, which the session selects.
+        var (trackerName, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: ["registration.view"], displayName: "Tracker Reader", branchIds: [Guid.CreateVersion7()]);
+        await ServesEverySortKeyAsync(await SignedInAsync(trackerName), [("/api/v1/tracker/visits", TrackerSortKeys.Visits)]);
 
         // The Super Admin registers that page on the server (a platform-tenant reader).
         var (platformName, _, _) = await factory.SeedUserAsync(tenantId: TenantIds.Platform, permissions: PlatformReader, displayName: "Platform Reader");

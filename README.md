@@ -234,7 +234,22 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+Change request LIS-CR-006 (2026-10-22, `docs/build/CR-2026-10-22_Lab-Tracker.md`): the **Lab Tracker**, chosen from the design canvas as
+layouts A (pipeline board) + B (stage lanes). No migration.
+
+- **Lab Tracker (client, CP-69, `/tracker`, first entry of Reception).** One page follows every visit of the day through
+  registration → samples → results → payment. A pipeline strip (Registered, Awaiting sample, In the lab, Awaiting verification, Ready,
+  Delivered) and *Needs attention* chips (Delayed, Panic, Rejected, Ready but unpaid) filter the list; desk views Reception / Bench
+  (→ Worklist) / Verification / Front desk; day picker and a scan-friendly search. **Table** view: one row per visit with the four stage
+  cells, the next step as a link to the page that does it (accession details, results by accession, payments), and a time-left pill on
+  the turnaround clock, server-sorted and paged. **Board** view: five stage lanes with progress cards. The page refreshes every 30 s
+  while visible ("Live · updated n s ago"). Sections outside the user's module rights read "—"; results follow the result rights; VIP
+  names are masked. Rules: delivered = printed; a verified visit not fully paid is flagged, never blocked.
+- **API.** `GET /api/v1/tracker/visits` [registration.view]: stage, next step, time left and attention flags per visit with day-wide
+  counters; filters `day`, `branchId`, `stage`, `attention`, `view`, `search`; sort keys `timeLeft`, `registeredAt`, `accession`,
+  `patient`, `stage`. One SQL read with row-level security (502 visits in about 0.1 s on the dev instance). Rules in
+  `Platform.Domain/Tracker/VisitProgress.cs`.
+- **Documents.** SRS 1.4 (CP-69), UAT 0.8 (UAT-REG-16), intake LIS-INT-TRK-001.
 
 ### v0.18.1 — 2026-10-21
 

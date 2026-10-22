@@ -1,0 +1,107 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.live {
+  color: var(--ok);
+  border-color: var(--ok-soft);
+  background: var(--ok-soft);
+}
+
+.live.paused {
+  color: var(--muted);
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.search {
+  min-width: 240px;
+}
+
+app-tracker-view-tabs,
+.strip {
+  display: block;
+  margin-block-end: var(--sp-3);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-block-end: var(--sp-3);
+}
+
+.problem {
+  margin-block-end: var(--sp-3);
+}
+
+.note {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.visit,
+.pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sub {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.link {
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+:host ::ng-deep tr.edge-late td:first-child {
+  border-inline-start: 3px solid var(--bad);
+}
+
+:host ::ng-deep tr.edge-warn td:first-child {
+  border-inline-start: 3px solid var(--warn);
+}
+
+:host ::ng-deep tr.edge-ok td:first-child {
+  border-inline-start: 3px solid var(--ok);
+}
+
+@media (max-width: 720px) {
+  .search {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+}

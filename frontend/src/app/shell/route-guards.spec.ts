@@ -39,6 +39,7 @@ const MIRROR: Routes = [
       { path: '', pathMatch: 'full', canActivate: [tenantGuard, homeRedirect], component: BlankPage },
       { path: 'billing', canActivate: [tenantGuard], children: ['payments', 'payment-methods', 'refunds', 'cash-closing'].map((path) => ({ path, component: BlankPage })) },
       { path: 'registration', canActivate: [tenantGuard], children: ['visits', 'visits/:id/job-order'].map((path) => ({ path, component: BlankPage })) },
+      { path: 'tracker', canActivate: [tenantGuard], component: BlankPage },
       { path: 'account', canActivate: [tenantGuard], children: ['select-branch', 'profile', 'dashboard'].map((path) => ({ path, component: BlankPage })) },
       {
         path: 'admin',
@@ -94,7 +95,7 @@ describe('route guards composed on the shell (R1-01, R1-04, R2-01)', () => {
   it('lands a user without the dashboard on their first menu entry when a URL is refused (R1-04)', async () => {
     await signIn({ permissions: ['registration.view'] }, false);
 
-    expect(await open('/billing/payments')).toBe('/registration/visits');
+    expect(await open('/billing/payments')).toBe('/tracker');   // the Lab Tracker is the first Reception entry (LIS-CR-006)
     expect(await open('/registration/visits/v1/job-order')).toBe('/registration/visits/v1/job-order');
   });
 

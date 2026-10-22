@@ -1,6 +1,6 @@
 # Sky LIS — Release 1 User Acceptance Test Scripts (LIS-UAT-001)
 
-Version 0.7 · 2026-10-20 · Status: draft for review by the business owner (0.7: sign-in by address, LIS-CR-005; 0.6: treasury removed, LIS-CR-004 — see the revision history).
+Version 0.8 · 2026-10-22 · Status: draft for review by the business owner (0.8: Lab Tracker UAT-REG-16, LIS-CR-006; 0.7: sign-in by address; 0.6: treasury removed — see the revision history).
 
 Sources: business SRS LIS-SRS-001 (`docs/srs`, page ids CP-nn / SA-nn, workflows WF-nn, rules BR-nn), the module intakes
 (`docs/intake`, acceptance scenario ids and refusal codes), the Release-1 scope record (`docs/build/MODULES.md` §6, wave 4),
@@ -538,6 +538,32 @@ Reception › Patients (`/patients`).
 Expected: (1) saved with "Estimated from the age; the age is what is saved."; the second is refused `PAT-007`. (2) the number never changes; the visits list the accessions. (3) PDF attached, viewable; `.exe` refused `PAT-042`; 12 MB refused `PAT-041`. (4) the duplicate becomes **Merged** with the banner "This file was merged into PAT-… by …"; the original keeps its number and lists "Files merged into this one"; the gender mismatch is refused `PAT-100` until confirmed. (5) refused `REG-002` "The patient file is merged into another file; register on the surviving file."
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
+#### UAT-REG-16 — Lab Tracker: follow the day's visits · critical
+Refs: CP-69 · WF-02, WF-06 · LIS-CR-006 (stages, next step, time left; delivered = printed; ready-but-unpaid is a flag).
+Preconditions: the visits of UAT-REG-03 (paid, results verified in UAT-VER), UAT-REG-09 (saved unpaid), UAT-SMP-02 (a rejected
+sample) and UAT-RES-02 (a panic value) exist today. Sign in as `lab.admin` (every right), then as `uat.reception`.
+1. Reception › Lab Tracker (`/tracker`). Read the pipeline strip (Registered, Awaiting sample, In the lab, Awaiting verification,
+   Ready, Delivered) and the *Needs attention* chips (Delayed, Panic, Rejected, Ready but unpaid).
+2. Click *Awaiting verification* on the strip, then click it again. Click the *Panic* chip.
+3. Table view: find the UAT-REG-09 visit; click its *Next step*. Come back; sort by *Time left* and by *Registration*.
+4. Switch to *Board*; find the same visits in their lanes; click *+ n more* on a lane.
+5. Scan or type the accession of UAT-REG-03 in the search box and press Enter.
+6. Leave the page open for a minute while another profile records a payment on the UAT-REG-09 visit (UAT-CSH-03).
+7. Desk views: *Reception*, *Verification*, *Front desk*; *Bench*.
+8. Sign in as `uat.reception` (no `results.view`, no `billing.view`) and open the page.
+9. Arabic check.
+Expected: (1) one row per visit of the day on the session branch, each with Registration (time, payer), Samples, Results (with the
+Panic tag on the UAT-RES-02 visit), Payment (Paid / Partial / Unpaid / Refund due with the remaining amount) and *Next step*; the strip
+counts add up to the day; the UAT-REG-03 visit is Ready or Delivered, the UAT-REG-09 visit shows *Take payment*; the UAT-SMP-02
+visit is in *Awaiting sample* with *Re-collect*. (2) the table narrows to that stage and widens again; the chip narrows to the panic
+visit. (3) *Take payment* opens Payments with the visit loaded; the sort changes the order and the header shows the direction. (4) five
+lanes with cards (accession, time-left pill, patient, detail, payment pill, flag pill, four-segment progress bar); *+ n more* returns to
+the table filtered by that stage. (5) exactly that visit is listed. (6) within 30 s the row's Payment cell reads Paid and "Live ·
+updated n s ago" restarts, without a page reload. (7) each view keeps only its visits; *Bench* opens the Worklist. (8) the Results and
+Payment cells read "—" with "Not in your rights"; the stage and next step still show. (9) right-to-left, Arabic labels and counted
+forms (e.g. "زيارتان").
+Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
+
 ### 5.5 Phlebotomist / technician — sample side (UAT-SMP)
 
 Release 1 has no sample scanning: tubes are generated on save (BR-02) and marked Received at once (BR-03 emulated).
@@ -948,7 +974,7 @@ signs when the three Super Admin personas have accepted.
 | Laboratory administrator | UAT-ADM-01…11 (11; ADM-06, 07 withdrawn) | ADM-01, 02, 03, 08 | |
 | Accounts | UAT-FIN-01…06 (6) | FIN-01, 02 | |
 | Cashier | UAT-CSH-01…10 (10; CSH-01, 02, 09, 10 withdrawn) | CSH-03, 04, 05, 07 | |
-| Reception clerk | UAT-REG-01…15 (15) | REG-01, 03, 04, 05, 07, 08, 09, 10, 11 | |
+| Reception clerk | UAT-REG-01…16 (16) | REG-01, 03, 04, 05, 07, 08, 09, 10, 11, 16 | |
 | Phlebotomist / technician (samples) | UAT-SMP-01…03 (3) | SMP-01 | |
 | Laboratory technician | UAT-RES-01…08 (8) | RES-01, 02, 04, 08 | |
 | Unit head / pathologist | UAT-VER-01…07 (7) | VER-01, 02, 03, 05, 06 | |
@@ -974,6 +1000,7 @@ signs when the three Super Admin personas have accepted.
 | CP-11 Patients | REG-04, REG-15 |
 | CP-12 Price query | FIN-02, FIN-04, REG-12 |
 | CP-18 Worklist | RES-01, RES-08, SMP-01 |
+| CP-69 Lab Tracker | REG-16 |
 | CP-19 Results by accession | RES-02…08, VER-01…06 |
 | CP-23 Payments (+ refund action of CP-24, void) | CSH-03…08, REG-09, FIN-05, FIN-06 |
 | CP-26 Cancellations (as action of CP-10) | REG-11, SMP-03 |
@@ -1055,3 +1082,4 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 0.5 | 2026-10-14 | Claude Code | UAT-ADM-08 gains step 13 (the parent-services block of the test editor, change request 2026-10-14: leave and rejoin a profile, locked chip on a test service); the Arabic check becomes step 14. Ids unchanged. |
 | 0.6 | 2026-10-20 | Claude Code | Treasury removed from the system (change request LIS-CR-004): UAT-ADM-06, UAT-ADM-07, UAT-CSH-01, UAT-CSH-02, UAT-CSH-09 and UAT-CSH-10 withdrawn (ids reserved); UAT-CSH-08 becomes "Payment stamped with the session branch"; UAT-REG-09 becomes "Registration saved without a payment" (amount 0); payment steps, personas (no `treasury.*` keys), run order, coverage and open point 8 updated. |
 | 0.7 | 2026-10-20 | Claude Code | Sign-in by address (change request LIS-CR-005, BR-28): set-up note (laboratory users at `<base>/lab/<slug>`, Super Admin personas at `<base>/admin/login`), UAT-REG-01 step 1a and expectations (another laboratory, admin address, unknown address, bare address; idle return), UAT-OPS intro (admin address, laboratory user refused), UAT-ADM-01 and the provisioning / subscription expectations print the new address. |
+| 0.8 | 2026-10-22 | Claude Code | New script UAT-REG-16 Lab Tracker (CP-69, change request LIS-CR-006): strip and chips, table and board, next-step links, search, live refresh, desk views, rights, Arabic. Reception persona and coverage updated. |

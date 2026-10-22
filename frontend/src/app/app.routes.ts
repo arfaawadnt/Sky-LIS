@@ -72,6 +72,11 @@ export const routes: Routes = [
         loadChildren: () => import('./features/registration/registration.routes').then((m) => m.REGISTRATION_ROUTES),
       },
       {
+        path: 'tracker',   // CP-69 Lab Tracker (LIS-CR-006)
+        canActivate: [tenantGuard],
+        loadChildren: () => import('./features/tracker/tracker.routes').then((m) => m.TRACKER_ROUTES),
+      },
+      {
         path: 'samples',
         canActivate: [tenantGuard],
         loadChildren: () => import('./features/samples/samples.routes').then((m) => m.SAMPLES_ROUTES),

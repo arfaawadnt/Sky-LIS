@@ -491,6 +491,16 @@ QMS source is never read or copied (section 1); everything here is written from 
   `Tenant.PortalUrl(base)` = `{base}/lab/{slug}`. A tenant without a `saas.tenants` client record cannot be signed into: DevTools
   `register-tenant-client` (the dev demo laboratory is `demo-lab`). Test host: `AuthClient` takes a `SignInTarget` (null = resolved from the
   user's one membership, `Support/SignInTargets.cs`) and `ApiFactory.SeedUserAsync` gives every seeded laboratory a client record (slug `t<id:N>`).
+- Change request LIS-CR-006 (2026-10-22, `docs/build/CR-2026-10-22_Lab-Tracker.md`; intake `LIS-INT-TRK-001_Lab-Tracker.md`; no migration):
+  **Lab Tracker** (CP-69, `/tracker`, first Reception nav entry so it is the landing page of a user without the dashboard). Read model
+  only: `GetLabTrackerQuery` [registration.view] → `ILabTrackerReader` (`Persistence/Tracker/LabTrackerReader.cs`, one SQL statement,
+  RLS, no elevation) + the pure rules `VisitProgressRules` in `Platform.Domain/Tracker/VisitProgress.cs` (stage Cancelled / AwaitingSample /
+  InLab / AwaitingVerification / Ready / Delivered, next step, time left on `TurnaroundClock`, flags); the handler composes, filters,
+  sorts (`TrackerSortKeys`) and pages in memory so the counters cover the whole day; sections `samples` / `results` / `payment` are null
+  without the module permission; results counted over `ResultRights.VisibilityOf`. `GET /api/v1/tracker/visits`. SPA `features/tracker`
+  (`TrackerFacade`: filter signal → `resource()`, board = one resource per lane, polling every 30 s behind `TRACKER_TIMERS`, paused while
+  the document is hidden; layout kept in the facade, no web storage), dictionaries `tracker.{en,ar}.json`. Delivered = printed; unpaid is a
+  flag, never a block (business assumptions in the intake §17).
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

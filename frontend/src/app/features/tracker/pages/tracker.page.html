@@ -1,0 +1,102 @@
+<app-page-header [title]="i18n.t('tracker.title')" [subtitle]="i18n.t('tracker.subtitle')">
+  @if (branchLabel(); as branch) {
+    <span pageActions class="chip branch"><app-icon name="building" [size]="14" />{{ branch }}</span>
+  }
+  <span pageActions class="chip live" [class.paused]="!facade.live()"><i class="dot" aria-hidden="true"></i>{{ liveText() }}</span>
+  <label pageActions class="day">
+    <span class="visually-hidden">{{ i18n.t('tracker.day') }}</span>
+    <input class="inp sm" type="date" [value]="facade.filter().day ?? facade.servedDay() ?? today" (change)="onDay($event)" />
+  </label>
+  <app-search-box
+    pageActions
+    class="search"
+    [value]="facade.filter().search ?? ''"
+    [placeholder]="i18n.t('tracker.searchPlaceholder')"
+    [label]="i18n.t('tracker.search')"
+    (searchChange)="facade.setSearch($event)"
+  />
+</app-page-header>
+
+<app-tracker-view-tabs [counters]="facade.counters()" [view]="facade.filter().view" (viewChange)="facade.setView($event)" />
+
+<app-tracker-pipeline-strip class="strip" [counters]="facade.counters()" [stage]="facade.filter().stage" (stageToggle)="facade.toggleStage($event)" />
+
+<div class="bar">
+  <app-tracker-attention-chips [counters]="facade.counters()" [attention]="facade.filter().attention" (attentionToggle)="facade.toggleAttention($event)" />
+  <app-tracker-layout-toggle [layout]="facade.layout()" (layoutChange)="facade.setLayout($event)" />
+</div>
+
+@if (problem(); as problem) {
+  <p class="problem" role="alert">{{ problem }}</p>
+}
+
+@if (facade.layout() === 'table') {
+  <app-section-card [padded]="false">
+    <app-data-table
+      [columns]="columns"
+      [rows]="facade.rows()"
+      [rowId]="rowId"
+      [rowClass]="rowClass"
+      [loading]="facade.list.isLoading()"
+      [interactive]="false"
+      [emptyTitle]="i18n.t('tracker.empty')"
+      [emptyMessage]="i18n.t('tracker.emptyHint')"
+      [caption]="i18n.t('tracker.title')"
+      [compact]="true"
+      [sort]="facade.sort()"
+      [serverSort]="true"
+      (sortChange)="facade.setSort($event)"
+    >
+      <ng-template appCell="visit" [appCellOf]="facade.rows()" let-row>
+        <span class="visit">
+          <a class="link mono" [routerLink]="accessionLink" [queryParams]="{ visitId: row.visitId }">{{ row.accession }}</a>
+          @if (row.urgent) {
+            <app-badge tone="bad"><app-icon name="zap" [size]="12" />{{ i18n.t('tracker.urgent') }}</app-badge>
+          }
+        </span>
+        <span class="sub">{{ patient(row) }}</span>
+      </ng-template>
+      <ng-template appCell="registration" [appCellOf]="facade.rows()" let-row>
+        <span class="mono">{{ registeredAt(row) }}</span>
+        <span class="sub">{{ registrationLine(row) }}</span>
+      </ng-template>
+      <ng-template appCell="samples" [appCellOf]="facade.rows()" let-row>
+        <app-tracker-pill [look]="samples(row)" />
+      </ng-template>
+      <ng-template appCell="results" [appCellOf]="facade.rows()" let-row>
+        <span class="pills">
+          <app-tracker-pill [look]="results(row)" />
+          @if (row.results; as results) {
+            @if (results.panic > 0) {
+              <app-badge tone="bad" [attr.title]="results.firstPanicTest"><app-icon name="zap" [size]="12" />{{ i18n.t('tracker.flag.panic') }}</app-badge>
+            }
+            @if (results.hidden > 0) {
+              <span class="sub">{{ i18n.tc('tracker.results.hidden', results.hidden, { count: count(results.hidden) }) }}</span>
+            }
+          }
+        </span>
+      </ng-template>
+      <ng-template appCell="payment" [appCellOf]="facade.rows()" let-row>
+        <app-tracker-pill [look]="payment(row)" />
+      </ng-template>
+      <ng-template appCell="nextStep" [appCellOf]="facade.rows()" let-row>
+        <app-tracker-next-step [item]="row" />
+        <span class="sub">{{ i18n.t('tracker.stage.' + row.stage) }}</span>
+      </ng-template>
+      <ng-template appCell="timeLeft" [appCellOf]="facade.rows()" let-row>
+        <app-tracker-pill [look]="timeLeft(row)" absent="none" />
+      </ng-template>
+    </app-data-table>
+    @if (page(); as page) {
+      <app-paginator [page]="page.page" [pageSize]="page.pageSize" [totalCount]="page.totalCount" (pageChange)="onPage($event)" />
+    }
+  </app-section-card>
+} @else {
+  @if (facade.filter().stage !== null) {
+    <p class="note">
+      {{ i18n.tf('tracker.board.filtered', { stage: i18n.t('tracker.stage.' + facade.filter().stage) }) }}
+      <button type="button" class="btn ghost sm" (click)="facade.toggleStage(null)">{{ i18n.t('tracker.board.showAll') }}</button>
+    </p>
+  }
+  <app-tracker-board [lanes]="boardLanes()" (more)="facade.showStage($event)" />
+}

@@ -71,6 +71,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 export const NAV_REGISTRY: readonly NavEntry[] = [
   { portal: 'client', group: 'shell.group.overview', path: '/account/dashboard', permission: 'dashboard.view', i18nKey: 'shell.nav.home', release: 'R1', icon: 'grid' },
   { portal: 'admin', group: 'shell.group.overview', path: '/admin', permission: null, i18nKey: 'shell.nav.adminHome', release: 'R1', icon: 'home' },
+  { portal: 'client', group: 'shell.group.reception', path: '/tracker', permission: 'registration.view', i18nKey: 'shell.nav.labTracker', release: 'R1', icon: 'layers' },
   { portal: 'client', group: 'shell.group.reception', path: '/registration/new', permission: 'registration.create', i18nKey: 'shell.nav.registration', release: 'R1', icon: 'clipboard' },
   { portal: 'client', group: 'shell.group.reception', path: '/registration/visits', permission: 'registration.view', i18nKey: 'shell.nav.searchRegistrations', release: 'R1', icon: 'search' },
   { portal: 'client', group: 'shell.group.reception', path: '/patients', permission: 'patients.view', i18nKey: 'shell.nav.patients', release: 'R1', icon: 'user' },

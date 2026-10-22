@@ -37,7 +37,7 @@ describe('homeRedirect (SRS CP-05 is the client home)', () => {
   // R1-04: this case used to keep the user on a developer placeholder (tenant id, raw expiry, permission keys)
   it('sends a user without the dashboard to the first menu entry they may open', async () => {
     await signInWith(['results.view', 'registration.view']);
-    expect((run() as UrlTree).toString()).toBe('/registration/visits'); // reception comes before the laboratory in the menu
+    expect((run() as UrlTree).toString()).toBe('/tracker'); // the Lab Tracker is the first Reception entry (LIS-CR-006)
   });
 
   it('sends a user without any menu permission to the profile, open to every client user', async () => {
