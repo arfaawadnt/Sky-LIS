@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.18.1** · released 2026-10-21 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.19.0** · released 2026-10-22 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.19.0 — 2026-10-22
 
 Change request LIS-CR-006 (2026-10-22, `docs/build/CR-2026-10-22_Lab-Tracker.md`): the **Lab Tracker**, chosen from the design canvas as
 layouts A (pipeline board) + B (stage lanes). No migration.
