@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.19.1** · released 2026-10-22 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.20.0** · released 2026-10-22 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -233,6 +233,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.20.0 — 2026-10-22
 
 - **Lab Tracker period filter (from / to).** The tracker's day picker becomes a period picker: *Today* (the laboratory's own day,
   the default), *Yesterday*, *A day…*, *Last 7 days* or *From / to…* — two date-time inputs in the laboratory's wall-clock,
