@@ -40,7 +40,7 @@ export function trackerCounters(overrides: Partial<LabTrackerCounters> = {}): La
 }
 
 export function trackerPage(items: readonly LabTrackerItem[], overrides: Partial<LabTrackerPage> = {}): LabTrackerPage {
-  return { items, page: 1, pageSize: 50, totalCount: items.length, counters: trackerCounters(), day: '2026-10-22', branchId: 'branch-1', ...overrides };
+  return { items, page: 1, pageSize: 50, totalCount: items.length, counters: trackerCounters(), day: '2026-10-22', branchId: 'branch-1', fromUtc: '2026-10-21T21:00:00+00:00', toUtc: '2026-10-22T21:00:00+00:00', ...overrides };
 }
 
 /** Timers a spec drives by hand: `advance(ms)` moves the clock a second at a time and runs the periodic tasks. */

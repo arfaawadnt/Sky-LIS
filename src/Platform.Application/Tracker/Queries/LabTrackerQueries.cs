@@ -31,6 +31,8 @@ namespace Platform.Application.Tracker.Queries;
 public sealed record GetLabTrackerQuery(
     DateOnly? Day,
     Guid? BranchId,
+    DateTime? From,
+    DateTime? To,
     string? Stage,
     string? Attention,
     string? View,
@@ -44,8 +46,16 @@ public sealed class GetLabTrackerValidator : AbstractValidator<GetLabTrackerQuer
 {
     public const int MaxSearchLength = 60;
 
+    /// <summary>A from / to range spans at most this many days (the day is composed in memory).</summary>
+    public const int MaxRangeDays = 31;
+
     public GetLabTrackerValidator()
     {
+        RuleFor(query => query.To).NotNull().When(query => query.From is not null).WithMessage("'from' and 'to' go together.");
+        RuleFor(query => query.From).NotNull().When(query => query.To is not null).WithMessage("'from' and 'to' go together.");
+        RuleFor(query => query.To).Must((query, to) => query.From is not { } from || to is not { } end || from <= end).WithMessage("'from' must not be after 'to'.");
+        RuleFor(query => query.To).Must((query, to) => query.From is not { } from || to is not { } end || (end - from).TotalDays <= MaxRangeDays)
+            .WithMessage($"The range may cover at most {MaxRangeDays} days.");
         RuleFor(query => query.Stage).IsEnumName(typeof(TrackerStage), caseSensitive: false).When(query => !string.IsNullOrEmpty(query.Stage));
         RuleFor(query => query.Attention).IsEnumName(typeof(TrackerAttention), caseSensitive: false).When(query => !string.IsNullOrEmpty(query.Attention));
         RuleFor(query => query.View).IsEnumName(typeof(TrackerView), caseSensitive: false).When(query => !string.IsNullOrEmpty(query.View));
@@ -73,8 +83,11 @@ public sealed class GetLabTrackerHandler(
         var zone = await laboratoryZone.FindAsync(cancellationToken).ConfigureAwait(false);
         var now = clock.UtcNow;
         var today = ReportPeriod.LocalDay(now, zone);
-        var day = query.Day ?? today;
-        var (fromUtc, toUtc) = ReportPeriod.Window(day, day, zone);
+        // a from / to range (laboratory wall-clock, inclusive to the minute) wins over the day; the day echoed is the range's first day
+        var day = query.From is { } rangeFrom ? DateOnly.FromDateTime(rangeFrom) : query.Day ?? today;
+        var (fromUtc, toUtc) = query is { From: { } from, To: { } to }
+            ? (ReportPeriod.InstantUtc(from, zone), ReportPeriod.InstantUtc(to, zone).AddMinutes(1))
+            : ReportPeriod.Window(day, day, zone);
 
         var rules = new TrackerRules(
             await settings.GetAsync(SettingKeys.ReviewBeforeVerify, cancellationToken).ConfigureAwait(false),
@@ -98,7 +111,7 @@ public sealed class GetLabTrackerHandler(
         var selected = TrackerRows.Select(visits, Parse<TrackerStage>(query.Stage), Parse<TrackerAttention>(query.Attention), Parse<TrackerView>(query.View));
         var ordered = TrackerRows.Order(selected, ListSort.Of(query.Sort, query.Direction), sections.SeeVip);
         var items = ordered.Skip(page.Skip).Take(page.PageSize).Select(visit => TrackerRows.Item(visit, sections, rules.Today)).ToList();
-        return new LabTrackerPage(items, page.Page, page.PageSize, selected.Count, counters, day, branchId);
+        return new LabTrackerPage(items, page.Page, page.PageSize, selected.Count, counters, day, branchId, fromUtc, toUtc);
     }
 
     private static TEnum? Parse<TEnum>(string? value)

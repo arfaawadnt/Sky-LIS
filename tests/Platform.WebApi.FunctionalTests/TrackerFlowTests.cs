@@ -114,6 +114,15 @@ public sealed class TrackerFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         var yesterday = day.Day.AddDays(-1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         Assert.Equal(0, (await client.GetFromJsonAsync<LabTrackerPage>($"{Tracker}?day={yesterday}"))!.Counters.Total);
         Assert.Equal(0, (await client.GetFromJsonAsync<LabTrackerPage>($"{Tracker}?branchId={Guid.CreateVersion7()}"))!.Counters.Total);
+
+        // a from / to range (laboratory wall-clock, inclusive to the minute) replaces the day: the whole day as a range holds
+        // everything, a range that ends yesterday holds nothing, and the page echoes the window it read
+        var dayText = day.Day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var ranged = (await client.GetFromJsonAsync<LabTrackerPage>($"{Tracker}?from={dayText}T00:00&to={dayText}T23:59"))!;
+        Assert.Equal(day.Counters.Total, ranged.Counters.Total);
+        Assert.Equal(day.Day, ranged.Day);
+        Assert.True(ranged.ToUtc > ranged.FromUtc);
+        Assert.Equal(0, (await client.GetFromJsonAsync<LabTrackerPage>($"{Tracker}?from={yesterday}T00:00&to={yesterday}T23:59"))!.Counters.Total);
     }
 
     [DatabaseFact]
@@ -161,7 +170,7 @@ public sealed class TrackerFlowTests(ApiFactory factory) : IClassFixture<ApiFact
 
         var (reader, _, _) = await factory.SeedUserAsync(tenantId: world.Tenant, permissions: ["registration.view"], branchIds: [world.Branch]);
         var client = await SignedInClientAsync(reader);
-        foreach (var query in new[] { "?sort=password", "?direction=sideways", "?stage=Lost", "?attention=Bored", "?view=Lab", "?pageSize=500", "?page=0", $"?search={new string('x', 61)}", "?day=yesterday" })
+        foreach (var query in new[] { "?sort=password", "?direction=sideways", "?stage=Lost", "?attention=Bored", "?view=Lab", "?pageSize=500", "?page=0", $"?search={new string('x', 61)}", "?day=yesterday", "?from=2026-10-20T08:00", "?to=2026-10-20T08:00", "?from=2026-10-20T10:00&to=2026-10-20T08:00", "?from=2026-01-01T00:00&to=2026-03-01T00:00", "?from=soon&to=later" })
         {
             var refused = await client.GetAsync(Tracker + query);
             Assert.True(refused.StatusCode == HttpStatusCode.BadRequest, $"{query}: {(int)refused.StatusCode}");

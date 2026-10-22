@@ -234,7 +234,12 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Lab Tracker period filter (from / to).** The tracker's day picker becomes a period picker: *Today* (the laboratory's own day,
+  the default), *Yesterday*, *A day…*, *Last 7 days* or *From / to…* — two date-time inputs in the laboratory's wall-clock,
+  inclusive to the minute, at most 31 days. `GET /api/v1/tracker/visits` takes `from` and `to` (`yyyy-MM-ddTHH:mm`, together; they
+  replace `day`; `VALIDATION-400` for one without the other, an inverted or a longer range) and the page echoes the UTC window it read
+  (`fromUtc` / `toUtc`). Counters, strip and chips cover the whole period. Specs: `period-picker.component.spec.ts`,
+  `TrackerFlowTests`.
 
 ### v0.19.1 — 2026-10-22
 

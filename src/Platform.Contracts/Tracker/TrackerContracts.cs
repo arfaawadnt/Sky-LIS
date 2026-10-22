@@ -101,4 +101,6 @@ public sealed record LabTrackerPage(
     long TotalCount,
     LabTrackerCounters Counters,
     DateOnly Day,
-    Guid BranchId);
+    Guid BranchId,
+    DateTimeOffset FromUtc,
+    DateTimeOffset ToUtc);

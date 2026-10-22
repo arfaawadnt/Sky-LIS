@@ -19,6 +19,7 @@ import { TrackerFacade } from '../state/tracker.facade';
 import { AttentionChipsComponent } from '../ui/attention-chips.component';
 import { LayoutToggleComponent } from '../ui/layout-toggle.component';
 import { NextStepComponent } from '../ui/next-step.component';
+import { PeriodPickerComponent } from '../ui/period-picker.component';
 import { PipelineStripComponent } from '../ui/pipeline-strip.component';
 import { StatusPillComponent } from '../ui/status-pill.component';
 import { type BoardLane, TrackerBoardComponent } from '../ui/tracker-board.component';
@@ -28,7 +29,7 @@ import { ViewTabsComponent } from '../ui/view-tabs.component';
 /**
  * Lab Tracker (LIS-CR-006, SRS CP-69): every visit of the laboratory day through registration → samples → results →
  * payment, as A · Pipeline board (table, server paged and sorted) or B · Stage lanes (board), over the same filters:
- * day, search, desk view, stage (strip) and attention (chips). Live: re-read every 30 s while the tab is visible.
+ * period (a day or a from / to range), search, desk view, stage (strip) and attention (chips). Live: re-read every 30 s while the tab is visible.
  * Sections the user may not see (samples, results, payment) arrive null from the server and read "—".
  */
 @Component({
@@ -44,6 +45,7 @@ import { ViewTabsComponent } from '../ui/view-tabs.component';
     BadgeComponent,
     IconComponent,
     ViewTabsComponent,
+    PeriodPickerComponent,
     PipelineStripComponent,
     AttentionChipsComponent,
     LayoutToggleComponent,
@@ -128,13 +130,6 @@ export class TrackerPage {
   protected readonly rowId = (row: LabTrackerItem): string => row.visitId;
 
   protected readonly rowClass = (row: LabTrackerItem): string | null => delayEdge(row.delayState, row.minutesLeft);
-
-  protected onDay(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    // the laboratory's own today (the day the server read by default) stays the default, so the page rolls over at midnight
-    const today = this.facade.filter().day === null ? (this.facade.servedDay() ?? this.today) : this.today;
-    this.facade.setDay(value.length === 0 || value === today ? null : value);
-  }
 
   protected onPage(page: PageRequest): void {
     this.facade.setPage(page);

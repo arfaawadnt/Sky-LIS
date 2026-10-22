@@ -26,10 +26,11 @@ reached from the tracker's *Bench* view. Read with `docs/build/MODULE-PATTERN.md
 Ready and unpaid), `PrintReport`, `None`. **Time left**: the earliest `ExpectedAtUtc` of the visit's unsigned visible results against
 the turnaround clock (`TurnaroundClock`, `delayWarnPercent` / `delayLatePercent`): minutes left (negative = late) and `DelayState`.
 
-**Query** `GetLabTrackerQuery(Day?, BranchId?, Stage?, Attention?, View?, Search?, Page, PageSize, Sort, Direction)`
+**Query** `GetLabTrackerQuery(Day?, BranchId?, From?, To?, Stage?, Attention?, View?, Search?, Page, PageSize, Sort, Direction)`
 [`registration.view`] → `LabTrackerPage { items, page, pageSize, totalCount, counters }`:
 - `Day` = laboratory day in the tenant time zone (default today; the visit's `RegisteredAtUtc` falls in it); `BranchId` = session branch by
-  default (same branch rule as the visits register).
+  default (same branch rule as the visits register). **Follow-up 2026-10-22**: `From` / `To` (laboratory wall-clock, both or neither,
+  `From ≤ To`, at most 31 days) replace the day with the window `[From, To + 1 min)`; the page echoes `fromUtc` / `toUtc`.
 - `Attention`: `Delayed` (DelayState Late), `Panic` (a visible result with an unacknowledged panic), `Rejected` (a rejected sample not
   replaced), `ReadyUnpaid` (stage Ready or Delivered and balance not Paid).
 - `View` presets: `Reception` (AwaitingSample or remaining patient share), `Verification` (AwaitingVerification), `FrontDesk` (Ready).
@@ -79,7 +80,7 @@ Feature `features/tracker`: `data/tracker.api.ts`, `state/tracker.facade.ts` (`r
 30 s** while the document is visible — `visibilitychange`, paused when hidden, reload on return; a "Live · updated n s ago" label;
 no `subscribe()` in components), `pages/tracker.page.{ts,html,css}` (route `''` of `TRACKER_ROUTES`; export it for the integrator), small
 `ui/` components to keep each stylesheet under 4 kB:
-- **Header**: title, branch chip, live label, search (scan-friendly: Enter submits, the field keeps focus), day picker.
+- **Header**: title, branch chip, live label, search (scan-friendly: Enter submits, the field keeps focus), period picker (today · yesterday · a day · last 7 days · from / to).
 - **View tabs**: All · Reception · Bench (a link to `/results/worklist`) · Verification · Front desk — with counts where the counters
   give them.
 - **Pipeline strip** (layout A): six stage tiles (Registered = total, Awaiting sample, In the lab, Awaiting verification, Ready,

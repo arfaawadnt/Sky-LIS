@@ -500,7 +500,10 @@ QMS source is never read or copied (section 1); everything here is written from 
   without the module permission; results counted over `ResultRights.VisibilityOf`. `GET /api/v1/tracker/visits`. SPA `features/tracker`
   (`TrackerFacade`: filter signal → `resource()`, board = one resource per lane, polling every 30 s behind `TRACKER_TIMERS`, paused while
   the document is hidden; layout kept in the facade, no web storage), dictionaries `tracker.{en,ar}.json`. Delivered = printed; unpaid is a
-  flag, never a block (business assumptions in the intake §17).
+  flag, never a block (business assumptions in the intake §17). **Period (2026-10-22)**: `GetLabTrackerQuery.From/To` (laboratory
+  wall-clock `DateTime`, together, From ≤ To, ≤ `GetLabTrackerValidator.MaxRangeDays` = 31) replace `Day`; the window is
+  `[InstantUtc(From), InstantUtc(To) + 1 min)` through `ReportPeriod.InstantUtc`; `LabTrackerPage.FromUtc/ToUtc` echo it. SPA
+  `ui/period-picker.component.ts` (presets today / yesterday / a day / last 7 days / custom; `TrackerFacade.setRange`).
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

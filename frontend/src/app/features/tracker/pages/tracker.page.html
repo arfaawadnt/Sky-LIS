@@ -3,10 +3,15 @@
     <span pageActions class="chip branch"><app-icon name="building" [size]="14" />{{ branch }}</span>
   }
   <span pageActions class="chip live" [class.paused]="!facade.live()"><i class="dot" aria-hidden="true"></i>{{ liveText() }}</span>
-  <label pageActions class="day">
-    <span class="visually-hidden">{{ i18n.t('tracker.day') }}</span>
-    <input class="inp sm" type="date" [value]="facade.filter().day ?? facade.servedDay() ?? today" (change)="onDay($event)" />
-  </label>
+  <app-tracker-period
+    pageActions
+    [day]="facade.filter().day"
+    [from]="facade.filter().from"
+    [to]="facade.filter().to"
+    [today]="facade.servedDay() ?? today"
+    (dayChange)="facade.setDay($event)"
+    (rangeChange)="facade.setRange($event.from, $event.to)"
+  />
   <app-search-box
     pageActions
     class="search"

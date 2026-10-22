@@ -123,18 +123,24 @@ export interface LabTrackerPage {
   readonly pageSize: number;
   readonly totalCount: number;
   readonly counters: LabTrackerCounters;
-  /** The laboratory day read (yyyy-MM-dd, after the default applied) and the branch. */
+  /** The laboratory day read (yyyy-MM-dd, after the default applied; the first day of a range) and the branch. */
   readonly day: string;
   readonly branchId: string;
+  /** The UTC window read, half-open. */
+  readonly fromUtc: string;
+  readonly toUtc: string;
 }
 
 /**
  * `GET /api/v1/tracker/visits` [registration.view]. `day` = laboratory day `yyyy-MM-dd` (absent = today in the tenant
- * time zone); `branchId` absent = the session branch. `sort`: `timeLeft` (default), `registeredAt`, `accession`,
+ * time zone); `from` / `to` (together, laboratory wall-clock `yyyy-MM-ddTHH:mm`, inclusive to the minute, at most 31 days)
+ * replace the day; `branchId` absent = the session branch. `sort`: `timeLeft` (default), `registeredAt`, `accession`,
  * `patient`, `stage`.
  */
 export interface LabTrackerQuery extends SortRequest {
   readonly day: string | null;
+  readonly from: string | null;
+  readonly to: string | null;
   readonly branchId: string | null;
   readonly stage: LabTrackerStage | null;
   readonly attention: LabTrackerAttention | null;

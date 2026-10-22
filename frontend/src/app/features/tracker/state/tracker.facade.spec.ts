@@ -71,6 +71,39 @@ describe('TrackerFacade (LIS-CR-006)', () => {
     });
   });
 
+  it('sends a from / to range in place of the day, and a day in place of the range', async () => {
+    await run();
+    visits().forEach((call) => call.flush(trackerPage([])));
+
+    facade.setDay('2026-10-21');
+    facade.setRange('2026-10-15T08:00', '2026-10-21T17:30');
+    await run();
+    let params = backend.expectOne((request) => request.url === TRACKER_API.visits).request.params;
+    expect([params.has('day'), params.get('from'), params.get('to')]).toEqual([false, '2026-10-15T08:00', '2026-10-21T17:30']);
+
+    facade.setDay('2026-10-20');
+    await run();
+    params = backend.expectOne((request) => request.url === TRACKER_API.visits).request.params;
+    expect([params.get('day'), params.has('from'), params.has('to')]).toEqual(['2026-10-20', false, false]);
+  });
+
+  it('takes the laboratory\'s today from a default-day answer only, never from a chosen day or range', async () => {
+    await run();
+    visits().forEach((call) => call.flush(trackerPage([], { day: '2026-10-22' })));
+    await run();
+    expect(facade.servedDay()).toBe('2026-10-22');
+
+    facade.setRange('2026-10-15T08:00', '2026-10-21T17:30');
+    await run();
+    backend.expectOne((request) => request.url === TRACKER_API.visits).flush(trackerPage([], { day: '2026-10-15' }));
+    await run();
+    facade.setDay('2026-10-01');
+    await run();
+    backend.expectOne((request) => request.url === TRACKER_API.visits).flush(trackerPage([], { day: '2026-10-01' }));
+    await run();
+    expect(facade.servedDay()).toBe('2026-10-22');
+  });
+
   it('maps the sortable columns to the server keys and toggles a stage or an attention flag off on a second press', async () => {
     await run();
     visits().forEach((call) => call.flush(trackerPage([])));

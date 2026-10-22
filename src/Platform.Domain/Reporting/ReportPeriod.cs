@@ -42,10 +42,13 @@ public static class ReportPeriod
         }
     }
 
-    private static DateTimeOffset StartOfDayUtc(DateOnly day, TimeZoneInfo? zone)
+    /// <summary>The instant of a laboratory wall-clock time (the kind is ignored; UTC when no zone is known).</summary>
+    public static DateTimeOffset InstantUtc(DateTime local, TimeZoneInfo? zone)
     {
-        var local = DateTime.SpecifyKind(day.ToDateTime(TimeOnly.MinValue), DateTimeKind.Unspecified);
-        var offset = zone?.GetUtcOffset(local) ?? TimeSpan.Zero;
-        return new DateTimeOffset(local, offset).ToUniversalTime();
+        var wall = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+        var offset = zone?.GetUtcOffset(wall) ?? TimeSpan.Zero;
+        return new DateTimeOffset(wall, offset).ToUniversalTime();
     }
+
+    private static DateTimeOffset StartOfDayUtc(DateOnly day, TimeZoneInfo? zone) => InstantUtc(day.ToDateTime(TimeOnly.MinValue), zone);
 }

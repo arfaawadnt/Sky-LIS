@@ -22,9 +22,14 @@ import { TrackerApi } from '../data/tracker.api';
 /** The two layouts over the same data and filters: A · Pipeline board (table) and B · Stage lanes (board). */
 export type TrackerLayout = 'table' | 'board';
 
-/** The tracker filter as the page edits it; `day` null = today in the laboratory's time zone (the server's default). */
+/**
+ * The tracker filter as the page edits it: `day` null = today in the laboratory's time zone (the server's default); a
+ * `from` / `to` range (laboratory wall-clock `yyyy-MM-ddTHH:mm`, both or neither) replaces the day.
+ */
 export interface TrackerFilter {
   readonly day: string | null;
+  readonly from: string | null;
+  readonly to: string | null;
   readonly stage: LabTrackerStage | null;
   readonly attention: LabTrackerAttention | null;
   readonly view: LabTrackerView | null;
@@ -34,7 +39,7 @@ export interface TrackerFilter {
 }
 
 export function defaultTrackerFilter(): TrackerFilter {
-  return { day: null, stage: null, attention: null, view: null, search: null, page: 1, pageSize: 50 };
+  return { day: null, from: null, to: null, stage: null, attention: null, view: null, search: null, page: 1, pageSize: 50 };
 }
 
 /** The server keys of the sortable table columns (allow-list `timeLeft`, `registeredAt`, `accession`, `patient`, `stage`). */
@@ -128,7 +133,7 @@ export class TrackerFacade {
   /** The filters a lane shares with the table (no stage, page or order of its own). */
   private readonly baseQuery = computed<Omit<LabTrackerQuery, 'stage' | 'page' | 'pageSize'>>(() => {
     const filter = this.filter();
-    return { day: filter.day, branchId: null, attention: filter.attention, view: filter.view, search: filter.search };
+    return { day: filter.day, from: filter.from, to: filter.to, branchId: null, attention: filter.attention, view: filter.view, search: filter.search };
   });
 
   readonly list = resource({
@@ -177,8 +182,14 @@ export class TrackerFacade {
     loader: ({ params, abortSignal }) => this.api.sessionBranch(params, abortSignal),
   });
 
+  /** One laboratory day (null = today); drops a range. */
   setDay(day: string | null): void {
-    this.update({ day: day === null || day.length === 0 ? null : day });
+    this.update({ day: day === null || day.length === 0 ? null : day, from: null, to: null });
+  }
+
+  /** A from / to range of laboratory wall-clock minutes; it replaces the day. */
+  setRange(from: string, to: string): void {
+    this.update({ day: null, from, to });
   }
 
   /** A stage tile: presses filter by that stage, a second press (or Registered) shows every stage again. */
@@ -293,7 +304,9 @@ export class TrackerFacade {
     const page = await this.api.visits(query, abortSignal);
     const now = this.timers.now();
     this.countersState.set(page.counters);
-    this.servedDay.set(page.day);
+    if (query.day === null && query.from === null) {
+      this.servedDay.set(page.day); // the server's default day = the laboratory's today; a chosen day or range echoes its own first day
+    }
     this.loadedAt.set(now);
     this.now.set(now);
     return page;

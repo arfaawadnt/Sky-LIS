@@ -24,6 +24,8 @@ public sealed class TrackerController(ISender sender) : ControllerBase
     public async Task<ActionResult<LabTrackerPage>> Visits(
         [FromQuery] DateOnly? day,
         [FromQuery] Guid? branchId,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
         [FromQuery] string? stage,
         [FromQuery] string? attention,
         [FromQuery] string? view,
@@ -33,5 +35,5 @@ public sealed class TrackerController(ISender sender) : ControllerBase
         [FromQuery] string? sort,
         [FromQuery] string? direction,
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new GetLabTrackerQuery(day, branchId, stage, attention, view, search, page, pageSize, sort, direction), cancellationToken));
+        Ok(await sender.Send(new GetLabTrackerQuery(day, branchId, from, to, stage, attention, view, search, page, pageSize, sort, direction), cancellationToken));
 }

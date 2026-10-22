@@ -550,8 +550,9 @@ sample) and UAT-RES-02 (a panic value) exist today. Sign in as `lab.admin` (ever
 5. Scan or type the accession of UAT-REG-03 in the search box and press Enter.
 6. Leave the page open for a minute while another profile records a payment on the UAT-REG-09 visit (UAT-CSH-03).
 7. Desk views: *Reception*, *Verification*, *Front desk*; *Bench*.
-8. Sign in as `uat.reception` (no `results.view`, no `billing.view`) and open the page.
-9. Arabic check.
+8. Period: pick *Yesterday*, then *Last 7 days*, then *From / to…* with yesterday 08:00 → today 12:00; back to *Today*.
+9. Sign in as `uat.reception` (no `results.view`, no `billing.view`) and open the page.
+10. Arabic check.
 Expected: (1) one row per visit of the day on the session branch, each with Registration (time, payer), Samples, Results (with the
 Panic tag on the UAT-RES-02 visit), Payment (Paid / Partial / Unpaid / Refund due with the remaining amount) and *Next step*; the strip
 counts add up to the day; the UAT-REG-03 visit is Ready or Delivered, the UAT-REG-09 visit shows *Take payment*; the UAT-SMP-02
@@ -559,8 +560,9 @@ visit is in *Awaiting sample* with *Re-collect*. (2) the table narrows to that s
 visit. (3) *Take payment* opens Payments with the visit loaded; the sort changes the order and the header shows the direction. (4) five
 lanes with cards (accession, time-left pill, patient, detail, payment pill, flag pill, four-segment progress bar); *+ n more* returns to
 the table filtered by that stage. (5) exactly that visit is listed. (6) within 30 s the row's Payment cell reads Paid and "Live ·
-updated n s ago" restarts, without a page reload. (7) each view keeps only its visits; *Bench* opens the Worklist. (8) the Results and
-Payment cells read "—" with "Not in your rights"; the stage and next step still show. (9) right-to-left, Arabic labels and counted
+updated n s ago" restarts, without a page reload. (7) each view keeps only its visits; *Bench* opens the Worklist. (8) the list and the strip counts follow the period (yesterday's
+visits, then both days, then only the visits registered inside the from / to minutes); *Today* restores the day. (9) the Results and
+Payment cells read "—" with "Not in your rights"; the stage and next step still show. (10) right-to-left, Arabic labels and counted
 forms (e.g. "زيارتان").
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
@@ -1083,3 +1085,4 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 0.6 | 2026-10-20 | Claude Code | Treasury removed from the system (change request LIS-CR-004): UAT-ADM-06, UAT-ADM-07, UAT-CSH-01, UAT-CSH-02, UAT-CSH-09 and UAT-CSH-10 withdrawn (ids reserved); UAT-CSH-08 becomes "Payment stamped with the session branch"; UAT-REG-09 becomes "Registration saved without a payment" (amount 0); payment steps, personas (no `treasury.*` keys), run order, coverage and open point 8 updated. |
 | 0.7 | 2026-10-20 | Claude Code | Sign-in by address (change request LIS-CR-005, BR-28): set-up note (laboratory users at `<base>/lab/<slug>`, Super Admin personas at `<base>/admin/login`), UAT-REG-01 step 1a and expectations (another laboratory, admin address, unknown address, bare address; idle return), UAT-OPS intro (admin address, laboratory user refused), UAT-ADM-01 and the provisioning / subscription expectations print the new address. |
 | 0.8 | 2026-10-22 | Claude Code | New script UAT-REG-16 Lab Tracker (CP-69, change request LIS-CR-006): strip and chips, table and board, next-step links, search, live refresh, desk views, rights, Arabic. Reception persona and coverage updated. |
+| 0.9 | 2026-10-22 | Claude Code | UAT-REG-16 gains step 8 (period picker: yesterday, last 7 days, from / to); rights and Arabic checks become steps 9 and 10. Ids unchanged. |

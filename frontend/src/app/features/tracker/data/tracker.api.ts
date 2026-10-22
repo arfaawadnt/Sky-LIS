@@ -14,6 +14,8 @@ export class TrackerApi {
   visits(query: LabTrackerQuery, signal?: AbortSignal): Promise<LabTrackerPage> {
     const params = toHttpParams({
       day: query.day,
+      from: query.from,
+      to: query.to,
       branchId: query.branchId,
       stage: query.stage,
       attention: query.attention,
