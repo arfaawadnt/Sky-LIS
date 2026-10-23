@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sky LIS — Response to the Reviewer's Comments (Shahed V1) — LIS-RC-001 v1.0</title>
+<meta name="description" content="Point-by-point answer to the two review documents of 2026-10-24 on the Sky LIS client portal and Super Admin portal: what the application does today, the proposed change and how it will be built.">
+<style>
+  :root{--bad:#C8102E;--bg:#F3F6FB;--blue-soft:#E8F1FE;--blue:#2A7DF5;--grad:linear-gradient(90deg,#2A7DF5,#6E3BE4);--ink:#14213A;--line-soft:#EAEFF6;--line:#DCE3EE;--muted:#6B7A90;--navy:#0B2A5B;--ok-soft:#E3F5EC;--ok:#13865A;--paper:#fff;--violet-soft:#EFE9FD;--violet:#6E3BE4;--warn-soft:#FFF3DF;--warn:#B26B00;--bad-soft:#FBE7EA}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+  .page{max-width:1180px;margin:0 auto;padding:32px 16px 64px}
+  header.doc{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:28px 32px;position:relative;overflow:hidden}
+  header.doc::before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:var(--grad)}
+  h1{margin:0 0 6px;font-size:28px;letter-spacing:-.01em;color:var(--navy)}
+  .sub{margin:0;color:var(--muted)}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 24px;margin-top:18px;font-size:13px}
+  .meta b{display:block;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:11px}
+  h2{font-size:20px;color:var(--navy);margin:40px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+  h3{font-size:16px;margin:0 0 6px;color:var(--navy)}
+  p{margin:8px 0}
+  ul{margin:6px 0 6px 18px;padding:0}
+  li{margin:3px 0}
+  .lead{color:var(--muted)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:18px 0}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card .n{font-size:30px;font-weight:700;color:var(--navy);line-height:1}
+  .card .l{color:var(--muted);font-size:13px;margin-top:6px}
+  .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .pill.blue{background:var(--blue-soft);color:var(--blue)}
+  .pill.violet{background:var(--violet-soft);color:var(--violet)}
+  .pill.ok{background:var(--ok-soft);color:var(--ok)}
+  .pill.warn{background:var(--warn-soft);color:var(--warn)}
+  .pill.bad{background:var(--bad-soft);color:var(--bad)}
+  .pill.grey{background:var(--line-soft);color:var(--muted)}
+  table{width:100%;border-collapse:collapse;margin:12px 0 4px;font-size:14px;background:var(--paper)}
+  th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left}
+  th{background:var(--line-soft);font-weight:600;color:var(--navy);font-size:12.5px;text-transform:uppercase;letter-spacing:.03em}
+  td.id{font-family:Consolas,monospace;font-size:13px;white-space:nowrap;color:var(--navy)}
+  code{font-family:Consolas,monospace;font-size:13px;background:var(--line-soft);padding:1px 5px;border-radius:4px}
+  .point{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin:16px 0}
+  .point-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:8px}
+  .point-head .id{font-family:Consolas,monospace;font-size:13px;color:var(--muted)}
+  .point-head h3{flex:1 1 auto;margin:0}
+  blockquote{margin:6px 0 12px;padding:8px 14px;border-inline-start:4px solid var(--violet);background:var(--violet-soft);border-radius:0 8px 8px 0;color:var(--ink)}
+  blockquote .ar{display:block;direction:rtl;text-align:right;font-family:"Segoe UI",Tahoma,Arial,sans-serif}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px}
+  .grid > div{min-width:0}
+  .k{display:block;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:11px;margin-bottom:2px}
+  .how{grid-column:1 / -1;background:var(--bg);border-radius:10px;padding:10px 14px}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:13px;color:var(--muted);margin:10px 0 0}
+  footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+  @media (max-width:720px){table{display:block;overflow-x:auto}header.doc{padding:22px 18px}.grid{grid-template-columns:1fr}}
+  @media print{body{background:#fff;font-size:12px}.page{max-width:none;padding:0}.point,header.doc,.card{break-inside:avoid;border-color:#bbb}h2{break-after:avoid}a{color:inherit;text-decoration:none}.how{background:#f3f3f3}}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="doc">
+  <h1>Sky LIS — Response to the Reviewer's Comments</h1>
+  <p class="sub">Point-by-point answer to the two review documents of Shahed (V1): the client portal (17 points) and the Super Admin portal (5 points). For every point: what the application does today, the answer or proposal, and how the application will deal with it.</p>
+  <div class="meta">
+    <div><b>Document</b>LIS-RC-001 · v1.0</div>
+    <div><b>Date</b>2026-10-24</div>
+    <div><b>Software state</b>v0.20.0 (github.com/arfaawadnt/Sky-LIS), installed on WIN-9S2KO4FA64L at https://192.168.80.38:5443</div>
+    <div><b>Sources</b>"SaaS Ai Comments Shahed V1.docx" (client portal), "SaaS Admin Portal Ai Comments Shahed V1.docx" (Super Admin portal) — both received 2026-10-24</div>
+    <div><b>Related</b>LIS-SRS-001 v1.5 (page ids CP-nn / SA-nn), LIS-RP-001 (remaining points), change requests LIS-CR-003…006</div>
+    <div><b>Prepared by</b>Claude Code (AI engineer), for review by Mohamed Hashem</div>
+  </div>
+</header>
+
+<section>
+  <h2>1. Summary</h2>
+  <p class="lead">Of the 22 points, 4 are already answered by the installed build (done or built and hidden by the Release-1 scope), 8 are quick user-interface changes, 7 are new features that deserve a change request each, and 3 are questions that need a business decision before any code. Nothing in the comments contradicts the architecture; every proposal below fits the modules as built.</p>
+  <div class="cards">
+    <div class="card"><div class="n">4</div><div class="l">already done or built (switch on / explain)</div></div>
+    <div class="card"><div class="n">8</div><div class="l">quick changes (a day or less each)</div></div>
+    <div class="card"><div class="n">7</div><div class="l">new features → change requests</div></div>
+    <div class="card"><div class="n">3</div><div class="l">business decisions first</div></div>
+  </div>
+  <div class="legend">
+    <span class="pill ok">done</span> already in v0.20.0
+    <span class="pill blue">quick change</span> small change, no new data
+    <span class="pill violet">change request</span> new feature with its own brief, migration and UAT
+    <span class="pill warn">decision</span> the business owner decides first
+  </div>
+
+  <table>
+    <thead><tr><th style="width:60px">Id</th><th>Point (reviewer's words, shortened)</th><th style="width:170px">Screen</th><th style="width:120px">Status</th><th style="width:70px">Size</th><th style="width:110px">Package</th></tr></thead>
+    <tbody>
+      <tr><td class="id">C-01</td><td>Find your lab: ask to add to the browser bookmarks the first time</td><td>Find your laboratory (/login)</td><td><span class="pill blue">quick change</span></td><td>S</td><td>CR-007</td></tr>
+      <tr><td class="id">C-02</td><td>"Sample collected outside the lab" should be per sample, not per visit</td><td>CP-06 Registration</td><td><span class="pill violet">change request</span></td><td>M</td><td>CR-008</td></tr>
+      <tr><td class="id">C-03</td><td>We don't need the treasury — make it simple</td><td>CP-06 / Payments</td><td><span class="pill ok">done</span></td><td>—</td><td>LIS-CR-004 (v0.16.0)</td></tr>
+      <tr><td class="id">C-04</td><td>More detailed address: districts, centres and villages</td><td>Subscribe wizard, SA-04 Client</td><td><span class="pill violet">change request</span></td><td>M</td><td>CR-008</td></tr>
+      <tr><td class="id">C-05</td><td>Telephone in two fields (country code + number), leading zero removed</td><td>Subscribe wizard, patient form, users</td><td><span class="pill blue">quick change</span></td><td>S</td><td>CR-007</td></tr>
+      <tr><td class="id">C-06</td><td>Row actions in one horizontal line</td><td>CP-10 Visits register</td><td><span class="pill blue">quick change</span></td><td>S</td><td>CR-007</td></tr>
+      <tr><td class="id">C-07</td><td>Payment box at the top, not the bottom</td><td>CP-23 Payments</td><td><span class="pill blue">quick change</span></td><td>S</td><td>CR-007</td></tr>
+      <tr><td class="id">C-08</td><td>Reference range shows only after the result is saved</td><td>CP-19 Results by accession</td><td><span class="pill blue">quick change</span></td><td>S</td><td>CR-007</td></tr>
+      <tr><td class="id">C-09</td><td>Why is the doctor code not auto-generated?</td><td>CP-48 Doctors</td><td><span class="pill blue">quick change</span></td><td>S</td><td>CR-007</td></tr>
+      <tr><td class="id">C-10</td><td>All list actions vertical — make them horizontal</td><td>Every register</td><td><span class="pill blue">quick change</span></td><td>S</td><td>CR-007 (with C-06)</td></tr>
+      <tr><td class="id">C-11</td><td>What is "Drug types"? Where are culture sample types?</td><td>CP-56 Microbiology</td><td><span class="pill blue">quick change</span></td><td>S</td><td>CR-007</td></tr>
+      <tr><td class="id">C-12</td><td>Services / tests must be simpler; drug list per country</td><td>CP-40…CP-44, CP-56 Catalogue</td><td><span class="pill warn">decision</span> + <span class="pill violet">CR</span></td><td>L</td><td>CR-009</td></tr>
+      <tr><td class="id">C-13</td><td>Need full data (sample types, units …)</td><td>CP-43, CP-44, SA master data</td><td><span class="pill violet">change request</span></td><td>M</td><td>CR-009</td></tr>
+      <tr><td class="id">C-14</td><td>Need 5 report designs</td><td>CP-13 Print reports, CP-54 Report templates</td><td><span class="pill violet">change request</span></td><td>L</td><td>CR-010</td></tr>
+      <tr><td class="id">C-15</td><td>Simplified cash ledger for the lab</td><td>Finance (new page)</td><td><span class="pill violet">change request</span></td><td>M</td><td>CR-011</td></tr>
+      <tr><td class="id">C-16</td><td>Subscription expiry reminder: at sign-in, on screen, e-mail, SMS</td><td>Shell, Platform jobs</td><td><span class="pill violet">change request</span></td><td>M</td><td>CR-012</td></tr>
+      <tr><td class="id">C-17</td><td>Advertisements on the login / splash screen and normal pages</td><td>Sign-in, shell, SA (new page)</td><td><span class="pill warn">decision</span> + <span class="pill violet">CR</span></td><td>M</td><td>CR-013</td></tr>
+      <tr><td class="id">A-01</td><td>Dashboard: the customers inactive for 3 days</td><td>SA-03 Dashboard</td><td><span class="pill blue">quick change</span></td><td>S</td><td>CR-007</td></tr>
+      <tr><td class="id">A-02</td><td>One admin for all countries or one per country? Prefer one for all</td><td>SA (all)</td><td><span class="pill ok">done</span> (as preferred)</td><td>—</td><td>—</td></tr>
+      <tr><td class="id">A-03</td><td>Subscriptions &amp; wallets: explain how it works</td><td>SA-05 Subscriptions &amp; wallets</td><td><span class="pill ok">explained</span> §3</td><td>—</td><td>—</td></tr>
+      <tr><td class="id">A-04</td><td>Test rules not found in the client portal — why?</td><td>CP-52 Test rules</td><td><span class="pill ok">built</span>, hidden (R2)</td><td>XS</td><td>switch on</td></tr>
+      <tr><td class="id">A-05</td><td>Shortcut sets not found in the client portal — why?</td><td>CP-51 Shortcut sets</td><td><span class="pill ok">built</span>, hidden (R2)</td><td>XS</td><td>switch on</td></tr>
+    </tbody>
+  </table>
+  <p class="lead">Size: XS = a configuration switch · S = up to one day · M = two to five days · L = one to two weeks, including tests, UAT script and documentation.</p>
+</section>
+
+<section>
+  <h2>2. Client portal — the 17 points</h2>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-01</span><h3>Bookmark the laboratory's address on the first visit</h3><span class="pill blue">quick change</span><span class="pill grey">S</span></div>
+    <blockquote>Find your lab &gt;&gt;&gt; on the first time, ask if we want to add to bookmarks in the browser.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>Since v0.18.0 every laboratory has its own sign-in address <code>…/lab/&lt;slug&gt;</code>; the bare address shows "Find your laboratory". Nothing prompts the user to keep the address.</div>
+      <div><span class="k">Answer</span>Agreed, with one technical limit: a web page cannot add a bookmark by itself — browsers forbid it. The page can prompt and guide, and it can remember the laboratory on this device.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li>After the first successful sign-in from a "found" address, the laboratory sign-in page shows a one-time strip: <em>"Save this address: press Ctrl+D (⌘+D on Mac) to bookmark it, or copy it"</em> with a <em>Copy address</em> button and a "Don't show again" choice. The strip is dismissed per device (a cookie flag, no web storage in the SPA).</li>
+          <li>The "Find your laboratory" page lists the laboratories recently signed into on this device (slug + name) so the user clicks instead of typing; the list is a per-device cookie, never a user record.</li>
+          <li>The laboratory's address is also printed on the welcome SMS / e-mail of the subscription (notification code <code>portal-url</code>, already exists) and on SA-04 Client.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-02</span><h3>"Collected outside the laboratory" per sample, not per visit</h3><span class="pill violet">change request</span><span class="pill grey">M · CR-008</span></div>
+    <blockquote>Sample collected outside the lab should be on sample level not visit level.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>The flag is one of the visit flags (Urgent · Biohazard · Sample collected outside the laboratory) on CP-06 and is stored on the visit (<code>Visit.CollectedOutside</code>), as in LDM.</div>
+      <div><span class="k">Answer</span>Agreed: a visit with blood drawn in the laboratory and a urine cup brought from home is the common case. The flag moves to the tube (sample) and the visit keeps a derived "any sample collected outside" for lists and reports.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li><strong>Data</strong>: <code>VisitTube.CollectedOutside</code> (new column, migration; the old visit flag is copied to every tube of the visits that carry it, then kept read-only as history).</li>
+          <li><strong>Registration (CP-06)</strong>: the visit chip becomes a per-sample toggle inside the sample list that appears once services are entered (one row per tube: sample type, colour, "Collected outside" switch). A quick action "All outside" keeps the one-click case.</li>
+          <li><strong>Samples</strong>: a tube marked outside skips the collection step (it is Collected on save with the time typed by the clerk, optional) and still passes the Received gate; the label prints "EXT".</li>
+          <li><strong>Reports and tracker</strong>: the report shows the collection time per sample as today; the Lab Tracker shows an "ext" tag on the samples cell.</li>
+          <li>API: <code>POST /api/v1/registration/visits</code> takes <code>samples[].collectedOutside</code>; the old visit-level field stays accepted for one release and marks every tube.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-03</span><h3>No treasury — keep it simple</h3><span class="pill ok">done</span><span class="pill grey">v0.16.0, 2026-10-20</span></div>
+    <blockquote>I think we don't need the treasury &gt;&gt;&gt; make it simple.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>Done by change request LIS-CR-004: the treasury (cash drawers, device-bound access requests, rule BR-27) was removed from the whole system. A payment carries the visit, amount, method, reference, cashier and branch — nothing else.</div>
+      <div><span class="k">Answer</span>The installed build already works this way; the screenshot in the review predates it or shows the registration payment block, which only asks for amount and method.</div>
+      <div class="how"><span class="k">How the application deals with it</span>Payments (CP-23) and the payment block of registration (CP-06) take a payment in two fields; the collections report groups by branch, user or method; cash closing (CP-30, Release 2) will close by session branch + cashier + period. See also C-15 for the cash ledger.</div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-04</span><h3>More detailed address: districts, centres and villages</h3><span class="pill violet">change request</span><span class="pill grey">M · CR-008</span></div>
+    <blockquote>Need more detailed address <span class="ar">الأحياء و المراكز و القرى</span></blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>The subscription wizard and the client record (SA-04) hold Country · Governorate · free-text Address. The platform already keeps a three-level hierarchy under the governorate — City / District / Area (LIS-CR-003 A2, SA-11 Governorates) — and the <em>patient</em> file already uses it.</div>
+      <div><span class="k">Answer</span>Agreed. The same hierarchy maps onto the Egyptian division: Governorate → Markaz / City (المركز) → District (الحي) → Village (القرية). The laboratory address and the branch address get the same pick lists as the patient.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li><strong>Subscribe wizard</strong>: after Governorate, cascading pick lists City (markaz) → District → Area (village); only Governorate stays mandatory, the rest optional; the free-text line keeps street and building.</li>
+          <li><strong>Client record (SA-04)</strong> and <strong>Branch (CP-36)</strong>: the same four fields; <code>Tenant.CityId / DistrictId / AreaId</code>, <code>Branch.CityId / DistrictId / AreaId</code> (migration, nullable, validated through the existing chain).</li>
+          <li><strong>Data</strong>: the pick lists are only as good as the master data. SA-11 gains a CSV import of cities / districts / areas per governorate so operations can load the official list of Egypt once (the reference list is a business deliverable, see decision D-2).</li>
+          <li>Reports and the public laboratory card print "Area, District, City, Governorate" when filled.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-05</span><h3>Telephone in two fields, leading zero removed</h3><span class="pill blue">quick change</span><span class="pill grey">S · CR-007</span></div>
+    <blockquote>Telephone break into two fields: country code and phone with auto removal of zero on the left if entered.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>One field. The server stores every mobile in international form (E.164, <code>+201004439855</code>) and already accepts <code>0100…</code>, <code>+20100…</code> and <code>0020100…</code>, dropping the trunk zero. The hint says "10 digits after +20", which is what confused the reviewer.</div>
+      <div><span class="k">Answer</span>Agreed on the presentation: a fixed country-code box (from the country's dial code) beside a national-number box that strips a leading zero as you type. Storage stays E.164 (nothing to migrate).</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li>A shared <code>app-mobile-input</code> control (SPA) with two visual parts: dial code (read-only from the selected country, or a small select where no country is chosen) and the national number; a typed leading 0 is removed on blur, pasting <code>+20…</code> or <code>0020…</code> is recognised; the hint reads "10 digits, without the leading 0".</li>
+          <li>Used on the subscribe wizard (laboratory and manager mobiles), the patient form (mobile and second phone), users, doctors, payer contacts and branches.</li>
+          <li>Server unchanged (E.164 and the unique check in every spelling, validation C-03 of LIS-VR-002).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-06 · C-10</span><h3>Row actions in one horizontal line</h3><span class="pill blue">quick change</span><span class="pill grey">S · CR-007</span></div>
+    <blockquote>Actions in one line below each record. — All actions &gt;&gt;&gt; always vertical, need to make it horizontal.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>Every register uses the shared data table; its Actions column is a flex row that <em>wraps</em> inside a 1 %-wide column, so with more than two or three buttons the actions stack vertically (visits register: eight actions in a tall column; master-data lists: status badge, edit, deactivate in three rows).</div>
+      <div><span class="k">Answer</span>Agreed. This is one fix in the shared table, so every list changes at once.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li><code>app-data-table</code>: the Actions column no longer wraps; actions render as a single horizontal row of icon buttons with tooltips (text stays in the accessible name and in the tooltip); the status badge moves to its own cell.</li>
+          <li>Up to four actions show inline; more fold into a "⋯ More" menu, except the primary action of the page (e.g. Details). Narrow screens keep the horizontal row and scroll the column.</li>
+          <li>The visits register (CP-10) also gets a second, denser layout option: the actions line <em>below</em> the record text, as the reviewer sketched, when the table is narrower than 1,100 px.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-07</span><h3>Payment box at the top</h3><span class="pill blue">quick change</span><span class="pill grey">S · CR-007</span></div>
+    <blockquote>Payment box should be at the top not the bottom.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>Payments (CP-23): accession lookup → visit account (totals) → two columns: "Take a payment" (left) and "Payments of the visit" (right). On a laptop the payment card is below the fold.</div>
+      <div><span class="k">Answer</span>Agreed: the cashier's job is to take the payment; the history is secondary.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>The page becomes: lookup strip (one line) → <strong>Take a payment</strong> beside the visit totals in one row (amount, method, reference, <em>Collect</em> button, F10 saves) → payments and refunds of the visit below, collapsed to the last three with "Show all". The amount field receives focus as soon as the visit is found, so scan → type amount → F10 needs no mouse.</div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-08</span><h3>Reference range visible before the result is saved</h3><span class="pill blue">quick change</span><span class="pill grey">S · CR-007</span></div>
+    <blockquote>The reference range appeared only once the results were saved, not while loading the sample.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>The range of a result is resolved (sex, age, patient condition) when a value is entered and stored with the result, so an <em>Ordered</em> line with no value shows an empty Reference range cell until the first save.</div>
+      <div><span class="k">Answer</span>A defect in presentation, not in data: the technician should see the expected range while typing.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>The result case query resolves the range for every ordered line from the test's range bands and the patient's sex / age / condition (the same resolver used at entry) and sends it as the row's <code>range</code>; the grid shows it greyed until a value is saved, then the stored range. Amended patient demographics re-resolve on the next load. One functional test covers "range shown on an ordered line".</div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-09</span><h3>Auto-generated doctor code</h3><span class="pill blue">quick change</span><span class="pill grey">S · CR-007</span></div>
+    <blockquote>Why is the code not autogenerated?</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>Doctors (CP-48), like the other master data, ask for a code typed by the user (LDM convention: short codes the clerks know by heart, e.g. DR01).</div>
+      <div><span class="k">Answer</span>Offer both: the form proposes the next code and the user may overwrite it.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li>On "Add doctor" the Code field is pre-filled with <code>DR-nnn</code> from the tenant's reference counters (atomic, per tenant, the mechanism used for ACC / PAT numbers) and stays editable; a typed code is validated as today (unique, pattern).</li>
+          <li>The same pattern is applied to Sending labs (<code>SL-nnn</code>), Payers (<code>PY-nnn</code>) and Diagnoses have ICD codes already. Services and tests keep user codes (they are the typing shortcuts of registration).</li>
+          <li>Setup › Parameters gains "Propose codes for master data: on/off" so a laboratory migrating from LDM can keep its own codes.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-11</span><h3>"Drug types" and culture sample types</h3><span class="pill blue">quick change</span><span class="pill grey">S · CR-007</span></div>
+    <blockquote>What is "Drug Types"? Where are culture sample types?</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>Microbiology (CP-56) holds five tabs: Drug types = classes of antimicrobials (Penicillins, Cephalosporins …) that group the antibiotics on the sensitivity panel; Commercial names; Antibiotics; Organisms; Sensitivity values (S / I / R). Culture specimens are ordinary <em>Sample types</em> (CP-43: urine, wound swab, blood culture …) and a culture service points to its sample type like any other service.</div>
+      <div><span class="k">Answer</span>The naming hides the meaning. Rename and add a direct path to the specimens used by cultures.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li>Rename the tab to <strong>Antibiotic classes</strong> (<span class="ar" style="display:inline">فئات المضادات الحيوية</span>) with the subtitle "Groups the antibiotics of the sensitivity panel"; the hint on the Antibiotic form says "Class: Penicillins …".</li>
+          <li>Add a sixth tab <strong>Culture specimens</strong>: the sample types flagged <em>Used for cultures</em> (new boolean on Sample type, default on for the seeded microbiology specimens), with a link to the full Sample types page. A culture service's sample-type picker offers these first.</li>
+          <li>Tab order: Organisms · Antibiotics · Antibiotic classes · Commercial names · Sensitivity values · Culture specimens.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-12</span><h3>Simpler services / tests; drug list per country</h3><span class="pill warn">decision</span><span class="pill violet">change request</span><span class="pill grey">L · CR-009</span></div>
+    <blockquote>We discussed the service / tests must be more simple. Need drug list for each country.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>The catalogue follows the Sky LIS model agreed in the SRS: a <em>Test</em> (what is measured: unit, ranges, method) is sold through a <em>Service</em> (test, profile, culture, text report or package with a price). A simple test therefore needs two records; the Test page already lets a test join profiles, and the Super Admin's global catalogue is copied into every new laboratory.</div>
+      <div><span class="k">Answer</span>Keep the model (it is what makes profiles, packages and prices work) but hide it: one "Add test" form that creates both records, and a ready-made global catalogue so a laboratory starts with hundreds of tests instead of an empty list. The drug list per country is a master-data content question, not a structure question — the structure exists.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li><strong>Quick add test (CP-41)</strong>: one form — code, name (en/ar), clinical group, sample type, unit, result type, reference range, price — creates the test and its single-test service together; "Advanced" opens the full editors. Editing a simple test edits both.</li>
+          <li><strong>Catalogue view</strong>: the Services and Tests pages merge into one <em>Catalogue</em> register with a type filter (Test · Profile · Culture · Package · Text report); profiles and packages open their members inline.</li>
+          <li><strong>Global catalogue by country</strong> (Super Admin, SA-12…SA-14 master data): the master data gets a <em>country</em> scope — antibiotics and commercial (trade) names per country (Egypt first), organisms and classes shared. A new laboratory receives the lists of its country at provisioning; an existing laboratory imports or refreshes them from Setup › Catalogue › "Import from Sky LIS" (this also answers remaining point A-02 of LIS-RP-001 on the update policy).</li>
+          <li><strong>Decision D-1</strong>: confirm that the two-level model stays (recommended) rather than a one-level "test with price" model, which would lose profiles, packages and contract prices.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-13</span><h3>Full reference data (sample types, units …)</h3><span class="pill violet">change request</span><span class="pill grey">M · CR-009</span></div>
+    <blockquote>Need full data.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>Sample types (CP-43) and Units of measurement (CP-44) hold what the demo laboratory seeded; the global catalogue of the Super Admin is still small. Every list has CSV export; import exists for price lines only.</div>
+      <div><span class="k">Answer</span>Ship complete standard lists with the product and let operations maintain them centrally.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li><strong>Seed packs</strong> in the Super Admin master data: units (the common clinical set, UCUM-based, ~120 units), sample types and containers (~40 specimens with tube colours), antibiotics / classes / organisms (CLSI panels), common test and profile definitions with reference ranges by sex and age (the pilot laboratory's own LDM catalogue is the best source: decision D-2).</li>
+          <li><strong>CSV import</strong> on every master-data page (client and Super Admin) with a dry run that reports what would be created / updated / refused, reusing the all-or-nothing import built for price lists (LIS-CR-003 C21).</li>
+          <li>Provisioning copies the full packs into a new laboratory; existing laboratories pull them through "Import from Sky LIS" (C-12).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-14</span><h3>Five report designs</h3><span class="pill violet">change request</span><span class="pill grey">L · CR-010</span></div>
+    <blockquote>Need 5 report designs.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>One result-report layout (CP-13 / CP-19 print): laboratory header with logo, patient block with QR, one table per unit, flags, signature line, footer. Report templates (CP-54) set logo, signature, header / footer text, QR and language per template type, not the layout.</div>
+      <div><span class="k">Answer</span>Agreed. Five layouts, selectable per laboratory (default) and per report template, all driven by the same data so verification, printing and the status log do not change.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li><strong>Layouts</strong>: 1 · Classic (today's table) · 2 · Modern (two-column header, coloured flag bars, range bar per result) · 3 · Compact (dense, one page where possible, for high-volume labs) · 4 · Letterhead (blank top band for pre-printed stationery, no logo) · 5 · Cumulative (the last three results of each test side by side, for chronic patients). Each in Arabic and English, A4 and Letter.</li>
+          <li><strong>Selection</strong>: Setup › Parameters › Printing "Report design" (default) and an override per report template (CP-54) and per payer contract (insurance companies often prescribe a layout); live preview with sample data in the template editor.</li>
+          <li><strong>Build</strong>: the SPA's report document component becomes five print components sharing one view model; the e-mail / PDF export uses the same components. Design mock-ups on the canvas first for the owner's choice of colours.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-15</span><h3>Simplified cash ledger</h3><span class="pill violet">change request</span><span class="pill grey">M · CR-011</span></div>
+    <blockquote>Need simplified cash ledger for the lab.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>Payments register (CP-23) lists receipts; the Collections report (on Payments) sums posted payments and refunds by branch, user or method for a period; Cash closing (CP-30) is built but parked in Release 2 and scoped by branch + cashier + period.</div>
+      <div><span class="k">Answer</span>Provide one page a laboratory owner understands at a glance: a day book of money in and out per branch and cashier, with a running balance and a one-click day close.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li><strong>Cash ledger (new page, Finance)</strong>: a day (or range) per branch: opening balance (previous close), receipts by method, refunds, voids, expenses (new: a simple "Cash out" entry with reason — supplier, petty cash — which is the part today's model lacks), closing balance; rows link to the receipt. Export to Excel and a printable A4 "Daily cash sheet".</li>
+          <li><strong>Close the day</strong>: reuses Cash closing (CP-30): the cashier counts, enters the counted cash, the difference is recorded with a reason; closed days are read-only. CP-30 moves to Release 1 in this simplified form.</li>
+          <li>Data: <code>app.cash_entries</code> for cash-out lines (migration); everything else is read from payments and refunds. Rights: <code>billing.view</code> to read, <code>billing.approve</code> (the Approve action of the Billing group) to close.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-16</span><h3>Subscription expiry reminders</h3><span class="pill violet">change request</span><span class="pill grey">M · CR-012</span></div>
+    <blockquote>Need subscription expiry reminder while log in, on screen, e-mail, SMS.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>A client is Trial (with an end date), Active or Inactive; the plan fee is charged from the prepaid wallet every period by the hourly charge job; a wallet at or below zero pauses metered services. Nobody is warned before a trial ends or a wallet runs dry.</div>
+      <div><span class="k">Answer</span>Agreed. A reminder policy with three channels, driven by the same job that charges wallets.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li><strong>Events</strong>: trial ends in 7 / 3 / 1 days and today; wallet covers fewer than 7 / 3 / 1 days of the monthly fee (projected) or is at zero; subscription suspended. Computed by a <code>SubscriptionReminderJob</code> (next to the wallet charge job), once a day per client, idempotent (a reminder is recorded, never sent twice).</li>
+          <li><strong>On screen</strong>: the session profile carries a <code>subscriptionNotice</code> (level, days left, amount to top up) → a banner under the top bar for administrators (dismissable for the day) and a modal at sign-in when fewer than 3 days remain; the Super Admin dashboard gets an "Expiring soon" tile and list.</li>
+          <li><strong>E-mail / SMS</strong>: notification templates <code>subscription-expiry</code> and <code>wallet-low</code> (SA-20, editable, placeholders laboratory, days, amount, link), sent to the manager's mobile and e-mail through the existing delivery stack; SMS needs the gateway (remaining point B-01).</li>
+          <li><strong>Grace</strong>: a configurable grace period (platform parameter, default 7 days) before the system blocks sign-in with a clear page "Subscription expired — contact …"; read-only access to reports stays during grace (decision D-3).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">C-17</span><h3>Advertisements on sign-in, splash and normal pages</h3><span class="pill warn">decision</span><span class="pill violet">change request</span><span class="pill grey">M · CR-013</span></div>
+    <blockquote>Advertisements, login or splash screen, normal pages.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>Nothing of the kind. The sign-in page (design 5c) has a free hero area on the left; the shell has a top bar and a sidebar.</div>
+      <div><span class="k">Answer</span>Feasible as an <em>Announcements</em> feature managed by National Technology in the Super Admin. Two decisions first (D-4): whose advertisements (National Technology's own products and partners only, or third-party paid ads) and where they may appear (sign-in and a splash card after sign-in are harmless; banners inside working pages compete with the bench and the cashier's screen).</div>
+      <div class="how"><span class="k">How the application will deal with it</span>
+        <ul>
+          <li><strong>Super Admin › Announcements (new page)</strong>: title, image (≤ 512 KB, same sniffing as logos), link, text en/ar, placement (sign-in hero · welcome card after sign-in · in-app strip), schedule (from / to), audience (country, plan, trial / active, specific clients), active flag; impressions and clicks counted per announcement.</li>
+          <li><strong>Delivery</strong>: a public endpoint serves the sign-in placement (cached, no session); the session profile carries the in-app placements. The laboratory administrator can hide the in-app strip for their laboratory if the business allows (decision).</li>
+          <li><strong>Recommended placements</strong>: the sign-in hero (replaces the slogan when an announcement is active), one dismissible welcome card on the dashboard; no banners on registration, results or payments.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>3. Super Admin portal — the 5 points</h2>
+
+  <div class="point">
+    <div class="point-head"><span class="id">A-01</span><h3>Customers inactive for 3 days</h3><span class="pill blue">quick change</span><span class="pill grey">S · CR-007</span></div>
+    <blockquote>Need the inactive customers for 3 days.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>The dashboard (SA-03) counts clients by status (active / inactive / trial), served patients, tests and registrations for a period, wallets at or below zero and the recent clients. "Inactive" there means the client's status, not its activity.</div>
+      <div><span class="k">Answer</span>Add a "No activity for 3 days" tile with its list, so operations call the laboratory before it churns.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>Last activity per client = the latest of last sign-in (login logs) and last registration (visits). Tile "Silent for 3+ days: n" (threshold a platform parameter, default 3; trial clients highlighted) → a list on Clients with the last activity date, the administrator's mobile, a "Call" note field and CSV export. Computed by one query, no new table.</div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">A-02</span><h3>One administration for all countries</h3><span class="pill ok">done, as preferred</span></div>
+    <blockquote>Will there be one admin for all countries or one per country? Prefer one for all.</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>One Super Admin portal and one platform tenant for all countries, exactly as preferred. Countries (SA-10) carry dial code, currency, language, time zone and mobile length; governorates and the lower levels hang under them; clients, plans and wallets carry the country and its currency.</div>
+      <div><span class="k">Answer</span>Confirmed: one administration. Country is a <em>filter and a scope</em>, not a separate installation.</div>
+      <div class="how"><span class="k">How the application deals with it</span>Lists (Clients, Subscriptions, Login logs, Dashboard) get a country filter where it is missing; plans can be limited to a country; master data gets a country scope (C-12). If one day a country team must see only its own clients, a <em>country-scoped administrator role</em> (platform role + allowed countries) is a small addition on top of the existing role model, not a new portal.</div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">A-03</span><h3>How subscriptions &amp; wallets work</h3><span class="pill ok">explained</span></div>
+    <blockquote>Need explanation how does it work.</blockquote>
+    <div class="grid">
+      <div class="how" style="grid-column:1 / -1"><span class="k">The model as built (SA-05, intake PLT-001)</span>
+        <ul>
+          <li><strong>Plan</strong> (tab <em>Plans</em>): code, name, <em>monthly fee</em> in the plan's currency, limits (branches, users, analysers) and an <em>SMS quota</em> per month. Every client is on one plan.</li>
+          <li><strong>Wallet</strong> (tab <em>Client wallets</em>): a prepaid balance per client in its currency. <em>Top up</em> adds credit (reference and note kept, every transaction listed and exportable).</li>
+          <li><strong>Charging</strong>: once per period (monthly), the wallet is debited the plan's monthly fee — automatically by the charge job (hourly check, each client charged once per period) or at once with <em>Run charges now</em>. "Next charge" shows the date.</li>
+          <li><strong>Trial</strong>: a client created through Subscribe starts in <em>Trial</em> for the configured days and is not charged; activating it (or the trial ending) makes it <em>Active</em> and chargeable. A client made inactive is not charged.</li>
+          <li><strong>Balance at or below zero</strong>: the laboratory keeps working, but <em>metered services pause</em> (today: SMS beyond the quota is not sent). The dashboard tile "Wallets at or below zero" lists them; the reminder policy of C-16 will warn before it happens.</li>
+          <li><strong>SMS used</strong>: counts the messages of the month against the plan quota; per-message pricing beyond the quota is not built because the price is not yet decided (business point Q12 of PLT-001).</li>
+        </ul>
+        <p>The screenshot shows a client with balance 0.00, monthly fee 222.00 EGP and next charge 28/10: on that day the charge job will try to debit 222.00; with no top-up the wallet goes negative and metered services stay paused. A one-page "How billing works" help card will be added to the page header (and to the laboratory's Subscription parameters group) with this text in both languages.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="point">
+    <div class="point-head"><span class="id">A-04 · A-05</span><h3>Test rules and shortcut sets in the client portal</h3><span class="pill ok">built</span><span class="pill grey">hidden by the Release-1 scope · XS</span></div>
+    <blockquote>Not found in client portal. Is there a reason?</blockquote>
+    <div class="grid">
+      <div><span class="k">Today</span>Both pages exist in the client portal (CP-52 Test rules — companion services added automatically to an order; CP-51 Shortcut sets — typing shortcuts that add several services at once), with their API and tests; their Super Admin twins are walked in UAT-MDR-02. They are marked <em>Release 2</em> in the navigation registry because the Release-1 prototype build (v2.1) did not show them, so the menu and the route guard hide them. The Super Admin's copies are in Release 1 because the global catalogue defines them.</div>
+      <div><span class="k">Answer</span>No functional reason. If the reviewer wants them in the pilot, they are switched on with one line each (<code>release: 'R1'</code>) and walked with a client-side copy of the UAT-MDR-02 steps. The registration page already applies the rules and the shortcuts when a laboratory has them.</div>
+      <div class="how"><span class="k">How the application will deal with it</span>Switch both entries to Release 1 in the next release (v0.21.0), under Setup › Catalogue; add the two pages to the Release-1 scope matrix of the SRS (CP-51, CP-52) and run their UAT scripts in the next session.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>4. Proposed packaging</h2>
+  <p class="lead">The points are grouped into change requests that can be built in parallel waves, each with its brief in <code>docs/build/</code>, its migration (where needed), tests, UAT script and release. Sizes include documentation.</p>
+  <table>
+    <thead><tr><th style="width:110px">Package</th><th>Content</th><th style="width:90px">Size</th><th style="width:150px">Needs first</th></tr></thead>
+    <tbody>
+      <tr><td class="id">switch on</td><td>A-04, A-05 — Test rules and Shortcut sets visible in the client portal</td><td>XS</td><td>—</td></tr>
+      <tr><td class="id">CR-007</td><td>UI quick wins: C-01 bookmark strip, C-05 mobile input, C-06/C-10 horizontal actions, C-07 payment box first, C-08 range before save, C-09 proposed codes, C-11 microbiology naming + culture specimens, A-01 silent clients</td><td>≈ 1 week</td><td>—</td></tr>
+      <tr><td class="id">CR-008</td><td>Addresses and samples: C-04 city / district / area on laboratory and branch (+ CSV import of the hierarchy), C-02 collected-outside per sample</td><td>≈ 1 week</td><td>D-2 (official locality list)</td></tr>
+      <tr><td class="id">CR-009</td><td>Catalogue simplification and content: C-12 quick-add test and merged catalogue register, country-scoped global master data with import, C-13 seed packs and CSV import on every master-data page</td><td>2 weeks</td><td>D-1, D-2</td></tr>
+      <tr><td class="id">CR-010</td><td>C-14 five report designs with per-laboratory / per-template / per-payer selection</td><td>2 weeks</td><td>design choice on the canvas</td></tr>
+      <tr><td class="id">CR-011</td><td>C-15 cash ledger, cash-out entries and day close (CP-30 brought to Release 1)</td><td>1 week</td><td>—</td></tr>
+      <tr><td class="id">CR-012</td><td>C-16 subscription and wallet reminders (job, banner, sign-in modal, templates, grace period)</td><td>1 week</td><td>D-3; SMS gateway for the SMS channel (B-01)</td></tr>
+      <tr><td class="id">CR-013</td><td>C-17 announcements (Super Admin page, sign-in hero, welcome card, in-app strip)</td><td>1 week</td><td>D-4</td></tr>
+    </tbody>
+  </table>
+  <p>Recommended order: switch-on + CR-007 first (visible in days, no decisions), then CR-008 and CR-011, then CR-012, with CR-009 / CR-010 / CR-013 once their decisions are taken.</p>
+</section>
+
+<section>
+  <h2>5. Decisions needed from the business owner</h2>
+  <table>
+    <thead><tr><th style="width:60px">Id</th><th>Decision</th><th style="width:360px">Recommendation</th><th style="width:90px">Unblocks</th></tr></thead>
+    <tbody>
+      <tr><td class="id">D-1</td><td>Keep the Test / Service two-level catalogue (hidden behind a quick-add form) or flatten to "test with price"?</td><td>Keep the two levels; profiles, packages and contract prices depend on them. Simplify the forms, not the model.</td><td>CR-009</td></tr>
+      <tr><td class="id">D-2</td><td>Source of the reference content: official Egyptian locality list (markaz / district / village), units, specimens, antibiotics per country, and the pilot laboratory's LDM catalogue as the seed of tests and ranges.</td><td>National Technology supplies the LDM export and the locality list; engineering builds the importers and the packs.</td><td>CR-008, CR-009</td></tr>
+      <tr><td class="id">D-3</td><td>What happens when a subscription expires: block sign-in at once, or a grace period with read-only reports?</td><td>7 days of grace with reminders, then sign-in blocked except the administrator's billing page.</td><td>CR-012</td></tr>
+      <tr><td class="id">D-4</td><td>Advertisements: own / partner announcements only or third-party paid ads; allowed placements; can a laboratory opt out of in-app placements?</td><td>Own and partner announcements on sign-in and a welcome card; nothing inside working pages; opt-out for paying clients.</td><td>CR-013</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>6. Revision history</h2>
+  <table>
+    <thead><tr><th style="width:80px">Version</th><th style="width:120px">Date</th><th style="width:200px">Author</th><th>Change</th></tr></thead>
+    <tbody>
+      <tr><td>1.0</td><td>2026-10-24</td><td>Claude Code, for review by Mohamed Hashem</td><td>First response to the two V1 review documents (22 points, 8 packages, 4 decisions).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>LIS-RC-001 v1.0 · 2026-10-24 · Sky LIS, National Technology · Written against the repository state at v0.20.0. Point ids C-nn / A-nn follow the order of the reviewer's documents; package ids CR-007…CR-013 are reserved for the change requests that will carry them.</footer>
+</div>
+</body>
+</html>

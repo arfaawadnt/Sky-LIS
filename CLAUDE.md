@@ -146,6 +146,12 @@ reach it, `validation-ui` (`tests/validation/serve-ui.mjs` serving the git-ignor
 build on 4300, same proxy rules); browser sessions are per
 host name, so parallel testers use `127.0.0.1` and `localhost` (the built-in browser opens no other names).
 
+### Review responses
+
+`docs/review/` holds the answers to external review documents: `Sky-LIS_Reviewer-Comments_Response_V1.html` (+ `.pdf`, LIS-RC-001,
+2026-10-24) answers the two V1 review documents of Shahed point by point (ids `C-nn` client portal, `A-nn` Super Admin; packages
+CR-007…CR-013 reserved; decisions D-1…D-4). Hand-written HTML, PDF via `pdf.ps1`; bump the version and add a history row on every change.
+
 ### Requirements specification
 
 `docs/requirements/LIS_Requirements_Specification.html` (LIS-RS-001) is the consolidated requirements document:

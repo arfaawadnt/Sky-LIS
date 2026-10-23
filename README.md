@@ -163,6 +163,7 @@ dotnet run --project tools/Platform.DevTools -- seed-demo-lab <username> <passwo
 | Build phases plan | [`docs/plan`](docs/plan) |
 | Module map and build waves, module pattern | [`docs/build`](docs/build) |
 | Intake specifications per module | [`docs/intake`](docs/intake) |
+| Review responses (LIS-RC-001: answer to the reviewer's comments, HTML + PDF) | [`docs/review`](docs/review) |
 | Old and new prototype comparison | [`docs/prototypes`](docs/prototypes) |
 | Domain knowledge: LDM and the Sky LIS prototypes | [`docs/knowledge`](docs/knowledge) |
 | Architecture pack (decisions, blueprint, security, pitfalls) | [`prompt`](prompt) |
@@ -234,7 +235,7 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Review response LIS-RC-001.** `docs/review/Sky-LIS_Reviewer-Comments_Response_V1.html` (+ `.pdf`): point-by-point answer to the two reviewer documents of 2026-10-24 (17 client-portal points, 5 Super Admin points): current behaviour, proposal and how the application will deal with each; packaged into CR-007…CR-013 with four business decisions D-1…D-4. Documentation only.
 
 ### v0.20.1 — 2026-10-22
 
