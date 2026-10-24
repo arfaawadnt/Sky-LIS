@@ -31,6 +31,7 @@ import {
 } from '../../../core/api/organization.contracts';
 import { emptyPage } from '../../../core/api/paging';
 import type { SettingValueItem, TenantSettingsResponse } from '../../../core/api/settings.contracts';
+import { type MobileDialCountry, mobileDialCountryOf } from '../../../shared/forms/mobile-input/mobile-number';
 import { toHttpParams } from '../../../shared/forms/paging';
 
 /** Typed calls of the module; URLs are built with `HttpParams` and encoded ids, never by string concatenation of input (pitfall P-60). */
@@ -39,6 +40,7 @@ export class OrganizationApi {
   private readonly http = inject(HttpClient);
 
   private countriesCache: Promise<readonly LookupOption[]> | null = null;
+  private mobileCountriesCache: Promise<readonly MobileDialCountry[]> | null = null;
   private governoratesCache: Promise<readonly LookupOption[]> | null = null;
 
   // ---- branches ----------------------------------------------------------------------------------------------
@@ -183,6 +185,15 @@ export class OrganizationApi {
   countries(): Promise<readonly LookupOption[]> {
     this.countriesCache ??= this.lookup(ORGANIZATION_API.countries, {});
     return this.countriesCache;
+  }
+
+  /** The same countries with their dial codes and mobile lengths, for the mobile field (LIS-CR-007 C-05). Cached for the session. */
+  mobileCountries(): Promise<readonly MobileDialCountry[]> {
+    const params = new HttpParams({ fromObject: { page: 1, pageSize: 200 } });
+    this.mobileCountriesCache ??= firstValueFrom(this.http.get<unknown>(ORGANIZATION_API.countries, { params }), { defaultValue: [] })
+      .then((body) => itemsOf(body).map(mobileDialCountryOf).filter((country): country is MobileDialCountry => country !== null))
+      .catch((): readonly MobileDialCountry[] => []);
+    return this.mobileCountriesCache;
   }
 
   /** Every governorate with its country as parent (one call, filtered client-side). */

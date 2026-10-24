@@ -219,6 +219,8 @@ export interface ResultRowView {
   readonly unit: string | null;
   readonly decimals: number;
   readonly range: RangeView | null;
+  /** LIS-CR-007 C-08: the range is the band BR-08 picks for the patient before any value is saved (optional; absent = stored). */
+  readonly rangeProvisional?: boolean;
   readonly flag: ResultFlag | null;
   readonly isPanic: boolean;
   readonly delta: DeltaView | null;

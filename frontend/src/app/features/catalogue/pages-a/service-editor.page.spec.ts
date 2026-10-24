@@ -43,7 +43,7 @@ function page<T>(items: T[]): Paged<T> {
 }
 
 const group: ClinicalGroupListItem = { id: 'g1', code: 'CHEM', unitCode: 'C', nameEn: 'Chemistry', nameAr: 'الكيمياء', reportName: null, reportTemplateId: null, displayOrder: 1, isActive: true };
-const serum: SampleTypeListItem = { id: 's1', code: 'SERUM', shortName: 'SER', nameEn: 'Serum', nameAr: 'مصل', activeConditionCount: 0, isActive: true };
+const serum: SampleTypeListItem = { id: 's1', code: 'SERUM', shortName: 'SER', nameEn: 'Serum', nameAr: 'مصل', activeConditionCount: 0, isActive: true, forCulture: false };
 
 function test(id: string, code: string): TestLookupItem {
   return { id, code, nameEn: code, nameAr: code, type: 'Numeric', clinicalGroupId: 'g1', clinicalGroupNameEn: 'Chemistry', clinicalGroupNameAr: 'الكيمياء', unitName: null };
@@ -77,12 +77,12 @@ describe('ServiceEditorPage (CP-40)', () => {
     harness = await RouterTestingHarness.create();
   });
 
-  async function open(url: string, detail: ServiceDetail | null): Promise<ServiceEditorInternals> {
+  async function open(url: string, detail: ServiceDetail | null, sampleTypes: SampleTypeListItem[] = [serum]): Promise<ServiceEditorInternals> {
     const component = await harness.navigateByUrl(url, ServiceEditorPage);
     TestBed.tick();
     await settle();
     backend.expectOne((request) => request.url === CATALOGUE_A_API.clinicalGroups).flush(page([group]));
-    backend.expectOne((request) => request.url === CATALOGUE_A_API.sampleTypes).flush(page([serum]));
+    backend.expectOne((request) => request.url === CATALOGUE_A_API.sampleTypes).flush(page(sampleTypes));
     backend.expectOne((request) => request.url === CATALOGUE_A_API.units).flush(page([]));
     backend.expectOne((request) => request.url === CATALOGUE_A_API.patientConditions).flush(page([]));
     backend.expectOne((request) => request.url === CATALOGUE_A_API.lookupTests).flush(page([test('t1', 'CHOL'), test('t2', 'HDL'), test('t3', 'TG')]));
@@ -289,5 +289,32 @@ describe('ServiceEditorPage (CP-40)', () => {
     expect(root.querySelector('form.editor > p.problem[role="alert"]')?.textContent).toContain('masterData.invalid');
     expect(document.activeElement).toBe(root.querySelector('form.editor input.ng-invalid'));
     expect(document.activeElement?.getAttribute('formcontrolname')).toBe('code');
+  });
+
+  it('LIS-CR-007: a culture service lists the culture specimens first, every other type keeps one list', async () => {
+    const swab: SampleTypeListItem = { id: 's2', code: 'WSWAB', shortName: 'SWAB', nameEn: 'Wound swab', nameAr: 'مسحة جرح', activeConditionCount: 0, isActive: true, forCulture: true };
+    const urine: SampleTypeListItem = { id: 's3', code: 'URINE', shortName: 'UR', nameEn: 'Urine', nameAr: 'بول', activeConditionCount: 0, isActive: true, forCulture: true };
+    const editor = await open('/catalogue/services/new', null, [serum, urine, swab]);
+    const root = harness.routeNativeElement as HTMLElement;
+    const picker = (): HTMLSelectElement => {
+      const select = root.querySelector<HTMLSelectElement>('select[formControlName="sampleTypeId"]');
+      if (select === null) {
+        throw new Error('sample-type picker missing');
+      }
+
+      return select;
+    };
+
+    editor.form.controls.type.setValue('Culture');
+    TestBed.tick();
+    const groups = Array.from(picker().querySelectorAll('optgroup'));
+    expect(groups.map((optgroup) => optgroup.label)).toEqual(['catalogue-a.services.cultureSpecimens', 'catalogue-a.services.otherSampleTypes']);
+    expect(Array.from(groups[0]?.querySelectorAll('option') ?? []).map((option) => option.textContent?.trim())).toEqual(['URINE · Urine', 'WSWAB · Wound swab']);
+    expect(Array.from(groups[1]?.querySelectorAll('option') ?? []).map((option) => option.textContent?.trim())).toEqual(['SERUM · Serum']);
+
+    editor.form.controls.type.setValue('Test');
+    TestBed.tick();
+    expect(picker().querySelectorAll('optgroup').length).toBe(0);
+    expect(Array.from(picker().querySelectorAll('option')).slice(1).map((option) => option.textContent?.trim())).toEqual(['SERUM · Serum', 'URINE · Urine', 'WSWAB · Wound swab']);
   });
 });

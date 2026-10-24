@@ -70,6 +70,22 @@ describe('DataTableComponent (shared/ui)', () => {
     expect(host.querySelectorAll('tbody .act').length).toBe(3);
   });
 
+  it('keeps the row actions on one line in a column as wide as its content (LIS-CR-007 C-06)', async () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    document.body.appendChild(fixture.nativeElement as HTMLElement);
+    await fixture.whenStable();
+    const host = fixture.nativeElement as HTMLElement;
+    try {
+      const cell = host.querySelector<HTMLElement>('tbody td.actions')!;
+      const line = cell.querySelector<HTMLElement>('.row-actions')!;
+      expect(line.querySelectorAll('.act').length).toBe(1);
+      expect(getComputedStyle(line).flexWrap).toBe('nowrap');
+      expect(getComputedStyle(cell).whiteSpace).toBe('nowrap');
+    } finally {
+      host.remove();
+    }
+  });
+
   it('sorts client-side on a header click: ascending, descending, then back to the server order', async () => {
     const fixture = TestBed.createComponent(HostComponent);
     await fixture.whenStable();

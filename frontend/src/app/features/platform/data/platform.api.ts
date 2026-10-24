@@ -39,6 +39,7 @@ import {
   type ReferenceListFilter,
   type RuleTemplateListItem,
   type RuleTemplateRequest,
+  type SilentClientList,
   type TemplatePlaceholders,
   type TopUpWalletRequest,
   type UpdateClientRequest,
@@ -240,6 +241,18 @@ export class PlatformApi {
   // dashboard and sessions (SA-03, SA-08)
   dashboard(period: DashboardPeriod, signal?: AbortSignal): Promise<PlatformDashboard> {
     return this.get<PlatformDashboard>(PLATFORM_API.dashboard, { period }, signal);
+  }
+
+  // silent clients (LIS-CR-007 A-01)
+  silentClients(days: number, signal?: AbortSignal): Promise<SilentClientList> {
+    return this.get<SilentClientList>(PLATFORM_API.silentClients, { days }, signal);
+  }
+
+  /** The CSV the server builds for the window (UTF-8 with BOM), headers in `language`, with the file name it chose. */
+  async exportSilentClients(days: number, language: string): Promise<DownloadedFile> {
+    const params = toHttpParams({ days, language });
+    const response = await firstValueFrom(this.http.get(`${PLATFORM_API.silentClients}/export`, { params, responseType: 'blob', observe: 'response' }));
+    return { blob: response.body ?? new Blob([], { type: 'text/csv' }), fileName: fileNameOf(response.headers.get('Content-Disposition')) ?? `silent-clients-${days}d.csv` };
   }
 
   listSessions(search: string | null, signal?: AbortSignal): Promise<readonly AdminSessionItem[]> {

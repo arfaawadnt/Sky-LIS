@@ -43,6 +43,7 @@ internal sealed class SampleTypeConfiguration : IEntityTypeConfiguration<SampleT
         builder.OwnsOne(sampleType => sampleType.Name, CatalogueAMapping.Bilingual<SampleType>("name"));
         builder.Navigation(sampleType => sampleType.Name).IsRequired();
         builder.Property(sampleType => sampleType.IsActive).IsRequired();
+        builder.Property(sampleType => sampleType.ForCulture).IsRequired();   // LIS-CR-007: column default false in the migration; existing culture specimens set by CatalogueA.migration.sql
         builder.Property(sampleType => sampleType.Revision).IsRequired();
 
         builder.HasMany(sampleType => sampleType.Conditions).WithOne()

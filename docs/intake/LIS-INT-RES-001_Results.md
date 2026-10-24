@@ -5,7 +5,7 @@
 | Module | `results` (Sky LIS Client Portal: CP-18 Worklist, CP-19 Results by accession, CP-20 Results by sample, CP-21 Work queue, CP-13 Print reports) and `quality` (CP-22 Quality control, placeholder scope); workflows WF-06, WF-07 (landing analyser results); business rules BR-03, BR-04, BR-08, BR-09, BR-10, BR-11, BR-13, BR-19, BR-20; status models "Test / result" and "Work-queue colour states" |
 | Slot / wave | `res`, wave 3 (MODULES.md §2) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001) and the LDM knowledge base (§2.3, §3.3–§3.7, §5, §6, §8, §12). **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.1 — 2026-10-12 (validation v0.5.0: VIP on the opened case and report, RES-056, Q19; one "late" definition, Q21; report language, digits and counted wording, Q22) |
+| Version | 1.2 — 2026-10-24 (reference range before the first save, LIS-CR-007 P-RES C-08, §17); 1.1 — 2026-10-12 (validation v0.5.0: VIP on the opened case and report, RES-056, Q19; one "late" definition, Q21; report language, digits and counted wording, Q22) |
 | Implemented in | `src/Platform.Domain/{Results,Quality}`, `src/Platform.Contracts/{Results,Quality}`, `src/Platform.Application/{Results,Quality}` (+ `Results/Policies`), `src/Platform.Infrastructure/Persistence/{Results,Quality}`, `src/Platform.WebApi/Controllers/{Results,Quality}`, `frontend/src/app/features/results`, `frontend/src/app/core/api/results.contracts.ts`, `frontend/public/i18n/results.{en,ar}.json` |
 
 > **Results page follow-ups (2026-10-14).** CP-19 with a visit open: previous / next visit from the context strip (the neighbour in
@@ -394,3 +394,30 @@ patient_id, branch_id, payer_id, registered_at_utc, urgent[, doctor_id])`, `app.
 expected_result_at_utc, status)`, `app.analysers(id, tenant_id, code, name_en, name_ar)`,
 `app.analyser_test_mappings(tenant_id, analyser_id, test_id, is_active)`. Each read checks that the table and columns
 exist and falls back to empty answers when they do not.
+
+## 17. Change request 2026-10-24 — Reference range before the first save (LIS-CR-007, package P-RES, reviewer point C-08, CP-19)
+
+**Today.** A result stores its range (BR-08) when a value is first entered (`ResultEntryEngine`), so an Ordered line showed an empty
+*Reference range* cell until the first save: the technician could not compare the value being typed with the expected band.
+
+**Change.**
+
+- `GET /api/v1/results?accession=|visitId=|sampleNumber=` (`GetResultCaseHandler`): a result with **no value and no stored range** is
+  served with the band BR-08 picks today for the visit's patient (`ResultViews.ProvisionalRange` → `ResultCatalogue.Range` →
+  `ReferenceRangeResolver`, the call entry makes; the patient profile is `PatientProfile.From(patient, today UTC)` like entry), and the row
+  carries `rangeProvisional: true` (`ResultRowView.RangeProvisional`, optional, default false; mirrored in `results.contracts.ts`).
+- Once a value exists the stored range wins, also when it is empty and also after the catalogue band or the patient file changes
+  (what was flagged is never rewritten on screen). A test without a matching band shows no range, as before.
+- The grid (`app-result-grid`) shows a provisional range greyed and in italics, with the tooltip `results.grid.rangeProvisional`
+  ("Expected range for this patient; confirmed when the result is saved" / «المعدل المتوقع لهذا المريض؛ يُثبَّت عند حفظ النتيجة»).
+- The worklist (CP-18) shows no range column, so it is unchanged. Reports print only entered results, so they are unchanged.
+- No new code, no new endpoint, no table change.
+
+Tests: Application `ResultsUseCaseTests.C08_*` (provisional before entry, stored after, no band → no range); functional
+`ResultsFlowTests.C08_an_ordered_line_shows_the_patient_s_range_before_entry_and_the_stored_range_after` (band changed after entry: the
+entered visit keeps 3.5 – 5.0, a new visit shows the new band provisionally); spec `result-grid.component.spec.ts`.
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| Q23 | Should a result whose value was cleared (or a cancelled line) show the provisional range again? | A result with a stored range keeps it; a result without a value and without a stored range shows the provisional one, whatever its status. |
+| Q24 | Should the provisional range follow a VIP-masked case? | Yes: masking hides identity only; sex and age stay (Q19), so the range is resolved the same way. |

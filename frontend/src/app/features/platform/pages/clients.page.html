@@ -33,9 +33,22 @@
         }
       </select>
     </label>
-    <button toolbarActions type="button" class="btn ghost" (click)="facade.clients.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('platform.refresh') }}</button>
+    <!-- LIS-CR-007 A-01: the Silent filter swaps the register for the clients with no activity for N days -->
+    <label toolbarFilters class="inline-filter" *appCan="permissions.platformView">
+      <span>{{ i18n.t('platform.clients.silent.filter') }}</span>
+      <select class="inp" (change)="onSilent($event)" data-testid="silent-filter">
+        <option value="">{{ i18n.t('platform.clients.silent.any') }}</option>
+        @for (days of silentOptions; track days) {
+          <option [value]="days" [selected]="silentDays() === days">{{ i18n.tc('platform.clients.silent.option', days) }}</option>
+        }
+      </select>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" (click)="reloadList()"><app-icon name="refresh" [size]="15" />{{ i18n.t('platform.refresh') }}</button>
   </app-toolbar>
 
+  @if (silentDays(); as days) {
+    <app-silent-clients [days]="days" [search]="facade.filter().search" [status]="facade.filter().status" (openClient)="openEdit({ id: $event })" />
+  } @else {
   @if (facade.clients.error()) {
     <p class="problem list-problem" role="alert">{{ i18n.t('platform.clients.loadError') }}</p>
   }
@@ -70,6 +83,7 @@
   </app-data-table>
 
   <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="facade.totalCount()" (pageChange)="onPage($event)" />
+  }
 </app-section-card>
 
 <app-drawer [(open)]="drawerOpen" [title]="i18n.t(editing() === null ? 'platform.clients.add' : 'platform.clients.edit')" size="lg" (closed)="onDrawerClosed()">
@@ -108,7 +122,7 @@
           <input type="text" formControlName="address" maxlength="300" autocomplete="off" />
         </app-form-field>
         <app-form-field [label]="i18n.t('platform.clients.field.mobile')" [hint]="i18n.t('platform.clients.hint.mobile')" [problem]="saveProblem()">
-          <input type="tel" formControlName="mobile" dir="ltr" maxlength="30" autocomplete="off" />
+          <app-mobile-input formControlName="mobile" [country]="drawerCountry()" />
         </app-form-field>
         <app-form-field [label]="i18n.t('platform.clients.field.licenceNo')" [problem]="saveProblem()">
           <input type="text" formControlName="licenceNo" maxlength="64" autocomplete="off" />
@@ -117,7 +131,7 @@
           <input type="text" formControlName="managerName" maxlength="200" autocomplete="off" />
         </app-form-field>
         <app-form-field [label]="i18n.t('platform.clients.field.managerMobile')" [hint]="i18n.t('platform.clients.hint.managerMobile')" [problem]="saveProblem()">
-          <input type="tel" formControlName="managerMobile" dir="ltr" maxlength="30" autocomplete="off" />
+          <app-mobile-input formControlName="managerMobile" [country]="drawerCountry()" />
         </app-form-field>
         <app-form-field [label]="i18n.t('platform.clients.field.email')" [problem]="saveProblem()">
           <input type="email" formControlName="email" dir="ltr" maxlength="254" autocomplete="off" />

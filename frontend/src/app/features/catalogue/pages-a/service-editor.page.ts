@@ -44,6 +44,12 @@ import { numberOrNull, serviceGeneralOf, textOrNull } from '../data-a/catalogue-
 import { CatalogueAOptions, type CatalogueOption, optionLabel } from '../state-a/catalogue-a-options';
 import { type MemberCandidate, ServiceEditorFacade } from '../state-a/service-editor.facade';
 
+/** The sample-type picker of a culture service: the culture specimens first, then the rest (LIS-CR-007, C-11). */
+export interface SampleTypeGroups {
+  readonly cultures: readonly CatalogueOption[];
+  readonly others: readonly CatalogueOption[];
+}
+
 /** A member row of the editor; its order is its position. */
 export interface MemberRow {
   readonly kind: ServiceMemberKind;
@@ -181,6 +187,17 @@ export class ServiceEditorPage {
 
   protected readonly groupOptions = computed(() => this.selectable(this.options.groups.hasValue() ? this.options.groups.value() : [], this.detail()?.clinicalGroupId ?? null));
   protected readonly sampleTypeOptions = computed(() => this.selectable(this.options.sampleTypes.hasValue() ? this.options.sampleTypes.value() : [], this.detail()?.sampleTypeId ?? null));
+
+  /** A culture service lists the culture specimens first (two groups); every other type, or no specimen flagged, keeps one list. */
+  protected readonly sampleTypeGroups = computed<SampleTypeGroups | null>(() => {
+    if (this.type() !== 'Culture') {
+      return null;
+    }
+
+    const options = this.sampleTypeOptions();
+    const cultures = options.filter((option) => option.forCulture === true);
+    return cultures.length === 0 ? null : { cultures, others: options.filter((option) => option.forCulture !== true) };
+  });
 
   constructor() {
     void this.i18n.load('catalogue-a');

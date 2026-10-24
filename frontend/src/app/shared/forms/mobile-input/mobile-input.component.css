@@ -1,0 +1,83 @@
+/* One bordered field in two parts (LIS-CR-007 C-05); the global `app-form-field input|select` look is drawn by the frame. */
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.mobile {
+  display: flex;
+  align-items: stretch;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  overflow: hidden;
+  transition:
+    border-color var(--ease),
+    box-shadow var(--ease);
+}
+
+.mobile:focus-within {
+  border-color: var(--blue);
+  box-shadow: var(--focus-ring);
+}
+
+.mobile:has(.number[aria-invalid='true']) {
+  border-color: var(--bad);
+}
+
+.mobile.disabled {
+  background: var(--surface-2);
+}
+
+.mobile input,
+.mobile select {
+  min-height: 34px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background-color: transparent;
+}
+
+.mobile input:focus,
+.mobile select:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.number {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mobile .dial {
+  order: -1;
+  flex: none;
+  display: flex;
+  align-items: center;
+  border-inline-end: 1px solid var(--line-soft);
+  background-color: var(--surface-2);
+  color: var(--ink-2);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mobile .fixed {
+  padding-inline: 10px;
+}
+
+.mobile select.dial {
+  width: auto;
+  max-width: 9.5em;
+  padding-block: 0;
+  padding-inline: 8px 26px;
+  background-position: right 8px center;
+  cursor: pointer;
+}
+
+.mobile input.dial {
+  width: 4.5em;
+  padding: 8px;
+}

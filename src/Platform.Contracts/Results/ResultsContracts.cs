@@ -95,6 +95,10 @@ public sealed record CultureIsolateView(Guid OrganismId, string OrganismCode, st
 
 public sealed record CultureView(bool NoGrowth, IReadOnlyList<CultureIsolateView> Isolates);
 
+/// <summary>
+/// One grid row of a result case. <see cref="RangeProvisional"/> (LIS-CR-007 C-08): the result holds no value and no stored range yet,
+/// so <see cref="Range"/> is the band BR-08 picks today for the patient's sex, age and condition; entry stores its own range.
+/// </summary>
 public sealed record ResultRowView(
     Guid Id,
     Guid LineId,
@@ -136,7 +140,8 @@ public sealed record ResultRowView(
     string? InternalNote,
     IReadOnlyList<ListOptionView> ListOptions,
     IReadOnlyList<ParagraphTemplateView> ParagraphTemplates,
-    DateTimeOffset ExpectedAtUtc);
+    DateTimeOffset ExpectedAtUtc,
+    bool RangeProvisional = false);
 
 public sealed record ReportUnitView(
     string Key,

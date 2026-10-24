@@ -3,6 +3,7 @@ export { STATUS_TONES, toneOf, type BadgeTone } from './badge/status-tones';
 export { CanDirective } from './can.directive';
 export { CellTemplateDirective, RowActionsTemplateDirective, type RowTypeHint } from './data-table/cell-template.directive';
 export { DataTableComponent } from './data-table/data-table.component';
+export { RowMenuComponent } from './data-table/row-menu.component';
 export { cellValue, compareCells, defaultRowId, type CellAlign, type CellValue, type RowContext, type RowId, type SelectionMode, type SortDirection, type TableColumn, type TableSort } from './data-table/data-table.types';
 export { ConfirmService, type ConfirmOptions, type PendingConfirm, type PromptReasonOptions } from './dialog/confirm.service';
 export { DialogHostComponent } from './dialog/dialog-host.component';

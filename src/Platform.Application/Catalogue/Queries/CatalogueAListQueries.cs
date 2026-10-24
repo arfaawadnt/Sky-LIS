@@ -45,7 +45,8 @@ public sealed class ExportClinicalGroupsHandler(IClinicalGroupRepository groups)
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
-public sealed record ListSampleTypesQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<SampleTypeListItem>>;
+/// <summary><paramref name="ForCulture"/> (LIS-CR-007): true = the culture specimens only (Microbiology tab), false = the others, null = all.</summary>
+public sealed record ListSampleTypesQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null, bool? ForCulture = null) : IQuery<Paged<SampleTypeListItem>>;
 
 public sealed class ListSampleTypesValidator : AbstractValidator<ListSampleTypesQuery>
 {
@@ -62,16 +63,16 @@ public sealed class ListSampleTypesValidator : AbstractValidator<ListSampleTypes
 public sealed class ListSampleTypesHandler(ISampleTypeRepository sampleTypes) : IQueryHandler<ListSampleTypesQuery, Paged<SampleTypeListItem>>
 {
     public Task<Paged<SampleTypeListItem>> Handle(ListSampleTypesQuery query, CancellationToken cancellationToken) =>
-        sampleTypes.ListAsync(new CatalogueAListFilter(query.Search, query.IsActive, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
+        sampleTypes.ListAsync(new SampleTypeListFilter(query.Search, query.IsActive, query.ForCulture, ListSort.Of(query.Sort, query.Direction)), PageRequest.Normalized(query.Page, query.PageSize), cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Export)]
-public sealed record ExportSampleTypesQuery(string? Search, bool? IsActive) : IQuery<IReadOnlyList<SampleTypeListItem>>;
+public sealed record ExportSampleTypesQuery(string? Search, bool? IsActive, bool? ForCulture = null) : IQuery<IReadOnlyList<SampleTypeListItem>>;
 
 public sealed class ExportSampleTypesHandler(ISampleTypeRepository sampleTypes) : IQueryHandler<ExportSampleTypesQuery, IReadOnlyList<SampleTypeListItem>>
 {
     public Task<IReadOnlyList<SampleTypeListItem>> Handle(ExportSampleTypesQuery query, CancellationToken cancellationToken) =>
-        sampleTypes.ExportAsync(new CatalogueAListFilter(query.Search, query.IsActive), cancellationToken);
+        sampleTypes.ExportAsync(new SampleTypeListFilter(query.Search, query.IsActive, query.ForCulture), cancellationToken);
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]

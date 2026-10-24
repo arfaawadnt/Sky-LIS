@@ -206,6 +206,41 @@ public sealed class CatalogueAFlowTests(ApiFactory factory) : IClassFixture<ApiF
     }
 
     [DatabaseFact]
+    public async Task Culture_specimens_are_flagged_on_the_sample_type_and_filtered_by_the_register()
+    {
+        // LIS-CR-007 (C-11): SampleType.ForCulture round trip and the Microbiology tab's filter forCulture=true
+        var tenant = Guid.CreateVersion7();
+        var (admin, _, _) = await factory.SeedUserAsync(tenantId: tenant, permissions: Administrator);
+        var client = await SignedInClientAsync(admin);
+
+        var serumId = await CreateAsync(client, "sample-types", new CreateSampleTypeRequest("SERUM", "SER", "Serum", "مصل", null));
+        var swabId = await CreateAsync(client, "sample-types", new CreateSampleTypeRequest("WSWAB", "SWAB", "Wound swab", "مسحة جرح", null, ForCulture: true));
+        var urineId = await CreateAsync(client, "sample-types", new CreateSampleTypeRequest("URINE", "UR", "Urine", "بول", null));
+
+        Assert.False((await client.GetFromJsonAsync<SampleTypeDetail>($"{Root}/sample-types/{serumId}"))!.ForCulture);
+        Assert.True((await client.GetFromJsonAsync<SampleTypeDetail>($"{Root}/sample-types/{swabId}"))!.ForCulture);
+
+        // the editor's switch: on for urine; an update without the field keeps it
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Root}/sample-types/{urineId}", new UpdateSampleTypeRequest("UR", "Urine", "بول", ForCulture: true))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Root}/sample-types/{urineId}", new UpdateSampleTypeRequest("URN", "Urine", "بول"))).StatusCode);
+        var urine = (await client.GetFromJsonAsync<SampleTypeDetail>($"{Root}/sample-types/{urineId}"))!;
+        Assert.Equal(("URN", true), (urine.ShortName, urine.ForCulture));
+
+        var cultures = (await client.GetFromJsonAsync<Paged<SampleTypeListItem>>($"{Root}/sample-types?forCulture=true&isActive=true"))!;
+        Assert.Equal(["URINE", "WSWAB"], cultures.Items.Select(item => item.Code));
+        Assert.All(cultures.Items, item => Assert.True(item.ForCulture));
+        var others = (await client.GetFromJsonAsync<Paged<SampleTypeListItem>>($"{Root}/sample-types?forCulture=false"))!;
+        Assert.Equal(["SERUM"], others.Items.Select(item => item.Code));
+        Assert.Equal(3, (await client.GetFromJsonAsync<Paged<SampleTypeListItem>>($"{Root}/sample-types"))!.TotalCount);
+        var exported = (await client.GetFromJsonAsync<SampleTypeListItem[]>($"{Root}/sample-types/export?forCulture=true"))!;
+        Assert.Equal(2, exported.Length);
+
+        // switched off again
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Root}/sample-types/{swabId}", new UpdateSampleTypeRequest("SWAB", "Wound swab", "مسحة جرح", ForCulture: false))).StatusCode);
+        Assert.Equal(["URINE"], (await client.GetFromJsonAsync<Paged<SampleTypeListItem>>($"{Root}/sample-types?forCulture=true"))!.Items.Select(item => item.Code));
+    }
+
+    [DatabaseFact]
     public async Task A_viewer_reads_but_cannot_create_nor_export_and_shapes_are_refused_with_400()
     {
         var tenant = Guid.CreateVersion7();

@@ -18,6 +18,7 @@ import { PermissionsService } from '../../../core/permissions/permissions.servic
 import { PortalService } from '../../../core/portal/portal.service';
 import { localizedPick, localizedTextGroup } from '../../../shared/forms/localized-text';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
+import { MobileInputComponent } from '../../../shared/forms/mobile-input/mobile-input.component';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { SERVER_ERROR_KEY, problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
@@ -102,6 +103,7 @@ export function parseShifts(value: string): string[] {
     SectionCardComponent,
     TabsComponent,
     FormFieldComponent,
+    MobileInputComponent,
     LocalizedTextInputComponent,
     BadgeComponent,
     IconComponent,
@@ -201,6 +203,7 @@ export class UserEditorPage {
   protected readonly keptOverrideCount = computed(() => this.added().length + this.removed().length - this.shownAdded().length - this.shownRemoved().length);
   protected readonly roles = computed(() => (this.facade.roles.hasValue() ? this.facade.roles.value() : []));
   protected readonly branches = computed(() => (this.facade.branches.hasValue() ? this.facade.branches.value() : []));
+  protected readonly mobileCountries = computed(() => (this.facade.mobileCountries.hasValue() ? this.facade.mobileCountries.value() : []));
 
   protected readonly title = computed(() => {
     const user = this.user();
@@ -518,7 +521,8 @@ export class UserEditorPage {
    * invalid; a server error arrives with the problem signal, so its mark is focused after that render.
    */
   private focusFirstInvalid(afterRender = false): void {
-    const selector = ['input', 'select', 'textarea'].map((tag) => `form ${tag}.ng-invalid:not([disabled])`).join(', ');
+    // the mobile is a two-part control (LIS-CR-007 C-05): its host carries the mark, its national number takes the focus
+    const selector = ['input', 'select', 'textarea', 'app-mobile-input'].map((tag) => `form ${tag}.ng-invalid:not([disabled])${tag === 'app-mobile-input' ? ' input.number' : ''}`).join(', ');
     const focus = (): void => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus();
     if (afterRender) {
       afterNextRender({ read: focus }, { injector: this.injector });

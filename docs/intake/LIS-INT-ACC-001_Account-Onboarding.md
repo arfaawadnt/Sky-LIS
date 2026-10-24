@@ -5,7 +5,7 @@
 | Slot / modules | `acc` — permission modules `support` (tickets), `wallet` (tenant view of the platform wallet), `dashboard` (CP-05), `audit` (CP-68 / SA-09 page and export) |
 | SRS pages | CP-01 Public website, CP-02 Subscription wizard (UI), CP-03 Login & password recovery (UI), CP-04 Branch selection (UI), CP-05 Dashboard, CP-65 Profile, CP-66 Wallet (UI), CP-67 Support, CP-68 Audit log; SA-09 Audit log, SA-21 Profile; the platform support desk (SA side of CP-67); workflow WF-01 (onboarding, steps 1 and 3) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), the prototypes and the architecture pack. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.1 — 2026-10-20 (§17 change request LIS-CR-005: the wizard's result and SMS carry the laboratory address `{base}/lab/{slug}`; CP-65 shows it) · 1.0 — 2026-10-09 |
+| Version | 1.2 — 2026-10-24 (§18 change request LIS-CR-007 P-FRM: two-part mobiles in the wizard, keep-address strip on the sign-in pages) · 1.1 — 2026-10-20 (§17 change request LIS-CR-005: the wizard's result and SMS carry the laboratory address `{base}/lab/{slug}`; CP-65 shows it) · 1.0 — 2026-10-09 |
 | Implemented in | `src/Platform.Domain/Account`, `src/Platform.Contracts/Account`, `src/Platform.Application/Account`, `src/Platform.Infrastructure/Persistence/Account` (+ `Account.migration.sql`), `src/Platform.WebApi/Controllers/Account`, `frontend/src/app/features/{public,account}`, `frontend/src/app/features/auth` (recovery, links), `frontend/src/app/features/home` (dashboard redirect), `frontend/src/app/core/api/account.contracts.ts`, `frontend/public/i18n/{public,account}.{en,ar}.json` |
 
 > **Preferences (2026-10-14).** Beside the language (A1), the member's row density of the results grid — `resultsDensity`
@@ -241,3 +241,20 @@ Scenarios (tests named after them):
   opens `/lab/{slug}?username=…` (package P-SPA).
 - CP-65 (profile, laboratory card) shows the same address (`LaboratoryProfile.portalUrl`).
 - No new endpoint, code or setting in this module; the base URL and its ConfigGuard rule are PLT-001 §18.
+
+## 18. Change request 2026-10-24 — mobiles in two parts and "keep this address" (LIS-CR-007 §3, package P-FRM, reviewer points C-05 and C-01)
+
+Source: `docs/build/CR-2026-10-24_Review-Quick-Wins.md` §3 and the review response LIS-RC-001 points C-05 and C-01. Built in
+slot `pat`; front end only (no server change, no new code, no new endpoint).
+
+| Item | Decision |
+| --- | --- |
+| CP-02 mobiles (C-05) | The laboratory mobile and the manager mobile use the shared `app-mobile-input` (`shared/forms/mobile-input`, see LIS-INT-PAT-001 §19): the dial code of the country chosen in the wizard is shown read-only beside the number, a typed trunk 0 is dropped, pasted `+20…` / `0020…` forms are read, and the request carries the E.164 form (`+201012345678`), which the server already accepts (GEO-010 / GEO-014). `countryMobileValidator` is unchanged, so a wrong length still names the country's digit count (LIS-VR-002 C-08); the hint reads "{length} digits after {dial}, without the leading 0". The same control is used by the Super Admin clients form (SA-04) and the user editor (CP-38). |
+| CP-03 keep the address (C-01) | Under the card of a found laboratory (`/lab/<slug>`) a compact strip reads "Keep this address: Ctrl+D (⌘+D on Apple devices) bookmarks it" with the address, *Copy address* (`navigator.clipboard`, toast "Copied"; a refused copy says so) and *Hide*. *Hide* is a signal of the page: it lasts until the page is left and is never stored. Not shown on the Super Admin sign-in nor on "address not found". Keys `auth.keepAddress.*`; component `features/auth/ui/keep-address.component.ts`; the frame has a slot under the card (`authAfterCard`). |
+| Find your laboratory (C-01) | Once the typed text has the shape of an address, a hint under *Continue* names the full address it opens (`<origin>/lab/<slug>`) with the bookmark keys and *Copy address*. The page still does not look the laboratory up (the laboratory page answers whether it exists). |
+| No device storage | Neither page writes anything on the device (no `localStorage`, `sessionStorage`, IndexedDB or cookie; security rule of the SPA). The "recent laboratories on this device" idea of LIS-RC-001 is **not built**: it would need device storage. |
+
+| # | Question | Assumption built on |
+| --- | --- | --- |
+| Q-K1 | Should the strip come back after *Hide* on the next visit? | Yes: nothing is stored, so every visit of the sign-in page shows it again until the user hides it. |
+| Q-K2 | May the sign-in pages remember the last laboratory to skip the find page? | No (no device storage); the bookmark is the way back. To be revisited only with a security decision on device storage. |

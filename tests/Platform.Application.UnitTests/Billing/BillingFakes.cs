@@ -324,6 +324,13 @@ internal sealed class CountingNumbers : IReferenceNumbers
         _counters[kind] = _counters.GetValueOrDefault(kind) + 1;
         return Task.FromResult($"{prefix}-{nowUtc.Year}-{_counters[kind]:00000}");
     }
+
+    public Task<string> NextShortAsync(string kind, string prefix, int width, CancellationToken cancellationToken)
+    {
+        Drawn++;
+        _counters[kind] = _counters.GetValueOrDefault(kind) + 1;
+        return Task.FromResult(Platform.SharedKernel.Primitives.ReferenceNumberFormat.Short(prefix, _counters[kind], width));
+    }
 }
 
 internal sealed class CountingUnitOfWork : IUnitOfWork

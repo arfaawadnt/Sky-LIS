@@ -12,6 +12,7 @@ import { CanDirective } from '../../../shared/ui/can.directive';
 import { CellTemplateDirective, RowActionsTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
 import { DataTableComponent } from '../../../shared/ui/data-table/data-table.component';
 import type { TableColumn } from '../../../shared/ui/data-table/data-table.types';
+import { RowMenuComponent } from '../../../shared/ui/data-table/row-menu.component';
 import { DialogComponent } from '../../../shared/ui/dialog/dialog.component';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
@@ -45,6 +46,7 @@ import { CancelServicesDialogComponent, VisitSamplesDialogComponent } from '../u
     ToolbarComponent,
     SearchBoxComponent,
     DataTableComponent,
+    RowMenuComponent,
     CellTemplateDirective,
     RowActionsTemplateDirective,
     PaginatorComponent,

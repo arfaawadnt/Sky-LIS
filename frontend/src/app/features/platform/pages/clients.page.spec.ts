@@ -189,6 +189,34 @@ describe('ClientsPage (SA-04)', () => {
     expect(view.saveProblem()).toBeNull();
   });
 
+  it('LIS-CR-007 C-05: the mobiles show the chosen country\'s dial code and keep the E.164 form without the leading 0', async () => {
+    const { fixture } = await render([plan('p1', 'STARTER', true)], [egypt]);
+    const view = fixture.componentInstance as unknown as DrawerAccess;
+    view.openCreate();
+    const form = view.form();
+    if (form === null) {
+      throw new Error('no form');
+    }
+
+    form.patchValue({ countryId: 'eg' });
+    view.onCountryChange(form);
+    await settle();
+    backend.match((request) => request.url === PLATFORM_API.governorates).forEach((request) => request.flush(page([])));
+    await fixture.whenStable();
+
+    const dial = document.querySelector('app-mobile-input[formcontrolname="mobile"] .dial');
+    expect(dial?.textContent).toContain('+20');
+    const input = document.querySelector<HTMLInputElement>('app-mobile-input[formcontrolname="managerMobile"] input.number');
+    if (input === null) {
+      throw new Error('no manager mobile');
+    }
+
+    input.value = '0111 222 3333';
+    input.dispatchEvent(new Event('input'));
+    expect(form.get('managerMobile')?.value).toBe('+201112223333');
+    expect(form.get('managerMobile')?.valid).toBe(true);
+  });
+
   it('deactivates a trial client with the reason the operator typed', async () => {
     const { fixture, host } = await render();
 

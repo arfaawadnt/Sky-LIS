@@ -23,6 +23,19 @@ public sealed class PlatformClientsController(ISender sender) : ControllerBase
         [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new ListClientsQuery(search, source, planId, status, page, pageSize, sort, direction), cancellationToken));
 
+    /// <summary>LIS-CR-007 A-01: the Trial and Active clients with no sign-in and no registration for <paramref name="days"/> days (1…90, default 3); <c>platform.view</c>.</summary>
+    [HttpGet("silent")]
+    public async Task<ActionResult<SilentClientList>> Silent([FromQuery] int? days, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListSilentClientsQuery(days), cancellationToken));
+
+    /// <summary>CSV of the silent clients (UTF-8 with BOM), headers in <paramref name="language"/> (en / ar).</summary>
+    [HttpGet("silent/export")]
+    public async Task<IActionResult> ExportSilent([FromQuery] int? days, [FromQuery] string? language, CancellationToken cancellationToken)
+    {
+        var file = await sender.Send(new ExportSilentClientsQuery(days, language), cancellationToken);
+        return File(file.Content, "text/csv; charset=utf-8", file.FileName);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ClientDetail>> Get(Guid id, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetClientQuery(id), cancellationToken));

@@ -109,12 +109,12 @@ td.actions {
   width: 1%;
 }
 
+/* one line, never wrapped (LIS-CR-007 C-06): the column takes the width of its content */
 .row-actions {
   display: inline-flex;
   gap: 4px;
   align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .sort-btn {
@@ -232,10 +232,10 @@ tr.state td {
   }
 
   td.actions {
-    /* the table-mode width: 1% would shrink the card's action row to its narrowest child */
+    /* keep the one-line row; it scrolls when the card is narrower */
     width: auto;
-    white-space: normal;
-    justify-content: flex-end;
+    overflow-x: auto;
+    justify-content: safe flex-end;
     padding-top: var(--sp-2);
     border-top: 1px dashed var(--line-soft);
     margin-top: var(--sp-1);

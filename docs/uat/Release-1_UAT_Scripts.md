@@ -186,6 +186,7 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 **Withdrawn on 2026-10-20** (change request LIS-CR-004: the treasury was removed from the system — payments need no device approval). The id stays reserved; nothing to run.
 
 #### UAT-ADM-08 — Catalogue A: groups, sample types, units, tests, services · critical
+LIS-CR-007: a sample type has the switch "Used for cultures"; switch it on, save and find the type on Microbiology › Culture specimens (off → gone). A Culture service's sample-type picker lists the culture specimens first; a Test service shows one list. *Shortcut sets* and *Test rules* are in the Setup menu of the laboratory (UAT-MDR-02 steps 3–4 apply to the client pages too).
 Refs: CP-39, CP-40, CP-41, CP-43, CP-44 · BR-08, BR-19, BR-24 · CAT S-T1-ok/code, S-T9-test, S-T9-members, S-T15, S-T16, S-T17, S-T14-type.
 Setup › Clinical groups / Sample types / Units of measurement / Tests / Services. These additions feed UAT-REG-05, UAT-REG-14, UAT-VER-03 and UAT-RES-02.
 1. Clinical groups › `Add clinical group`: code `MICRO`, unit code `M`, names, display order 3. Save. Then add another with code `micro!`.
@@ -216,6 +217,7 @@ Expected: (1) "2 sequence(s) saved."; the registration service picker and the re
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-ADM-10 — Catalogue B: preparations, comment library, doctors, microbiology · standard
+LIS-CR-007: add a doctor with the code left blank → the code is the laboratory's next `DR-001`, `DR-002` … (placeholder "Generated on save", no required mark; read-only on Edit). Microbiology tabs read Organisms · Antibiotics · Antibiotic classes · Commercial names · Sensitivity values · Culture specimens and the page opens on Organisms; "Add drug type" is "Add antibiotic class"; the commercial-name field is "Class".
 Refs: CP-46, CP-47, CP-48, CP-56 · CTB S-CTB-T1-ok, S-CTB-T1-options, S-CTB-T1-share, S-CTB-T2-ok, S-CTB-T3/T4.
 1. Setup › Preparations › `Add preparation`: code `FAST`, question "Fasting hours?" / Arabic, type Option list, options `8 h`, `12 h`, linked services GLU and CREA. Save. Add `FAST2` of type Option list with one option.
 2. Setup › Comment library › `Add comment`: short name `HAEM`, text EN/AR "Sample slightly haemolysed; potassium may be raised.", scope CHEM. Save.
@@ -316,6 +318,7 @@ Sign in as `uat.cashier` in the cashier's browser profile; branch MAIN (auto-sel
 **Withdrawn on 2026-10-20** (change request LIS-CR-004: the treasury was removed from the system — a payment needs no approval). The id stays reserved; nothing to run.
 
 #### UAT-CSH-03 — Full payment and receipt · critical
+LIS-CR-007: after scanning the accession the cursor is in the amount; *Take a payment* sits in the first row beside the visit totals; F10 pays.
 Refs: CP-23 · WF-09 step 2 · BR-26 · BIL S-T1-ok.
 Visit: the one UAT-REG-09 saved without payment (patient share 210).
 1. Payments › `Collect` › accession → account: remaining 210, status Unpaid.
@@ -326,6 +329,7 @@ Expected: (2) "Payment recorded — receipt RCT-2026-nnnnn."; the receipt prints
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-CSH-04 — Partial payments, card reference · critical
+LIS-CR-007: with more than three payments the list shows the latest three and *Show all (n)* shows every one.
 Refs: CP-23 · WF-09 step 2 · BR-26 · BIL S-T1-ok, S-T1-ref.
 Visit: UAT-REG-08 (150 due, 100 paid at registration, 50 remaining).
 1. `Pay`: 20, method Card, reference empty. `Pay`.
@@ -387,6 +391,7 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 Sign in as `uat.reception`; branch MAIN.
 
 #### UAT-REG-01 — Sign in, branch, dashboard · critical
+LIS-CR-007: after opening `<base>/lab/demo-lab`, a strip under the card shows the address with *Copy address* (toast "Copied"; the pasted text has no query string) and *Hide* (back after a reload). On `/login`, typing `demo-lab` shows the full address under Continue.
 Refs: CP-03, CP-04, CP-05 · ACC S-D1 · ORG AS-S1.
 1. Open `<base>/lab/demo-lab` (the laboratory name and logo show on the card); sign in with a wrong password; then with `<pw>`.
 1a. Open `<base>/lab/uatlabb` (another laboratory) and sign in as `uat.reception` with `<pw>`; open `<base>/admin/login` and do the same; open `<base>/lab/no-such-lab`; open `<base>/` signed out.
@@ -409,6 +414,7 @@ Expected: (1) "If an account matches, a 6-digit code was sent …" (the same mes
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-03 — Walk-in registration with full cash payment · critical
+LIS-CR-007: the mobile is typed after the `+20` dial code (preselected on the laboratory's country); `0100 123 4567` reads `1001234567` after leaving the field and is still stored as `01001234567`. Paste `+966 50 123 4567`: the dial code switches to SA and the number is stored as `+966501234567`.
 Refs: CP-06, CP-10 · WF-02 · BR-01, BR-02, BR-06, BR-26, BR-27 · REG S-V1-ok · BIL S-T1-ok · PAT S-T1-ok.
 Reception › Registration (`/registration/new`).
 1. Type the patient name "Mona Hassan": no similar file. `New patient`: title Mrs, gender (filled Female by the title), date of birth 1990-05-01, mobile `0100 123 4567`, nationality, governorate. 
@@ -481,9 +487,9 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 Refs: CP-10 · WF-02 · documents (labels, job order, receipt, report).
 Reception › Search registrations (`/registration/visits`).
 1. Search by accession; by patient number; by name; by mobile; date range today; status filters.
-2. Row › `Samples` (needs `samples.view`): the dialog lists the tubes with unit, type, status **Received**, collected and received times, sample number; `Label` prints one, `Print all labels`.
-3. Row › `Documents`: sample labels, print / open the job order, receipts (Payments page), results report.
-4. Row › `Payments`; row › `Results`; row › `Edit`.
+2. The row shows its actions on one line: *Details*, *Edit*, then the *Payments* and *Documents* icons and a *More* menu (Enter opens it, Esc closes it). Row › More › `Samples` (needs `samples.view`): the dialog lists the tubes with unit, type, status **Received**, collected and received times, sample number; `Label` prints one, `Print all labels`.
+3. Row › `Documents` (printer icon): sample labels, print / open the job order, receipts (Payments page), results report.
+4. Row › `Payments` (coins icon); row › More › `Results`; row › `Edit`.
 5. `Export CSV`.
 6. Arabic check.
 Expected: (1) each filter returns the right visits; the row shows services (reserved and cancelled styled differently), patient share, remaining balance. (2) tubes as registered; labels reprint. (3) the job order reprints; the report link opens Results by accession (prints only once verified, BR-09). (4) Payments opens with the accession filled; Results opens the visit; Edit opens the visit page. (5) a CSV (UTF-8 with BOM, Arabic readable in Excel) with the listed visits.
@@ -492,7 +498,7 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 #### UAT-REG-11 — Cancel services with a reason · critical
 Refs: CP-10, CP-26 · WF-09 step 5 · BR-05, BR-15 · REG S-V4-cancel, S-V4-verified, S-V4-right.
 Visits: (a) UAT-REG-03 (K, GLU, HGB paid 360; after UAT-VER-01 K and GLU are verified, HGB is not); (b) UAT-CSH-03's visit (paid 210, no results yet).
-1. Visit (b) › `Cancel services`: tick K, reason empty. Confirm.
+1. Visit (b) › More › `Cancel services`: tick K, reason empty. Confirm.
 2. Tick K, reason "Patient declined". Confirm.
 3. Visit (a) › `Cancel services`: tick K (verified).
 4. Visit (a): tick HGB with reason "Ordered by mistake". Confirm.
@@ -626,6 +632,7 @@ Expected: (1) the visits list collapses (`Hide visits`), the query fields stay; 
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-RES-03 — List, formula and reference-range resolution · standard
+LIS-CR-007: before typing a value the range cell already shows the patient's range greyed with a tooltip; after Save it shows in normal text with the flag.
 Refs: CP-19, CP-41 · BR-08, BR-19 · RES R-T2-list, R-T2-formula · CAT S-BR08.
 1. Visit of UAT-SMP-01: tab HEMA: BLDGRP — pick `AB`; then type `X`. Save.
 2. Visit of UAT-REG-13 (GLU + CREA for Mona, female 36 y): CREA = `1.05`. Save. Look at the range and flag. Then type a value into EGFR (profile RENAL in another visit).
@@ -757,6 +764,7 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 Sign in at the Super Admin address `<base>/admin/login` as `uat.ops` (created in UAT-SUP-02); a laboratory user there is refused with `AUTH-002`.
 
 #### UAT-OPS-01 — Sign in, home, platform dashboard · critical
+LIS-CR-007: the dashboard tile "Silent for 3+ days" (red when above 0, trial count in the subtitle) opens Clients with *Activity = Silent 3+ days*: client, address, status, administrator with a `tel:` link, last sign-in, last registration, days silent; no inactive client; the window 7 / 14 / 30 changes the list and the address (`?silent=7`); *Export CSV* downloads `silent-clients-…csv`; *Activity = Any* restores the register; `GET …/clients/silent?days=0` → 400; without `platform.view` → 403 and no select.
 Refs: SA-01, SA-02, SA-03 · WF-12.
 1. Sign in with a wrong password, then `<pw>`.
 2. Home (`/admin`): brand and welcome.
@@ -816,6 +824,7 @@ Expected: (1) saved; the malformed dial code is refused ("'+' and the country co
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-OPS-07 — Self-service subscription wizard · critical · *gateway*
+LIS-CR-007: once Egypt is chosen the `+20` dial code appears beside both mobiles; typing `01012345678` (leading 0) is accepted; the 9-digit refusal is unchanged.
 Refs: CP-01, CP-02 · WF-01 step 1 · BR-25 · PLT S-P1-sub, S-P1-mobile, S-S2-code.
 Public site (`/welcome`), no sign-in.
 1. `Subscribe now`. Step "Laboratory details": name EN/AR, country Egypt, governorate, address, mobile with 9 digits, licence, manager name and mobile, e-mail. Next.
@@ -1068,7 +1077,7 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 7 | Service-entry resolution (code + Enter) needs `registration.create` (REG intake §6): on the Price query page a `registration.view`-only role (Accounts) falls back to the picker without a message. Confirm, or relax the policy to `registration.view`. | FIN-02, FIN-04 |
 | 8 | Closed 2026-10-20: the treasury-access list was withdrawn with the treasury (LIS-CR-004). | — |
 | 9 | Printing a verified report from Search registrations › Documents needs `results.export` and the print result right; the Reception role of §4 holds `results.view` only (preview works). Decide whether reception prints reports. | VER-06, REG-10 |
-| 10 | The Countries master gives Egypt a mobile length of 10: an Egyptian number typed with the trunk 0 (11 digits, as the seeded patients) is refused under "Egypt (10)" and accepted under "Any". Confirm the convention. | REG-03, SMP-01 |
+| 10 | Closed 2026-10-24 (LIS-CR-007 C-05): mobiles are typed as dial code + national number and a trunk 0 is always dropped; the "Any" choice no longer exists. | — |
 | 11 | The creation of a client (tenant, wallet, branch, administrator, master-data copy) is audited in the **new laboratory's** trail, where its administrator sees "Created Tenant · Platform Administrator"; the platform trail starts with the first later change (deactivation, top-up). The security-event ledger records `TENANT_PROVISIONED`. Decide whether the platform trail must carry the provisioning (D-15 of the Super Admin dry run). | SUP-04, OPS-02 |
 | 12 | Closed after the run: every client feature route carries `tenantGuard` (D-17 fixed in `app.routes.ts`); SUP-08 step 4 to be re-tested. |
 | 13 | Route-provided facades outlive their pages (Angular keeps the route injector): a list page opened again showed the previous visit's data — even another sign-in's — until `Refresh` (D-14, fixed for the platform, organization and catalogue features by re-reading on open; D-08 was the billing case). The laboratory features (registration, patients, results, pricing, treasury, …) follow the same pattern and need the same treatment. | MDR-01, all list pages |
@@ -1086,3 +1095,4 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 0.7 | 2026-10-20 | Claude Code | Sign-in by address (change request LIS-CR-005, BR-28): set-up note (laboratory users at `<base>/lab/<slug>`, Super Admin personas at `<base>/admin/login`), UAT-REG-01 step 1a and expectations (another laboratory, admin address, unknown address, bare address; idle return), UAT-OPS intro (admin address, laboratory user refused), UAT-ADM-01 and the provisioning / subscription expectations print the new address. |
 | 0.8 | 2026-10-22 | Claude Code | New script UAT-REG-16 Lab Tracker (CP-69, change request LIS-CR-006): strip and chips, table and board, next-step links, search, live refresh, desk views, rights, Arabic. Reception persona and coverage updated. |
 | 0.9 | 2026-10-22 | Claude Code | UAT-REG-16 gains step 8 (period picker: yesterday, last 7 days, from / to); rights and Arabic checks become steps 9 and 10. Ids unchanged. |
+| 1.0 | 2026-10-24 | Claude Code | Reviewer quick wins (change request LIS-CR-007, response LIS-RC-001): UAT-REG-10 / UAT-REG-11 row actions on one line with a *More* menu; UAT-CSH-03 / 04 payment card first, focus on the amount, "Show all"; UAT-REG-01 keep-this-address strip; UAT-REG-03 and UAT-OPS-07 mobiles typed after the dial code; UAT-ADM-10 doctor code left blank → DR-nnn; UAT-RES-03 range shown before entry; UAT-ADM-08 "Used for cultures"; UAT-MDR-02 Microbiology tab names and order (Antibiotic classes, Culture specimens); UAT-OPS-01 silent-clients tile; UAT-ADM-08 / UAT-MDR-02 shortcut sets and test rules in the client menu. Open point 10 closed. Ids unchanged; the per-script notes are the "LIS-CR-007" lines under each script's Refs. |

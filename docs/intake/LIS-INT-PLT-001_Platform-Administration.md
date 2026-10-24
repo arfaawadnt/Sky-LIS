@@ -5,7 +5,7 @@
 | Slot / modules | `plat` — permission modules `tenancy` (clients, plans, wallets), `platform` (dashboard, sessions), `notifications` (templates), `integration` (library), `wallet` (tenant-facing wallet), `settings` (SA-19 over the foundation's settings API) |
 | SRS pages | SA-03 Dashboard, SA-04 Clients, SA-05 Subscriptions & wallets, SA-08 Sessions, SA-10 Countries, SA-11 Governorates, SA-15 Analyser models, SA-16 PCR kits, SA-17 Code systems, SA-18 Rule templates, SA-19 Platform parameters, SA-20 Notification templates; CP-02 Subscription wizard (backend only), CP-66 Wallet (API only); workflows WF-01 (onboarding), WF-12 (platform operations); rule BR-25 |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001) and the architecture pack. **For review by the business owner**; assumptions in §16. |
-| Version | 1.3 — 2026-10-20 (§18 change request LIS-CR-005: portal base URL `Lis:Platform:PortalBaseUrl`, addresses `{base}/lab/{slug}`, public laboratory card and logo, `PLT-404`) · 1.2 — 2026-10-19 (change request LIS-CR-003: P-A1 client login logs, SA-08b; P-A2 location hierarchy under a governorate, SA-11b, §17) |
+| Version | 1.4 — 2026-10-24 (§19 change request LIS-CR-007 A-01: silent clients on SA-03 and SA-04) · 1.3 — 2026-10-20 (§18 change request LIS-CR-005: portal base URL `Lis:Platform:PortalBaseUrl`, addresses `{base}/lab/{slug}`, public laboratory card and logo, `PLT-404`) · 1.2 — 2026-10-19 (change request LIS-CR-003: P-A1 client login logs, SA-08b; P-A2 location hierarchy under a governorate, SA-11b, §17) |
 | Implemented in | `src/Platform.Domain/PlatformAdmin`, `src/Platform.Contracts/PlatformAdmin`, `src/Platform.Application/PlatformAdmin`, `src/Platform.Infrastructure/Persistence/PlatformAdmin` (+ `PlatformAdmin.migration.sql`), `src/Platform.WebApi/Controllers/PlatformAdmin`, `frontend/src/app/features/platform`, `frontend/src/app/core/api/{platform,public-subscription}.contracts.ts`, `frontend/public/i18n/platform.{en,ar}.json` |
 | Namespace | `PlatformAdmin`, not `Platform`: a namespace `Platform.Application.Platform` would capture every `Platform.*` qualified name written inside `Platform.Application.*` (C# resolves `Platform` to the nearest enclosing member first), breaking other modules' code. |
 
@@ -411,3 +411,52 @@ Scenario S-GEO-view: tenancy.view lists; create / rename / deactivate → 403; a
 - **Elevation**: none added (the reads use the platform table and a tenant scope, not `Elevate()`).
 - **Tooling**: `ClientRecordRegistrar` (Application, not an endpoint) + `Tenant.RegisterExisting` create the client record of an
   existing tenant (Active, Manual, no event, no wallet).
+
+## 19. Change request 2026-10-24 — silent clients (LIS-CR-007 A-01, package P-PLT)
+
+Source: the reviewer's comments response LIS-RC-001, point A-01 ("show the clients that stopped using the system so we can call
+them"); brief `docs/build/CR-2026-10-24_Review-Quick-Wins.md` §6.
+
+- **Rule** (`Platform.Domain.PlatformAdmin.ClientSilence`, pure): last activity of a client = the later of its users' last sign-in
+  and its last registration; a client is **silent** for a window of N days when that activity is strictly before `now − N days`, or
+  when it has none and the client was created before that instant. Inactive clients are never silent. N is 1…90 (default 3; the
+  Clients page offers 3 / 7 / 14 / 30).
+- **Last sign-in** = the latest `identity.refresh_sessions.issued_at_utc` of a **browser** session of the tenant (a sign-in or a
+  renewal; machine sessions of site agents do not count). **Last registration** = the latest `app.visits.registered_at_utc` of the
+  client. **Administrator** shown = the client record's manager name and mobile (E.164) — provisioning creates the laboratory
+  administrator from them, and the Super Admin keeps them current on SA-04.
+- **Reads** (port `IClientLastActivityReader`, adapter `Persistence/PlatformAdmin/ClientLastActivityReader.cs`, no elevation, no
+  migration): the Trial and Active clients and their last browser sign-in from the platform tables (`saas.tenants`,
+  `identity.refresh_sessions`: no RLS) in two queries; the last registration of a client in that client's own tenant scope
+  (`ForTenant`, the pattern of the public laboratory card), one indexed `max` per client (`ix_visits_tenant_id_registered_at_utc`),
+  asked only for the clients whose sign-ins did not already clear them (`SilentClientFinder`). The brief mentioned the dashboard's
+  `SECURITY DEFINER` counters; a new function would have needed a migration, which this package may not add — the `ForTenant` read
+  gives the same answer without one. If the number of candidates grows large, a `saas.client_last_registrations()` function in
+  the pattern of `saas.client_activity_counts` is the drop-in replacement (open question Q22).
+- **Endpoints** (`platform.view`, platform tenant only: PLT-403):
+  - `GET /api/v1/platform/clients/silent?days=3` → `SilentClientList { days, asOfUtc, trial, items[] }`, items
+    `{ id, nameEn, nameAr, portalUrl, status, createdAtUtc, lastSignInAtUtc, lastRegistrationAtUtc, lastActivityAtUtc, silentDays,
+    administratorName, administratorMobile }`, longest silence first (no activity at all first), never paged;
+  - `GET /api/v1/platform/clients/silent/export?days=3&language=en|ar` → CSV (UTF-8 with BOM, RFC 4180, cells escaped against formula
+    injection, times UTC `yyyy-MM-dd HH:mm`), file `silent-clients-{days}d-{yyyy-MM-dd-HHmm}.csv`;
+  - `GET /api/v1/platform/dashboard?period=…&silentDays=3` → `PlatformDashboard` gains `silentClients`, `silentTrialClients`,
+    `silentDays` (independent of the period; `silentDays` optional, default 3).
+  - `days` / `silentDays` outside 1…90 → `VALIDATION-400`. No new problem code.
+- **SPA** (`features/platform`): SA-03 tile "Silent for 3+ days" (red when > 0, the trial ones in the subtitle) linking to
+  `/admin/clients?silent=3`; SA-04 toolbar select *Activity* (Any / Silent 3+ / 7+ / 14+ / 30+ days, shown with `platform.view`) that
+  swaps the register for the silent table (`ui/silent-clients.component.ts`, facade `state/silent-clients.facade.ts`): client and
+  portal address, status, administrator with a `tel:` link, last sign-in, last registration, last activity, days silent, created; the
+  page's search box and status select narrow it in the browser; *Export CSV* in the header exports the server's CSV of the window;
+  a row opens the client drawer. The window is kept in the address (`?silent=`), no storage.
+- **Tests**: domain `ClientSilenceTests` (S-SIL-1…8), application `SilentClientFinderTests`, integration
+  `ClientLastActivityReaderTests`, functional `SilentClientsFlowTests` (sign-in today → not silent; last sign-in four days old →
+  silent for 3, not for 7; inactive excluded; dashboard counts; CSV; `days=0`/`91` and `silentDays=0` → 400; 403 without
+  `platform.view` and for a laboratory user); SPA specs `clients-silent.page.spec.ts`, `dashboard.page.spec.ts`,
+  `silent-clients.facade.spec.ts`.
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| Q22 | Is one indexed read per candidate client acceptable for the dashboard? | Yes for the current client count (tens): only clients without a sign-in inside the window are read. A `SECURITY DEFINER` function can replace it in a later migration without changing the port. |
+| Q23 | Does a token renewal count as a sign-in? | Yes: an open session renews every 15 minutes while someone works, so the latest issue is the best "last seen" the platform tables hold without reading the laboratory's data. |
+| Q24 | Who is "the administrator" to call? | The manager on the client record (name and mobile), which provisioning used for the laboratory administrator and the Super Admin maintains on SA-04; the administrator user's own profile may differ later. |
+| Q25 | Are trial clients included? | Yes, counted separately in the tile's subtitle (a silent trial is the most important call). |

@@ -4,6 +4,7 @@ using Platform.Application.Abstractions.Security;
 using Platform.Application.Identity;
 using Platform.Contracts.PlatformAdmin;
 using Platform.Domain.Authorization;
+using Platform.Domain.PlatformAdmin;
 using Platform.SharedKernel.Abstractions;
 using Platform.SharedKernel.MultiTenancy;
 
@@ -58,19 +59,26 @@ public sealed class ListAdminSessionsHandler(IPlatformSessionDirectory sessions,
     }
 }
 
-/// <summary>SA-03 for a period: today, week, month or year (UTC calendar boundaries; default month).</summary>
+/// <summary>
+/// SA-03 for a period: today, week, month or year (UTC calendar boundaries; default month). LIS-CR-007 A-01:
+/// <paramref name="SilentDays"/> is the window of the silent-clients tile (1…90, default 3).
+/// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Platform, PermissionAction.View)]
-public sealed record GetPlatformDashboardQuery(string? Period) : IQuery<PlatformDashboard>, IPlatformAdministrationRequest;
+public sealed record GetPlatformDashboardQuery(string? Period, int? SilentDays = null) : IQuery<PlatformDashboard>, IPlatformAdministrationRequest;
 
 public sealed class GetPlatformDashboardValidator : AbstractValidator<GetPlatformDashboardQuery>
 {
-    public GetPlatformDashboardValidator() =>
+    public GetPlatformDashboardValidator()
+    {
         RuleFor(query => query.Period).Must(period => DashboardPeriods.IsKnown(period)).WithMessage("The period is today, week, month or year.");
+        RuleFor(query => query.SilentDays).SilentWindow();
+    }
 }
 
 public sealed class GetPlatformDashboardHandler(
     IPlatformDashboardReader reader,
     IClientActivityReader activity,
+    IClientLastActivityReader lastActivity,
     IPortalAddressOptions portal,
     ICurrentTenant currentTenant,
     IClock clock) : IQueryHandler<GetPlatformDashboardQuery, PlatformDashboard>
@@ -98,7 +106,11 @@ public sealed class GetPlatformDashboardHandler(
             .Select(item => names.TryGetValue(item.TenantId, out var name) ? new ClientActivity(item.TenantId, name.NameEn, name.NameAr, item.Registrations) : new ClientActivity(item.TenantId, item.TenantId.ToString(), item.TenantId.ToString(), item.Registrations))
             .ToList();
 
-        return new PlatformDashboard(period, from, to, clients, adminUsers, new ActivityTotals(snapshot.ServedPatients, snapshot.Tests, snapshot.Registrations), atZero, plans, byClient, recent);
+        var silentDays = query.SilentDays ?? ClientSilence.DefaultDays;
+        var silent = await SilentClientFinder.FindAsync(lastActivity, portal.PortalBaseUrl, now, silentDays, cancellationToken);
+        var silentTrial = silent.Count(item => item.Status == nameof(TenantStatus.Trial));
+
+        return new PlatformDashboard(period, from, to, clients, adminUsers, new ActivityTotals(snapshot.ServedPatients, snapshot.Tests, snapshot.Registrations), atZero, plans, byClient, recent, silent.Count, silentTrial, silentDays);
     }
 }
 

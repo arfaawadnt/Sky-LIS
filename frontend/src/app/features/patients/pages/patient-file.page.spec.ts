@@ -162,7 +162,7 @@ describe('PatientFilePage (CP-11 file, documents, visits, merge)', () => {
     expect(host.querySelector('tbody tr[data-row]')?.textContent).toContain('referral.pdf');
     expect(host.querySelector('tbody tr[data-row]')?.textContent).toContain('PAT-2026-00000');
     expect(host.textContent).toContain('patients.document.attachTitle');
-    expect(host.textContent).not.toContain('patients.document.deactivate');
+    expect(host.querySelector('[aria-label="patients.document.deactivate"]')).toBeNull();
   });
 
   it('shows the visits tab as unavailable until the registration module answers', async () => {

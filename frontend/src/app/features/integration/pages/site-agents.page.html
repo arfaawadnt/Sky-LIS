@@ -35,13 +35,16 @@
       <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
         <button type="button" class="icon-btn" (click)="openDetail(row)" [attr.aria-label]="i18n.t('integration.agents.details')" [title]="i18n.t('integration.agents.details')"><app-icon name="eye" [size]="15" /></button>
         <button type="button" class="icon-btn" (click)="openLogs(row)" [attr.aria-label]="i18n.t('integration.agents.logs')" [title]="i18n.t('integration.agents.logs')"><app-icon name="inbox" [size]="15" /></button>
-        @if (row.isActive) {
-          <ng-container *appCan="permissions.manage">
-            <button type="button" class="icon-btn" (click)="push(row)" [disabled]="facade.push.pending()" [attr.aria-label]="i18n.t('integration.agents.push')" [title]="i18n.t('integration.agents.push')"><app-icon name="zap" [size]="15" /></button>
-            <button type="button" class="icon-btn" (click)="rotate(row)" [disabled]="facade.rotate.pending()" [attr.aria-label]="i18n.t('integration.agents.rotate')" [title]="i18n.t('integration.agents.rotate')"><app-icon name="shield" [size]="15" /></button>
-          </ng-container>
-        }
-        <button type="button" class="icon-btn" *appCan="permissions.manage" (click)="toggleActive(row)" [attr.aria-label]="i18n.t(row.isActive ? 'integration.agents.deactivate' : 'integration.agents.reactivate')" [title]="i18n.t(row.isActive ? 'integration.agents.deactivate' : 'integration.agents.reactivate')"><app-icon name="power" [size]="15" /></button>
+        <!-- LIS-CR-007 C-10: at most four actions in the line, the rest in the More menu -->
+        <app-row-menu>
+          @if (row.isActive) {
+            <ng-container *appCan="permissions.manage">
+              <button type="button" (click)="push(row)" [disabled]="facade.push.pending()"><app-icon name="zap" [size]="14" />{{ i18n.t('integration.agents.push') }}</button>
+              <button type="button" (click)="rotate(row)" [disabled]="facade.rotate.pending()"><app-icon name="shield" [size]="14" />{{ i18n.t('integration.agents.rotate') }}</button>
+            </ng-container>
+          }
+          <button type="button" [class.danger]="row.isActive" *appCan="permissions.manage" (click)="toggleActive(row)"><app-icon name="power" [size]="14" />{{ i18n.t(row.isActive ? 'integration.agents.deactivate' : 'integration.agents.reactivate') }}</button>
+        </app-row-menu>
       </ng-template>
     </app-data-table>
 

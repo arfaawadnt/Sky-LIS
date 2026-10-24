@@ -32,6 +32,7 @@ import { CanDirective } from '../../../shared/ui/can.directive';
 import { CellTemplateDirective, RowActionsTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
 import { DataTableComponent } from '../../../shared/ui/data-table/data-table.component';
 import type { TableColumn } from '../../../shared/ui/data-table/data-table.types';
+import { RowMenuComponent } from '../../../shared/ui/data-table/row-menu.component';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { DialogComponent } from '../../../shared/ui/dialog/dialog.component';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
@@ -126,6 +127,7 @@ export function toAnalyserRequest(form: AnalyserForm): SaveAnalyserRequest {
     ToolbarComponent,
     SearchBoxComponent,
     DataTableComponent,
+    RowMenuComponent,
     CellTemplateDirective,
     RowActionsTemplateDirective,
     PaginatorComponent,

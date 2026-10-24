@@ -10,9 +10,9 @@ public interface ISampleTypeRepository : IRepository<SampleType>
 {
     Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken);
 
-    Task<Paged<SampleTypeListItem>> ListAsync(CatalogueAListFilter filter, PageRequest page, CancellationToken cancellationToken);
+    Task<Paged<SampleTypeListItem>> ListAsync(SampleTypeListFilter filter, PageRequest page, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<SampleTypeListItem>> ExportAsync(CatalogueAListFilter filter, CancellationToken cancellationToken);
+    Task<IReadOnlyList<SampleTypeListItem>> ExportAsync(SampleTypeListFilter filter, CancellationToken cancellationToken);
 
     Task<SampleTypeDetail?> GetDetailAsync(Guid id, CancellationToken cancellationToken);
 }

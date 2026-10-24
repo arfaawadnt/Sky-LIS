@@ -108,6 +108,15 @@ describe('VisitsPage (CP-10)', () => {
     return page;
   }
 
+  /** The row's inline actions by their text, or by their accessible name for an icon button. */
+  function inlineActions(row: Element | null | undefined): string[] {
+    return [...(row?.querySelectorAll<HTMLButtonElement>('.row-actions > button') ?? [])].map((button) => button.textContent?.trim() || (button.getAttribute('aria-label') ?? ''));
+  }
+
+  function menuItems(row: Element | null | undefined): string[] {
+    return [...(row?.querySelectorAll('.row-menu-panel button') ?? [])].map((button) => button.textContent?.trim() ?? '');
+  }
+
   it('exports the date as the local date and time shown in the grid, not raw UTC (UAT A-15)', async () => {
     const page = await open();
     const blobs: Blob[] = [];
@@ -140,7 +149,10 @@ describe('VisitsPage (CP-10)', () => {
     expect(row?.querySelector('.chip.cancelled')?.textContent).toBe('GLU');
     expect(row?.querySelector('.chip:not(.cancelled)')?.textContent).toBe('CBC');
     expect(row?.textContent).toContain('60.00');
-    expect(row?.querySelectorAll('button').length).toBe(7);
+    // LIS-CR-007 C-06: Details, Edit, Payments and Documents inline, the rest (Patient needs patients.edit) in the More menu
+    expect(inlineActions(row)).toEqual(['registration.accession.details', 'registration.visits.edit', 'registration.visits.payments ACC-2026-00001', 'registration.visits.documents ACC-2026-00001']);
+    expect(row?.querySelector('app-row-menu')?.hasAttribute('hidden')).toBe(false);
+    expect(menuItems(row)).toEqual(['registration.visits.samples', 'registration.visits.results', 'registration.cancel.action']);
     expect(host.querySelector('app-page-header .btn.primary')).not.toBeNull();
   });
 
@@ -149,7 +161,9 @@ describe('VisitsPage (CP-10)', () => {
     await open([visitRow({ patientMasked: true, patientName: null, mobile: null, remaining: 0 })]);
     const host = harness.routeNativeElement!;
     const row = host.querySelector('tbody tr[data-row]');
-    expect(row?.querySelectorAll('button').length).toBe(2);
+    expect(inlineActions(row)).toEqual(['registration.accession.details', 'registration.visits.documents ACC-2026-00001']);
+    expect(menuItems(row)).toEqual([]);
+    expect(row?.querySelector('app-row-menu')?.hasAttribute('hidden')).toBe(true);   // no empty More menu
     expect(row?.textContent).toContain('registration.vipMasked');
     expect(row?.textContent).not.toContain('Mona');
     expect(row?.textContent).toContain('registration.visits.settled');
@@ -212,7 +226,7 @@ describe('VisitsPage (CP-10)', () => {
     granted.add('patients.edit');
     const page = await open();
     const host = harness.routeNativeElement!;
-    expect(host.querySelector('tbody tr[data-row]')?.querySelectorAll('button').length).toBe(8);
+    expect(menuItems(host.querySelector('tbody tr[data-row]'))[0]).toBe('registration.visits.patient');
 
     await openPatient(page, false);
     expect(page.patientOpen()).toBe(true);
@@ -271,5 +285,23 @@ describe('VisitsPage (CP-10)', () => {
     page.details(visitRow());
     await settle();
     expect(router.url).toBe('/registration/accession?accession=ACC-2026-00001');
+  });
+
+  it('runs an action of the More menu and closes the menu (LIS-CR-007 C-06)', async () => {
+    await open();
+    const router = TestBed.inject(Router);
+    const row = harness.routeNativeElement!.querySelector('tbody tr[data-row]')!;
+    const trigger = row.querySelector<HTMLButtonElement>('app-row-menu > button')!;
+    const panel = row.querySelector<HTMLElement>('.row-menu-panel')!;
+    expect(panel.hidden).toBe(true);
+
+    trigger.click();
+    await tick();
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(panel.hidden).toBe(false);
+
+    [...panel.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('registration.visits.results'))!.click();
+    await tick();
+    expect(router.url).toBe('/results/by-accession?accession=ACC-2026-00001');
   });
 });

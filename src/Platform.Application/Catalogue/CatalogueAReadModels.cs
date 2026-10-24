@@ -7,6 +7,9 @@ namespace Platform.Application.Catalogue;
 /// <remarks><see cref="Sort"/> is applied on the server before paging (validation v0.5.0 B-03; keys in <see cref="CatalogueSortKeys"/>).</remarks>
 public sealed record CatalogueAListFilter(string? Search, bool? IsActive, ListSort Sort = default);
 
+/// <summary>The sample-type register filter: <see cref="CatalogueAListFilter"/> plus the culture flag (LIS-CR-007; null = every type).</summary>
+public sealed record SampleTypeListFilter(string? Search, bool? IsActive, bool? ForCulture, ListSort Sort = default);
+
 public sealed record ServiceListFilter(string? Search, ServiceType? Type, Guid? ClinicalGroupId, bool? IsActive, ListSort Sort = default);
 
 public sealed record LabTestListFilter(string? Search, LabTestType? Type, Guid? ClinicalGroupId, bool? IsActive, ListSort Sort = default);

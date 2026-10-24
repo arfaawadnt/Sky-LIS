@@ -113,7 +113,7 @@ export interface DraftChange {
                   }
                 </td>
                 <td class="small">{{ row.unit ?? '' }}</td>
-                <td class="small range">{{ row.range?.display ?? '' }}</td>
+                <td class="small range" [class.provisional]="row.rangeProvisional === true" [attr.title]="row.rangeProvisional ? i18n.t('results.grid.rangeProvisional') : null">{{ row.range?.display ?? '' }}</td>
                 <td>
                   @if (symbol(row); as flag) {
                     <app-badge [tone]="tone(row)">{{ flag }}</app-badge>
@@ -178,6 +178,7 @@ export interface DraftChange {
     .panic { display: inline-block; margin-inline-start: 6px; color: var(--panic); font-weight: 700; }
     .refusal { display: block; color: var(--bad); font-size: var(--fs-xs); font-weight: 500; }
     .range { white-space: nowrap; }
+    .range.provisional { color: var(--muted); font-style: italic; }
     .actions { white-space: nowrap; text-align: end; }
     .icon-btn.flagged { color: var(--violet); }
     tr.flag-high td.value-col, tr.flag-high .value-input { background: var(--bad-soft); }

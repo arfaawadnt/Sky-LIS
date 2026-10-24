@@ -98,7 +98,7 @@ internal sealed class SampleTypeRepository(AppDbContext context) : Repository<Sa
         return Set.AnyAsync(sampleType => sampleType.Code == cleaned, cancellationToken);
     }
 
-    public async Task<Paged<SampleTypeListItem>> ListAsync(CatalogueAListFilter filter, PageRequest page, CancellationToken cancellationToken)
+    public async Task<Paged<SampleTypeListItem>> ListAsync(SampleTypeListFilter filter, PageRequest page, CancellationToken cancellationToken)
     {
         var query = Filtered(filter);
         var total = await query.LongCountAsync(cancellationToken).ConfigureAwait(false);
@@ -107,7 +107,7 @@ internal sealed class SampleTypeRepository(AppDbContext context) : Repository<Sa
         return new Paged<SampleTypeListItem>(items, page.Page, page.PageSize, total);
     }
 
-    public async Task<IReadOnlyList<SampleTypeListItem>> ExportAsync(CatalogueAListFilter filter, CancellationToken cancellationToken) =>
+    public async Task<IReadOnlyList<SampleTypeListItem>> ExportAsync(SampleTypeListFilter filter, CancellationToken cancellationToken) =>
         await Project(Filtered(filter).OrderBy(sampleType => sampleType.Code).Take(CatalogueALimits.MaxExportRows)).ToListAsync(cancellationToken).ConfigureAwait(false);
 
     public Task<SampleTypeDetail?> GetDetailAsync(Guid id, CancellationToken cancellationToken) =>
@@ -120,16 +120,22 @@ internal sealed class SampleTypeRepository(AppDbContext context) : Repository<Sa
                 sampleType.Name.En,
                 sampleType.Name.Ar,
                 sampleType.IsActive,
-                sampleType.Conditions.OrderBy(condition => condition.Code).Select(condition => new SampleConditionView(condition.Id, condition.Code, condition.Name.En, condition.Name.Ar, condition.IsActive)).ToList()))
+                sampleType.Conditions.OrderBy(condition => condition.Code).Select(condition => new SampleConditionView(condition.Id, condition.Code, condition.Name.En, condition.Name.Ar, condition.IsActive)).ToList(),
+                sampleType.ForCulture))
             .FirstOrDefaultAsync(cancellationToken);
 
-    private IQueryable<SampleType> Filtered(CatalogueAListFilter filter)
+    private IQueryable<SampleType> Filtered(SampleTypeListFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
         var query = Set.AsNoTracking();
         if (filter.IsActive is { } active)
         {
             query = query.Where(sampleType => sampleType.IsActive == active);
+        }
+
+        if (filter.ForCulture is { } forCulture)
+        {
+            query = query.Where(sampleType => sampleType.ForCulture == forCulture);
         }
 
         if (CatalogueASearch.Pattern(filter.Search) is { } pattern)
@@ -152,7 +158,8 @@ internal sealed class SampleTypeRepository(AppDbContext context) : Repository<Sa
             sampleType.Name.En,
             sampleType.Name.Ar,
             sampleType.Conditions.Count(condition => condition.IsActive),
-            sampleType.IsActive));
+            sampleType.IsActive,
+            sampleType.ForCulture));
 }
 
 internal sealed class MeasurementUnitRepository(AppDbContext context) : Repository<MeasurementUnit>(context), IMeasurementUnitRepository

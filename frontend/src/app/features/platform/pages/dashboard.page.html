@@ -25,6 +25,12 @@
     <app-stat-card [label]="i18n.t('platform.dashboard.registrations')" [value]="number(d.activity.registrations)" [hint]="periodLabel(d.period)" icon="clipboard" />
     <app-stat-card [label]="i18n.t('platform.dashboard.walletsAtZero')" [value]="number(d.walletsAtOrBelowZero)" [hint]="i18n.t('platform.dashboard.walletsAtZeroHint')"
                    [tone]="d.walletsAtOrBelowZero > 0 ? 'bad' : 'ok'" icon="coins" />
+    <!-- LIS-CR-007 A-01: clients with no sign-in and no registration for N days, a list to call them -->
+    <a class="kpi-link" routerLink="../clients" [queryParams]="{ silent: d.silentDays }" data-testid="silent-tile"
+       [attr.aria-label]="i18n.tf('platform.dashboard.silentOpen', { count: d.silentClients, days: d.silentDays })">
+      <app-stat-card [label]="i18n.tf('platform.dashboard.silent', { days: d.silentDays })" [value]="number(d.silentClients)"
+                     [hint]="i18n.tc('platform.dashboard.silentTrial', d.silentTrialClients)" [tone]="d.silentClients > 0 ? 'bad' : 'ok'" icon="alert" />
+    </a>
   </div>
 
   <div class="grid-2">

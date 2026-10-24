@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, resource, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -22,6 +23,7 @@ import { mutation } from '../../../core/state/mutation';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { PublicLaboratoryApi } from '../data/public-laboratory.api';
 import { AuthFrameComponent } from '../ui/auth-frame.component';
+import { KeepAddressComponent } from '../ui/keep-address.component';
 
 /** Where a client-portal session without a branch goes first (CP-04); the account module owns the page. */
 export const SELECT_BRANCH_PATH = '/account/select-branch';
@@ -39,11 +41,12 @@ type AddressState = 'loading' | 'found' | 'missing' | 'unavailable';
  * `/admin/login` (mode `admin`) is the Super Admin sign-in and posts `{ admin: true }`. The envelope interceptor seals the
  * password before the request leaves the browser. After sign-in the interface switches to the user's language and a
  * laboratory session without a branch goes to branch selection (CP-04). `?reason=idle` (F-01) says the session ended
- * after inactivity; `?username=` prefills the form (after a subscription or a recovery).
+ * after inactivity; `?username=` prefills the form (after a subscription or a recovery). LIS-CR-007 C-01: under the card of a
+ * found laboratory a strip says how to keep the address (bookmark keys, *Copy address*); *Hide* lasts for the page only.
  */
 @Component({
   selector: 'app-login-page',
-  imports: [ReactiveFormsModule, RouterLink, IconComponent, AuthFrameComponent],
+  imports: [ReactiveFormsModule, RouterLink, IconComponent, AuthFrameComponent, KeepAddressComponent],
   templateUrl: './login.page.html',
   styleUrl: './login.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -131,6 +134,16 @@ export class LoginPage {
     const name = this.laboratoryName();
     return name === null ? this.i18n.t('auth.title') : this.i18n.tf('auth.lab.title', { name });
   });
+
+  /** *Hide* on the keep-address strip: for this page only, never stored (no device storage, LIS-CR-007 C-01). */
+  protected readonly keepHidden = signal(false);
+
+  private readonly origin = inject(DOCUMENT).defaultView?.location.origin ?? '';
+
+  /** The laboratory's sign-in address without the query string, while the strip is shown. */
+  protected readonly keepAddress = computed(() =>
+    !this.isAdmin() && this.state() === 'found' && !this.keepHidden() ? `${this.origin}${LABORATORY_PATH_PREFIX}/${this.card()?.slug ?? this.address()}` : null,
+  );
 
   protected readonly recoverLink = computed<readonly string[]>(() =>
     this.isAdmin() ? [ADMIN_SIGN_IN_PATH, 'recover'] : [LABORATORY_PATH_PREFIX, this.address(), 'recover'],

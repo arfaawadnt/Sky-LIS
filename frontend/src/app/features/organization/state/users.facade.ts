@@ -91,6 +91,9 @@ export class UserEditorFacade {
 
   readonly branches = resource({ loader: ({ abortSignal }) => this.api.activeBranches(abortSignal).catch(() => []) });
 
+  /** The dial codes of the mobile field (LIS-CR-007 C-05). */
+  readonly mobileCountries = resource({ loader: () => this.api.mobileCountries() });
+
   readonly catalogue = resource({ loader: ({ abortSignal }) => this.api.permissionCatalogue(abortSignal).catch(() => ({ modules: [], actions: [] })) });
 
   /** The tenant's password minimum, read when the actor may read the parameters (else the default). */

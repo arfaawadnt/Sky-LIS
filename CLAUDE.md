@@ -510,6 +510,21 @@ QMS source is never read or copied (section 1); everything here is written from 
   wall-clock `DateTime`, together, From ≤ To, ≤ `GetLabTrackerValidator.MaxRangeDays` = 31) replace `Day`; the window is
   `[InstantUtc(From), InstantUtc(To) + 1 min)` through `ReportPeriod.InstantUtc`; `LabTrackerPage.FromUtc/ToUtc` echo it. SPA
   `ui/period-picker.component.ts` (presets today / yesterday / a day / last 7 days / custom; `TrackerFacade.setRange`).
+- Change request LIS-CR-007 (2026-10-24, `docs/build/CR-2026-10-24_Review-Quick-Wins.md`, from the review response LIS-RC-001 in
+  `docs/review/`; migration `ReviewQuickWins` = `app.sample_types.for_culture` + the dated block in `CatalogueA.migration.sql`): CP-51 /
+  CP-52 switched to Release 1; **row actions** never wrap — `shared/ui/data-table/row-menu.component.ts` (`app-row-menu`, popover top
+  layer, roving arrows, Escape stopped before drawers) holds the overflow beyond four actions; Payments (CP-23) shows the payment card in
+  the first row and `MovementFormComponent.focusAmount()` after a find; **provisional range** — `GetResultCaseHandler` resolves the band of
+  a value-less result (`ResultRowView.RangeProvisional`), the stored range wins; **generated doctor code** — blank `CreateDoctorCommand.Code`
+  → `IReferenceNumbers.NextShortAsync('doctor','DR',3)` (counter row year 0, `ReferenceNumberFormat.Short`), a typed code never moves the
+  counter; **mobile input** — `shared/forms/mobile-input` (`app-mobile-input`, dial code + national number, trunk 0 dropped, value E.164 or
+  as typed; the patient form keeps the laboratory-country trunk form in storage, PAT Q20); **keep-this-address strip** on `/lab/<slug>`
+  (`features/auth/ui/keep-address.component.ts`, no device storage); **Microbiology** tab order Organisms · Antibiotics · Antibiotic
+  classes (the `DrugType` entity and `drug-types` route keep their names) · Commercial names · Sensitivity values · Culture specimens
+  (`SampleType.ForCulture`, list filter `forCulture`, admin nav entry `shell.nav.cultureSpecimens`); **silent clients** —
+  `Domain/PlatformAdmin/ClientSilence.cs`, `IClientLastActivityReader` (last browser-session issue per tenant + `max(registered_at_utc)`
+  read in each client's own tenant scope, no elevation), `GET /api/v1/platform/clients/silent[/export]?days=1…90`, dashboard
+  `SilentClients/SilentTrialClients/SilentDays`, SPA `features/platform/ui/silent-clients.component.ts` behind `?silent=` on Clients.
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

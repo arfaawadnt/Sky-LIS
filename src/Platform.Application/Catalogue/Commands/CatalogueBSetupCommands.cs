@@ -70,14 +70,15 @@ public sealed class UpdateCommentTemplateHandler(ICommentTemplateRepository temp
     }
 }
 
+/// <summary>T1 Create doctor (CP-48). A blank <paramref name="Code"/> takes the next generated <c>DR-nnn</c> (LIS-CR-007 C-09).</summary>
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Create)]
-public sealed record CreateDoctorCommand(string Code, string NameEn, string NameAr, string? Specialty, string? Occupation, IReadOnlyList<Guid>? BranchIds, decimal SharePercent, string? Phone) : ICommand<CreatedResource>;
+public sealed record CreateDoctorCommand(string? Code, string NameEn, string NameAr, string? Specialty, string? Occupation, IReadOnlyList<Guid>? BranchIds, decimal SharePercent, string? Phone) : ICommand<CreatedResource>;
 
 public sealed class CreateDoctorValidator : AbstractValidator<CreateDoctorCommand>
 {
     public CreateDoctorValidator()
     {
-        RuleFor(command => command.Code).RequiredText(CatalogueBGuard.MaxCodeLength);
+        RuleFor(command => command.Code).MaximumLength(CatalogueBGuard.MaxCodeLength);
         RuleFor(command => command.NameEn).RequiredText(CatalogueBGuard.MaxNameLength);
         RuleFor(command => command.NameAr).RequiredText(CatalogueBGuard.MaxNameLength);
         RuleFor(command => command.Specialty).MaximumLength(CatalogueBGuard.MaxFreeTextLength);
@@ -88,21 +89,47 @@ public sealed class CreateDoctorValidator : AbstractValidator<CreateDoctorComman
     }
 }
 
-public sealed class CreateDoctorHandler(IDoctorRepository doctors, ICatalogueBReferences references, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<CreateDoctorCommand, CreatedResource>
+public sealed class CreateDoctorHandler(IDoctorRepository doctors, ICatalogueBReferences references, IReferenceNumbers numbers, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<CreateDoctorCommand, CreatedResource>
 {
+    /// <summary>Generated codes skipped because a typed code already holds them, before the handler gives up (CAT-300).</summary>
+    public const int MaxGeneratedAttempts = 50;
+
     public async Task<CreatedResource> Handle(CreateDoctorCommand command, CancellationToken cancellationToken)
     {
-        var code = CatalogueBGuard.Code(command.Code);
+        // A typed code is refused before anything else (as before C-09); a generated one is drawn last, so a refused request spends no number.
+        var typed = string.IsNullOrWhiteSpace(command.Code) ? null : await TypedCodeAsync(command.Code, cancellationToken);
+        await CatalogueBRules.RequireBranchesAsync(references, command.BranchIds, cancellationToken);
+        var code = typed ?? await GenerateCodeAsync(cancellationToken);
+        var doctor = Doctor.Create(code, new LocalizedText(command.NameEn, command.NameAr), command.Specialty, command.Occupation, command.BranchIds, command.SharePercent, command.Phone, clock.UtcNow);
+        doctors.Add(doctor);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return new CreatedResource(doctor.Id);
+    }
+
+    private async Task<string> TypedCodeAsync(string typed, CancellationToken cancellationToken)
+    {
+        var code = CatalogueBGuard.Code(typed);
         if (await doctors.CodeExistsAsync(code, cancellationToken))
         {
             throw CatalogueBRules.CodeExists(code);
         }
 
-        await CatalogueBRules.RequireBranchesAsync(references, command.BranchIds, cancellationToken);
-        var doctor = Doctor.Create(code, new LocalizedText(command.NameEn, command.NameAr), command.Specialty, command.Occupation, command.BranchIds, command.SharePercent, command.Phone, clock.UtcNow);
-        doctors.Add(doctor);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new CreatedResource(doctor.Id);
+        return code;
+    }
+
+    /// <summary>The next free DR-nnn of the tenant's counter; a number a typed code already holds is skipped (gaps allowed).</summary>
+    private async Task<string> GenerateCodeAsync(CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < MaxGeneratedAttempts; attempt++)
+        {
+            var code = await numbers.NextShortAsync(Doctor.GeneratedCodeKind, Doctor.GeneratedCodePrefix, Doctor.GeneratedCodeWidth, cancellationToken);
+            if (!await doctors.CodeExistsAsync(code, cancellationToken))
+            {
+                return code;
+            }
+        }
+
+        throw CatalogueBRules.CodeExists(Doctor.GeneratedCodePrefix + "-…");
     }
 }
 

@@ -6641,5 +6641,38 @@ BEGIN
     VALUES ('20261020093923_TreasuryRemoved', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261023231824_ReviewQuickWins') THEN
+    ALTER TABLE app.sample_types ADD for_culture boolean NOT NULL DEFAULT FALSE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261023231824_ReviewQuickWins') THEN
+    -- ---------------------------------------------------------------------------------------------------------------------
+    -- 2026-10-24 Culture specimens (change request LIS-CR-007, P-MIC, reviewer point C-11): app.sample_types.for_culture
+    -- marks the sample types used by cultures (Microbiology › Culture specimens, the culture service's sample-type picker).
+    -- Appended to the ReviewQuickWins migration after EF added the column (NOT NULL DEFAULT false). The existing culture
+    -- specimens of every tenant — the platform's global templates included, so new laboratories copy the flag — are the
+    -- types whose English name names one: swab, culture, urine, stool, sputum, pus, CSF, wound. Only sets the flag (never
+    -- clears one), so a rerun changes nothing. Idempotent.
+    -- ---------------------------------------------------------------------------------------------------------------------
+    UPDATE app.sample_types
+    SET for_culture = true
+    WHERE NOT for_culture
+      AND name_en ILIKE ANY (ARRAY['%swab%', '%culture%', '%urine%', '%stool%', '%sputum%', '%pus%', '%csf%', '%wound%']);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261023231824_ReviewQuickWins') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261023231824_ReviewQuickWins', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

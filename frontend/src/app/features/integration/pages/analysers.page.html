@@ -40,8 +40,11 @@
       <button type="button" class="icon-btn" *appCan="permissions.edit" (click)="edit(row)" [attr.aria-label]="i18n.t('integration.edit')" [title]="i18n.t('integration.edit')"><app-icon name="edit" [size]="15" /></button>
       <button type="button" class="icon-btn" (click)="testConnection(row)" [disabled]="facade.testConnection.pending()" [attr.aria-label]="i18n.t('integration.analysers.testConnection')" [title]="i18n.t('integration.analysers.testConnection')"><app-icon name="plug" [size]="15" /></button>
       <button type="button" class="icon-btn" (click)="openMappings(row)" [attr.aria-label]="i18n.t('integration.analysers.mappings')" [title]="i18n.t('integration.analysers.mappings')"><app-icon name="layers" [size]="15" /></button>
-      <button type="button" class="icon-btn" (click)="openSampleCodes(row)" [attr.aria-label]="i18n.t('integration.analysers.sampleCodes')" [title]="i18n.t('integration.analysers.sampleCodes')"><app-icon name="barcode" [size]="15" /></button>
-      <button type="button" class="icon-btn" *appCan="permissions.manage" (click)="toggleActive(row)" [attr.aria-label]="i18n.t(row.isActive ? 'integration.analysers.deactivate' : 'integration.analysers.activate')" [title]="i18n.t(row.isActive ? 'integration.analysers.deactivate' : 'integration.analysers.activate')"><app-icon name="power" [size]="15" /></button>
+      <!-- LIS-CR-007 C-10: at most four actions in the line, the rest in the More menu -->
+      <app-row-menu>
+        <button type="button" (click)="openSampleCodes(row)"><app-icon name="barcode" [size]="14" />{{ i18n.t('integration.analysers.sampleCodes') }}</button>
+        <button type="button" [class.danger]="row.isActive" *appCan="permissions.manage" (click)="toggleActive(row)"><app-icon name="power" [size]="14" />{{ i18n.t(row.isActive ? 'integration.analysers.deactivate' : 'integration.analysers.activate') }}</button>
+      </app-row-menu>
     </ng-template>
   </app-data-table>
 

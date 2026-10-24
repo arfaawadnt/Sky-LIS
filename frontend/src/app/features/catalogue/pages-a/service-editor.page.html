@@ -70,8 +70,23 @@
           <app-form-field [label]="i18n.t('catalogue-a.services.field.sampleTypeId')" [required]="true">
             <select formControlName="sampleTypeId">
               <option [ngValue]="null">{{ i18n.t('shared.form.choose') }}</option>
-              @for (option of sampleTypeOptions(); track option.value) {
-                <option [ngValue]="option.value" [disabled]="!option.isActive">{{ optionText(option) }}</option>
+              @if (sampleTypeGroups(); as groups) {
+                <optgroup [label]="i18n.t('catalogue-a.services.cultureSpecimens')">
+                  @for (option of groups.cultures; track option.value) {
+                    <option [ngValue]="option.value" [disabled]="!option.isActive">{{ optionText(option) }}</option>
+                  }
+                </optgroup>
+                @if (groups.others.length > 0) {
+                  <optgroup [label]="i18n.t('catalogue-a.services.otherSampleTypes')">
+                    @for (option of groups.others; track option.value) {
+                      <option [ngValue]="option.value" [disabled]="!option.isActive">{{ optionText(option) }}</option>
+                    }
+                  </optgroup>
+                }
+              } @else {
+                @for (option of sampleTypeOptions(); track option.value) {
+                  <option [ngValue]="option.value" [disabled]="!option.isActive">{{ optionText(option) }}</option>
+                }
               }
             </select>
           </app-form-field>

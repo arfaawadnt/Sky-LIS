@@ -68,6 +68,8 @@
   "account.payments": "Payments of the visit",
   "account.refunds": "Refunds of the visit",
   "account.noPayments": "No payment yet.",
+  "account.showAll": "Show all ({count})",
+  "account.showLatest": "Show the latest three",
   "account.printInvoice": "Print invoice",
   "account.refundDue": "Refund the balance",
   "account.billedThroughClaims": "This visit belongs to a lab-to-lab batch: it is billed to the sending laboratory through claims.",

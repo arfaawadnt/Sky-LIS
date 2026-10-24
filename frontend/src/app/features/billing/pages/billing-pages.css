@@ -34,6 +34,24 @@
   }
 }
 
+/* Payments (LIS-CR-007 C-07): totals and "Take a payment" in one row; the card takes the whole line once it wraps */
+.top-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  align-items: flex-start;
+}
+
+.top-row .account-card {
+  flex: 999 1 460px;
+  min-width: 0;
+}
+
+.top-row .pay-card {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
 .filter {
   display: inline-flex;
   align-items: center;

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, type ElementRef, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { type AbstractControl, FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors, type ValidatorFn, Validators } from '@angular/forms';
 
 import { PAYMENT_METHODS, type BillingReasonOption, type PaymentMethod, type PaymentMethodOption } from '../../../core/api/billing.contracts';
@@ -54,7 +54,7 @@ const isKind = (value: string): value is PaymentMethod => (PAYMENT_METHODS as re
     <form [formGroup]="form" (ngSubmit)="submit()" appSaveShortcut (appSaveShortcut)="submit()" novalidate>
       <div class="form-grid">
         <app-form-field [label]="i18n.t('billing.field.amount')" [hint]="amountHint()">
-          <input type="number" inputmode="decimal" step="0.01" min="0.01" formControlName="amount" />
+          <input #amountInput type="number" inputmode="decimal" step="0.01" min="0.01" formControlName="amount" />
         </app-form-field>
 
         <app-form-field [label]="i18n.t('billing.field.method')">
@@ -131,6 +131,8 @@ export class MovementFormComponent {
 
   readonly submitted = output<MovementInput>();
 
+  private readonly amountInput = viewChild<ElementRef<HTMLInputElement>>('amountInput');
+
   /** The chosen option's code, or the kind when the form runs on kinds; mirrors the `methodKey` control for the computeds. */
   private readonly methodKey = signal<string>('Cash');
 
@@ -193,6 +195,16 @@ export class MovementFormComponent {
     const due = roundMoney(Math.max(this.dueAmount(), 0));
     this.form.reset({ amount: due > 0 ? due : null, methodKey: this.defaultKey(), reference: '', reasonId: '', note: '' });
     this.methodKey.set(this.form.controls.methodKey.value);
+  }
+
+  /**
+   * Puts the cursor in the amount with the proposed value selected (LIS-CR-007 C-07): after a visit is found the cashier
+   * types over it, or keeps it, and saves with F10, with no mouse.
+   */
+  focusAmount(): void {
+    const input = this.amountInput()?.nativeElement;
+    input?.focus();
+    input?.select();
   }
 
   protected optionName(option: PaymentMethodOption): string {

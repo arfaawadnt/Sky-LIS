@@ -4,7 +4,7 @@
 | --- | --- |
 | Module | `patients` (+ `files` for documents) — Sky LIS Client Portal page **CP-11 Patients**; the patient-file rules of **CP-06 Registration**; workflow **WF-02** steps 1–2; business rules **BR-01** (immutable identifiers), **BR-08** (condition selects the range), **BR-15** (nothing is erased); requirements **REG-001**, **REG-002**, **REG-003** |
 | Status | Derived by the development team (build slot `pat`, wave 1) from the Business SRS (LIS-SRS-001), the requirements specification (LIS-RS-001) and the LDM synthesis. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.3 — 2026-10-19 (change request LIS-CR-003 P-A2: location hierarchy on the file and a second phone, §18; previous: 1.2 — 2026-10-12, validation LIS-VR-002 Q8 / Q14, v0.5.0 Q8 / Q14) |
+| Version | 1.4 — 2026-10-24 (change request LIS-CR-007 P-FRM: the two phones in the two-part mobile control, §19; previous: 1.3 — 2026-10-19, LIS-CR-003 P-A2, §18; 1.2 — 2026-10-12, validation LIS-VR-002 Q8 / Q14, v0.5.0 Q8 / Q14) |
 | Implemented in | `src/Platform.Infrastructure/Persistence/Patients/Patients.migration.sql` (guards appended to the wave migration), `src/Platform.Domain/Patients`, `src/Platform.Contracts/Patients`, `src/Platform.Application/Patients`, `src/Platform.Application/Abstractions/Files/IFileStore.cs`, `src/Platform.Infrastructure/Persistence/Patients`, `src/Platform.Infrastructure/Services/Files/LocalFileStore.cs`, `src/Platform.WebApi/Controllers/Patients`, `frontend/src/app/features/patients`, `frontend/src/app/core/api/patients.contracts.ts`, `frontend/public/i18n/patients.{en,ar}.json` |
 
 ## 1. Purpose and policy basis
@@ -388,3 +388,25 @@ Scenario S-PHONE-bad: a second phone "abc" → PAT-017 (400)
 | Q17 | What happens to the stored free-text city when a city is later picked? | It is replaced by the picked city's English name; the previous text stays in the field history (`audit.field_changes`). |
 | Q18 | Is a file whose city, district or area was deactivated later still valid? | Yes: deactivation hides the row from the pick lists only; the file keeps its ids and names and can be edited without touching them (the chain rule checks parentage, not activity). The form shows the stored level only while its row is in the active list; a hidden one is kept and re-sent unchanged. |
 | Q19 | Does the client (tenant) address move to the hierarchy too? | Not in this change: it stays free text in the subscription wizard and SA-04 (LIS-CR-003 §3). |
+
+## 19. Change request 2026-10-24 — the phones in two parts (LIS-CR-007 §3, package P-FRM, reviewer point C-05)
+
+Source: `docs/build/CR-2026-10-24_Review-Quick-Wins.md` §3 and the review response LIS-RC-001 point C-05 ("telephone in two
+fields, country code + number, leading zero removed"). Built in slot `pat`; **the server is unchanged** (no migration, no new
+code, no new endpoint): PAT-008 / PAT-017 and the mobile search stay as they are.
+
+**What changes.**
+
+| Item | Decision |
+| --- | --- |
+| Shared control | `frontend/src/app/shared/forms/mobile-input/` — `app-mobile-input` (`ControlValueAccessor`), one bordered field in two parts: the dial code (read-only when the form fixes the country, else a select over the public countries list `GET /api/v1/public/countries`, else free text starting with `+`) and the national number. A trunk 0 is dropped from the value at once and from the field on blur; pasting `+20 100…`, `0020100…` or `0100…` is recognised and moves the dial code to the pasted country. The value is the E.164 string or `''`; text that is not a number is passed on so the form refuses it; a value written by the form keeps its spelling until the user edits the field. Pure rules in `mobile-number.ts`. Also adopted by the subscription wizard (CP-02), the user editor (CP-38) and the Super Admin clients form (SA-04). |
+| Patient form | The former "Mobile country" select and the number field become one `app-mobile-input` per phone (mobile and second phone), each with its own dial code, preselected on the laboratory's country (`settings.countryCode`, F-08), else the first listed country. `CountryOption` carries the optional `dialCode` of the public list. The similar-patient lookup still starts from every edit of a phone (`onIdentityInput`, now on the control's `edited` output) and the demographics lock (§17) is unchanged: the phones are contact data and stay editable. |
+| Validation | An international value is checked against the length of the country its dial code names (8–15 digits when the platform publishes no length); a local value (a file stored before) follows the former rule with the laboratory country's length. |
+| Storage (A-09 kept) | A number of the laboratory's country is still stored in its trunk form (`01012345678`), whether it arrives as `+201012345678` or as typed before, so existing files, the exact similar-patient match (BR-01) and the mobile search keep working. A number of another country is stored in its **E.164 form** (`+966501234567`) instead of a trunk form that could be read as a local number. |
+
+**Open questions and assumptions.**
+
+| # | Question | Assumption built on |
+| --- | --- | --- |
+| Q20 | Should the patient phones be stored in E.164 like the users' mobiles? | Not in this change: a data migration of the stored trunk forms would be needed first (and the similar-patient match compares stored strings). The laboratory's own numbers stay in the trunk form; only foreign numbers move to E.164. |
+| Q21 | Which dial code opens when the laboratory's country is not in the platform list (or has no mobile length)? | The first listed country; the clerk changes it in the select or pastes a number with `+`. The "Any (8–15 digits)" choice is gone: a number of an unlisted country is typed or pasted with its `+`. |

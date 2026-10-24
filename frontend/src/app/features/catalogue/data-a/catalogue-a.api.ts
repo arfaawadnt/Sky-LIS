@@ -28,6 +28,7 @@ import {
   type RangeBandItem,
   type SampleConditionItem,
   type SampleTypeDetail,
+  type SampleTypeListFilter,
   type SampleTypeListItem,
   type SampleTypeRequest,
   type ServiceDetail,
@@ -87,8 +88,8 @@ export class CatalogueAApi {
 
   // ---- sample types and conditions (CP-43)
 
-  listSampleTypes(filter: CatalogueListFilter, signal?: AbortSignal): Promise<Paged<SampleTypeListItem>> {
-    return this.page<SampleTypeListItem>(CATALOGUE_A_API.sampleTypes, listParams(filter), signal);
+  listSampleTypes(filter: SampleTypeListFilter, signal?: AbortSignal): Promise<Paged<SampleTypeListItem>> {
+    return this.page<SampleTypeListItem>(CATALOGUE_A_API.sampleTypes, { ...listParams(filter), forCulture: filter.forCulture ?? null }, signal);
   }
 
   exportSampleTypes(filter: CatalogueExportFilter): Promise<readonly SampleTypeListItem[]> {

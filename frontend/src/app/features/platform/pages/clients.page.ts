@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -11,6 +11,7 @@ import {
   type ClientListItem,
   PLATFORM_PERMISSIONS,
   type PlanListItem,
+  SILENT_DAYS,
 } from '../../../core/api/platform.contracts';
 import { ProblemError } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
@@ -19,6 +20,7 @@ import { blockedSave } from '../../../shared/forms/blocked-save';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { problemToFormErrors, SERVER_ERROR_KEY } from '../../../shared/forms/problem-to-form-errors';
+import { MobileInputComponent } from '../../../shared/forms/mobile-input/mobile-input.component';
 import { SaveShortcutDirective } from '../../../shared/forms/save-shortcut.directive';
 import { mobileValidator, requiredText } from '../../../shared/forms/validators';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
@@ -42,6 +44,7 @@ import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { ClientsFacade } from '../state/clients.facade';
 import { fileStamp, formatDate, formatMoney, pick } from '../ui/format';
+import { SilentClientsComponent } from '../ui/silent-clients.component';
 import { statusTone } from '../ui/status';
 import {
   countryMobileValidator,
@@ -79,8 +82,10 @@ type ClientForm = ReturnType<ClientsPage['buildForm']>;
     DrawerComponent,
     DialogComponent,
     FormFieldComponent,
+    MobileInputComponent,
     LocalizedTextInputComponent,
     IconComponent,
+    SilentClientsComponent,
   ],
   templateUrl: './clients.page.html',
   styleUrl: './platform-pages.css',
@@ -99,6 +104,11 @@ export class ClientsPage {
   protected readonly permissions = PLATFORM_PERMISSIONS;
   protected readonly sources = CLIENT_SOURCES;
   protected readonly statuses = CLIENT_STATUSES;
+
+  /** LIS-CR-007 A-01: the Silent filter (`?silent=3` from the dashboard tile); null shows the register. */
+  protected readonly silentOptions = SILENT_DAYS;
+  protected readonly silentDays = signal<number | null>(silentDaysOf(this.route.snapshot.queryParamMap.get('silent')));
+  private readonly silentPanel = viewChild(SilentClientsComponent);
   protected readonly passwordMin = PASSWORD_MIN_LENGTH;
 
   protected readonly columns: readonly TableColumn<ClientListItem>[] = [
@@ -178,11 +188,32 @@ export class ClientsPage {
     this.facade.setPlan(value === '' ? null : value);
   }
 
+  protected onSilent(event: Event): void {
+    const days = silentDaysOf((event.target as HTMLSelectElement).value);
+    this.silentDays.set(days);
+    void this.router.navigate([], { relativeTo: this.route, queryParams: { silent: days }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  protected reloadList(): void {
+    const silent = this.silentPanel();
+    if (silent) {
+      silent.refresh();
+    } else {
+      this.facade.clients.reload();
+    }
+  }
+
   protected onPage(page: PageRequest): void {
     this.facade.setPage(page);
   }
 
   protected async exportCsv(): Promise<void> {
+    const silent = this.silentPanel();
+    if (silent) {
+      await silent.exportCsv();   // LIS-CR-007 A-01: the server's CSV of the silent clients
+      return;
+    }
+
     try {
       const rows = await this.facade.exportRows();
       const lang = this.i18n.lang();
@@ -279,7 +310,7 @@ export class ClientsPage {
     this.drawerOpen.set(true);
   }
 
-  protected async openEdit(row: ClientListItem): Promise<void> {
+  protected async openEdit(row: Pick<ClientListItem, 'id'>): Promise<void> {
     try {
       const detail = await this.api.getClient(row.id);
       this.editing.set(detail);
@@ -379,6 +410,12 @@ export class ClientsPage {
     }
   }
 
+  /** LIS-CR-007 C-05: the drawer's country gives the two mobiles their dial code. */
+  protected readonly drawerCountry = computed(() => {
+    const id = this.facade.drawerCountryId();
+    return id === null ? null : this.countryById(id);
+  });
+
   private countryMobile(messageKey: string) {
     return countryMobileValidator(
       'countryId',
@@ -415,6 +452,12 @@ export class ClientsPage {
     );
     return form;
   }
+}
+
+/** The Silent window of a query parameter or select value: one of the offered windows, else null (the register). */
+export function silentDaysOf(value: string | null | undefined): number | null {
+  const days = Number(value);
+  return value !== null && value !== undefined && value !== '' && SILENT_DAYS.includes(days) ? days : null;
 }
 
 function emptyToNull(value: string): string | null {

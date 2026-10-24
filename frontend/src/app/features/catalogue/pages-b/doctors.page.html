@@ -47,7 +47,7 @@
     }
     <div class="form-grid">
       <app-form-field [label]="i18n.t('catalogue-b.doctors.field.code')" [hint]="i18n.t('catalogue-b.common.hint.code')" [problem]="saveProblem()">
-        <input type="text" formControlName="code" appUppercase maxlength="20" autocomplete="off" spellcheck="false" />
+        <input type="text" formControlName="code" appUppercase maxlength="20" autocomplete="off" spellcheck="false" [attr.placeholder]="editing() === null ? i18n.t('catalogue-b.doctors.codePlaceholder') : null" />
       </app-form-field>
       <app-form-field [label]="i18n.t('catalogue-b.doctors.field.phone')" [problem]="saveProblem()">
         <input type="tel" formControlName="phone" maxlength="20" autocomplete="off" dir="ltr" />

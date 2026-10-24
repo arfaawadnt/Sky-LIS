@@ -67,4 +67,8 @@
       }
     }
   }
+
+  @if (keepAddress(); as keep) {
+    <app-keep-address authAfterCard [address]="keep" (hide)="keepHidden.set(true)" />
+  }
 </app-auth-frame>

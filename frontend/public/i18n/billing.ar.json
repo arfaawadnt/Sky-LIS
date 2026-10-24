@@ -68,6 +68,8 @@
   "account.payments": "مدفوعات الزيارة",
   "account.refunds": "استردادات الزيارة",
   "account.noPayments": "لا توجد مدفوعات بعد.",
+  "account.showAll": "عرض الكل ({count})",
+  "account.showLatest": "عرض آخر ثلاث حركات",
   "account.printInvoice": "طباعة الفاتورة",
   "account.refundDue": "رد الرصيد",
   "account.billedThroughClaims": "هذه الزيارة ضمن دفعة معمل لمعمل: تُحاسب على المعمل المرسل من خلال المطالبات.",

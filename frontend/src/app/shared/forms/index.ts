@@ -8,3 +8,5 @@ export { SERVER_ERROR_KEY, SERVER_RULES_KEY, clearServerErrors, problemToFormErr
 export { SaveShortcutDirective } from './save-shortcut.directive';
 export { UppercaseDirective } from './uppercase.directive';
 export { CODE_MAX_LENGTH, CODE_PATTERN, MOBILE_PATTERN, codeValidator, mobileValidator, requiredText, textValidators } from './validators';
+export { MobileInputComponent } from './mobile-input/mobile-input.component';
+export { composeMobile, mobileDialCountryOf, mobileValueOf, splitMobile, type MobileDialCountry, type MobileParts } from './mobile-input/mobile-number';

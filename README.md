@@ -235,7 +235,36 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+Change request LIS-CR-007 (2026-10-24, `docs/build/CR-2026-10-24_Review-Quick-Wins.md`): the "switch on" item and the quick wins of the
+reviewer's response LIS-RC-001, built as five packages and integrated.
+
+- **Shortcut sets and Test rules in the laboratory menu** (CP-51, CP-52; A-04 / A-05). Built since Release 1 as Super Admin master data,
+  now visible under Setup for every laboratory.
+- **Row actions on one line** (C-06, C-10). Every register shows its actions horizontally; pages with more than four put the rest in a
+  keyboard-accessible *More* menu (`shared/ui/data-table/row-menu.component.ts`). Search registrations keeps *Details* and *Edit*
+  labelled, *Payments* and *Documents* as icons, and *Patient*, *Samples*, *Results* and *Cancel visit* in *More*.
+- **Payments: the payment card first** (C-07). *Take a payment* sits beside the visit totals in the first row; the visit's payments and
+  refunds show the latest three with *Show all*; the amount field takes focus as soon as a visit is found (scan → amount → F10).
+- **Reference range before the first save** (C-08). Results by accession shows, for every test without a value, the range the patient's
+  sex, age and condition select — greyed with a tooltip (`rangeProvisional`); the saved range replaces it once a value exists.
+- **Doctor code generated when blank** (C-09). *Add doctor* no longer needs a code: left blank, the laboratory's next `DR-001`,
+  `DR-002` … is assigned on save (`IReferenceNumbers.NextShortAsync`); typed codes work as before and stay read-only on Edit.
+- **Mobiles typed as dial code + number** (C-05). New `app-mobile-input` (`shared/forms/mobile-input`): the leading 0 is dropped,
+  pasted `+20…` / `0020…` numbers are recognised; used on the subscription wizard, users, the Super Admin clients form and the patient
+  form (each phone picks its own dial code; numbers of the laboratory's country keep the trunk 0 in storage, foreign numbers are stored
+  in international form). Server unchanged (E.164).
+- **Keep this address** (C-01). The laboratory sign-in page shows under the card how to keep its address (Ctrl+D / ⌘+D) with *Copy
+  address* and *Hide*; Find your laboratory shows the full address Continue opens. Nothing is stored on the device.
+- **Microbiology: Antibiotic classes and Culture specimens** (C-11). *Drug types* is now **Antibiotic classes** (فئات المضادات
+  الحيوية); the tabs read Organisms · Antibiotics · Antibiotic classes · Commercial names · Sensitivity values · Culture specimens (the
+  page opens on Organisms). Sample types gain the switch **Used for cultures** (`SampleType.ForCulture`, filter `forCulture=`);
+  migration `ReviewQuickWins` flags the existing types whose English name contains swab, culture, urine, stool, sputum, pus, CSF or
+  wound; a Culture service's sample-type picker lists the culture specimens first.
+- **Super Admin: silent clients** (A-01). Dashboard tile "Silent for 3+ days" (Trial and Active clients with no sign-in and no
+  registration; red when any, trial count in the subtitle) opening the Clients page on the new *Activity* filter (3 / 7 / 14 / 30 days)
+  with last sign-in, last registration, days silent and the administrator's mobile, CSV export. API `GET /api/v1/platform/clients/silent?days=`
+  and `…/silent/export` [platform.view]; `GET /api/v1/platform/dashboard?silentDays=`.
+- Documents: SRS 1.6, UAT 1.0, intakes PAT 1.4, ACC 1.2, RES 1.2, CTB 1.3, CAT 1.3, PLT 1.4.
 
 ### v0.20.2 — 2026-10-23
 

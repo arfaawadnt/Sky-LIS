@@ -4,7 +4,7 @@
 | --- | --- |
 | Module | `catalogue` (second half, slot `cat2`). SRS pages CP-46 Preparations, CP-47 Comment library, CP-48 Doctors, CP-49 Diagnoses, CP-50 Sending labs, CP-51 Shortcut sets, CP-52 Test rules, CP-53 Reasons, CP-54 Report templates, CP-56 Drug types · Antibiotics · Organisms; admin SA-14 (adds Commercial names and Sensitivity values) and the catalogue-B lists of SA-12 / SA-13 under the platform tenant. Business rules BR-15, BR-24, BR-25. |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), the Sky LIS prototypes and the LDM synthesis. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.1 — 2026-10-12 (report-template logo and signature images, preview and provisioning copy: validation F-02, A10) |
+| Version | 1.3 — 2026-10-24 (proposed doctor code DR-nnn, change request LIS-CR-007 P-RES, reviewer point C-09, §18); 1.2 — 2026-10-24 (Microbiology naming and culture specimens tab, change request LIS-CR-007 P-MIC, reviewer point C-11); 1.1 — 2026-10-12 (report-template logo and signature images, preview and provisioning copy: validation F-02, A10) |
 | Implemented in | `src/Platform.Domain/Catalogue` (files `CatalogueB*.cs`, `Preparation.cs`, `CommentTemplate.cs`, `Doctor.cs`, `Diagnosis.cs`, `SendingLab.cs`, `ShortcutSet.cs`, `TestRule.cs`, `Reason.cs`, `ReportTemplate.cs`, `DrugType.cs`, `CommercialName.cs`, `Antibiotic.cs`, `Organism.cs`, `SensitivityValue.cs`), `src/Platform.Contracts/Catalogue/CatalogueBContracts.cs`, `src/Platform.Application/Catalogue/{CatalogueB*.cs, Commands/CatalogueB*.cs, Queries/CatalogueB*.cs}`, `src/Platform.Infrastructure/Persistence/Catalogue/CatalogueB*`, `src/Platform.WebApi/Controllers/Catalogue/*` (controllers of this intake), `frontend/src/app/features/catalogue/{pages-b,data-b,state-b,ui-b}`, `frontend/src/app/core/api/catalogue-b.contracts.ts` |
 | Shares with | Catalogue A (LIS-INT-CTA, slot `cat`: clinical groups, sample types, units, patient conditions, services, tests). This module references services and clinical groups **by id only**. |
 
@@ -257,3 +257,65 @@ Open questions (assumed answers let the build proceed; confirm or change):
 | A13 | Who may read reasons / doctors in other modules' pickers? | `catalogue.view` (the same list endpoints with `isActive=true`); roles that register or cancel need it. |
 | A14 | Editors of lists that link sets of records | The kit's master-data page has no multi-select field, so preparations, doctors, diagnoses, shortcut sets and test rules are hand-written pages built from the kit's parts (page header, toolbar, data table, paginator, drawer, form fields) with the module's chip picker; the other nine lists use `MasterDataPageComponent`. They move to the master-data page once the kit offers a multi-select field. |
 | A15 | Same-wave references | Services and clinical groups (Catalogue A), branches (Organization), payers and contract tiers (Pricing) are checked by SQL on `app.services`, `app.clinical_groups`, `app.branches`, `app.payers`, `app.contract_tiers` (`id`, `tenant_id`, plus `code`, `name_en`, `name_ar`, `is_active`, `payer_id` where used); no foreign keys to them yet. |
+
+## 17. Change request 2026-10-24 — Microbiology naming and culture specimens (LIS-CR-007, package P-MIC, reviewer point C-11, CP-56 / SA-14)
+
+The reviewer asked what "Drug types" are and where the culture sample types are (LIS-RC-001 C-11). The answer is wording and a direct path,
+not a new structure.
+
+**What changes**
+
+- **Rename (wording only).** The *Drug types* list reads **Antibiotic classes** / `فئات المضادات الحيوية` with the subtitle "Groups the
+  antibiotics of the sensitivity panel (Penicillins, Cephalosporins …)". The commercial-name form and list call the link to it **Class**
+  (`الفئة`) with the hint "Class: Penicillins, Cephalosporins …", and the not-found messages CAT-260 / CAT-389 say "antibiotic class".
+  Only dictionary values change (`catalogue-b.drugTypes.*`, `commercialNames.*`, `microbiology.tab.drug-types`): the route
+  `…/microbiology/drug-types`, the API path `/api/v1/catalogue/drug-types`, the entity `DrugType`, the table `app.drug_types` and the
+  permission keys keep their names. Note: in this model the class is held by the *commercial name* (antibiotic → commercial name →
+  class), so the "Class" label sits on the commercial-name form; the antibiotic form has no class field of its own.
+- **Sixth tab Culture specimens** (`…/microbiology/culture-specimens`, `CultureSpecimensPage`): a read-only list of the sample types
+  flagged *Used for cultures* (Catalogue A, `SampleType.ForCulture`, intake LIS-INT-CAT-001 §18) — code, short name, name, status
+  (active and inactive) — read from `GET /api/v1/catalogue/sample-types?forCulture=true` with `catalogue.view`, and the link **Manage on
+  Sample types** to `../../sample-types` (CP-43 / SA-12 master data). No editor of its own: the flag is set on the sample type.
+- **Tab order**: Organisms · Antibiotics · Antibiotic classes · Commercial names · Sensitivity values · Culture specimens; the bare
+  `…/microbiology` address now opens Organisms (the first tab).
+
+Tests: `culture-specimens.page.spec.ts` (the filter, the columns, the link, read-only, the tab order) and `catalogue-b-pages.spec.ts`
+(tab of a URL, default tab).
+
+**Open question (assumed answer lets the build proceed)**
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| A16 | Should the Super Admin portal (SA-14) list the culture specimens of the global catalogue as a menu entry like the other microbiology lists? | Yes: the page works under `/admin/catalogue/microbiology/culture-specimens`; the integrator adds the admin nav entry beside the others and relabels `shell.nav.drugTypes` "Antibiotic classes". |
+
+## 18. Change request 2026-10-24 — Proposed doctor code (LIS-CR-007, package P-RES, reviewer point C-09, CP-48)
+
+**Today.** *Add doctor* required a typed code (1–20, letters, digits, `.`, `-`, `_`, unique per laboratory), so reception had to
+invent one for every referring doctor.
+
+**Change.**
+
+- `POST /api/v1/catalogue/doctors` (`CreateDoctorCommand`, `catalogue.create`): `code` is optional (`CreateDoctorRequest.Code` and the
+  command's `Code` are nullable; old bodies with a code keep working). A blank, whitespace-only or missing code takes the next
+  **`DR-nnn`** of the laboratory: `Doctor.GeneratedCodeKind` `doctor`, prefix `DR`, at least three digits, no year (`DR-001`, … `DR-999`,
+  `DR-1000`), formatted by `Doctor.GeneratedCode` / `ReferenceNumberFormat.Short` (SharedKernel).
+- Numbering: `IReferenceNumbers.NextShortAsync(kind, prefix, width)` over the same atomic upsert of `app.reference_counters` as the yearly
+  numbers, on the counter row of year `0` (`ReferenceNumbers.UndatedYear`): one never-restarting counter per tenant, no migration. Gaps
+  are allowed and numbers are never reused. A generated number already held by a typed code is skipped (up to 50 tries, then CAT-300).
+- Order of checks: a typed code is validated first as before (CAT-200 format, CAT-300 duplicate), then the branches (CAT-205); the
+  number is drawn last, so a refused request spends no number.
+- The code stays immutable (Edit keeps it read-only). Typed codes are unchanged, including codes that look like `DR-nnn`.
+- SPA (`features/catalogue/pages-b/doctors.page`): on *Add doctor* the Code field has no required mark and the placeholder
+  `catalogue-b.doctors.codePlaceholder` ("Generated on save (DR-001 …)" / «يُولَّد عند الحفظ (DR-001 …)»); a blank field is sent as `null`;
+  on Edit the field is read-only without the placeholder.
+
+Tests: domain `DoctorCodeTests` (format, padding, valid code, counter below 1 refused); functional
+`CatalogueBDoctorCodeFlowTests.A_blank_code_is_generated_per_laboratory_and_skips_a_typed_one` (DR-001, DR-002 without a `code`
+property, typed `dr-003` skipped by the counter, refusals spend no number, a second laboratory starts at DR-001); spec
+`doctors.page.spec.ts` (placeholder, no required mark, `code: null`, read-only on Edit).
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| A17 | Prefix and width of the generated code | `DR` and three digits, no year, per laboratory (reviewer's example). |
+| A18 | Does the Super Admin portal (platform tenant) generate codes too? | Yes: the same command serves it, with the platform tenant's own counter. Doctors are not copied to new laboratories (no provisioning path creates them). |
+| A19 | Should a typed code of the form `DR-nnn` advance the counter? | No: the counter only moves when it issues a number; it skips a number a typed code already holds. |

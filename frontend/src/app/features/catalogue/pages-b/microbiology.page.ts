@@ -6,8 +6,12 @@ import { filter, map } from 'rxjs';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { type TabItem, TabsComponent } from '../../../shared/ui/tabs/tabs.component';
 
-/** The lists of the microbiology masters, in the order of SA-14 (they are also the child route paths). */
-export const MICROBIOLOGY_TABS = ['drug-types', 'commercial-names', 'antibiotics', 'organisms', 'sensitivity-values'] as const;
+/**
+ * The lists of the microbiology masters (they are also the child route paths), in the order of change request
+ * LIS-CR-007 (C-11): Organisms · Antibiotics · Antibiotic classes · Commercial names · Sensitivity values · Culture
+ * specimens. The path `drug-types` stays (bookmarks, API): only its label reads "Antibiotic classes".
+ */
+export const MICROBIOLOGY_TABS = ['organisms', 'antibiotics', 'drug-types', 'commercial-names', 'sensitivity-values', 'culture-specimens'] as const;
 
 export type MicrobiologyTab = (typeof MICROBIOLOGY_TABS)[number];
 
@@ -18,8 +22,8 @@ export function microbiologyTabOf(url: string): MicrobiologyTab {
 }
 
 /**
- * Drug types · Commercial names · Antibiotics · Organisms · Sensitivity values (SRS CP-56, SA-14): one tab per list;
- * each tab is a child route holding the list's master-data page, so every list has its own URL.
+ * Organisms · Antibiotics · Antibiotic classes · Commercial names · Sensitivity values · Culture specimens (SRS CP-56,
+ * SA-14, LIS-CR-007): one tab per list; each tab is a child route holding the list's page, so every list has its own URL.
  */
 @Component({
   selector: 'app-catalogue-b-microbiology-page',

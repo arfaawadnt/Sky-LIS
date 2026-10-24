@@ -61,19 +61,20 @@ internal static class ResultViews
     /// counted on it and their clinical groups named, so the page can say what is missing (change request 2026-10-14);
     /// the ones of a key with nothing visible make a hidden unit (counted by the case, never built).
     /// </summary>
-    public static IReadOnlyList<ReportUnitView> Units(IEnumerable<Result> results, IEnumerable<Result> hidden, ResultReadContext context, IUserPrivileges privileges)
+    /// <remarks><paramref name="patient"/> resolves the expected range of the rows not entered yet (LIS-CR-007 C-08); null leaves them without.</remarks>
+    public static IReadOnlyList<ReportUnitView> Units(IEnumerable<Result> results, IEnumerable<Result> hidden, ResultReadContext context, IUserPrivileges privileges, PatientProfile? patient = null)
     {
         var hiddenByUnit = (hidden ?? []).GroupBy(result => result.ReportUnitKey).ToDictionary(group => group.Key, group => (IReadOnlyList<Result>)[.. group], StringComparer.Ordinal);
         return results
             .GroupBy(result => result.ReportUnitKey)
-            .Select(group => Unit(group.Key, [.. group], hiddenByUnit.GetValueOrDefault(group.Key) ?? [], context, privileges))
+            .Select(group => Unit(group.Key, [.. group], hiddenByUnit.GetValueOrDefault(group.Key) ?? [], context, privileges, patient))
             .OrderBy(unit => context.Groups.GetValueOrDefault(unit.ClinicalGroupId)?.DisplayOrder ?? int.MaxValue)
             .ThenBy(unit => unit.PrintAloneServiceId is null ? 0 : 1)
             .ThenBy(unit => unit.Key, StringComparer.Ordinal)
             .ToList();
     }
 
-    public static ReportUnitView Unit(string key, IReadOnlyList<Result> results, IReadOnlyList<Result> hidden, ResultReadContext context, IUserPrivileges privileges)
+    public static ReportUnitView Unit(string key, IReadOnlyList<Result> results, IReadOnlyList<Result> hidden, ResultReadContext context, IUserPrivileges privileges, PatientProfile? patient = null)
     {
         var live = results.Where(result => result.IsLive).ToList();
         var hiddenGroups = hidden
@@ -126,14 +127,16 @@ internal static class ResultViews
             samples,
             ResultRights.View(rights),
             banners,
-            [.. ordered.Select(result => Row(result, context))],
+            [.. ordered.Select(result => Row(result, context, patient))],
             hidden.Count,
             hiddenGroups);
     }
 
-    public static ResultRowView Row(Result result, ResultReadContext context)
+    public static ResultRowView Row(Result result, ResultReadContext context, PatientProfile? patient = null)
     {
         var test = context.Tests.GetValueOrDefault(result.TestId);
+        var decimals = result.HasValue ? result.Decimals : test?.Decimals ?? 0;
+        var provisional = ProvisionalRange(result, test, patient);
         var sample = result.TubeId is { } tube ? context.Samples.GetValueOrDefault(tube) : null;
         return new ResultRowView(
             result.Id,
@@ -157,8 +160,8 @@ internal static class ResultViews
             result.Formatted?.Paragraphs.Select(paragraph => new FormattedParagraphDto(paragraph.Title, paragraph.Text)).ToList(),
             Culture(result.Culture),
             result.Unit ?? test?.UnitName,
-            result.HasValue ? result.Decimals : test?.Decimals ?? 0,
-            ResultCatalogue.RangeView(result.Range, result.HasValue ? result.Decimals : test?.Decimals ?? 0),
+            decimals,
+            ResultCatalogue.RangeView(result.Range ?? provisional, decimals),
             result.Flag?.ToString(),
             result.IsPanic,
             result.DeltaFlag || result.DeltaPercent is not null
@@ -178,7 +181,19 @@ internal static class ResultViews
             result.InternalNote,
             test is null ? [] : [.. test.ListValues.OrderBy(value => value.DisplayOrder).Select(value => new ListOptionView(value.Value, value.IsNormal, value.IsCritical, value.IsPlaceholder, value.Colour))],
             test is null ? [] : [.. test.Paragraphs.OrderBy(paragraph => paragraph.DisplayOrder).Select(paragraph => new ParagraphTemplateView(paragraph.Title, paragraph.Text))],
-            result.ExpectedAtUtc);
+            result.ExpectedAtUtc,
+            provisional is not null);
+    }
+
+    /// <summary>
+    /// LIS-CR-007 C-08: the band BR-08 picks for the patient (<see cref="ResultCatalogue.Range"/>, the call entry makes) for a
+    /// result with neither a value nor a stored range, so the grid shows the expected range before the first save. Once a value
+    /// exists the stored range wins, even when it is empty (a band added later never rewrites what was flagged).
+    /// </summary>
+    public static ResolvedRange? ProvisionalRange(Result result, CatalogueTestInfo? test, PatientProfile? patient)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return result.Range is null && !result.HasValue && test is not null && patient is not null ? ResultCatalogue.Range(test, patient) : null;
     }
 
     public static CultureView? Culture(CultureReport? culture) =>

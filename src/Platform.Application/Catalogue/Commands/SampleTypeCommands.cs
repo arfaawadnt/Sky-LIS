@@ -15,7 +15,8 @@ namespace Platform.Application.Catalogue.Commands;
 // Sample types and conditions (SRS CP-43; intake LIS-INT-CAT-001 T3–T6).
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Create)]
-public sealed record CreateSampleTypeCommand(string Code, string ShortName, string NameEn, string NameAr, IReadOnlyList<SampleConditionItem>? Conditions) : ICommand<CreatedResource>;
+/// <summary><paramref name="ForCulture"/> (LIS-CR-007, C-11): a culture specimen; absent = false.</summary>
+public sealed record CreateSampleTypeCommand(string Code, string ShortName, string NameEn, string NameAr, IReadOnlyList<SampleConditionItem>? Conditions, bool? ForCulture = null) : ICommand<CreatedResource>;
 
 public sealed class CreateSampleTypeValidator : AbstractValidator<CreateSampleTypeCommand>
 {
@@ -51,7 +52,7 @@ public sealed class CreateSampleTypeHandler(ISampleTypeRepository sampleTypes, I
         }
 
         var conditions = (command.Conditions ?? []).Select(item => new SampleConditionSpec(null, item.Code, new LocalizedText(item.NameEn, item.NameAr), item.IsActive)).ToList();
-        var sampleType = SampleType.Create(code, command.ShortName, new LocalizedText(command.NameEn, command.NameAr), conditions, clock.UtcNow);
+        var sampleType = SampleType.Create(code, command.ShortName, new LocalizedText(command.NameEn, command.NameAr), conditions, clock.UtcNow, command.ForCulture ?? false);
         sampleTypes.Add(sampleType);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new CreatedResource(sampleType.Id);
@@ -59,7 +60,8 @@ public sealed class CreateSampleTypeHandler(ISampleTypeRepository sampleTypes, I
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Edit)]
-public sealed record UpdateSampleTypeCommand(Guid SampleTypeId, string ShortName, string NameEn, string NameAr) : ICommand;
+/// <summary><paramref name="ForCulture"/> (LIS-CR-007, C-11): absent = the flag is kept, so an older client never clears it.</summary>
+public sealed record UpdateSampleTypeCommand(Guid SampleTypeId, string ShortName, string NameEn, string NameAr, bool? ForCulture = null) : ICommand;
 
 public sealed class UpdateSampleTypeValidator : AbstractValidator<UpdateSampleTypeCommand>
 {
@@ -79,7 +81,7 @@ public sealed class UpdateSampleTypeHandler(ISampleTypeRepository sampleTypes, I
         var sampleType = await sampleTypes.GetForUpdateAsync(command.SampleTypeId, cancellationToken)
             ?? throw new DomainException(SampleTypeCodes.NotFound, "Sample type not found.", DomainFault.NotFound);
 
-        sampleType.Change(command.ShortName, new LocalizedText(command.NameEn, command.NameAr), clock.UtcNow);
+        sampleType.Change(command.ShortName, new LocalizedText(command.NameEn, command.NameAr), clock.UtcNow, command.ForCulture);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

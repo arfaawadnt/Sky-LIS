@@ -60,12 +60,12 @@ public sealed class ClinicalGroupsController(ISender sender) : ControllerBase
 public sealed class SampleTypesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<Paged<SampleTypeListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ListSampleTypesQuery(search, isActive, page, pageSize, sort, direction), cancellationToken));
+    public async Task<ActionResult<Paged<SampleTypeListItem>>> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? sort, [FromQuery] string? direction, [FromQuery] bool? forCulture, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListSampleTypesQuery(search, isActive, page, pageSize, sort, direction, forCulture), cancellationToken));
 
     [HttpGet("export")]
-    public async Task<ActionResult<IReadOnlyList<SampleTypeListItem>>> Export([FromQuery] string? search, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new ExportSampleTypesQuery(search, isActive), cancellationToken));
+    public async Task<ActionResult<IReadOnlyList<SampleTypeListItem>>> Export([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] bool? forCulture, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ExportSampleTypesQuery(search, isActive, forCulture), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SampleTypeDetail>> Get(Guid id, CancellationToken cancellationToken) =>
@@ -75,7 +75,7 @@ public sealed class SampleTypesController(ISender sender) : ControllerBase
     public async Task<ActionResult<CreatedResource>> Create([FromBody] CreateSampleTypeRequest body, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
-        var created = await sender.Send(new CreateSampleTypeCommand(body.Code, body.ShortName, body.NameEn, body.NameAr, body.Conditions), cancellationToken);
+        var created = await sender.Send(new CreateSampleTypeCommand(body.Code, body.ShortName, body.NameEn, body.NameAr, body.Conditions, body.ForCulture), cancellationToken);
         return Created($"/api/v1/catalogue/sample-types/{created.Id}", created);
     }
 
@@ -83,7 +83,7 @@ public sealed class SampleTypesController(ISender sender) : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateSampleTypeRequest body, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
-        await sender.Send(new UpdateSampleTypeCommand(id, body.ShortName, body.NameEn, body.NameAr), cancellationToken);
+        await sender.Send(new UpdateSampleTypeCommand(id, body.ShortName, body.NameEn, body.NameAr, body.ForCulture), cancellationToken);
         return NoContent();
     }
 

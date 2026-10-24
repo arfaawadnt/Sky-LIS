@@ -228,6 +228,7 @@
   "grid.result": "النتيجة",
   "grid.unit": "الوحدة",
   "grid.range": "المعدل المرجعي",
+  "grid.rangeProvisional": "المعدل المتوقع لهذا المريض؛ يُثبَّت عند حفظ النتيجة",
   "grid.flag": "العلامة",
   "grid.delta": "Δ",
   "grid.sampleStatus": "العينة",

@@ -1,5 +1,5 @@
 import patientsAr from '../../../../public/i18n/patients.ar.json';
-import { ageBetween, ageParts, ageText, birthDateFromAge, defaultGender, fileSize, isValidAge, isValidMobile, localDigits, mobileForStorage, normalizeMobile, parseIso, todayIso } from './patient-demographics';
+import { ageBetween, ageParts, ageText, birthDateFromAge, defaultGender, fileSize, isValidAge, isValidMobile, isValidPhone, localDigits, mobileForStorage, normalizeMobile, parseIso, phoneForStorage, todayIso } from './patient-demographics';
 
 describe('patient demographics (the server rules, mirrored)', () => {
   it('computes the age exactly like PatientAge.Between', () => {
@@ -103,5 +103,21 @@ describe('patient demographics (the server rules, mirrored)', () => {
     expect(ageText({ years: 2, months: 1, days: 0 }, 'ar', arabic)).toBe('سنتان شهر واحد');
     expect(ageText({ years: 0, months: 11, days: 3 }, 'ar', arabic)).toBe('١١ شهرًا ٣ أيام');
     expect(ageText({ years: 0, months: 0, days: 0 }, 'ar', arabic)).toBe('٠ يوم');
+  });
+  it('LIS-CR-007 C-05: checks a two-part phone against its dial code and stores the laboratory\'s numbers in the trunk form', () => {
+    const egypt = { dialCode: '+20', mobileLength: 10 };
+    const saudi = { dialCode: '+966', mobileLength: 9 };
+    expect(isValidPhone('+201012345678', [egypt, saudi], 10)).toBe(true);
+    expect(isValidPhone('+20101234567', [egypt, saudi], 10)).toBe(false);
+    expect(isValidPhone('+966501234567', [egypt, saudi], 10)).toBe(true);
+    expect(isValidPhone('+447911123456', [egypt, saudi], 10)).toBe(true);   // no published length: 8–15 digits
+    expect(isValidPhone('01012345678', [egypt], 10)).toBe(true);           // a file stored before
+    expect(isValidPhone('12ab', [egypt], 10)).toBe(false);
+
+    expect(phoneForStorage('+201012345678', egypt)).toBe('01012345678');
+    expect(phoneForStorage('01012345678', egypt)).toBe('01012345678');
+    expect(phoneForStorage('+966501234567', egypt)).toBe('+966501234567');
+    expect(phoneForStorage('+201012345678', null)).toBe('+201012345678');
+    expect(phoneForStorage('', egypt)).toBe('');
   });
 });

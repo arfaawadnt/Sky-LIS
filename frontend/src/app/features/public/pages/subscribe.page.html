@@ -55,7 +55,7 @@
               <input type="text" formControlName="address" maxlength="300" autocomplete="street-address" />
             </app-form-field>
             <app-form-field [label]="i18n.t('public.field.mobile')" [hint]="mobileHint()">
-              <input type="tel" formControlName="mobile" inputmode="tel" autocomplete="tel" dir="ltr" />
+              <app-mobile-input formControlName="mobile" autocomplete="tel" [country]="facade.country()" />
             </app-form-field>
             <app-form-field [label]="i18n.t('public.field.licenceNo')" [hint]="i18n.t('public.wizard.optional')">
               <input type="text" formControlName="licenceNo" maxlength="64" />
@@ -64,7 +64,7 @@
               <input type="text" formControlName="managerName" maxlength="200" autocomplete="name" />
             </app-form-field>
             <app-form-field [label]="i18n.t('public.field.managerMobile')" [hint]="i18n.t('public.wizard.managerMobileHint')">
-              <input type="tel" formControlName="managerMobile" inputmode="tel" autocomplete="tel" dir="ltr" />
+              <app-mobile-input formControlName="managerMobile" autocomplete="tel" [country]="facade.country()" />
             </app-form-field>
             <app-form-field class="full" [label]="i18n.t('public.field.email')" [hint]="i18n.t('public.wizard.optional')">
               <input type="email" formControlName="email" maxlength="254" autocomplete="email" dir="ltr" />

@@ -33,5 +33,9 @@
     </div>
 
     <button type="submit" class="submit">{{ i18n.t('auth.find.continue') }}</button>
+
+    @if (foundAddress(); as found) {
+      <app-keep-address variant="hint" [address]="found" />
+    }
   </form>
 </app-auth-frame>

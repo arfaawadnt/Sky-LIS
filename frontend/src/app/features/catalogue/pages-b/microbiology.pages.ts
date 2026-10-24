@@ -91,7 +91,7 @@ export class CommercialNamesPage {
       { key: 'drugType', header: 'catalogue-b.commercialNames.column.drugType', sortable: true, sortKey: localizedSortKey('drugType'), value: (item) => localizedPick({ en: item.drugTypeNameEn, ar: item.drugTypeNameAr }, this.i18n.lang()) },
     ],
     fields: [
-      { name: 'drugTypeId', kind: 'select', required: true, options: async () => (await this.lookups.drugTypes()).map(toSelectOption) },
+      { name: 'drugTypeId', kind: 'select', required: true, hint: 'catalogue-b.commercialNames.hint.drugTypeId', options: async () => (await this.lookups.drugTypes()).map(toSelectOption) },
       { name: 'name', kind: 'localizedText', required: true, maxLength: 200 },
     ],
     adapter: {

@@ -46,6 +46,9 @@ internal sealed class ReferenceCounterConfiguration : IEntityTypeConfiguration<R
 /// </summary>
 public sealed class ReferenceNumbers(AppDbContext context, ITenantContextAccessor tenant) : IReferenceNumbers
 {
+    /// <summary>The year of the counters that never restart.</summary>
+    public const int UndatedYear = 0;
+
     private const string NextSql = """
         WITH counter AS (
             INSERT INTO app.reference_counters (tenant_id, kind, year, last_value)
@@ -66,5 +69,20 @@ public sealed class ReferenceNumbers(AppDbContext context, ITenantContextAccesso
         var values = await context.Database.SqlQueryRaw<long>(NextSql, tenantId, kind, nowUtc.Year).ToListAsync(cancellationToken).ConfigureAwait(false);
         var next = values.Single();
         return string.Create(CultureInfo.InvariantCulture, $"{prefix}-{nowUtc.Year:D4}-{next:D5}");
+    }
+
+    /// <summary>
+    /// The never-restarting counter of short codes (LIS-CR-007 C-09): the same row-locked upsert on the year-0 row of the
+    /// kind (no calendar year is 0, so it cannot meet a yearly counter of the same kind).
+    /// </summary>
+    public async Task<string> NextShortAsync(string kind, string prefix, int width, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
+        var tenantId = tenant.CurrentTenantId
+            ?? throw new DomainException(ProblemCodes.TenantUnresolved, "No tenant is resolved for this scope; a reference number cannot be issued.", DomainFault.Refused);
+
+        var values = await context.Database.SqlQueryRaw<long>(NextSql, tenantId, kind, UndatedYear).ToListAsync(cancellationToken).ConfigureAwait(false);
+        return ReferenceNumberFormat.Short(prefix, values.Single(), width);
     }
 }

@@ -10,6 +10,8 @@ export interface CatalogueOption {
   readonly nameEn: string;
   readonly nameAr: string;
   readonly isActive: boolean;
+  /** Sample types only: a culture specimen (LIS-CR-007), offered first to a culture service. */
+  readonly forCulture?: boolean;
 }
 
 const ALL = { search: '', isActive: null, page: 1, pageSize: OPTIONS_PAGE_SIZE } as const;
@@ -31,7 +33,7 @@ export class CatalogueAOptions {
 
   readonly sampleTypes = resource({
     loader: async ({ abortSignal }): Promise<readonly CatalogueOption[]> =>
-      (await this.api.listSampleTypes(ALL, abortSignal)).items.map((row) => ({ value: row.id, code: row.code, nameEn: row.nameEn, nameAr: row.nameAr, isActive: row.isActive })),
+      (await this.api.listSampleTypes(ALL, abortSignal)).items.map((row) => ({ value: row.id, code: row.code, nameEn: row.nameEn, nameAr: row.nameAr, isActive: row.isActive, forCulture: row.forCulture })),
   });
 
   readonly units = resource({

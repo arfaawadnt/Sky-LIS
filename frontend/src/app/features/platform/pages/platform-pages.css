@@ -11,6 +11,20 @@
   margin-block-end: var(--sp-4);
 }
 
+/* LIS-CR-007 A-01: a KPI tile that opens a list (the silent clients) */
+.kpi-link {
+  display: block;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--r-lg);
+}
+
+.kpi-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .grid-2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));

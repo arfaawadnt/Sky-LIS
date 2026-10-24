@@ -26,7 +26,8 @@ public sealed record CommentTemplateListItem(Guid Id, string ShortName, string T
 
 // CP-48 Doctors
 
-public sealed record CreateDoctorRequest(string Code, string NameEn, string NameAr, string? Specialty, string? Occupation, IReadOnlyList<Guid>? BranchIds, decimal SharePercent, string? Phone);
+/// <summary>CP-48 Add doctor: a blank or missing <c>Code</c> is generated as <c>DR-nnn</c> (LIS-CR-007 C-09).</summary>
+public sealed record CreateDoctorRequest(string? Code, string NameEn, string NameAr, string? Specialty, string? Occupation, IReadOnlyList<Guid>? BranchIds, decimal SharePercent, string? Phone);
 
 public sealed record UpdateDoctorRequest(string NameEn, string NameAr, string? Specialty, string? Occupation, IReadOnlyList<Guid>? BranchIds, decimal SharePercent, string? Phone);
 

@@ -23,19 +23,20 @@
     }
 
     @if (facade.current(); as account) {
-      <app-section-card [title]="i18n.t('billing.account.title')">
-        <ng-container cardActions>
-          @if (account.refundable > 0) {
-            <a *appCan="permissions.refund" class="btn sm" routerLink="../refunds" [queryParams]="{ visitId: account.visitId }">
-              <app-icon name="arrow-down" [size]="14" />{{ i18n.t('billing.account.refundDue') }}
-            </a>
-          }
-          <button type="button" class="btn sm ghost" (click)="printInvoice(account)"><app-icon name="printer" [size]="14" />{{ i18n.t('billing.account.printInvoice') }}</button>
-        </ng-container>
-        <app-billing-account-summary [account]="account" />
-      </app-section-card>
+      <!-- LIS-CR-007 C-07: the visit totals and "Take a payment" share the first row; the history comes below -->
+      <div class="top-row">
+        <app-section-card class="account-card" [title]="i18n.t('billing.account.title')">
+          <ng-container cardActions>
+            @if (account.refundable > 0) {
+              <a *appCan="permissions.refund" class="btn sm" routerLink="../refunds" [queryParams]="{ visitId: account.visitId }">
+                <app-icon name="arrow-down" [size]="14" />{{ i18n.t('billing.account.refundDue') }}
+              </a>
+            }
+            <button type="button" class="btn sm ghost" (click)="printInvoice(account)"><app-icon name="printer" [size]="14" />{{ i18n.t('billing.account.printInvoice') }}</button>
+          </ng-container>
+          <app-billing-account-summary [account]="account" />
+        </app-section-card>
 
-      <div class="columns">
         <app-section-card class="pay-card" *appCan="permissions.pay" [title]="i18n.t('billing.pay.title')" [subtitle]="desk.cashierLine()">
           @if (account.billedThroughClaims) {
             <p class="info-strip">{{ i18n.t('billing.account.billedThroughClaims') }}</p>
@@ -53,35 +54,42 @@
             />
           }
         </app-section-card>
-
-        <app-section-card class="list-card" [title]="i18n.t('billing.account.payments')" [padded]="false">
-          <app-data-table [columns]="visitColumns" [rows]="account.payments" [interactive]="false" [compact]="true" [emptyTitle]="i18n.t('billing.account.noPayments')" [caption]="i18n.t('billing.account.payments')">
-            <ng-template appCell="method" [appCellOf]="account.payments" let-row>{{ movementMethod(row) }}</ng-template>
-            <ng-template appCell="status" [appCellOf]="account.payments" let-row>
-              <app-badge [tone]="tone(row.status)">{{ statusLabel(row.status) }}</app-badge>
-            </ng-template>
-            <ng-template appRowActions [appRowActionsOf]="account.payments" let-row>
-              <button type="button" class="btn sm ghost" (click)="reprint(row)" [attr.aria-label]="i18n.t('billing.reprint') + ' ' + row.receiptNumber"><app-icon name="printer" [size]="14" /></button>
-              @if (canVoid(row)) {
-                <button type="button" class="btn sm" *appCan="permissions.void" (click)="voidPayment(row)" [disabled]="facade.voidPayment.pending()">{{ i18n.t('billing.void.action') }}</button>
-              }
-            </ng-template>
-          </app-data-table>
-
-          @if (account.refunds.length > 0) {
-            <h3 class="sub">{{ i18n.t('billing.account.refunds') }}</h3>
-            <ul class="refund-list">
-              @for (refund of account.refunds; track refund.id) {
-                <li>
-                  <span class="mono">{{ refund.number }}</span>
-                  <span>{{ money(refund.amount) }}</span>
-                  <span class="muted">{{ movementMethod(refund) }}</span>
-                </li>
-              }
-            </ul>
-          }
-        </app-section-card>
       </div>
+
+      <app-section-card class="list-card" [title]="i18n.t('billing.account.payments')" [padded]="false">
+        <ng-container cardActions>
+          @if (collapsible()) {
+            <button type="button" class="btn sm ghost show-all" [attr.aria-expanded]="showAllMovements()" (click)="toggleMovements()">
+              {{ showAllMovements() ? i18n.t('billing.account.showLatest') : i18n.tf('billing.account.showAll', { count: account.payments.length + account.refunds.length }) }}
+            </button>
+          }
+        </ng-container>
+        <app-data-table [columns]="visitColumns" [rows]="shownPayments()" [interactive]="false" [compact]="true" [emptyTitle]="i18n.t('billing.account.noPayments')" [caption]="i18n.t('billing.account.payments')">
+          <ng-template appCell="method" [appCellOf]="shownPayments()" let-row>{{ movementMethod(row) }}</ng-template>
+          <ng-template appCell="status" [appCellOf]="shownPayments()" let-row>
+            <app-badge [tone]="tone(row.status)">{{ statusLabel(row.status) }}</app-badge>
+          </ng-template>
+          <ng-template appRowActions [appRowActionsOf]="shownPayments()" let-row>
+            <button type="button" class="row-btn" (click)="reprint(row)" [attr.aria-label]="i18n.t('billing.reprint') + ' ' + row.receiptNumber" [title]="i18n.t('billing.reprint')"><app-icon name="printer" [size]="15" /></button>
+            @if (canVoid(row)) {
+              <button type="button" class="btn sm" *appCan="permissions.void" (click)="voidPayment(row)" [disabled]="facade.voidPayment.pending()">{{ i18n.t('billing.void.action') }}</button>
+            }
+          </ng-template>
+        </app-data-table>
+
+        @if (shownRefunds().length > 0) {
+          <h3 class="sub">{{ i18n.t('billing.account.refunds') }}</h3>
+          <ul class="refund-list">
+            @for (refund of shownRefunds(); track refund.id) {
+              <li>
+                <span class="mono">{{ refund.number }}</span>
+                <span>{{ money(refund.amount) }}</span>
+                <span class="muted">{{ movementMethod(refund) }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </app-section-card>
     } @else if (facade.lookup() === null) {
       <app-empty-state [title]="i18n.t('billing.lookup.emptyTitle')" [message]="i18n.t('billing.lookup.emptyMessage')" icon="search" />
     }
@@ -150,7 +158,7 @@
         <app-badge [tone]="tone(row.status)">{{ statusLabel(row.status) }}</app-badge>
       </ng-template>
       <ng-template appRowActions [appRowActionsOf]="registerRows()" let-row>
-        <button type="button" class="btn sm ghost" (click)="reprint(row)" [attr.aria-label]="i18n.t('billing.reprint') + ' ' + row.receiptNumber"><app-icon name="printer" [size]="14" /></button>
+        <button type="button" class="row-btn" (click)="reprint(row)" [attr.aria-label]="i18n.t('billing.reprint') + ' ' + row.receiptNumber" [title]="i18n.t('billing.reprint')"><app-icon name="printer" [size]="15" /></button>
         <button type="button" class="btn sm" (click)="openFromRegister(row)">{{ i18n.t('billing.openVisit') }}</button>
       </ng-template>
     </app-data-table>

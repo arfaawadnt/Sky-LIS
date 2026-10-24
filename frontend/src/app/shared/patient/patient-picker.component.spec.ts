@@ -170,7 +170,7 @@ describe('PatientPickerComponent (CP-06 patient search / create)', () => {
     const form = host.querySelector<HTMLElement>('app-patient-form');
     type(form?.querySelector<HTMLInputElement>('input[formcontrolname="fullName"]'), 'Omar Said');
     type(form?.querySelector<HTMLInputElement>('input[formcontrolname="ageYears"]'), '40');
-    type(form?.querySelector<HTMLInputElement>('input[formcontrolname="mobile"]'), '0100 555 6666');
+    type(form?.querySelector<HTMLInputElement>('app-mobile-input[formcontrolname="mobile"] input.number'), '0100 555 6666');
     await settle(400);   // the similar lookup is debounced
     await flush();
 
@@ -260,7 +260,7 @@ describe('PatientPickerComponent (CP-06 patient search / create)', () => {
     backend.match(() => true).forEach((call) => call.flush(call.request.url.endsWith('form-settings') ? { mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true } : []));
     await flush();
 
-    type(host.querySelector<HTMLInputElement>('input[formcontrolname="mobile"]'), '01007778888');
+    type(host.querySelector<HTMLInputElement>('app-mobile-input[formcontrolname="mobile"] input.number'), '01007778888');
     await settle(400);
     await flush();
     const masked: SimilarPatient = { ...mona, id: 'p-10', number: 'PAT-2026-00010', fullName: '', nameAr: null, mobile: null, nationalId: null, match: 'Mobile', identityMasked: true };

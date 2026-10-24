@@ -66,7 +66,7 @@ internal sealed partial class CatalogueACloner(AppDbContext context, ICurrentTen
         foreach (var source in await Source<SampleType>(sourceTenantId).Where(sampleType => sampleType.IsActive).ToListAsync(cancellationToken).ConfigureAwait(false))
         {
             var activeConditions = source.Conditions.Where(condition => condition.IsActive).ToList();
-            var copy = SampleType.Create(source.Code, source.ShortName, source.Name, activeConditions.Select(condition => new SampleConditionSpec(null, condition.Code, condition.Name, true)), now);
+            var copy = SampleType.Create(source.Code, source.ShortName, source.Name, activeConditions.Select(condition => new SampleConditionSpec(null, condition.Code, condition.Name, true)), now, source.ForCulture);
             Stage(copy, targetTenantId);
             sampleTypes[source.Id] = copy.Id;
             foreach (var condition in activeConditions)

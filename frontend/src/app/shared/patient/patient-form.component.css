@@ -39,7 +39,7 @@ form {
   grid-template-columns: auto minmax(0, 1fr);
 }
 
-/* Arabic name | national id; in Contact the mobile (country + number) takes the first cell */
+/* Arabic name | national id; in Contact the mobile (dial code + number, one control) takes the first cell */
 .pair {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -164,30 +164,6 @@ form {
   max-width: 50%;
 }
 
-/* mobile = country + number side by side */
-.mobile {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: var(--sp-2);
-  align-items: start;
-}
-
-.mobile:has(> :only-child) {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.ff-plain {
-  display: grid;
-  gap: 4px;
-  align-content: start;
-}
-
-.ff-plain .label {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink-2);
-}
-
 /* optional details */
 .more {
   border: 1px solid var(--line);
@@ -293,8 +269,7 @@ form {
 }
 
 @container (max-width: 380px) {
-  .name-row,
-  .mobile {
+  .name-row {
     grid-template-columns: minmax(0, 1fr);
   }
 }

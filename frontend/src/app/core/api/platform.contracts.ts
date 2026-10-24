@@ -485,6 +485,46 @@ export interface PlatformDashboard {
   readonly planDistribution: readonly PlanShare[];
   readonly registrationsByClient: readonly ClientActivity[];
   readonly recentClients: readonly RecentClient[];
+  /** LIS-CR-007 A-01: Trial and Active clients with no sign-in and no registration for `silentDays` days (default 3), and the trial ones among them. */
+  readonly silentClients: number;
+  readonly silentTrialClients: number;
+  readonly silentDays: number;
+}
+
+// ── Silent clients (LIS-CR-007 A-01) ───────────────────────────────────────────────────────────
+
+/** The windows the Clients page offers; the API takes 1…90 days (VALIDATION-400 otherwise). */
+export const SILENT_DAYS: readonly number[] = [3, 7, 14, 30];
+
+/** The window of the dashboard tile. */
+export const DEFAULT_SILENT_DAYS = 3;
+
+/**
+ * A client with no activity for the window: last sign-in (a browser session issued to one of its users), last
+ * registration, the later of the two (null: none since it was created), whole days of silence, and the administrator to
+ * call (the client record's manager, mobile in E.164). Status is Trial or Active.
+ */
+export interface SilentClientItem {
+  readonly id: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly portalUrl: string;
+  readonly status: ClientStatus;
+  readonly createdAtUtc: string;
+  readonly lastSignInAtUtc: string | null;
+  readonly lastRegistrationAtUtc: string | null;
+  readonly lastActivityAtUtc: string | null;
+  readonly silentDays: number;
+  readonly administratorName: string;
+  readonly administratorMobile: string;
+}
+
+/** The silent clients of a window, longest silence first; `trial` counts the trial clients among them. */
+export interface SilentClientList {
+  readonly days: number;
+  readonly asOfUtc: string;
+  readonly trial: number;
+  readonly items: readonly SilentClientItem[];
 }
 
 export type AdminSessionStatus = 'Active' | 'Idle';
@@ -521,6 +561,8 @@ export const PLATFORM_API = {
   /** SA-08b client login logs (LIS-CR-003 §2): the paged history and its CSV (`…/export`). */
   loginLogs: '/api/v1/platform/login-logs',
   dashboard: '/api/v1/platform/dashboard',
+  /** LIS-CR-007 A-01: the silent clients of a window (`?days=`) and their CSV (`…/export`). */
+  silentClients: '/api/v1/platform/clients/silent',
   /** The laboratory's own wallet (CP-66). */
   myWallet: '/api/v1/wallet',
 } as const;

@@ -24,6 +24,18 @@ public sealed class Doctor : CatalogueBRecord
         BranchIds = [];
     }
 
+    /// <summary>Counter kind of the generated codes (LIS-CR-007 C-09): one never-restarting counter per tenant.</summary>
+    public const string GeneratedCodeKind = "doctor";
+
+    /// <summary>Prefix of a generated code: <c>DR-001</c>, <c>DR-002</c> … (no year).</summary>
+    public const string GeneratedCodePrefix = "DR";
+
+    /// <summary>Digits of a generated code's number (at least; <c>DR-1000</c> follows <c>DR-999</c>).</summary>
+    public const int GeneratedCodeWidth = 3;
+
+    /// <summary>The code proposed for the <paramref name="sequence"/>-th doctor of a tenant when the user leaves the code blank.</summary>
+    public static string GeneratedCode(long sequence) => ReferenceNumberFormat.Short(GeneratedCodePrefix, sequence, GeneratedCodeWidth);
+
     /// <summary>Unique per tenant, immutable.</summary>
     public string Code { get; private set; }
 

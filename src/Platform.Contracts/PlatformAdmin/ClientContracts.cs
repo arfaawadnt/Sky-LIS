@@ -126,3 +126,28 @@ public sealed record ResetClientAdminPasswordRequest
 
 /// <summary>The result of provisioning: the new tenant id, its portal address and the administrator's username.</summary>
 public sealed record ProvisionedClient(Guid Id, string PortalUrl, string AdministratorUsername);
+
+/// <summary>
+/// LIS-CR-007 A-01: a client with no activity for the window (SA-04 "Silent" filter, SA-03 tile). Last sign-in = the latest
+/// browser session issued to one of its users (a sign-in or a renewal); last registration = its latest visit; last activity
+/// = the later of the two (null: none since the client was created). <paramref name="SilentDays"/> counts whole days since
+/// the last activity, or since the creation. <paramref name="AdministratorName"/> / <paramref name="AdministratorMobile"/> are
+/// the client record's manager (the person provisioning made the laboratory administrator), the mobile in E.164.
+/// <paramref name="Status"/> is Trial or Active (inactive clients are never silent).
+/// </summary>
+public sealed record SilentClientItem(
+    Guid Id,
+    string NameEn,
+    string NameAr,
+    string PortalUrl,
+    string Status,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? LastSignInAtUtc,
+    DateTimeOffset? LastRegistrationAtUtc,
+    DateTimeOffset? LastActivityAtUtc,
+    int SilentDays,
+    string AdministratorName,
+    string AdministratorMobile);
+
+/// <summary>The silent clients for a window of <paramref name="Days"/> days as of <paramref name="AsOfUtc"/>, longest silence first; <paramref name="Trial"/> counts the trial clients among them.</summary>
+public sealed record SilentClientList(int Days, DateTimeOffset AsOfUtc, int Trial, IReadOnlyList<SilentClientItem> Items);

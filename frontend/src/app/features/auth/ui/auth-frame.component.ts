@@ -8,6 +8,7 @@ import { IconComponent } from '../../../shared/ui/icon/icon.component';
  * The ground of the sign-in pages, design 5c "light premium" (2026-10-20): the Sky LIS logo large in the header with
  * the language switch, the hero on the start side, the white card (the page's content) on the end side, and the footer
  * links. Shared by the laboratory and Super Admin sign-in and the find page (LIS-CR-005). The texts arrive translated.
+ * Content marked `authAfterCard` is drawn under the card (the bookmark strip of LIS-CR-007 C-01).
  */
 @Component({
   selector: 'app-auth-frame',

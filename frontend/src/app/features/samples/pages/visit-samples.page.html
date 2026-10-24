@@ -74,7 +74,7 @@
         }
         <a class="btn sm ghost" [routerLink]="links.track(row.sampleNumber)">{{ i18n.t('samples.track') }}</a>
         @if (row.status === 'Collected' || row.status === 'Received') {
-          <a class="btn sm ghost" *appCan="permissions.edit" [routerLink]="links.rejections" [queryParams]="{ sampleNumber: row.sampleNumber }">{{ i18n.t('samples.reject.action') }}</a>
+          <a class="row-btn danger" *appCan="permissions.edit" [routerLink]="links.rejections" [queryParams]="{ sampleNumber: row.sampleNumber }" [attr.aria-label]="i18n.t('samples.reject.action') + ' ' + row.sampleNumber" [title]="i18n.t('samples.reject.action')"><app-icon name="x" [size]="15" /></a>
         }
       </ng-template>
     </app-data-table>

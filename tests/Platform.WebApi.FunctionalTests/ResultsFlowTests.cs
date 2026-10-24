@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Platform.Application.Abstractions.Messaging;
 using Platform.Application.Abstractions.Persistence;
@@ -107,6 +108,29 @@ public sealed class ResultsFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.Equal(("Complete", 1), (Assert.Single(visits.Items).Status, visits.Items[0].Units));
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"{Results}/lookups/comment-templates?search=%25rep")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"{Results}/lookups/microbiology")).StatusCode);
+    }
+
+    [DatabaseFact]
+    public async Task C08_an_ordered_line_shows_the_patient_s_range_before_entry_and_the_stored_range_after()
+    {
+        // LIS-CR-007 C-08: before the first save the case answers the band BR-08 picks (provisional); once a value exists the
+        // stored range is served, even after the catalogue band changes, while a new visit shows the new band.
+        var lab = await SeedLabAsync();
+        var (bench, _, _) = await factory.SeedUserAsync(tenantId: lab.Tenant, permissions: BenchPermissions, branchIds: [lab.Branch]);
+        await GrantResultRightsAsync(lab.Tenant, bench, SpecialRights.All, lab.Group);
+        var client = await SignedInClientAsync(bench);
+        var visit = await RegisterVisitAsync(lab);
+
+        var ordered = await RowAsync(client, visit.Accession);
+        Assert.Equal(("Ordered", "3.5 – 5.0", 3.5m, 5.0m, true), (ordered.Status, ordered.Range!.Display, ordered.Range.Low!.Value, ordered.Range.High!.Value, ordered.RangeProvisional));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Results}/{ordered.Id}", new EnterResultValueRequest(4.2m, null, null, null))).StatusCode);
+        await ReplaceBandAsync(lab, 3.0m, 4.0m);
+
+        var entered = await RowAsync(client, visit.Accession);
+        Assert.Equal(("Complete", "3.5 – 5.0", false), (entered.Status, entered.Range!.Display, entered.RangeProvisional));
+        var next = await RowAsync(client, (await RegisterVisitAsync(lab)).Accession);
+        Assert.Equal(("3.0 – 4.0", true), (next.Range!.Display, next.RangeProvisional));
     }
 
     [DatabaseFact]
@@ -243,6 +267,16 @@ public sealed class ResultsFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         context.Set<Service>().Add(service);
         await unitOfWork.SaveChangesAsync(CancellationToken.None);
         return new Lab(tenant, Guid.CreateVersion7(), group.Id, sampleType.Id, test.Id, service.Id);
+    }
+
+    /// <summary>Replaces the test's band with one Any-sex band of the given limits (a catalogue change after entry).</summary>
+    private async Task ReplaceBandAsync(Lab lab, decimal low, decimal high)
+    {
+        using var scope = factory.Services.CreateScope();
+        using var tenantScope = scope.ServiceProvider.GetRequiredService<ICurrentTenantSetter>().ForTenant(lab.Tenant);
+        var test = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Set<LabTest>().SingleAsync(item => item.Id == lab.Test);
+        test.ReplaceRangeBands([new RangeBandSpec(GenderRestriction.Any, 0, 150, RangeAgeUnit.Years, null, low, high, null, null, null, null, null)], factory.Clock.UtcNow);
+        await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
     }
 
     /// <summary>Runs the Samples and Results policies for a registration the way the outbox processor would (Release 1 defaults: the tube is received at once).</summary>

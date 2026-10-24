@@ -22,6 +22,9 @@ const dashboard: PlatformDashboard = {
   planDistribution: [],
   registrationsByClient: [],
   recentClients: [],
+  silentClients: 0,
+  silentTrialClients: 0,
+  silentDays: 3,
 };
 
 /** UAT R2-05: the Super Admin home shows the Release-1 tiles only, filled from the platform dashboard the dashboard page reads. */

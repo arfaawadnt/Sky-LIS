@@ -15,8 +15,8 @@ namespace Platform.WebApi.Controllers.PlatformAdmin;
 public sealed class PlatformDashboardController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<PlatformDashboard>> Get([FromQuery] string? period, CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new GetPlatformDashboardQuery(period), cancellationToken));
+    public async Task<ActionResult<PlatformDashboard>> Get([FromQuery] string? period, [FromQuery] int? silentDays, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new GetPlatformDashboardQuery(period, silentDays), cancellationToken));
 }
 
 /// <summary>Live sessions of the platform administrators (SRS SA-08).</summary>

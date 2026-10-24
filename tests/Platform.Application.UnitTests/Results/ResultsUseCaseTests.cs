@@ -86,6 +86,41 @@ public sealed class ResultsUseCaseTests
     }
 
     [Fact]
+    public async Task C08_the_case_shows_the_patient_s_range_before_entry_and_the_stored_range_after()
+    {
+        // LIS-CR-007 C-08: an ordered line shows the band BR-08 picks for the patient, marked provisional; once a value is
+        // entered the stored range is served and the mark goes.
+        var world = new World();
+        var test = world.AddTest("HB", bands: [FakeCatalogue.Band(GenderRestriction.Female, 12m, 15m), FakeCatalogue.Band(GenderRestriction.Male, 13.5m, 17.5m)]);
+        world.Patients.Items[world.Patient] = FakePatients.Patient(world.Patient, "Female", 40);
+        var result = await world.OrderedAsync(test);
+        world.Samples.Received(world.Tube, world.Visit);
+
+        var before = (await world.CaseAsync()).Units.Single().Results.Single();
+        Assert.Null(result.Range);
+        Assert.Equal((12m, 15m, true), (before.Range!.Low!.Value, before.Range.High!.Value, before.RangeProvisional));
+
+        await world.SaveAsync(new ResultValueItem(result.Id, 13m, null, null, null));
+        world.Patients.Items[world.Patient] = FakePatients.Patient(world.Patient, "Male", 40);   // a later file change does not move a stored range
+
+        var after = (await world.CaseAsync()).Units.Single().Results.Single();
+        Assert.Equal((12m, 15m, false), (after.Range!.Low!.Value, after.Range.High!.Value, after.RangeProvisional));
+    }
+
+    [Fact]
+    public async Task C08_a_test_without_a_matching_band_shows_no_range_before_entry()
+    {
+        var world = new World();
+        var test = world.AddTest("PSA", bands: [FakeCatalogue.Band(GenderRestriction.Male, 0m, 4m)]);
+        world.Patients.Items[world.Patient] = FakePatients.Patient(world.Patient, "Female", 40);
+        await world.OrderedAsync(test);
+
+        var row = (await world.CaseAsync()).Units.Single().Results.Single();
+
+        Assert.Equal((null, false), (row.Range, row.RangeProvisional));
+    }
+
+    [Fact]
     public async Task R_T2b_formulas_compute_from_their_inputs_in_the_same_save()
     {
         var world = new World();
@@ -562,7 +597,7 @@ public sealed class ResultsUseCaseTests
             Patients.Items[Patient] = FakePatients.Patient(Patient, "Female", 30) with { Number = "PAT-2026-00010", FullName = "V14 Walk-in Two", NameAr = "ووك إن", DateOfBirth = new DateOnly(1996, 1, 1), IsVip = true };
 
         public Task<ResultCaseView> CaseAsync() =>
-            new GetResultCaseHandler(Results, Samples, Catalogue, Patients, new FakeDirectory(), Privileges, Visits, new FakeReferences(), new NoDoctors(), Settings)
+            new GetResultCaseHandler(Results, Samples, Catalogue, Patients, new FakeDirectory(), Privileges, Visits, new FakeReferences(), new NoDoctors(), Settings, Clock)
                 .Handle(new GetResultCaseQuery(null, Visit, null), CancellationToken.None);
 
         public Task PrintAsync(string key) =>

@@ -54,6 +54,19 @@ describe('MovementFormComponent (pay and refund form)', () => {
     element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? 'change' : 'input'));
   }
 
+  it('puts the cursor in the amount with the proposed value selected (LIS-CR-007 C-07)', async () => {
+    const { host, root } = await render();
+    const amount = field<HTMLInputElement>(root, 'input[formcontrolname=amount]');
+    document.body.appendChild(root);
+    try {
+      host.form().focusAmount();
+      expect(document.activeElement).toBe(amount);
+      expect(amount.value).toBe('150');
+    } finally {
+      root.remove();
+    }
+  });
+
   it('proposes what is due, refuses more than that and a non-cash payment without reference', async () => {
     const { host, root, submit } = await render();
     expect(root.querySelector('select[formcontrolname=treasuryId]')).toBeNull();   // LIS-CR-004: no treasury to choose

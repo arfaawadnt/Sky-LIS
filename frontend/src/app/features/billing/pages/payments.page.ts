@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Injector, afterNextRender, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
@@ -10,6 +10,7 @@ import {
   PAYMENT_STATUSES,
   type PaymentListItem,
   type PaymentMethod,
+  type RefundListItem,
   type PaymentStatus,
   type VisitAccountView,
 } from '../../../core/api/billing.contracts';
@@ -42,6 +43,9 @@ import { MovementFormComponent, type MovementInput } from '../ui/movement-form.c
 import { saveFile } from '../ui/save-file';
 
 type PaymentsTab = 'collect' | 'register';
+
+/** How many of the visit's payments and refunds show before "Show all" (LIS-CR-007 C-07). */
+export const LATEST_MOVEMENTS = 3;
 
 /**
  * Payments (SRS CP-23, BR-26; LIS-CR-004): find a visit by accession, see its account (total, discount, patient share, paid,
@@ -84,6 +88,10 @@ export class PaymentsPage {
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
+
+  /** Set by a find (or an opened link): the next account to load puts the cursor in the amount (scan → amount → F10). */
+  private focusAmountPending = false;
 
   /** Query parameters (router input binding): a link from Registration opens the visit (BR-26). */
   readonly visitId = input<string>();
@@ -126,6 +134,18 @@ export class PaymentsPage {
 
   protected readonly registerTotal = computed(() => (this.facade.register.hasValue() ? this.facade.register.value().totalCount : 0));
 
+  /** The visit's history collapsed to the latest payments and refunds unless the cashier asked for all of them. */
+  protected readonly showAllMovements = signal(false);
+
+  protected readonly shownPayments = computed<readonly PaymentListItem[]>(() => this.latest(this.facade.current()?.payments ?? []));
+
+  protected readonly shownRefunds = computed<readonly RefundListItem[]>(() => this.latest(this.facade.current()?.refunds ?? []));
+
+  protected readonly collapsible = computed(() => {
+    const account = this.facade.current();
+    return account !== null && (account.payments.length > LATEST_MOVEMENTS || account.refunds.length > LATEST_MOVEMENTS);
+  });
+
   protected readonly lookupProblem = computed(() => problemOf(this.facade.account.error()));
 
   /** The member's report rights once the collections dialog has read them (null while loading: the branch option stays hidden). */
@@ -143,12 +163,24 @@ export class PaymentsPage {
       const accession = this.accession();
       untracked(() => {
         if (visitId) {
+          this.expectNewVisit();
           this.facade.open(visitId);
         } else if (accession) {
           this.search.setValue(accession);
+          this.expectNewVisit();
           this.facade.find(accession);
         }
       });
+    });
+
+    // LIS-CR-007 C-07: once the found visit's account is on screen, the amount field takes the focus.
+    effect(() => {
+      if (this.facade.current() === null || !this.focusAmountPending) {
+        return;
+      }
+
+      this.focusAmountPending = false;
+      afterNextRender(() => this.form()?.focusAmount(), { injector: this.injector });
     });
 
     effect(() => {
@@ -158,7 +190,15 @@ export class PaymentsPage {
   }
 
   protected find(): void {
+    if (this.search.value.trim() !== '') {
+      this.expectNewVisit();
+    }
+
     this.facade.find(this.search.value);
+  }
+
+  protected toggleMovements(): void {
+    this.showAllMovements.update((all) => !all);
   }
 
   protected reload(): void {
@@ -216,6 +256,7 @@ export class PaymentsPage {
   }
 
   protected openFromRegister(row: PaymentListItem): void {
+    this.expectNewVisit();
     this.facade.open(row.visitId);
     this.search.setValue(row.accession ?? '');
     this.tab.set('collect');
@@ -309,6 +350,16 @@ export class PaymentsPage {
 
   protected problemText(problem: { code: string } | null): string {
     return problemMessage(this.i18n, 'billing', problem);
+  }
+
+  /** A visit is being looked up: its history starts collapsed and its amount field will take the focus. */
+  private expectNewVisit(): void {
+    this.showAllMovements.set(false);
+    this.focusAmountPending = true;
+  }
+
+  private latest<T>(rows: readonly T[]): readonly T[] {
+    return this.showAllMovements() || rows.length <= LATEST_MOVEMENTS ? rows : rows.slice(-LATEST_MOVEMENTS);
   }
 
   private async run(print: () => Promise<void>): Promise<void> {

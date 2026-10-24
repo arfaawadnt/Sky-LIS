@@ -100,6 +100,40 @@ describe('DoctorsPage (CP-48)', () => {
     backend.expectOne((request) => request.method === 'GET' && request.url === CATALOGUE_B_API.doctors).flush(page([doctor]));
   });
 
+  it('LIS-CR-007 C-09: Add offers a generated code (placeholder, no required mark) and sends a blank code as null; Edit keeps it read-only', async () => {
+    const { fixture, host } = await render();
+
+    Array.from(host.querySelectorAll<HTMLButtonElement>('app-page-header .btn.primary')).at(-1)?.click();
+    await fixture.whenStable();
+    const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+    const code = dialog?.querySelector<HTMLInputElement>('input[formcontrolname="code"]');
+    expect(code?.getAttribute('placeholder')).toBe('catalogue-b.doctors.codePlaceholder');
+    expect(code?.disabled).toBe(false);
+    expect(code?.closest('app-form-field')?.querySelector('.req')).toBeNull();
+    setValue(dialog?.querySelector<HTMLInputElement>('input[lang="en"]'), 'Dr. Omar');
+    setValue(dialog?.querySelector<HTMLInputElement>('input[lang="ar"]'), 'د. عمر');
+    await fixture.whenStable();
+
+    dialog?.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
+    await settle();
+    const post = backend.expectOne((request) => request.method === 'POST' && request.url === CATALOGUE_B_API.doctors);
+    expect(post.request.body).toEqual({ code: null, nameEn: 'Dr. Omar', nameAr: 'د. عمر', specialty: null, occupation: null, branchIds: [], sharePercent: 0, phone: null });
+    post.flush({ id: 'd2' }, { status: 201, statusText: 'Created' });
+    await settle();
+    TestBed.tick();
+    await settle();
+    backend.expectOne((request) => request.method === 'GET' && request.url === CATALOGUE_B_API.doctors).flush(page([doctor]));
+    await settle();
+    await fixture.whenStable();
+
+    host.querySelector<HTMLTableRowElement>('tbody tr[data-row="d1"]')?.click();
+    await fixture.whenStable();
+    const editCode = host.querySelector<HTMLElement>('[role="dialog"]')?.querySelector<HTMLInputElement>('input[formcontrolname="code"]');
+    expect(editCode?.disabled).toBe(true);
+    expect(editCode?.value).toBe('D1');
+    expect(editCode?.hasAttribute('placeholder')).toBe(false);
+  });
+
   it('refuses an invalid phone and a share above 100 on the client', async () => {
     const { fixture, host } = await render();
 

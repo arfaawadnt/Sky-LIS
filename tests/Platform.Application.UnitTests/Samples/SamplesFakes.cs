@@ -115,6 +115,13 @@ internal sealed class SequenceNumbers : IReferenceNumbers
         Issued.Add($"{kind}:{number}");
         return Task.FromResult(number);
     }
+
+    public Task<string> NextShortAsync(string kind, string prefix, int width, CancellationToken cancellationToken)
+    {
+        var number = Platform.SharedKernel.Primitives.ReferenceNumberFormat.Short(prefix, ++_next, width);
+        Issued.Add($"{kind}:{number}");
+        return Task.FromResult(number);
+    }
 }
 
 internal sealed class StoppedClock(DateTimeOffset utcNow) : IClock

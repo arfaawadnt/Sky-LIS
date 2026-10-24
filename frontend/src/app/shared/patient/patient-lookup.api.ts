@@ -150,7 +150,7 @@ function toCountry(value: Record<string, unknown>): CountryOption | null {
     return null;
   }
 
-  return { id: text(value['id']) ?? code, code, nameEn, nameAr: text(value['nameAr']) ?? nameEn, mobileLength: count(value['mobileLength']) ?? count(value['mobileDigits']) };
+  return { id: text(value['id']) ?? code, code, nameEn, nameAr: text(value['nameAr']) ?? nameEn, mobileLength: count(value['mobileLength']) ?? count(value['mobileDigits']), dialCode: text(value['dialCode']) };
 }
 
 function toGovernorate(value: Record<string, unknown>): GovernorateOption | null {

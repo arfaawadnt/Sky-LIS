@@ -9,6 +9,8 @@ import { PUBLIC_LABORATORY_API, type PublicLaboratory } from '../../../core/api/
 import { AuthStore } from '../../../core/auth/auth.store';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PLATFORM_TENANT_ID } from '../../../core/tenancy/tenant-ids';
+import { ToastService } from '../../../shared/ui/toast/toast.service';
+import { bookmarkKeys } from '../ui/keep-address.component';
 import { FindLaboratoryPage } from './find-laboratory.page';
 import { LoginPage, SELECT_BRANCH_PATH } from './login.page';
 
@@ -221,6 +223,89 @@ describe('Sign-in addresses (CP-03, LIS-CR-005)', () => {
       await continueWith(fixture, ' https://sky.example.com/lab/Nile-Lab ');
       expect((fixture.nativeElement as HTMLElement).querySelector('[role=alert]')).toBeNull();
       expect(router.navigate).toHaveBeenCalledWith(['/lab', 'nile-lab'], { queryParams: { returnUrl: '/results/worklist' } });
+    });
+
+    it('LIS-CR-007 C-01: names the full address Continue opens, with the bookmark keys and a copy button, once the text is an address', async () => {
+      const fixture = await findPage();
+      const root = fixture.nativeElement as HTMLElement;
+      type(root, '#laboratory-address', 'ab');
+      await render(fixture);
+      expect(root.querySelector('app-keep-address')).toBeNull();
+
+      type(root, '#laboratory-address', 'Nile-Lab');
+      await render(fixture);
+      const hint = root.querySelector('form app-keep-address');
+      expect(hint?.querySelector('.address')?.textContent).toBe(`${location.origin}/lab/nile-lab`);
+      expect(hint?.textContent).toContain('auth.keepAddress.hint');
+      expect(hint?.querySelector('.quiet')).toBeNull();   // no Hide on the hint
+    });
+  });
+
+  describe('Keep this address (LIS-CR-007 C-01)', () => {
+    let writeText: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    });
+
+    afterEach(() => {
+      Reflect.deleteProperty(navigator, 'clipboard');
+    });
+
+    it('shows the strip under the card of a found laboratory, copies the address and hides it for the page only', async () => {
+      const storage = vi.spyOn(Storage.prototype, 'setItem');
+      const toast = TestBed.inject(ToastService);
+      const success = vi.spyOn(toast, 'success');
+      const fixture = await laboratoryPage('nile-lab', { returnUrl: '/results/worklist' });
+      backend.expectOne(PUBLIC_LABORATORY_API.card('nile-lab')).flush(NILE);
+      await render(fixture);
+      const root = fixture.nativeElement as HTMLElement;
+
+      const strip = root.querySelector('.card-col > app-keep-address');
+      expect(strip).not.toBeNull();
+      expect(root.querySelector('.card app-keep-address')).toBeNull();   // under the card, not inside it
+      expect(strip?.textContent).toContain('auth.keepAddress.strip');
+      expect(strip?.querySelector('.address')?.textContent).toBe(`${location.origin}/lab/nile-lab`);   // without the query string
+
+      strip?.querySelector<HTMLButtonElement>('.link-btn:not(.quiet)')?.click();
+      await settle();
+      expect(writeText).toHaveBeenCalledWith(`${location.origin}/lab/nile-lab`);
+      expect(success).toHaveBeenCalledWith('auth.keepAddress.copied');
+
+      strip?.querySelector<HTMLButtonElement>('.link-btn.quiet')?.click();
+      await render(fixture);
+      expect(root.querySelector('app-keep-address')).toBeNull();
+      expect(storage).not.toHaveBeenCalled();
+      expect(document.cookie).toBe('');
+    });
+
+    it('says so when the browser refuses the copy', async () => {
+      writeText.mockRejectedValue(new Error('denied'));
+      const failure = vi.spyOn(TestBed.inject(ToastService), 'error');
+      const fixture = await laboratoryPage('nile-lab');
+      backend.expectOne(PUBLIC_LABORATORY_API.card('nile-lab')).flush(NILE);
+      await render(fixture);
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('app-keep-address .link-btn:not(.quiet)')?.click();
+      await settle();
+      expect(failure).toHaveBeenCalledWith('auth.keepAddress.copyFailed');
+    });
+
+    it('shows no strip on the Super Admin sign-in nor for an address that was not found', async () => {
+      const admin = TestBed.createComponent(LoginPage);
+      admin.componentRef.setInput('mode', 'admin');
+      await render(admin);
+      expect((admin.nativeElement as HTMLElement).querySelector('app-keep-address')).toBeNull();
+
+      const missing = await laboratoryPage('closed-lab');
+      backend.expectOne(PUBLIC_LABORATORY_API.card('closed-lab')).flush({ code: 'PLT-404', title: 'Not found', status: 404 }, { status: 404, statusText: 'Not Found' });
+      await render(missing);
+      expect((missing.nativeElement as HTMLElement).querySelector('app-keep-address')).toBeNull();
+    });
+
+    it('names the bookmark keys of the device', () => {
+      expect(bookmarkKeys('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)')).toBe('⌘+D');
+      expect(bookmarkKeys('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('Ctrl+D');
     });
   });
 });

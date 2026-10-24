@@ -38,7 +38,11 @@ public sealed record RecentClient(
     string Source,
     string Status);
 
-/// <summary>Periods: today, week, month, year (UTC calendar boundaries).</summary>
+/// <summary>
+/// Periods: today, week, month, year (UTC calendar boundaries). LIS-CR-007 A-01: <paramref name="SilentClients"/> counts
+/// the Trial and Active clients with no sign-in and no registration for <paramref name="SilentDays"/> days (default 3),
+/// <paramref name="SilentTrialClients"/> the trial clients among them; they do not depend on the period.
+/// </summary>
 public sealed record PlatformDashboard(
     string Period,
     DateTimeOffset FromUtc,
@@ -49,4 +53,7 @@ public sealed record PlatformDashboard(
     int WalletsAtOrBelowZero,
     IReadOnlyList<PlanShare> PlanDistribution,
     IReadOnlyList<ClientActivity> RegistrationsByClient,
-    IReadOnlyList<RecentClient> RecentClients);
+    IReadOnlyList<RecentClient> RecentClients,
+    int SilentClients = 0,
+    int SilentTrialClients = 0,
+    int SilentDays = 3);

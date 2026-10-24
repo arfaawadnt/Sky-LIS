@@ -89,8 +89,14 @@ h1 {
   color: var(--ink-2);
 }
 
-.card {
+.card-col {
   flex: 0 1 420px;
+  min-width: 0;
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.card {
   min-width: 0;
   box-sizing: border-box;
   padding: 36px;

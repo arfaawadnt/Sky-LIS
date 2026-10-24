@@ -111,7 +111,8 @@ export interface DoctorBranch {
 }
 
 export interface CreateDoctorRequest {
-  readonly code: string;
+  /** Null or blank: the server generates the next DR-nnn of the laboratory (LIS-CR-007 C-09). */
+  readonly code: string | null;
   readonly nameEn: string;
   readonly nameAr: string;
   readonly specialty: string | null;

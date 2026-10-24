@@ -104,7 +104,8 @@ describe('UserEditorPage (CP-38)', () => {
 
     const host = fixture.nativeElement as HTMLElement;
     const set = (name: string, value: string): void => {
-      const control = host.querySelector<HTMLInputElement>(`[formcontrolname="${name}"]`);
+      // the mobile is a two-part control (LIS-CR-007 C-05): its national number is the input to type in
+      const control = host.querySelector<HTMLInputElement>(`input[formcontrolname="${name}"], app-mobile-input[formcontrolname="${name}"] input.number`);
       if (control) {
         control.value = value;
         control.dispatchEvent(new Event('input'));
@@ -132,6 +133,40 @@ describe('UserEditorPage (CP-38)', () => {
     await flush();
     const post = backend.expectOne({ method: 'POST', url: ORGANIZATION_API.users });
     expect(post.request.body).toMatchObject({ username: 'mona.adel', password: 'a long secret', email: 'mona@lab.example', shifts: ['Morning', 'Night'], mustChangePassword: true, branchIds: [], allBranches: true });
+  });
+
+  it('LIS-CR-007 C-05: the mobile takes its dial code from the public countries and posts the E.164 form without the leading 0', async () => {
+    const fixture = TestBed.createComponent(UserEditorPage);
+    await flush();
+    flushPickers();
+    backend.match((request) => request.url === ORGANIZATION_API.countries).forEach((request) =>
+      request.flush([{ id: 'eg', isoCode: 'EG', nameEn: 'Egypt', nameAr: 'مصر', dialCode: '+20', mobileLength: 10 }]),
+    );
+    await flush();
+    await fixture.whenStable();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector<HTMLSelectElement>('app-mobile-input[formcontrolname="mobile"] select.dial')?.value).toBe('EG');
+    const set = (selector: string, value: string): void => {
+      const control = host.querySelector<HTMLInputElement>(selector);
+      if (control) {
+        control.value = value;
+        control.dispatchEvent(new Event('input'));
+      }
+    };
+    set('input[formcontrolname="username"]', 'mona.adel');
+    set('input[formcontrolname="password"]', 'a long secret');
+    set('input[formcontrolname="confirm"]', 'a long secret');
+    set('input[formcontrolname="email"]', 'mona@lab.example');
+    set('app-mobile-input[formcontrolname="mobile"] input.number', '0100 123 4567');
+    host.querySelectorAll<HTMLInputElement>('app-localized-text-input input').forEach((input, index) => {
+      input.value = index === 0 ? 'Mona Adel' : 'منى عادل';
+      input.dispatchEvent(new Event('input'));
+    });
+    await flush();
+    host.querySelector<HTMLButtonElement>('form button[type="submit"]')?.click();
+    await flush();
+    expect(backend.expectOne({ method: 'POST', url: ORGANIZATION_API.users }).request.body).toMatchObject({ mobile: '+201001234567' });
   });
 
   /** Opens the "new user" page and fills a valid profile. */
@@ -178,7 +213,7 @@ describe('UserEditorPage (CP-38)', () => {
         .flush({ type: 'about:blank', title: 'Conflict', status: 409, code, traceId: null, correlationId: null, errors: null }, { status: 409, statusText: 'Conflict' });
       await flush();
 
-      const input = host.querySelector<HTMLInputElement>(`[formcontrolname="${field}"]`);
+      const input = host.querySelector<HTMLInputElement>(`input[formcontrolname="${field}"], app-mobile-input[formcontrolname="${field}"] input.number`);
       expect(input?.getAttribute('aria-invalid')).toBe('true');
       expect(input?.closest('app-form-field')?.querySelector('[role="alert"]')).not.toBeNull();
       expect(banner(host)).toEqual([]);

@@ -54,11 +54,13 @@ export class SampleTypesPage {
       { key: 'shortName', header: 'catalogue-a.sampleTypes.column.shortName', width: '120px' },
       { key: 'name', header: 'catalogue-a.sampleTypes.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (row) => localizedPick({ en: row.nameEn, ar: row.nameAr }, this.i18n.lang()) },
       { key: 'activeConditionCount', header: 'catalogue-a.sampleTypes.column.conditions', align: 'end', width: '120px' },
+      { key: 'forCulture', header: 'catalogue-a.sampleTypes.column.forCulture', width: '110px', secondary: true, value: (row) => (row.forCulture ? this.i18n.t('catalogue-a.sampleTypes.culture') : '') },
     ],
     fields: [
       { name: 'code', kind: 'code', required: true, maxLength: 20, hint: 'catalogue-a.sampleTypes.hint.code' },
       { name: 'shortName', kind: 'text', required: true, maxLength: 20 },
       { name: 'name', kind: 'localizedText', required: true, maxLength: 200 },
+      { name: 'forCulture', kind: 'boolean', defaultValue: false, full: true },
     ],
     adapter: {
       list: (filter, page, signal) => {
@@ -84,6 +86,7 @@ export class SampleTypesPage {
         { header: this.i18n.t('catalogue-a.csv.nameEn'), value: (row) => row.nameEn },
         { header: this.i18n.t('catalogue-a.csv.nameAr'), value: (row) => row.nameAr },
         { header: t('conditions'), value: (row) => row.activeConditionCount },
+        { header: t('forCulture'), value: (row) => yesNo((key) => this.i18n.t(key), row.forCulture) },
         { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => yesNo((key) => this.i18n.t(key), row.isActive) },
       ]),
     );

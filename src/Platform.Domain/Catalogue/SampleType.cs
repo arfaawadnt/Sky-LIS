@@ -44,6 +44,13 @@ public sealed class SampleType : AggregateRoot, ITenantScoped
 
     public bool IsActive { get; private set; }
 
+    /// <summary>
+    /// The type is a culture specimen (urine, wound swab, blood culture …): listed on the Microbiology page's *Culture
+    /// specimens* tab and offered first by the sample-type picker of a culture service (change request LIS-CR-007, C-11).
+    /// A flag only: it restricts nothing.
+    /// </summary>
+    public bool ForCulture { get; private set; }
+
     public uint RowVersion { get; private set; }
 
     /// <summary>Incremented by every change of the conditions, so the root row carries the concurrency check and the modification stamp.</summary>
@@ -51,25 +58,29 @@ public sealed class SampleType : AggregateRoot, ITenantScoped
 
     public IReadOnlyList<SampleCondition> Conditions => _conditions.AsReadOnly();
 
-    /// <summary>T4 Create (<c>catalogue.create</c>) with its initial conditions.</summary>
-    public static SampleType Create(string code, string shortName, LocalizedText name, IEnumerable<SampleConditionSpec> conditions, DateTimeOffset nowUtc)
+    /// <summary>T4 Create (<c>catalogue.create</c>) with its initial conditions; <paramref name="forCulture"/> marks a culture specimen.</summary>
+    public static SampleType Create(string code, string shortName, LocalizedText name, IEnumerable<SampleConditionSpec> conditions, DateTimeOffset nowUtc, bool forCulture = false)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(conditions);
-        var sampleType = new SampleType(Guid.CreateVersion7(), CleanCode(code), CleanShortName(shortName), name);
+        var sampleType = new SampleType(Guid.CreateVersion7(), CleanCode(code), CleanShortName(shortName), name) { ForCulture = forCulture };
         sampleType.UpsertConditions(conditions, deactivateOmitted: false);
         sampleType.Raise(new SampleTypeCreated(sampleType.Id, sampleType.Code, nowUtc));
         return sampleType;
     }
 
-    /// <summary>T5 Edit (<c>catalogue.edit</c>): short name and names; the code is immutable.</summary>
-    public void Change(string shortName, LocalizedText name, DateTimeOffset nowUtc)
+    /// <summary>
+    /// T5 Edit (<c>catalogue.edit</c>): short name, names and the culture flag; the code is immutable. A null
+    /// <paramref name="forCulture"/> keeps the flag (an editor that predates the flag never clears it).
+    /// </summary>
+    public void Change(string shortName, LocalizedText name, DateTimeOffset nowUtc, bool? forCulture = null)
     {
         ArgumentNullException.ThrowIfNull(name);
-        var before = (ShortName, Name);
+        var before = (ShortName, Name, ForCulture);
         ShortName = CleanShortName(shortName);
         Name = name;
-        if (before != (ShortName, Name))
+        ForCulture = forCulture ?? ForCulture;
+        if (before != (ShortName, Name, ForCulture))
         {
             Raise(new SampleTypeChanged(Id, Code, nowUtc));
         }

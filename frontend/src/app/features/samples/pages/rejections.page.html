@@ -88,7 +88,7 @@
           }
           <button type="button" class="btn sm primary" [disabled]="facade.replace.pending()" (click)="replace(row)">{{ i18n.t('samples.replace.action') }}</button>
         </ng-container>
-        <a class="btn sm ghost" [routerLink]="links.track(row.sampleNumber)">{{ i18n.t('samples.track') }}</a>
+        <a class="row-btn" [routerLink]="links.track(row.sampleNumber)" [attr.aria-label]="i18n.t('samples.track') + ' ' + row.sampleNumber" [title]="i18n.t('samples.track')"><app-icon name="eye" [size]="15" /></a>
       </ng-template>
     </app-data-table>
 

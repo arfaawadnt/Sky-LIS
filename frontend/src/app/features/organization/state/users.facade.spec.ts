@@ -74,6 +74,7 @@ describe('Users facades (CP-38)', () => {
   function flushPickers(): void {
     backend.match((request) => request.url === ORGANIZATION_API.roles || request.url === ORGANIZATION_API.branches).forEach((request) => request.flush(page([])));
     backend.match(ORGANIZATION_API.permissionCatalogue).forEach((request) => request.flush({ modules: [], actions: [] }));
+    backend.match((request) => request.url === ORGANIZATION_API.countries).forEach((request) => request.flush([]));
   }
 
   it('filters the register by search, role and status', async () => {

@@ -75,8 +75,8 @@ describe('Public pages (CP-01, CP-02)', () => {
       await render();
       backend.expectOne((request) => request.url === PUBLIC_SUBSCRIPTION_API.governorates).flush([]);
       for (const name of ['mobile', 'managerMobile']) {
-        setValue(root, `input[formcontrolname=${name}]`, '12345');
-        root.querySelector(`input[formcontrolname=${name}]`)?.dispatchEvent(new Event('blur'));
+        setValue(root, `app-mobile-input[formcontrolname=${name}] input.number`, '12345');
+        root.querySelector(`app-mobile-input[formcontrolname=${name}] input.number`)?.dispatchEvent(new Event('blur'));
       }
       await render();
       const shown = (): string => root.textContent ?? '';
@@ -111,9 +111,9 @@ describe('Public pages (CP-01, CP-02)', () => {
       setValue(root, 'input[formcontrolname=labNameAr]', 'مختبرات النور');
       setValue(root, 'select[formcontrolname=governorateId]', 'cairo');
       setValue(root, 'input[formcontrolname=address]', 'Nasr City');
-      setValue(root, 'input[formcontrolname=mobile]', '0101234567');
+      setValue(root, 'app-mobile-input[formcontrolname=mobile] input.number', '0101234567');
       setValue(root, 'input[formcontrolname=managerName]', 'Ahmed Hassan');
-      setValue(root, 'input[formcontrolname=managerMobile]', '01012345679');
+      setValue(root, 'app-mobile-input[formcontrolname=managerMobile] input.number', '01012345679');
       (root.querySelector('form button[type=submit]') as HTMLButtonElement).click();
       await render();
       backend.expectNone(PUBLIC_SUBSCRIPTION_API.start);
@@ -122,17 +122,34 @@ describe('Public pages (CP-01, CP-02)', () => {
       expect(root.textContent).not.toContain('public.wizard.validation.managerMobileLength');
       expect(root.textContent).not.toContain('shared.validation.invalid');
 
-      setValue(root, 'input[formcontrolname=mobile]', '01012345678');
+      setValue(root, 'app-mobile-input[formcontrolname=mobile] input.number', '01012345678');
       (root.querySelector('form button[type=submit]') as HTMLButtonElement).click();
       await render();
       const start = backend.expectOne(PUBLIC_SUBSCRIPTION_API.start);
-      expect(start.request.body).toMatchObject({ labNameEn: 'Al Noor Laboratories', countryId: 'eg', governorateId: 'cairo', mobile: '01012345678', licenceNo: null, email: null, language: 'en' });
+      expect(start.request.body).toMatchObject({ labNameEn: 'Al Noor Laboratories', countryId: 'eg', governorateId: 'cairo', mobile: '+201012345678', managerMobile: '+201012345679', licenceNo: null, email: null, language: 'en' });
       start.flush({ subscriptionId: 'sub-1', expiresAtUtc: '2026-10-09T13:00:00Z', maskedMobile: '+201******679', codeLifetimeSeconds: 300 });
       await render();
       expect(root.textContent).toContain('public.wizard.verifyTitle');
       expect(root.querySelector<HTMLButtonElement>('button.link')?.disabled).toBe(true);
       // without a revealed code (an SMS gateway sends it) the page shows nothing but the masked mobile
       expect(root.querySelector('.code-reveal')).toBeNull();
+    });
+
+    it('shows the dial code of the chosen country beside each mobile and drops a typed leading 0 (LIS-CR-007 C-05)', async () => {
+      setValue(root, 'select[formcontrolname=countryId]', 'eg');
+      await render();
+      backend.expectOne((request) => request.url === PUBLIC_SUBSCRIPTION_API.governorates).flush([]);
+      await render();
+      for (const name of ['mobile', 'managerMobile']) {
+        expect(root.querySelector(`app-mobile-input[formcontrolname=${name}] .dial`)?.textContent).toContain('+20');
+      }
+
+      const input = root.querySelector<HTMLInputElement>('app-mobile-input[formcontrolname=mobile] input.number')!;
+      setValue(root, 'app-mobile-input[formcontrolname=mobile] input.number', '01012345678');
+      input.dispatchEvent(new Event('blur'));
+      await render();
+      expect(input.value).toBe('1012345678');
+      expect(root.textContent).not.toContain('public.wizard.validation.mobileLength');
     });
 
     it('shows the verification code on the page when the host reveals it (no SMS gateway yet, 2026-10-14)', async () => {
@@ -144,9 +161,9 @@ describe('Public pages (CP-01, CP-02)', () => {
       setValue(root, 'input[formcontrolname=labNameAr]', 'مختبرات النور');
       setValue(root, 'select[formcontrolname=governorateId]', 'cairo');
       setValue(root, 'input[formcontrolname=address]', 'Nasr City');
-      setValue(root, 'input[formcontrolname=mobile]', '01012345678');
+      setValue(root, 'app-mobile-input[formcontrolname=mobile] input.number', '01012345678');
       setValue(root, 'input[formcontrolname=managerName]', 'Ahmed Hassan');
-      setValue(root, 'input[formcontrolname=managerMobile]', '01012345679');
+      setValue(root, 'app-mobile-input[formcontrolname=managerMobile] input.number', '01012345679');
       (root.querySelector('form button[type=submit]') as HTMLButtonElement).click();
       await render();
       backend.expectOne(PUBLIC_SUBSCRIPTION_API.start).flush({ subscriptionId: 'sub-1', expiresAtUtc: '2026-10-09T13:00:00Z', maskedMobile: '+201******679', codeLifetimeSeconds: 300, verificationCode: '482913' });

@@ -4,7 +4,7 @@
 | --- | --- |
 | Module | `catalogue` (half A; slot `cat`). Client pages CP-39 Clinical groups, CP-40 Services, CP-41 Tests, CP-42 Service sequence, CP-43 Sample types, CP-44 Units of measurement, CP-45 Patient conditions, CP-55 Additional services; admin SA-12/SA-13 reuse the same pages under the platform tenant. Business rules BR-02 (input), BR-08, BR-11, BR-12, BR-13, BR-19, BR-20, BR-24, BR-25. |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), the Sky LIS prototypes synthesis and the LDM knowledge base (`docs/knowledge/ldm/LDM_Business_Knowledge.md` §2.2, §2.5, §3.1–§3.8, §5.6, §6). **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.2 — 2026-10-19 (service sequence reordering, change request LIS-CR-003 P-C18: §17, scenario S-T12b, questions Q18–Q20); 1.1 — 2026-10-14 (parent services on the test page, change request: T21, scenario S-T21, question Q17) |
+| Version | 1.3 — 2026-10-24 (culture specimens: `SampleType.ForCulture`, change request LIS-CR-007 P-MIC, reviewer point C-11: §18, scenario S-T3c, questions Q21–Q23); 1.2 — 2026-10-19 (service sequence reordering, change request LIS-CR-003 P-C18: §17, scenario S-T12b, questions Q18–Q20); 1.1 — 2026-10-14 (parent services on the test page, change request: T21, scenario S-T21, question Q17) |
 | Implemented in | `src/Platform.Domain/Catalogue` (ClinicalGroup, SampleType, MeasurementUnit, PatientCondition, Service, LabTest, ReferenceRangeResolver), `src/Platform.Contracts/Catalogue`, `src/Platform.Application/Catalogue` (+ `Services/` formula evaluator, `ICatalogueLookup`, `ICatalogueACloner`), `src/Platform.Infrastructure/Persistence/Catalogue`, `src/Platform.WebApi/Controllers/Catalogue`, `frontend/src/app/features/catalogue/{pages-a,data-a,state-a,ui-a}`, `frontend/src/app/core/api/catalogue-a.contracts.ts`, `frontend/public/i18n/catalogue-a.{en,ar}.json` |
 | Codes | `CAT-001`…`CAT-199` (catalogue B uses `CAT-200`…`CAT-399`) |
 
@@ -312,3 +312,47 @@ Scenario S-T12b-ui: the arrow buttons, a drop before / after a row, a typed numb
 | Q18 | What does a typed number mean on the reorder page: the row's new sequence number, or the position whose number it is? | The position: the row takes the place of that number (between two numbers, the place of the lower one) and every visible row keeps a number the set already uses. A laboratory that wants gaps for later inserts gives a service its number on the service page (CP-40), as before. |
 | Q19 | May the filters change while an order is unsaved? | No: the filters and *Refresh* are disabled until the order is saved or discarded, because the renumbering is defined over the rows on screen. |
 | Q20 | Should a reorder of a filtered subset be allowed to renumber rows outside the filter (for example to close gaps)? | No: only the visible rows change, within their own numbers (the prototype's "only the visible rows renumber"). |
+
+## 18. Change request 2026-10-24 — culture specimens (LIS-CR-007, package P-MIC, reviewer point C-11, CP-43 / CP-40 / CP-56)
+
+The reviewer asked where the culture sample types are (LIS-RC-001 C-11). Culture specimens stay ordinary sample types; a flag marks the
+ones cultures use, so the Microbiology page can list them and a culture service can find them first.
+
+**What changes**
+
+- Domain: `SampleType.ForCulture` (bool, default false). `SampleType.Create(…, forCulture = false)`; `SampleType.Change(shortName, name,
+  now, forCulture?)` — a null flag keeps the stored one, a change of the flag raises `SampleTypeChanged` like any other edit. The flag
+  restricts nothing (any sample type may still be chosen for any service); no new code.
+- Table: `app.sample_types.for_culture boolean NOT NULL DEFAULT false` (migration **`ReviewQuickWins`**). The migration then runs the
+  dated section of `Persistence/Catalogue/CatalogueA.migration.sql`: every tenant's sample types — the platform's global templates
+  included — whose English name contains *swab*, *culture*, *urine*, *stool*, *sputum*, *pus*, *csf* or *wound* (case-insensitive) are
+  flagged. The statement only sets the flag, so a rerun changes nothing. The catalogue cloner copies the flag into a new laboratory.
+- Contracts (all new fields optional, older clients keep working): `CreateSampleTypeRequest.ForCulture?` (absent = false),
+  `UpdateSampleTypeRequest.ForCulture?` (absent = kept), `SampleTypeListItem.ForCulture`, `SampleTypeDetail.ForCulture`.
+- Endpoints: `GET /api/v1/catalogue/sample-types?forCulture=true|false` and `GET …/sample-types/export?forCulture=` filter by the
+  flag (absent = every type); create / update / detail carry the field. Permissions unchanged (`catalogue.view` / `create` / `edit` /
+  `export`).
+- CP-43 Sample types: the editor has the switch **Used for cultures** (`مستخدم للمزارع`); the list shows a *Cultures* column and the CSV
+  export a yes / no column.
+- CP-40 Service editor: for a service of type **Culture** the sample-type picker shows two groups — *Culture specimens* first, then
+  *Other sample types*; every other type, or a laboratory without flagged types, keeps the single list.
+
+**Scenario added**
+
+```gherkin
+Scenario S-T3c: a sample type is created as a culture specimen or not (default not); the editor switches the flag on and off, an update
+                without the field keeps it; the register filtered forCulture=true lists the culture specimens only (forCulture=false the
+                others, no filter all of them); the export honours the filter; a culture service's picker lists the culture specimens
+                first, a test service one list
+```
+
+Tests: `ReferenceListTests.CR007_*` (domain), `CatalogueAFlowTests.Culture_specimens_are_flagged_on_the_sample_type_and_filtered_by_the_register`
+(functional), `sample-types.page.spec.ts` and `service-editor.page.spec.ts` (SPA).
+
+**Open questions (assumed answers let the build proceed; confirm or change)**
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| Q21 | Which existing sample types are culture specimens? | Those whose English name contains swab, culture, urine, stool, sputum, pus, csf or wound (the list of the change request). Urine also serves chemistry: the flag only orders the culture picker and fills the Microbiology tab, so a flagged urine type stays usable everywhere. The laboratory corrects the rest with the switch. |
+| Q22 | Should a culture service be *restricted* to culture specimens? | No: the picker offers them first and still lists the other types (a blood culture bottle may be modelled as any type). |
+| Q23 | Does an update that omits the flag clear it? | No: absent = kept, so a client older than this change never clears it; the SPA always sends it. |

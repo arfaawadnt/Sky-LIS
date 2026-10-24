@@ -17,9 +17,13 @@
       <p class="lead">{{ lead() }}</p>
     </div>
 
-    <section class="card" [attr.aria-labelledby]="labelledBy()">
-      <ng-content />
-    </section>
+    <div class="card-col">
+      <section class="card" [attr.aria-labelledby]="labelledBy()">
+        <ng-content />
+      </section>
+      <!-- under the card: the page's strip with the [authAfterCard] attribute (the bookmark hint, LIS-CR-007 C-01) -->
+      <ng-content select="[authAfterCard]" />
+    </div>
   </main>
 
   <footer class="foot">

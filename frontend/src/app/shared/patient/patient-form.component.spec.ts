@@ -26,8 +26,23 @@ class HostComponent {
 
 let granted = new Set<string>();
 
+/** The element to type in: a phone is a two-part control (LIS-CR-007 C-05) whose national number is the input. */
+function field(host: HTMLElement, control: string): HTMLInputElement | HTMLSelectElement | null {
+  return host.querySelector<HTMLInputElement>(`app-mobile-input[formcontrolname="${control}"] input.number`) ?? host.querySelector<HTMLInputElement | HTMLSelectElement>(`[formcontrolname="${control}"]`);
+}
+
+/** The dial-code select of a phone. */
+function dialOf(host: HTMLElement, control: string): HTMLSelectElement {
+  const select = host.querySelector<HTMLSelectElement>(`app-mobile-input[formcontrolname="${control}"] select.dial`);
+  if (!select) {
+    throw new Error(`${control} has no dial code select`);
+  }
+
+  return select;
+}
+
 function type(host: HTMLElement, control: string, value: string): void {
-  const element = host.querySelector<HTMLInputElement | HTMLSelectElement>(`[formcontrolname="${control}"]`);
+  const element = field(host, control);
   if (!element) {
     throw new Error(`${control} not found`);
   }
@@ -56,7 +71,7 @@ async function flushLookups(): Promise<void> {
 function value(host: HTMLElement, control: string): string {
   // the gender is a radio switch: its value is the checked option's
   const checked = host.querySelector<HTMLInputElement>(`input[type="radio"][formcontrolname="${control}"]:checked`);
-  return checked?.value ?? host.querySelector<HTMLInputElement | HTMLSelectElement>(`[formcontrolname="${control}"]`)?.value ?? '';
+  return checked?.value ?? field(host, control)?.value ?? '';
 }
 
 describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
@@ -239,8 +254,8 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
 
   describe('Egyptian national id', () => {
     const countries: readonly CountryOption[] = [
-      { id: 'c-eg', code: 'EG', nameEn: 'Egypt', nameAr: 'مصر', mobileLength: 10 },
-      { id: 'c-sa', code: 'SA', nameEn: 'Saudi Arabia', nameAr: 'السعودية', mobileLength: 9 },
+      { id: 'c-eg', code: 'EG', nameEn: 'Egypt', nameAr: 'مصر', mobileLength: 10, dialCode: '+20' },
+      { id: 'c-sa', code: 'SA', nameEn: 'Saudi Arabia', nameAr: 'السعودية', mobileLength: 9, dialCode: '+966' },
     ];
     const governorates: readonly GovernorateOption[] = [
       { id: 'g-cairo', nameEn: 'Cairo', nameAr: 'القاهرة', countryId: 'c-eg' },
@@ -258,7 +273,9 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
     it('accepts an Egyptian mobile with the trunk 0 or without it and saves both as 01xxxxxxxxx (remaining point A-09)', async () => {
       for (const typed of ['01011140001', '1011140001']) {
         const { fixture, host } = await renderWithLists();
-        const country = host.querySelector<HTMLSelectElement>('.mobile select')!;
+        fixture.componentInstance.settings.set({ mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true, countryCode: 'EG', countryMobileLength: 10 });
+        await fixture.whenStable();
+        const country = dialOf(host, 'mobile');
         country.value = 'EG';
         country.dispatchEvent(new Event('change'));
         type(host, 'fullName', 'Walk In');
@@ -276,8 +293,9 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
       const { fixture, host } = await renderWithLists();
       fixture.componentInstance.settings.set({ mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true, countryCode: 'EG', countryMobileLength: 10 });
       await fixture.whenStable();
-      const country = host.querySelector<HTMLSelectElement>('.mobile select')!;
+      const country = dialOf(host, 'mobile');
       expect(country.value).toBe('EG');
+      expect(dialOf(host, 'secondPhone').value).toBe('EG');
       type(host, 'fullName', 'Mobile Ten');
       type(host, 'ageYears', '30');
       type(host, 'mobile', '1019199912');
@@ -285,20 +303,49 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
       expect(fixture.componentInstance.form().submit()).toBe(true);
       expect(fixture.componentInstance.saved.at(-1)?.mobile).toBe('01019199912');
 
-      // "Any", chosen on purpose, keeps the number as typed (PAT Q14)
-      country.value = '';
+      // LIS-CR-007 C-05: a number of another country (its dial code chosen, or pasted with +) is stored in its E.164 form
+      country.value = 'SA';
       country.dispatchEvent(new Event('change'));
+      type(host, 'mobile', '0501234567');
       await fixture.whenStable();
       expect(fixture.componentInstance.form().submit()).toBe(true);
-      expect(fixture.componentInstance.saved.at(-1)?.mobile).toBe('1019199912');
+      expect(fixture.componentInstance.saved.at(-1)?.mobile).toBe('+966501234567');
+
+      // the country's length still decides: 10 digits after +966 are refused
+      type(host, 'mobile', '1019199912');
+      await fixture.whenStable();
+      expect(fixture.componentInstance.form().submit()).toBe(false);
       fixture.destroy();
     });
 
-    it('F-08: stays on "Any" when the laboratory names no country or one without a mobile length', async () => {
+    it('F-08: opens on the first listed country when the laboratory names one not listed, and keeps its numbers international', async () => {
       const { fixture, host } = await renderWithLists();
       fixture.componentInstance.settings.set({ mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true, countryCode: 'KW', countryMobileLength: 8 });
       await fixture.whenStable();
-      expect(host.querySelector<HTMLSelectElement>('.mobile select')!.value).toBe('');
+      expect(dialOf(host, 'mobile').value).toBe('EG');
+      type(host, 'fullName', 'Walk In');
+      type(host, 'ageYears', '30');
+      type(host, 'mobile', '01011140001');
+      await fixture.whenStable();
+      expect(fixture.componentInstance.form().submit()).toBe(true);
+      expect(fixture.componentInstance.saved.at(-1)?.mobile).toBe('+201011140001');
+      fixture.destroy();
+    });
+
+    it('LIS-CR-007 C-05: a pasted international number moves the dial code and an edited file keeps its stored trunk form', async () => {
+      const { fixture, host } = await renderWithLists();
+      fixture.componentInstance.settings.set({ mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true, countryCode: 'EG', countryMobileLength: 10 });
+      await fixture.whenStable();
+      type(host, 'fullName', 'Walk In');
+      type(host, 'ageYears', '30');
+      const input = field(host, 'mobile') as HTMLInputElement;
+      const paste = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(paste, 'clipboardData', { value: { getData: () => '0020 101 114 0001' } });
+      input.dispatchEvent(paste);
+      await fixture.whenStable();
+      expect(input.value).toBe('1011140001');
+      expect(fixture.componentInstance.form().submit()).toBe(true);
+      expect(fixture.componentInstance.saved.at(-1)?.mobile).toBe('01011140001');
       fixture.destroy();
     });
 
@@ -486,11 +533,10 @@ describe('PatientFormComponent (CP-06 / CP-11 patient data)', () => {
 
     it('saves the second phone cleaned like the mobile and types it into the similar-patient lookup (C3)', async () => {
       const { fixture, host } = await render();
-      fixture.componentInstance.countries.set([{ id: 'c-eg', code: 'EG', nameEn: 'Egypt', nameAr: 'مصر', mobileLength: 10 }]);
+      fixture.componentInstance.countries.set([{ id: 'c-eg', code: 'EG', nameEn: 'Egypt', nameAr: 'مصر', mobileLength: 10, dialCode: '+20' }]);
+      fixture.componentInstance.settings.set({ mandatoryMobile: false, mandatoryNationalId: false, similarNameWarning: true, countryCode: 'EG', countryMobileLength: 10 });
       await tick();
-      const country = host.querySelector<HTMLSelectElement>('.mobile select')!;
-      country.value = 'EG';
-      country.dispatchEvent(new Event('change'));
+      expect(dialOf(host, 'secondPhone').value).toBe('EG');
 
       const typed: TypedIdentity[] = [];
       fixture.componentInstance.form().typed.subscribe((identity) => typed.push(identity));

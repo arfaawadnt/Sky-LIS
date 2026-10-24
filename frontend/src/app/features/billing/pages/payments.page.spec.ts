@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
-import { BILLING_API, type CollectionsReportDocument, type CollectionsReportRequest, type PaymentListItem, type VisitAccountView } from '../../../core/api/billing.contracts';
+import { BILLING_API, type CollectionsReportDocument, type CollectionsReportRequest, type PaymentListItem, type RefundListItem, type VisitAccountView } from '../../../core/api/billing.contracts';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
@@ -48,6 +48,24 @@ const posted: PaymentListItem = {
   voidedByName: null,
   voidedAtUtc: null,
 };
+
+const refund = (index: number): RefundListItem => ({
+  id: `ref-${index}`,
+  number: `RFD-2026-0000${index}`,
+  visitId: 'v-1',
+  accession: 'ACC-2026-00001',
+  amount: 10,
+  method: 'Cash',
+  reference: null,
+  reasonId: 'r-1',
+  reasonNameEn: 'Overpaid',
+  reasonNameAr: null,
+  note: null,
+  cashierUserId: 'u-1',
+  cashierName: 'Cashier One',
+  branchId: 'b-1',
+  refundedAtUtc: `2026-10-09T1${index}:00:00Z`,
+});
 
 class PrinterStub {
   readonly printed: string[] = [];
@@ -202,6 +220,75 @@ describe('PaymentsPage (CP-23)', () => {
     harness.detectChanges();
     expect(harness.routeNativeElement?.querySelector('[role="alert"]')).not.toBeNull();
     backend.verify();
+  });
+
+  // ---- layout, LIS-CR-007 C-07 -------------------------------------------------------------------------
+
+  /** Answers the account of visit v-1 opened by the link and renders it. */
+  async function openAccount(view: VisitAccountView): Promise<HTMLElement> {
+    await open('/billing/payments?visitId=v-1');
+    backend.expectOne(`${BILLING_API.visits}/v-1/account`).flush(view);
+    TestBed.tick();
+    await settle();
+    harness.detectChanges();
+    return harness.routeNativeElement as HTMLElement;
+  }
+
+  it('puts "Take a payment" in the first row beside the visit totals, above the payments of the visit (C-07)', async () => {
+    const root = await openAccount(account({ payments: [posted] }));
+    const row = root.querySelector('.top-row')!;
+    expect([...row.children].map((card) => card.className.split(' ').find((name) => name.endsWith('-card')))).toEqual(['account-card', 'pay-card']);
+    expect(row.querySelector('.pay-card input[formcontrolname=amount]')).not.toBeNull();
+    const list = root.querySelector('.list-card')!;
+    expect(row.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(list.querySelector('.show-all')).toBeNull();   // one payment: nothing to collapse
+  });
+
+  it('shows the latest three payments and refunds, and all of them on "Show all" (C-07)', async () => {
+    const payments = [1, 2, 3, 4, 5].map((index) => ({ ...posted, id: `pay-${index}`, receiptNumber: `RCT-2026-0000${index}` }));
+    const refunds = [1, 2, 3, 4].map(refund);
+    const root = await openAccount(account({ payments, refunds }));
+    const list = root.querySelector('.list-card')!;
+    const receipts = (): string[] => [...list.querySelectorAll('tbody tr[data-row]')].map((tr) => tr.getAttribute('data-row') ?? '');
+    const refundNumbers = (): string[] => [...list.querySelectorAll('.refund-list li .mono')].map((item) => item.textContent?.trim() ?? '');
+
+    expect(receipts()).toEqual(['pay-3', 'pay-4', 'pay-5']);
+    expect(refundNumbers()).toEqual(['RFD-2026-00002', 'RFD-2026-00003', 'RFD-2026-00004']);
+    const toggle = list.querySelector<HTMLButtonElement>('.show-all')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(toggle.textContent?.trim()).toBe('billing.account.showAll');   // the dictionary is not loaded in the spec
+
+    toggle.click();
+    TestBed.tick();
+    await settle();
+    expect(receipts()).toEqual(['pay-1', 'pay-2', 'pay-3', 'pay-4', 'pay-5']);
+    expect(refundNumbers().length).toBe(4);
+    expect(toggle.textContent?.trim()).toBe('billing.account.showLatest');
+
+    toggle.click();
+    TestBed.tick();
+    await settle();
+    expect(receipts()).toEqual(['pay-3', 'pay-4', 'pay-5']);
+  });
+
+  it('moves the focus to the amount once a visit is found, with the proposed amount selected (C-07: scan, amount, F10)', async () => {
+    await open('/billing/payments');
+    const root = harness.routeNativeElement as HTMLElement;
+    const accession = root.querySelector<HTMLInputElement>('input[type=search]')!;
+    accession.value = 'ACC-2026-00001';
+    accession.dispatchEvent(new Event('input'));
+    accession.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    TestBed.tick();
+    await settle();
+    backend.expectOne(`${BILLING_API.visits}/by-accession/ACC-2026-00001/account`).flush(account());
+    TestBed.tick();
+    await settle();
+    TestBed.tick();
+    await settle();
+
+    const amount = root.querySelector<HTMLInputElement>('input[formcontrolname=amount]')!;
+    expect(document.activeElement).toBe(amount);
+    expect(amount.value).toBe('200');
   });
 
   // ---- collections report, change request 2026-10-13 item 2 ---------------------------------------------

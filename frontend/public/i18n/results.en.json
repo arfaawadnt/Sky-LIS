@@ -204,6 +204,7 @@
   "grid.result": "Result",
   "grid.unit": "Unit",
   "grid.range": "Reference range",
+  "grid.rangeProvisional": "Expected range for this patient; confirmed when the result is saved",
   "grid.flag": "Flag",
   "grid.delta": "Δ",
   "grid.sampleStatus": "Sample",

@@ -88,7 +88,7 @@
   "wizard.chooseCountryFirst": "Choose the country first",
   "wizard.validation.mobileLength": "The laboratory mobile has {length} digits after {dial} in the selected country.",
   "wizard.validation.managerMobileLength": "The manager's mobile has {length} digits after {dial} in the selected country.",
-  "wizard.mobileHint": "{length} digits after {dial}",
+  "wizard.mobileHint": "{length} digits after {dial}, without the leading 0",
   "wizard.optional": "Optional",
   "wizard.managerMobileHint": "The verification code is sent to this number.",
   "wizard.back": "Back",

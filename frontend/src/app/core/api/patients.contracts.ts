@@ -289,6 +289,8 @@ export interface CountryOption {
   readonly nameEn: string;
   readonly nameAr: string;
   readonly mobileLength: number | null;
+  /** `+20`: the dial code the mobile control shows (LIS-CR-007 C-05); absent when the list does not give one. */
+  readonly dialCode?: string | null;
 }
 
 /** A governorate of the platform list (anonymous `/api/v1/public/governorates`, every country when unfiltered). */

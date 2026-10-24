@@ -1,0 +1,43 @@
+<div class="mobile" dir="ltr" [class.disabled]="disabled()">
+  <input
+    #number
+    class="number"
+    type="tel"
+    inputmode="tel"
+    maxlength="24"
+    [attr.autocomplete]="autocomplete()"
+    [attr.placeholder]="placeholder()"
+    [value]="national()"
+    [disabled]="disabled()"
+    (input)="onInput($event)"
+    (paste)="onPaste($event)"
+    (blur)="onBlur()"
+  />
+  @switch (mode()) {
+    @case ('fixed') {
+      <span class="dial fixed"><span class="visually-hidden">{{ i18n.t('shared.mobileInput.dialCode') }}</span>{{ dial() }}</span>
+    }
+    @case ('select') {
+      <select class="dial" [disabled]="disabled()" [attr.aria-label]="i18n.t('shared.mobileInput.dialCode')" (change)="onDialChange($event)" (blur)="onDialBlur()">
+        @for (option of countries(); track key(option)) {
+          <option [value]="key(option)" [selected]="key(option) === selectedKey()" [attr.title]="optionTitle(option)">{{ optionLabel(option) }}</option>
+        }
+      </select>
+    }
+    @default {
+      <input
+        class="dial free"
+        type="tel"
+        inputmode="tel"
+        maxlength="5"
+        placeholder="+"
+        autocomplete="off"
+        [attr.aria-label]="i18n.t('shared.mobileInput.dialCode')"
+        [value]="freeDial()"
+        [disabled]="disabled()"
+        (input)="onFreeDial($event)"
+        (blur)="onDialBlur()"
+      />
+    }
+  }
+</div>

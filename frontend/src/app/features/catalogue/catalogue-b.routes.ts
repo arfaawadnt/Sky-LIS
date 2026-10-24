@@ -53,12 +53,13 @@ export const CATALOGUE_B_ROUTES: Routes = [
     path: 'microbiology',
     loadComponent: () => import('./pages-b/microbiology.page').then((m) => m.MicrobiologyPage),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'drug-types' },
+      { path: '', pathMatch: 'full', redirectTo: 'organisms' },
+      { path: 'organisms', loadComponent: () => import('./pages-b/microbiology.pages').then((m) => m.OrganismsPage) },
+      { path: 'antibiotics', loadComponent: () => import('./pages-b/microbiology.pages').then((m) => m.AntibioticsPage) },
       { path: 'drug-types', loadComponent: () => import('./pages-b/microbiology.pages').then((m) => m.DrugTypesPage) },
       { path: 'commercial-names', loadComponent: () => import('./pages-b/microbiology.pages').then((m) => m.CommercialNamesPage) },
-      { path: 'antibiotics', loadComponent: () => import('./pages-b/microbiology.pages').then((m) => m.AntibioticsPage) },
-      { path: 'organisms', loadComponent: () => import('./pages-b/microbiology.pages').then((m) => m.OrganismsPage) },
       { path: 'sensitivity-values', loadComponent: () => import('./pages-b/microbiology.pages').then((m) => m.SensitivityValuesPage) },
+      { path: 'culture-specimens', loadComponent: () => import('./pages-b/culture-specimens.page').then((m) => m.CultureSpecimensPage) },
     ],
   },
 ];

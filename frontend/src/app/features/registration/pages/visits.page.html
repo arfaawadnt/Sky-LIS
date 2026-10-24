@@ -96,14 +96,17 @@
       <app-badge [status]="row.status">{{ i18n.t('registration.status.' + row.status) }}</app-badge>
     </ng-template>
     <ng-template appRowActions [appRowActionsOf]="rows()" let-row>
+      <!-- LIS-CR-007 C-06: one line — the two labelled actions, two icons, the rest in the More menu -->
       <button type="button" class="btn sm ghost" (click)="details(row)" [attr.aria-label]="i18n.t('registration.accession.details') + ' ' + row.accession"><app-icon name="eye" [size]="14" />{{ i18n.t('registration.accession.details') }}</button>
       <button type="button" class="btn sm ghost" *appCan="permissions.edit" (click)="edit(row)" [attr.aria-label]="i18n.t('registration.visits.edit') + ' ' + row.accession"><app-icon name="edit" [size]="14" />{{ i18n.t('registration.visits.edit') }}</button>
-      <button type="button" class="btn sm ghost" *appCan="patientPermissions.edit" (click)="openPatient(row)" [attr.aria-label]="i18n.t('registration.visits.patient') + ' ' + row.accession"><app-icon name="user" [size]="14" />{{ i18n.t('registration.visits.patient') }}</button>
-      <button type="button" class="btn sm ghost" *appCan="'samples.view'" (click)="openSamples(row)" [attr.aria-label]="i18n.t('registration.visits.samples') + ' ' + row.accession"><app-icon name="barcode" [size]="14" />{{ i18n.t('registration.visits.samples') }}</button>
-      <button type="button" class="btn sm ghost" *appCan="'billing.view'" (click)="payments(row)" [attr.aria-label]="i18n.t('registration.visits.payments') + ' ' + row.accession"><app-icon name="coins" [size]="14" />{{ i18n.t('registration.visits.payments') }}</button>
-      <button type="button" class="btn sm ghost" (click)="openDocuments(row)" [attr.aria-label]="i18n.t('registration.visits.documents') + ' ' + row.accession"><app-icon name="printer" [size]="14" />{{ i18n.t('registration.visits.documents') }}</button>
-      <button type="button" class="btn sm ghost" *appCan="'results.view'" (click)="results(row)" [attr.aria-label]="i18n.t('registration.visits.results') + ' ' + row.accession"><app-icon name="flask" [size]="14" />{{ i18n.t('registration.visits.results') }}</button>
-      <button type="button" class="btn sm danger" *appCan="permissions.cancel" (click)="openCancel(row)" [attr.aria-label]="i18n.t('registration.cancel.action') + ' ' + row.accession"><app-icon name="x" [size]="14" />{{ i18n.t('registration.cancel.action') }}</button>
+      <button type="button" class="row-btn" *appCan="'billing.view'" (click)="payments(row)" [attr.aria-label]="i18n.t('registration.visits.payments') + ' ' + row.accession" [title]="i18n.t('registration.visits.payments')"><app-icon name="coins" [size]="15" /></button>
+      <button type="button" class="row-btn" (click)="openDocuments(row)" [attr.aria-label]="i18n.t('registration.visits.documents') + ' ' + row.accession" [title]="i18n.t('registration.visits.documents')"><app-icon name="printer" [size]="15" /></button>
+      <app-row-menu [label]="i18n.t('shared.table.moreActions') + ' ' + row.accession">
+        <button type="button" *appCan="patientPermissions.edit" (click)="openPatient(row)"><app-icon name="user" [size]="14" />{{ i18n.t('registration.visits.patient') }}</button>
+        <button type="button" *appCan="'samples.view'" (click)="openSamples(row)"><app-icon name="barcode" [size]="14" />{{ i18n.t('registration.visits.samples') }}</button>
+        <button type="button" *appCan="'results.view'" (click)="results(row)"><app-icon name="flask" [size]="14" />{{ i18n.t('registration.visits.results') }}</button>
+        <button type="button" class="danger" *appCan="permissions.cancel" (click)="openCancel(row)"><app-icon name="x" [size]="14" />{{ i18n.t('registration.cancel.action') }}</button>
+      </app-row-menu>
     </ng-template>
   </app-data-table>
 

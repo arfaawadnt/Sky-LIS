@@ -5,7 +5,9 @@ describe('Catalogue B page helpers', () => {
   it('finds the microbiology tab of a client or admin URL', () => {
     expect(microbiologyTabOf('/catalogue/microbiology/antibiotics')).toBe('antibiotics');
     expect(microbiologyTabOf('/admin/catalogue/microbiology/sensitivity-values?x=1')).toBe('sensitivity-values');
-    expect(microbiologyTabOf('/catalogue/microbiology')).toBe('drug-types');
+    expect(microbiologyTabOf('/catalogue/microbiology/culture-specimens')).toBe('culture-specimens');
+    expect(microbiologyTabOf('/catalogue/microbiology/drug-types')).toBe('drug-types');   // Antibiotic classes keeps its path (LIS-CR-007)
+    expect(microbiologyTabOf('/catalogue/microbiology')).toBe('organisms');   // the first tab since LIS-CR-007
   });
 
   it('sends the texts of a report template, empty ones as null, and never the logo or signature (their own calls, F-02)', () => {

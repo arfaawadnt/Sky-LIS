@@ -67,7 +67,7 @@
             <input type="email" formControlName="email" autocomplete="off" maxlength="254" />
           </app-form-field>
           <app-form-field [label]="i18n.t('organization.users.field.mobile')" [hint]="i18n.t('organization.users.hint.mobile')">
-            <input type="tel" formControlName="mobile" autocomplete="off" maxlength="30" />
+            <app-mobile-input formControlName="mobile" [countries]="mobileCountries()" />
           </app-form-field>
           <app-form-field [label]="i18n.t('organization.users.field.designation')">
             <input type="text" formControlName="designation" maxlength="100" />

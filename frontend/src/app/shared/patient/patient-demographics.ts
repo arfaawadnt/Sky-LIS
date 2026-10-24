@@ -156,6 +156,67 @@ export function mobileForStorage(value: string, countryLength: number | null = n
   return national === null ? normalized : `0${national}`;
 }
 
+/** A country as the two phones of the patient form read it (LIS-CR-007 C-05). */
+export interface PhoneCountry {
+  readonly dialCode: string;
+  readonly mobileLength: number | null;
+}
+
+/** The digits after the longest dial code of `countries` that starts `digits`, with that country; `null` when none does. */
+function nationalOfInternational(digits: string, countries: readonly PhoneCountry[]): { readonly country: PhoneCountry; readonly national: string } | null {
+  let best: { country: PhoneCountry; national: string } | null = null;
+  let bestLength = 0;
+  for (const country of countries) {
+    const dial = country.dialCode.replace(/\D/g, '');
+    if (dial.length > bestLength && digits.startsWith(dial)) {
+      best = { country, national: digits.slice(dial.length) };
+      bestLength = dial.length;
+    }
+  }
+
+  return best;
+}
+
+/**
+ * The phone rule of the two-part mobile control (LIS-CR-007 C-05): an international value (`+…`, what the control sends) is
+ * checked against the length of the country its dial code names, else 8–15 digits; a local value (a stored file written
+ * before, or typed without a dial code) follows {@link isValidMobile} with the laboratory country's length.
+ */
+export function isValidPhone(value: string, countries: readonly PhoneCountry[], localLength: number | null): boolean {
+  const normalized = normalizeMobile(value);
+  if (!normalized.startsWith('+')) {
+    return isValidMobile(normalized, localLength);
+  }
+
+  const digits = normalized.slice(1);
+  if (!/^\d+$/.test(digits) || digits.length < MOBILE_MIN_DIGITS || digits.length > MOBILE_MAX_DIGITS) {
+    return false;
+  }
+
+  const match = nationalOfInternational(digits, countries);
+  return match === null || match.country.mobileLength === null || (match.national.length === match.country.mobileLength && !match.national.startsWith('0'));
+}
+
+/**
+ * The phone as the patient file stores it: a number of the laboratory's country in its trunk form (`01012345678`, as every
+ * file stored before, remaining point A-09), whether it arrives as `+201012345678` from the control or typed locally; a
+ * number of another country in its E.164 form (no more ambiguous trunk forms of foreign numbers).
+ */
+export function phoneForStorage(value: string, local: PhoneCountry | null): string {
+  const normalized = normalizeMobile(value);
+  const length = local?.mobileLength ?? null;
+  if (!normalized.startsWith('+')) {
+    return mobileForStorage(normalized, length);
+  }
+
+  if (local === null || length === null) {
+    return normalized;
+  }
+
+  const match = nationalOfInternational(normalized.slice(1), [local]);
+  return match !== null && /^\d+$/.test(match.national) && match.national.length === length && !match.national.startsWith('0') ? `0${match.national}` : normalized;
+}
+
 /** The national digits of a local number: `length` digits not starting with 0, optionally after the trunk 0. */
 function nationalDigits(digits: string, length: number): string | null {
   const national = digits.length === length + 1 && digits.startsWith('0') ? digits.slice(1) : digits;

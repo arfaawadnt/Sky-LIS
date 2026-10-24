@@ -128,6 +128,33 @@ public sealed class ReferenceListTests
     }
 
     [Fact]
+    public void CR007_A_sample_type_is_no_culture_specimen_unless_created_as_one()
+    {
+        Assert.False(SampleType.Create("SERUM", "SER", Name(), [], Now).ForCulture);
+        Assert.True(SampleType.Create("USWAB", "SWAB", Name("Wound swab", "مسحة جرح"), [], Now, forCulture: true).ForCulture);
+    }
+
+    [Fact]
+    public void CR007_Edit_sets_or_clears_the_culture_flag_and_keeps_it_when_the_editor_sends_none()
+    {
+        var sampleType = SampleType.Create("URINE", "UR", Name("Urine", "بول"), [], Now);
+        sampleType.ClearDomainEvents();
+
+        sampleType.Change("UR", Name("Urine", "بول"), Now, forCulture: true);
+        Assert.True(sampleType.ForCulture);
+        Assert.IsType<SampleTypeChanged>(Assert.Single(sampleType.DomainEvents));
+
+        sampleType.ClearDomainEvents();
+        sampleType.Change("UR", Name("Urine", "بول"), Now);   // an older client: the flag stays, nothing changed
+        Assert.True(sampleType.ForCulture);
+        Assert.Empty(sampleType.DomainEvents);
+
+        sampleType.Change("UR", Name("Urine", "بول"), Now, forCulture: false);
+        Assert.False(sampleType.ForCulture);
+        Assert.IsType<SampleTypeChanged>(Assert.Single(sampleType.DomainEvents));
+    }
+
+    [Fact]
     public void T7_Unit_names_are_trimmed_keyed_ignoring_case_and_refused_when_empty_CAT_015()
     {
         var unit = MeasurementUnit.Create(" mg/dL ", Now);

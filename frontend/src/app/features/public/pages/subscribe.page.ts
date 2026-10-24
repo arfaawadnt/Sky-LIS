@@ -8,6 +8,7 @@ import { SUBSCRIPTION_PASSWORD_RULE, type PublicCountry } from '../../../core/ap
 import { LABORATORY_PATH_PREFIX, SIGN_IN_PATH, laboratorySlugOf } from '../../../core/auth/session-navigation';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
+import { MobileInputComponent } from '../../../shared/forms/mobile-input/mobile-input.component';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
 import { requiredText } from '../../../shared/forms/validators';
@@ -28,7 +29,7 @@ const CODE_PATTERN = /^\d{4,8}$/;
  */
 @Component({
   selector: 'app-subscribe-page',
-  imports: [ReactiveFormsModule, RouterLink, FormFieldComponent, IconComponent, PublicHeaderComponent],
+  imports: [ReactiveFormsModule, RouterLink, FormFieldComponent, IconComponent, MobileInputComponent, PublicHeaderComponent],
   templateUrl: './subscribe.page.html',
   styleUrl: './subscribe.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

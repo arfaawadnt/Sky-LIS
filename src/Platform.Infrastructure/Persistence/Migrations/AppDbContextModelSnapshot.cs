@@ -2112,6 +2112,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_user_id");
 
+                    b.Property<bool>("ForCulture")
+                        .HasColumnType("boolean")
+                        .HasColumnName("for_culture");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");

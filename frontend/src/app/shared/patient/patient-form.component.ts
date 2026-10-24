@@ -24,6 +24,8 @@ import { ProblemCodes, type ProblemDetails } from '../../core/api/problem-detail
 import { I18nService } from '../../core/i18n/i18n.service';
 import { PermissionsService } from '../../core/permissions/permissions.service';
 import { markAllTouched } from '../forms/mark-all-touched';
+import { MobileInputComponent } from '../forms/mobile-input/mobile-input.component';
+import { type MobileDialCountry, mobileDialCountryOf } from '../forms/mobile-input/mobile-number';
 import { problemMessage } from '../forms/problem-text';
 import { SERVER_ERROR_KEY, clearServerErrors, problemToFormErrors } from '../forms/problem-to-form-errors';
 import { SaveShortcutDirective } from '../forms/save-shortcut.directive';
@@ -33,7 +35,7 @@ import { CanDirective } from '../ui/can.directive';
 import { FormFieldComponent } from '../ui/form-field/form-field.component';
 import { IconComponent } from '../ui/icon/icon.component';
 import { type NationalIdFacts, readEgyptianNationalId } from './egyptian-national-id';
-import { ageBetween, ageText, birthDateFromAge, defaultGender, isValidAge, isValidMobile, localDigits, mobileForStorage, parseIso, todayIso } from './patient-demographics';
+import { ageBetween, ageText, birthDateFromAge, defaultGender, isValidAge, isValidPhone, localDigits, parseIso, phoneForStorage, todayIso } from './patient-demographics';
 import { PatientLookupApi } from './patient-lookup.api';
 
 /** What the user is typing in a new file, for the similar-patient lookup (BR-01): the second phone matches like the mobile (C3). */
@@ -77,11 +79,11 @@ const IDENTITY_FIELDS = ['title', 'fullName', 'nameAr', 'gender', 'dateOfBirth',
 
 /**
  * The patient create/edit form (CP-06 patient data, CP-11), in four groups — identity (title, both names, national id),
- * sex and age (gender switch, date of birth or age on one line, condition), contact (mobile with its country) and the
+ * sex and age (gender switch, date of birth or age on one line, condition), contact (two-part mobile controls) and the
  * optional details folded until needed. An Egyptian national id fills the empty date of birth, gender and governorate of
  * birth (`egyptian-national-id.ts`) and lists what it contradicts; title proposes the gender, date of birth ↔ age sync in both
- * directions (the last one typed is what is saved), mobile digits checked against the chosen country's length when the
- * platform publishes it (8–15 otherwise), mandatory mobile / national id from the tenant parameters, VIP only for
+ * directions (the last one typed is what is saved), each phone in `app-mobile-input` (dial code + national number, LIS-CR-007
+ * C-05) checked against its country's length when the platform publishes it (8–15 otherwise), mandatory mobile / national id from the tenant parameters, VIP only for
  * `patients.viewConfidential`, and the similar-patient warning while a new file is typed. A second phone follows the mobile
  * (C3). After the governorate, the city / district / area of the platform's location hierarchy are picked from linked selects
  * when the governorate has active cities (read here through `PatientLookupApi` from the public lookups, A2); otherwise the
@@ -90,7 +92,7 @@ const IDENTITY_FIELDS = ['title', 'fullName', 'nameAr', 'gender', 'dateOfBirth',
  */
 @Component({
   selector: 'app-patient-form',
-  imports: [ReactiveFormsModule, SaveShortcutDirective, FormFieldComponent, CanDirective, BadgeComponent, IconComponent],
+  imports: [ReactiveFormsModule, SaveShortcutDirective, FormFieldComponent, MobileInputComponent, CanDirective, BadgeComponent, IconComponent],
   templateUrl: './patient-form.component.html',
   styleUrl: './patient-form.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -136,29 +138,28 @@ export class PatientFormComponent {
 
   /** Which of the two the user gave last: that one is saved, the other is derived. */
   protected readonly birthSource = signal<'dob' | 'age' | null>(null);
-  /** The country the clerk picked for the mobile ('' = "Any"); null until they pick one. */
-  private readonly chosenMobileCountry = signal<string | null>(null);
+  /** The dial codes the two phones offer (LIS-CR-007 C-05): the platform countries that publish one. */
+  protected readonly dialCountries = computed<readonly MobileDialCountry[]>(() =>
+    this.countries().flatMap((country) => {
+      const dial = mobileDialCountryOf({ dialCode: country.dialCode, mobileLength: country.mobileLength, isoCode: country.code, nameEn: country.nameEn, nameAr: country.nameAr });
+      return dial === null ? [] : [dial];
+    }),
+  );
+  /** The laboratory's country (`settings.countryCode`, the client record's country; validation v0.5.0 F-08): preselected on both phones. */
+  protected readonly laboratoryCountry = computed(() => this.settings()?.countryCode ?? null);
   /**
-   * The mobile country: the clerk's choice, else the laboratory's country (`settings.countryCode`, the client record's
-   * country; validation v0.5.0 F-08) when the platform publishes its mobile length, else "Any". So a 10-digit Egyptian
-   * number is stored in its trunk form without the clerk choosing Egypt.
+   * The laboratory's country when the platform publishes its mobile length: its numbers are checked against that length when
+   * written locally and stored in the trunk form (A-09), so a 10-digit Egyptian number is stored as `01…` as before.
    */
-  protected readonly mobileCountry = computed(() => {
-    const chosen = this.chosenMobileCountry();
-    if (chosen !== null) {
-      return chosen;
-    }
-
-    const laboratory = this.settings()?.countryCode ?? null;
-    return laboratory !== null && this.mobileCountries().some((country) => country.code === laboratory) ? laboratory : '';
-  });
+  private readonly localCountry = computed(() => this.dialCountries().find((country) => country.isoCode === this.laboratoryCountry() && country.mobileLength !== null) ?? null);
+  /** The country each phone's dial code names (from the control), for its hint. */
+  protected readonly mobileDial = signal<MobileDialCountry | null>(null);
+  protected readonly secondPhoneDial = signal<MobileDialCountry | null>(null);
   /** The folded "More details" section: open while the clerk wants it, when it holds data or when a field in it is wrong. */
   protected readonly moreOpen = signal(false);
   /** A save was refused on the client: the notice above the form says so until the next attempt (validation round 4). */
   protected readonly blocked = signal(false);
 
-  protected readonly mobileLength = computed(() => this.countries().find((country) => country.code === this.mobileCountry())?.mobileLength ?? null);
-  protected readonly mobileCountries = computed(() => this.countries().filter((country) => country.mobileLength !== null));
   protected readonly generalProblem = computed(() => {
     const problem = this.problem();
     if (problem === null || problem.code === ProblemCodes.validationFailed || problem.code in FIELD_OF_CODE) {
@@ -306,9 +307,10 @@ export class PatientFormComponent {
       });
     });
 
-    // The mobile country decides the mobile rule: re-check the number when the laboratory's default arrives (F-08).
+    // The countries and the laboratory's country decide the phone rule: re-check the numbers when they arrive (F-08).
     effect(() => {
-      this.mobileCountry();
+      this.dialCountries();
+      this.localCountry();
       untracked(() => {
         this.form.controls.mobile.updateValueAndValidity();
         this.form.controls.secondPhone.updateValueAndValidity();
@@ -374,7 +376,7 @@ export class PatientFormComponent {
       dateOfBirth: source === 'age' ? null : blankToNull(value.dateOfBirth),
       age: source === 'age' && age !== null ? age : null,
       patientConditionId: blankToNull(value.patientConditionId),
-      mobile: blankToNull(mobileForStorage(value.mobile, this.mobileLength())),   // A-09: with or without the trunk 0, stored one way
+      mobile: blankToNull(phoneForStorage(value.mobile, this.localCountry())),   // A-09: the laboratory's numbers stored one way (trunk form)
       nationalId: blankToNull(value.nationalId),
       nationality: blankToNull(value.nationality),
       email: blankToNull(value.email),
@@ -387,7 +389,7 @@ export class PatientFormComponent {
       cityId,
       districtId: cityId === null ? null : blankToNull(value.districtId),
       areaId: cityId === null ? null : blankToNull(value.areaId),
-      secondPhone: blankToNull(mobileForStorage(value.secondPhone, this.mobileLength())),
+      secondPhone: blankToNull(phoneForStorage(value.secondPhone, this.localCountry())),
     });
     return true;
   }
@@ -546,11 +548,11 @@ export class PatientFormComponent {
     this.clearTimer();
     this.typedTimer = setTimeout(() => {
       this.typedTimer = null;
-      const length = this.mobileLength();
+      const local = this.localCountry();
       this.typed.emit({
         name: this.form.controls.fullName.value.trim(),
-        mobile: mobileForStorage(this.form.controls.mobile.value, length),
-        secondPhone: mobileForStorage(this.form.controls.secondPhone.value, length),
+        mobile: phoneForStorage(this.form.controls.mobile.value, local),
+        secondPhone: phoneForStorage(this.form.controls.secondPhone.value, local),
       });
     }, SIMILAR_DEBOUNCE_MS);
   }
@@ -561,7 +563,8 @@ export class PatientFormComponent {
 
   /** The first marked field in document order; the date of birth when only "date of birth or age" is missing. */
   private focusFirstInvalid(): void {
-    const selector = ['input', 'select', 'textarea'].map((tag) => `${tag}.ng-invalid:not([disabled])`).join(', ');
+    // a phone is a two-part control (LIS-CR-007 C-05): its host carries the mark, its national number takes the focus
+    const selector = [...['input', 'select', 'textarea'].map((tag) => `${tag}.ng-invalid:not([disabled])`), 'app-mobile-input.ng-invalid input.number:not([disabled])'].join(', ');
     const target = this.host.querySelector<HTMLElement>(selector) ?? (this.form.hasError('birthOrAge') ? this.host.querySelector<HTMLElement>('[formcontrolname="dateOfBirth"]') : null);
     target?.focus();
   }
@@ -573,10 +576,10 @@ export class PatientFormComponent {
     }
   }
 
-  protected onMobileCountryChange(event: Event): void {
-    this.chosenMobileCountry.set((event.target as HTMLSelectElement).value);
-    this.form.controls.mobile.updateValueAndValidity();
-    this.form.controls.secondPhone.updateValueAndValidity();
+  /** "10 digits, without the leading 0 …" when the phone's country publishes its length, else `fallback`. */
+  protected phoneHint(country: MobileDialCountry | null, fallback: string): string {
+    const length = country?.mobileLength ?? null;
+    return length === null ? this.i18n.t(fallback) : this.i18n.tf('patients.hint.mobileLength', { length: this.num(length) });
   }
 
   /** A number in the page language's digits (validation v0.5.0 F-09). */
@@ -609,7 +612,6 @@ export class PatientFormComponent {
 
   private fill(patient: PatientDetail): void {
     const estimated = patient.dateOfBirthIsEstimated;
-    this.chosenMobileCountry.set(null);
     this.form.reset({
       title: patient.title,
       fullName: patient.fullName,
@@ -643,7 +645,6 @@ export class PatientFormComponent {
 
   private reset(name: string): void {
     this.form.reset();
-    this.chosenMobileCountry.set(null);
     this.form.controls.fullName.setValue(name);
     this.birthSource.set(null);
     this.moreOpen.set(false);
@@ -671,7 +672,7 @@ export class PatientFormComponent {
       return null;
     }
 
-    return value.trim() === '' || isValidMobile(value, this.mobileLength()) ? null : { mobile: true };
+    return value.trim() === '' || isValidPhone(value, this.dialCountries(), this.localCountry()?.mobileLength ?? null) ? null : { mobile: true };
   }
 
   private validateBirthOrAge(group: AbstractControl): ValidationErrors | null {

@@ -88,7 +88,7 @@
   "wizard.chooseCountryFirst": "اختر الدولة أولاً",
   "wizard.validation.mobileLength": "جوال المعمل {length} أرقام بعد {dial} في الدولة المختارة.",
   "wizard.validation.managerMobileLength": "جوال المدير {length} أرقام بعد {dial} في الدولة المختارة.",
-  "wizard.mobileHint": "{length} رقماً بعد {dial}",
+  "wizard.mobileHint": "{length} رقماً بعد {dial}، بدون الصفر في أوله",
   "wizard.optional": "اختياري",
   "wizard.managerMobileHint": "يُرسل رمز التحقق إلى هذا الرقم.",
   "wizard.back": "رجوع",

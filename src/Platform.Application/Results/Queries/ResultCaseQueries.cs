@@ -12,6 +12,7 @@ using Platform.Contracts.Results;
 using Platform.Domain.Authorization;
 using Platform.Domain.Results;
 using Platform.Domain.Samples;
+using Platform.SharedKernel.Abstractions;
 using Platform.SharedKernel.Primitives;
 
 namespace Platform.Application.Results.Queries;
@@ -47,7 +48,8 @@ public sealed class GetResultCaseHandler(
     IVisitLookup visits,
     IResultReferenceLookup references,
     IDoctorLookup doctors,
-    ITenantSettings settings) : IQueryHandler<GetResultCaseQuery, ResultCaseView>
+    ITenantSettings settings,
+    IClock clock) : IQueryHandler<GetResultCaseQuery, ResultCaseView>
 {
     public async Task<ResultCaseView> Handle(GetResultCaseQuery query, CancellationToken cancellationToken)
     {
@@ -90,10 +92,12 @@ public sealed class GetResultCaseHandler(
         var header = await new ResultHeaderLoader(patients, visits, references, doctors).LoadAsync(scoped[0], cancellationToken);
         // F-06: an opened VIP case reads "VIP patient" without the See-VIP right, like the lists (A-03, RES Q19).
         var patientView = ResultVip.IsMasked(header.Patient, privileges) ? ResultVip.Mask(header.PatientView) : header.PatientView;
+        // C-08: the expected range of rows not entered yet, with the profile entry uses (same day rule as ResultEntryEngine).
+        var profile = PatientProfile.From(header.Patient, DateOnly.FromDateTime(clock.UtcNow.UtcDateTime));
         return new ResultCaseView(
             header.VisitView,
             patientView,
-            ResultViews.Units(visible, hidden, context, privileges),
+            ResultViews.Units(visible, hidden, context, privileges, profile),
             hiddenUnits,
             hiddenResults,
             scanned,

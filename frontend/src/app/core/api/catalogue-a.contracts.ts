@@ -33,6 +33,11 @@ export interface CatalogueListFilter extends SortRequest {
   readonly pageSize: number;
 }
 
+/** The sample-type register adds the culture flag (LIS-CR-007): `true` = the culture specimens only, `null`/absent = all. */
+export interface SampleTypeListFilter extends CatalogueListFilter {
+  readonly forCulture?: boolean | null;
+}
+
 // ---- clinical groups (CP-39)
 
 export interface ClinicalGroupListItem {
@@ -72,6 +77,8 @@ export interface SampleTypeRequest {
   readonly shortName: string;
   readonly nameEn: string;
   readonly nameAr: string;
+  /** A culture specimen (LIS-CR-007, C-11); absent on create = false, absent on update = kept. */
+  readonly forCulture?: boolean;
 }
 
 export interface SampleTypeListItem {
@@ -82,6 +89,8 @@ export interface SampleTypeListItem {
   readonly nameAr: string;
   readonly activeConditionCount: number;
   readonly isActive: boolean;
+  /** Listed on Microbiology › Culture specimens and offered first to a culture service (LIS-CR-007). */
+  readonly forCulture: boolean;
 }
 
 export interface SampleConditionView {
@@ -100,6 +109,7 @@ export interface SampleTypeDetail {
   readonly nameAr: string;
   readonly isActive: boolean;
   readonly conditions: readonly SampleConditionView[];
+  readonly forCulture: boolean;
 }
 
 // ---- units (CP-44) and patient conditions (CP-45)
