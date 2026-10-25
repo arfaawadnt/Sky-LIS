@@ -15,7 +15,7 @@ describe('release scope (R1 prototype builds)', () => {
       expect(r1Client).toContain(path);
     }
 
-    for (const hidden of ['/integration/analysers', '/samples/collection', '/billing/cash-closing', '/pricing/contract-pricing', '/account/audit']) {
+    for (const hidden of ['/integration/analysers', '/samples/collection', '/billing/batch-payment', '/pricing/contract-pricing', '/account/audit']) {
       expect(r1Client).not.toContain(hidden);
     }
   });

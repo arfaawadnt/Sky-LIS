@@ -7,20 +7,23 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { LocationsFacade } from '../state/locations.facade';
 import { pick } from './format';
+import { LocalityImportComponent } from './locality-import.component';
 import { LocationColumnComponent, type LocationColumnSave } from './location-column.component';
 
 /**
  * SA-11b "Locations" of a governorate (LIS-CR-003 §3): a drawer with three linked columns — cities → districts of the
  * selected city → areas of the selected district — each with search, add, rename and activate / deactivate
- * (`tenancy.manage`). Open while `governorate` is set; closing emits `closed`. Owns its facade.
+ * (`tenancy.manage`), and (LIS-CR-008 C-04) the CSV import of the whole hierarchy above the columns. Open while `governorate`
+ * is set; closing emits `closed`. Owns its facade.
  */
 @Component({
   selector: 'app-platform-locations-drawer',
-  imports: [DrawerComponent, LocationColumnComponent],
+  imports: [DrawerComponent, LocalityImportComponent, LocationColumnComponent],
   providers: [LocationsFacade],
   template: `
     <app-drawer [open]="governorate() !== null" (openChange)="onOpenChange($event)" [title]="title()" size="xl">
       @if (governorate() !== null) {
+        <app-platform-locality-import />
         <div class="columns">
           <app-platform-location-column
             level="cities"

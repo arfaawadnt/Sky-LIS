@@ -64,7 +64,7 @@ public sealed class CancelSampleOnVisitLineCancelledPolicy(ISampleRepository sam
     }
 }
 
-/// <summary>The shared body of P1 (intake §7 T1, §16 Q3–Q4).</summary>
+/// <summary>The shared body of P1 (intake §7 T1, §16 Q3–Q4); a tube marked "collected outside" arrives Collected (LIS-CR-008 C-02).</summary>
 internal static class TubeSampleFactory
 {
     private const string OrderedLine = "Ordered";
@@ -122,7 +122,14 @@ internal static class TubeSampleFactory
                 tube.ServiceIds ?? [],
                 visit.ActorUserId,
                 visit.AtUtc);
-            sample.AutoAdvance(autoCollect, autoReceive, visit.ActorUserId, visit.BranchId, visit.AtUtc);
+            if (tube.CollectedOutside)
+            {
+                sample.ArriveCollectedOutside(tube.CollectedAtUtc, autoReceive, visit.ActorUserId, visit.BranchId, visit.AtUtc);   // LIS-CR-008 C-02
+            }
+            else
+            {
+                sample.AutoAdvance(autoCollect, autoReceive, visit.ActorUserId, visit.BranchId, visit.AtUtc);
+            }
             samples.Add(sample);
         }
 

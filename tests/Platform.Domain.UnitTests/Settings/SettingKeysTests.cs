@@ -9,7 +9,11 @@ public sealed class SettingKeysTests
     [Fact]
     public void The_catalogue_holds_the_twenty_six_keys_with_unique_lower_camel_names_and_valid_defaults()
     {
-        Assert.Equal(26, SettingKeys.All.Count);
+        // Every declared descriptor is registered (the count follows the declarations; LIS-CR-010 onwards several packages add keys at once).
+        var declared = typeof(SettingKeys).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Count(field => typeof(SettingDescriptor).IsAssignableFrom(field.FieldType));
+        Assert.True(SettingKeys.All.Count >= 27);
+        Assert.Equal(declared, SettingKeys.All.Count);
         Assert.Equal(SettingKeys.All.Count, SettingKeys.All.Select(descriptor => descriptor.Key).Distinct(StringComparer.Ordinal).Count());
         Assert.All(SettingKeys.All, descriptor =>
         {

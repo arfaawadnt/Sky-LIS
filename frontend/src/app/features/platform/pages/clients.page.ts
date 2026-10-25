@@ -12,9 +12,12 @@ import {
   PLATFORM_PERMISSIONS,
   type PlanListItem,
   SILENT_DAYS,
+  SUBSCRIPTION_FILTERS,
+  type SubscriptionFilter,
 } from '../../../core/api/platform.contracts';
 import { ProblemError } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { LocalityFieldsComponent, type LocalityControls, type LocalityLabels, localityRequest } from '../../../shared/forms/locality-fields/locality-fields.component';
 import { localizedTextGroup } from '../../../shared/forms/localized-text';
 import { blockedSave } from '../../../shared/forms/blocked-save';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
@@ -43,8 +46,10 @@ import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
 import { CsvExportService } from '../data/csv-export';
 import { PlatformApi } from '../data/platform.api';
 import { ClientsFacade } from '../state/clients.facade';
+import { ClientAnnouncementsSwitchComponent } from '../ui/client-announcements-switch.component';
 import { fileStamp, formatDate, formatMoney, pick } from '../ui/format';
 import { SilentClientsComponent } from '../ui/silent-clients.component';
+import { SubscriptionClientsComponent } from '../ui/subscription-clients.component';
 import { statusTone } from '../ui/status';
 import {
   countryMobileValidator,
@@ -86,6 +91,9 @@ type ClientForm = ReturnType<ClientsPage['buildForm']>;
     LocalizedTextInputComponent,
     IconComponent,
     SilentClientsComponent,
+    SubscriptionClientsComponent,
+    LocalityFieldsComponent,
+    ClientAnnouncementsSwitchComponent,
   ],
   templateUrl: './clients.page.html',
   styleUrl: './platform-pages.css',
@@ -109,11 +117,17 @@ export class ClientsPage {
   protected readonly silentOptions = SILENT_DAYS;
   protected readonly silentDays = signal<number | null>(silentDaysOf(this.route.snapshot.queryParamMap.get('silent')));
   private readonly silentPanel = viewChild(SilentClientsComponent);
+  /** LIS-CR-012 (C-16): the Subscription filter (`?subscription=expiring` from the SA-03 tile); null shows the register. */
+  protected readonly subscriptionOptions = SUBSCRIPTION_FILTERS;
+  protected readonly subscriptionFilter = signal<SubscriptionFilter | null>(
+    this.silentDays() === null ? subscriptionFilterOf(this.route.snapshot.queryParamMap.get('subscription')) : null,
+  );
+  private readonly subscriptionPanel = viewChild(SubscriptionClientsComponent);
   protected readonly passwordMin = PASSWORD_MIN_LENGTH;
 
   protected readonly columns: readonly TableColumn<ClientListItem>[] = [
     { key: 'name', header: 'platform.clients.column.client', sortable: true, value: (row) => this.name(row) },
-    { key: 'country', header: 'platform.clients.column.country', value: (row) => `${pick(row.countryNameEn, row.countryNameAr, this.i18n.lang())} · ${pick(row.governorateNameEn, row.governorateNameAr, this.i18n.lang())}`, secondary: true },
+    { key: 'country', header: 'platform.clients.column.country', value: (row) => this.place(row), secondary: true },
     { key: 'manager', header: 'platform.clients.column.manager', value: (row) => row.managerName },
     { key: 'planCode', header: 'platform.clients.column.plan', mono: true, sortable: true },
     { key: 'walletBalance', header: 'platform.clients.column.wallet', align: 'end', sortable: true, value: (row) => row.walletBalance },
@@ -126,6 +140,16 @@ export class ClientsPage {
 
   // drawer
   protected readonly drawerOpen = signal(false);
+  /** LIS-CR-008 C-04: the drawer's governorate (its cities feed the locality selects) and the form's three locality controls. */
+  protected readonly drawerGovernorateId = signal<string | null>(null);
+  protected readonly localityControls = signal<LocalityControls | null>(null);
+  protected readonly localityLabels = computed<LocalityLabels>(() => ({
+    city: this.i18n.t('platform.clients.address.city'),
+    district: this.i18n.t('platform.clients.address.district'),
+    area: this.i18n.t('platform.clients.address.area'),
+    none: this.i18n.t('platform.clients.address.none'),
+    hint: this.i18n.t('platform.clients.address.hint'),
+  }));
   protected readonly editing = signal<ClientDetail | null>(null);
   protected readonly form = signal<ClientForm | null>(null);
   protected readonly saveProblem = signal<ProblemError['problem'] | null>(null);
@@ -165,6 +189,13 @@ export class ClientsPage {
     return pick(row.nameEn, row.nameAr, this.i18n.lang());
   }
 
+  /** "Country · governorate", or (LIS-CR-008 C-04) "Country · Area, District, City, Governorate" when the client has a city. */
+  protected place(row: ClientListItem): string {
+    const lang = this.i18n.lang();
+    const line = lang === 'ar' ? row.addressLineAr : row.addressLineEn;
+    return `${pick(row.countryNameEn, row.countryNameAr, lang)} · ${line ?? pick(row.governorateNameEn, row.governorateNameAr, lang)}`;
+  }
+
   protected money(row: ClientListItem): string {
     return formatMoney(row.walletBalance, row.walletCurrency, this.i18n.lang());
   }
@@ -191,13 +222,31 @@ export class ClientsPage {
   protected onSilent(event: Event): void {
     const days = silentDaysOf((event.target as HTMLSelectElement).value);
     this.silentDays.set(days);
-    void this.router.navigate([], { relativeTo: this.route, queryParams: { silent: days }, queryParamsHandling: 'merge', replaceUrl: true });
+    if (days !== null) {
+      this.subscriptionFilter.set(null);   // one swap at a time: the Silent list replaces the Subscription list
+    }
+
+    void this.router.navigate([], { relativeTo: this.route, queryParams: { silent: days, subscription: days === null ? this.subscriptionFilter() : null }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  /** LIS-CR-012: the Subscription filter swaps the register for the clients expiring within a week, in grace or expired. */
+  protected onSubscription(event: Event): void {
+    const state = subscriptionFilterOf((event.target as HTMLSelectElement).value);
+    this.subscriptionFilter.set(state);
+    if (state !== null) {
+      this.silentDays.set(null);
+    }
+
+    void this.router.navigate([], { relativeTo: this.route, queryParams: { subscription: state, silent: state === null ? this.silentDays() : null }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
   protected reloadList(): void {
     const silent = this.silentPanel();
+    const subscription = this.subscriptionPanel();
     if (silent) {
       silent.refresh();
+    } else if (subscription) {
+      subscription.refresh();
     } else {
       this.facade.clients.reload();
     }
@@ -214,6 +263,12 @@ export class ClientsPage {
       return;
     }
 
+    const subscription = this.subscriptionPanel();
+    if (subscription) {
+      subscription.exportCsv();   // LIS-CR-012: the rows of the Subscription filter
+      return;
+    }
+
     try {
       const rows = await this.facade.exportRows();
       const lang = this.i18n.lang();
@@ -223,6 +278,7 @@ export class ClientsPage {
         { header: this.i18n.t('platform.clients.column.portalUrl'), value: (row) => row.portalUrl },
         { header: this.i18n.t('platform.clients.column.country'), value: (row) => pick(row.countryNameEn, row.countryNameAr, lang) },
         { header: this.i18n.t('platform.clients.column.governorate'), value: (row) => pick(row.governorateNameEn, row.governorateNameAr, lang) },
+        { header: this.i18n.t('platform.clients.address.line'), value: (row) => (lang === 'ar' ? row.addressLineAr : row.addressLineEn) ?? '' },
         { header: this.i18n.t('platform.clients.column.manager'), value: (row) => row.managerName },
         { header: this.i18n.t('platform.clients.column.managerMobile'), value: (row) => row.managerMobile },
         { header: this.i18n.t('platform.clients.column.plan'), value: (row) => row.planCode },
@@ -306,7 +362,7 @@ export class ClientsPage {
     this.saveProblem.set(null);
     this.blockedSave.reset();
     this.facade.drawerCountryId.set(null);
-    this.form.set(this.buildForm(null));
+    this.setForm(this.buildForm(null));
     this.drawerOpen.set(true);
   }
 
@@ -317,14 +373,26 @@ export class ClientsPage {
       this.saveProblem.set(null);
       this.blockedSave.reset();
       this.facade.drawerCountryId.set(detail.countryId);
-      this.form.set(this.buildForm(detail));
+      this.setForm(this.buildForm(detail));
       this.drawerOpen.set(true);
     } catch (error: unknown) {
       this.toast.error(this.problemText(error));
     }
   }
 
+  /** The drawer's form with its locality wiring (LIS-CR-008 C-04). */
+  private setForm(form: ClientForm): void {
+    this.drawerGovernorateId.set(form.controls.governorateId.value === '' ? null : form.controls.governorateId.value);
+    this.localityControls.set({ cityId: form.controls.cityId, districtId: form.controls.districtId, areaId: form.controls.areaId });
+    this.form.set(form);
+  }
+
+  protected onGovernorateChange(form: ClientForm): void {
+    this.drawerGovernorateId.set(form.controls.governorateId.value === '' ? null : form.controls.governorateId.value);
+  }
+
   protected onDrawerClosed(): void {
+    this.localityControls.set(null);
     this.form.set(null);
     this.editing.set(null);
   }
@@ -332,6 +400,7 @@ export class ClientsPage {
   protected onCountryChange(form: ClientForm): void {
     this.facade.drawerCountryId.set(form.controls.countryId.value === '' ? null : form.controls.countryId.value);
     form.controls.governorateId.setValue('');
+    this.drawerGovernorateId.set(null);
     // C-03: the mobiles are checked against the chosen country's length
     form.controls.mobile.updateValueAndValidity();
     form.controls.managerMobile.updateValueAndValidity();
@@ -357,6 +426,7 @@ export class ClientsPage {
       email: emptyToNull(value.email),
       planId: value.planId,
       language: value.language,
+      ...localityRequest(value),
     };
 
     this.saveProblem.set(null);
@@ -397,7 +467,9 @@ export class ClientsPage {
     }
 
     // C-03: a mobile refused for the country's length is shown under its own field (GEO-010 laboratory, GEO-014 manager)
-    const mobileControl = problem.code === 'GEO-010' ? form.controls.mobile : problem.code === 'GEO-014' ? form.controls.managerMobile : null;
+    // LIS-CR-008 C-04: a broken locality chain is shown under the level the server refused (GEO-020 city, GEO-021 district, GEO-022 area)
+    const localityControl = problem.code === 'GEO-020' ? form.controls.cityId : problem.code === 'GEO-021' ? form.controls.districtId : problem.code === 'GEO-022' ? form.controls.areaId : null;
+    const mobileControl = localityControl ?? (problem.code === 'GEO-010' ? form.controls.mobile : problem.code === 'GEO-014' ? form.controls.managerMobile : null);
     if (mobileControl !== null) {
       mobileControl.setErrors({ ...(mobileControl.errors ?? {}), [SERVER_ERROR_KEY]: this.problemText(problem) });
       mobileControl.markAsTouched();
@@ -435,6 +507,9 @@ export class ClientsPage {
         name: localizedTextGroup({ en: detail?.nameEn ?? '', ar: detail?.nameAr ?? '' }, { required: true, maxLength: 200 }),
         countryId: new FormControl(detail?.countryId ?? '', { nonNullable: true, validators: [Validators.required] }),
         governorateId: new FormControl(detail?.governorateId ?? '', { nonNullable: true, validators: [Validators.required] }),
+        cityId: new FormControl(detail?.cityId ?? '', { nonNullable: true }),
+        districtId: new FormControl(detail?.districtId ?? '', { nonNullable: true }),
+        areaId: new FormControl(detail?.areaId ?? '', { nonNullable: true }),
         address: new FormControl(detail?.address ?? '', { nonNullable: true, validators: [requiredText, Validators.maxLength(300)] }),
         mobile: new FormControl(detail?.mobile ?? '', { nonNullable: true, validators: [requiredText, mobileValidator, this.countryMobile('platform.clients.validation.mobileLength')] }),
         licenceNo: new FormControl(detail?.licenceNo ?? '', { nonNullable: true, validators: [Validators.maxLength(64)] }),
@@ -455,6 +530,11 @@ export class ClientsPage {
 }
 
 /** The Silent window of a query parameter or select value: one of the offered windows, else null (the register). */
+/** LIS-CR-012: the Subscription filter of a query parameter or select value (expiring / grace / expired), else null (the register). */
+export function subscriptionFilterOf(value: string | null | undefined): SubscriptionFilter | null {
+  return SUBSCRIPTION_FILTERS.find((filter) => filter === value) ?? null;
+}
+
 export function silentDaysOf(value: string | null | undefined): number | null {
   const days = Number(value);
   return value !== null && value !== undefined && value !== '' && SILENT_DAYS.includes(days) ? days : null;

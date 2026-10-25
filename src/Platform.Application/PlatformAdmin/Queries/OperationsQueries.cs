@@ -1,6 +1,7 @@
 using FluentValidation;
 using Platform.Application.Abstractions.Messaging;
 using Platform.Application.Abstractions.Security;
+using Platform.Application.Abstractions.Settings;
 using Platform.Application.Identity;
 using Platform.Contracts.PlatformAdmin;
 using Platform.Domain.Authorization;
@@ -79,6 +80,9 @@ public sealed class GetPlatformDashboardHandler(
     IPlatformDashboardReader reader,
     IClientActivityReader activity,
     IClientLastActivityReader lastActivity,
+    ISubscriptionStateReader subscriptions,
+    ITenantSettings settings,
+    ICurrentTenantSetter tenantScope,
     IPortalAddressOptions portal,
     ICurrentTenant currentTenant,
     IClock clock) : IQueryHandler<GetPlatformDashboardQuery, PlatformDashboard>
@@ -110,7 +114,19 @@ public sealed class GetPlatformDashboardHandler(
         var silent = await SilentClientFinder.FindAsync(lastActivity, portal.PortalBaseUrl, now, silentDays, cancellationToken);
         var silentTrial = silent.Count(item => item.Status == nameof(TenantStatus.Trial));
 
-        return new PlatformDashboard(period, from, to, clients, adminUsers, new ActivityTotals(snapshot.ServedPatients, snapshot.Tests, snapshot.Registrations), atZero, plans, byClient, recent, silent.Count, silentTrial, silentDays);
+        // LIS-CR-012 (C-16): "Expiring soon" = the clients whose trial, wallet cover or grace ends within 7 days; with the grace and expired counts.
+        var graceDays = await SubscriptionGrace.DaysAsync(settings, tenantScope, cancellationToken);
+        var states = await SubscriptionClientFinder.StatesAsync(subscriptions, now, graceDays, cancellationToken);
+        var expiring = states.Count(entry => SubscriptionFilters.Matches(SubscriptionFilters.Expiring, entry.State, SubscriptionFilters.DefaultDays));
+        var inGrace = states.Count(entry => SubscriptionFilters.Matches(SubscriptionFilters.Grace, entry.State, SubscriptionFilters.DefaultDays));
+        var expired = states.Count(entry => SubscriptionFilters.Matches(SubscriptionFilters.Expired, entry.State, SubscriptionFilters.DefaultDays));
+
+        return new PlatformDashboard(period, from, to, clients, adminUsers, new ActivityTotals(snapshot.ServedPatients, snapshot.Tests, snapshot.Registrations), atZero, plans, byClient, recent, silent.Count, silentTrial, silentDays)
+        {
+            ExpiringSoonClients = expiring,
+            GraceClients = inGrace,
+            ExpiredClients = expired,
+        };
     }
 }
 

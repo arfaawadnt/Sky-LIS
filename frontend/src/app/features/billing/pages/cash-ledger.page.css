@@ -1,0 +1,46 @@
+/* CP-70 Cash ledger (LIS-CR-011): module layout only; the UI kit owns every component's look. */
+:host {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.filter .inp {
+  min-width: 140px;
+}
+
+.totals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--sp-3);
+}
+
+.scope-line,
+.small {
+  font-size: var(--fs-sm);
+  margin: 0;
+}
+
+.problem,
+.info-strip {
+  margin: 0;
+}
+
+.ledger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+}
+
+.ledger-actions:empty {
+  display: none;
+}

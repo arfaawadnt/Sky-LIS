@@ -70,10 +70,23 @@ public sealed record VisitRegistration(
     bool Biohazard,
     bool CollectedOutside,
     int UtcOffsetMinutes,
-    Guid? CollectorUserId);
+    Guid? CollectorUserId,
+    IReadOnlyList<OutsideSample>? OutsideSamples = null);
 
-/// <summary>The editable details of a saved visit (V5).</summary>
-public sealed record VisitDetails(string? TreatmentNo, Guid? ReferringDoctorId, string? InsuranceId, bool Urgent, bool Biohazard, bool CollectedOutside);
+/// <summary>
+/// A sample the clerk marks "collected outside the laboratory" at registration (LIS-CR-008 C-02): one tube of the dry run
+/// (<paramref name="Key"/>) or every tube of a sample type (<paramref name="SampleTypeId"/> without a key), with the time
+/// it was collected when the clerk typed one (else the registration time).
+/// </summary>
+public sealed record OutsideSample(TubeKey? Key, Guid? SampleTypeId, DateTimeOffset? CollectedAtUtc)
+{
+    /// <summary>The key wins; without one, every tube of the sample type matches.</summary>
+    public bool Matches(TubeKey key) =>
+        Key is { } own ? own == key : SampleTypeId is { } type && type == key.SampleTypeId;
+}
+
+/// <summary>The editable details of a saved visit (V5). "Collected outside" is a property of each tube since LIS-CR-008 and is not edited here.</summary>
+public sealed record VisitDetails(string? TreatmentNo, Guid? ReferringDoctorId, string? InsuranceId, bool Urgent, bool Biohazard);
 
 /// <summary>
 /// A discount the actor applies (V1/V6): kind and value, the catalogue reason (kind Discount) with its name for the

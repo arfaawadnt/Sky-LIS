@@ -525,6 +525,28 @@ QMS source is never read or copied (section 1); everything here is written from 
   `Domain/PlatformAdmin/ClientSilence.cs`, `IClientLastActivityReader` (last browser-session issue per tenant + `max(registered_at_utc)`
   read in each client's own tenant scope, no elevation), `GET /api/v1/platform/clients/silent[/export]?days=1…90`, dashboard
   `SilentClients/SilentTrialClients/SilentDays`, SPA `features/platform/ui/silent-clients.component.ts` behind `?silent=` on Clients.
+- Change requests LIS-CR-008 / 010 / 011 / 012 / 013 (2026-10-24/25, `docs/build/CR-2026-10-24_Review-Features.md`; one migration
+  `ReviewFeatures`): **localities** — `Tenant`, `SubscriptionRequest` and `Branch` carry `CityId/DistrictId/AreaId` validated by
+  `Locality.Resolve` (GEO-020…022), `AddressLine` prints them, `LocalityImport.Plan` + `ImportLocalitiesCommand` (CSV, dry run, GEO-023…025)
+  behind `POST /api/v1/platform/governorates/{id}/localities/import` [tenancy.manage]; shared `shared/forms/locality-fields` and
+  `FieldSchema.dependsOn` on the master-data page. **Collected outside per sample** — `VisitTube.CollectedOutside/CollectedOutsideAtUtc`,
+  `Sample.ArriveCollectedOutside`, derived `Visit.AnyCollectedOutside` (the old column is history), order contract `samples[]`, REG-040/041,
+  `ui/sample-flags`. **Report designs** — `ReportDesign` enum + `ReportDesigns.Resolve` (contract → template → `SettingKeys.ReportDesign`),
+  `ReportTemplate.Design` (CAT-273), `ContractPricing.ReportDesign` (PRC-047), five print components under
+  `features/results/ui/documents/designs/` behind the `report.document.ts` dispatcher; `SettingKeysTests` is now a reflection gate over
+  `SettingKeys.All`. **Cash ledger** — `CashEntry` (`app.cash_entries`, BIL-060…064, trigger guard), `CashLedger.Build/CloseWindow`,
+  `ICashLedgerReader` (one UNION ALL), `ClosingTotals` with opening / cash in / cash out, closed periods refuse posting (BIL-061, also in the
+  payment and refund handlers), SPA `/billing/cash-ledger`; CP-30 is Release 1. **Subscription reminders** — `SubscriptionState`
+  (Ok / Warning / Grace / Expired), `SubscriptionReminder` log (`saas.subscription_reminders`), `SubscriptionReminderJob`
+  (`Lis:Jobs:SubscriptionReminders`, off in `ApiFactory`), `Wallet.AtOrBelowZeroSinceUtc`, `SettingKeys.SubscriptionGraceDays` (platform
+  row only), `AuthProfile.SubscriptionNotice` read inside `SessionPrincipalQuery`'s one query, sign-in SUB-020, `SubscriptionExpiredGate`
+  in `PipelineOrder` after `PasswordChangeGate` (SUB-021, allow-list auth / own profile / wallet / support), CLI-020 now only for
+  deactivated laboratories; SPA `features/account/ui/subscription-notice` (banner mounted in the shell for the client portal, modal in the
+  app root), `/account/wallet` is Release 1. **Announcements** — `Announcement` (`saas.announcements`, no tenant, `AnnouncementCodes`
+  ANN-0xx, image in file-store area `announcements`), counters through `IAnnouncementCounters` (atomic `ExecuteUpdate`, handler under
+  `Application/PlatformAdmin/Counters/`), public list with `PublicCacheItem` (max-age 300), `GET /api/v1/account/announcements`,
+  `SettingKeys.HideAnnouncements` = a client flag (`SettingKeys.IsClientFlag`, SET-004: laboratories cannot change client flags), SA page
+  `/admin/announcements` (nav group Platform), sign-in hero slot `[authHero]` of `auth-frame`, `app-welcome-announcement` on the dashboard.
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

@@ -186,7 +186,8 @@ public sealed class GetVisitLabelsHandler(
                 letterhead.BranchNameAr,
                 visit.Urgent,
                 [.. pair.Lines.OrderBy(line => line.Sequence).Select(line => line.ServiceCode)],
-                visit.Biohazard))
+                visit.Biohazard,
+                pair.Tube.CollectedOutside))
             .ToList();
 
         return new VisitLabelsDocument(letterhead, visit.Accession, Math.Max(1, copies), visit.UtcOffsetMinutes, labels);
@@ -244,7 +245,7 @@ public sealed class GetJobOrderHandler(
             detail.DoctorNameAr,
             visit.Urgent,
             visit.Biohazard,
-            visit.CollectedOutside,
+            visit.AnyCollectedOutside,
             detail.BatchNumber,
             lines,
             [.. detail.Tubes.Where(tube => tube.IsLive)],
@@ -838,7 +839,9 @@ internal sealed class VisitDetailComposer(
                 tube.SampleConditionNameEn,
                 tube.SampleConditionNameAr,
                 tubeLines.Any(line => line.Status == VisitLineStatus.Ordered),
-                [.. tubeLines.Where(line => line.Status == VisitLineStatus.Ordered).Select(line => line.ServiceCode)]);
+                [.. tubeLines.Where(line => line.Status == VisitLineStatus.Ordered).Select(line => line.ServiceCode)],
+                tube.CollectedOutside,
+                tube.CollectedOutsideAtUtc);
         }).ToList();
 
         var transfers = new List<VisitTransferItem>();
@@ -892,7 +895,7 @@ internal sealed class VisitDetailComposer(
             batch?.Number,
             visit.Urgent,
             visit.Biohazard,
-            visit.CollectedOutside,
+            visit.AnyCollectedOutside,
             visit.RegisteredAtUtc,
             NameOf(visit.RegisteredByUserId),
             visit.CompletedAtUtc,

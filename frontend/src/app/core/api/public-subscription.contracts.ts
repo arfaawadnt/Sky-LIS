@@ -44,6 +44,10 @@ export interface StartSubscriptionRequest {
   readonly email: string | null;
   /** `en` or `ar`: the language of the SMS messages. */
   readonly language: string | null;
+  /** LIS-CR-008 C-04: optional city (markaz) / district / area under the governorate (GEO-020…022). */
+  readonly cityId?: string | null;
+  readonly districtId?: string | null;
+  readonly areaId?: string | null;
 }
 
 export interface SubscriptionStarted {

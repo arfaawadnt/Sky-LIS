@@ -103,3 +103,33 @@ CREATE TRIGGER bookings_no_delete BEFORE DELETE ON app.bookings FOR EACH ROW EXE
 
 DROP TRIGGER IF EXISTS batches_no_delete ON app.batches;
 CREATE TRIGGER batches_no_delete BEFORE DELETE ON app.batches FOR EACH ROW EXECUTE FUNCTION app.registration_refuse_delete();
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 2026-10-24 Collected outside per sample (change request LIS-CR-008, P-SMP, reviewer point C-02). Appended to the
+-- ReviewFeatures migration after EF added app.visit_tubes.collected_outside (boolean, default false),
+-- app.visit_tubes.collected_outside_at_utc (timestamptz, null) and app.samples.collected_outside (boolean, default false).
+-- Idempotent: each UPDATE touches only rows still false.
+-- ---------------------------------------------------------------------------------------------------------------------
+
+-- (1) The visit-level flag of the old contract meant "every tube collected outside": copy it to every tube of the visits
+--     that carry it. app.visits.collected_outside stays as history (since this change it is true only for a visit
+--     registered with the old visit-level field, which marks every tube, so a rerun changes nothing). The tube guard
+--     (app.visit_tubes_guard) protects the number and key only, so this UPDATE passes it.
+UPDATE app.visit_tubes t
+SET collected_outside = true
+FROM app.visits v
+WHERE v.tenant_id = t.tenant_id
+  AND v.id = t.visit_id
+  AND v.collected_outside
+  AND NOT t.collected_outside;
+
+-- (2) The first sample of such a tube (generation 0) shows the "Outside" tag and prints "EXT"; a replacement sample was
+--     collected again in the laboratory and stays false. Its status and times are left as they were recorded.
+UPDATE app.samples s
+SET collected_outside = true
+FROM app.visit_tubes t
+WHERE t.tenant_id = s.tenant_id
+  AND t.id = s.tube_id
+  AND t.collected_outside
+  AND s.generation = 0
+  AND NOT s.collected_outside;

@@ -4,6 +4,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 
+import { ANNOUNCEMENT_API, type PublicAnnouncement } from '../../../core/api/announcement.contracts';
 import { AUTH_API, type AuthProfile, type AuthResponse } from '../../../core/api/auth.contracts';
 import { PUBLIC_LABORATORY_API, type PublicLaboratory } from '../../../core/api/public-laboratory.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
@@ -52,7 +53,11 @@ describe('Sign-in addresses (CP-03, LIS-CR-005)', () => {
     vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
   });
 
-  afterEach(() => backend.verify());
+  afterEach(() => {
+    // LIS-CR-013: a found laboratory also reads its SignIn announcements; tests that do not look at them answer none.
+    backend.match((request) => request.url === ANNOUNCEMENT_API.publicList).forEach((request) => request.flush([]));
+    backend.verify();
+  });
 
   async function render(fixture: ComponentFixture<unknown>): Promise<void> {
     fixture.detectChanges();
@@ -307,5 +312,92 @@ describe('Sign-in addresses (CP-03, LIS-CR-005)', () => {
       expect(bookmarkKeys('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)')).toBe('⌘+D');
       expect(bookmarkKeys('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('Ctrl+D');
     });
+  });
+});
+
+/**
+ * LIS-CR-013 (C-17): the laboratory sign-in page shows the laboratory's live SignIn announcement in the hero instead of the
+ * slogan (image, title, text, link), reports one impression, counts a click; without an announcement the slogan stays; the
+ * Super Admin sign-in never asks.
+ */
+describe('Sign-in announcement (LIS-CR-013)', () => {
+  let backend: HttpTestingController;
+
+  const OFFER: PublicAnnouncement = { id: 'a1', titleEn: 'New analyser offer', titleAr: 'عرض الأجهزة', bodyEn: 'Ten percent off.', bodyAr: null, linkUrl: 'https://nationaltechnology.net/offer', imageVersion: 2 };
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(withInterceptors([problemDetailsInterceptor])), provideHttpClientTesting()],
+    });
+    backend = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => backend.verify());
+
+  async function open(mode: 'laboratory' | 'admin', announcements: readonly PublicAnnouncement[] | null): Promise<HTMLElement> {
+    const fixture = TestBed.createComponent(LoginPage);
+    fixture.componentRef.setInput('mode', mode);
+    fixture.componentRef.setInput('slug', 'nile-lab');
+    fixture.detectChanges();
+    TestBed.tick();
+    await settle();
+    if (mode === 'laboratory') {
+      backend.expectOne(PUBLIC_LABORATORY_API.card('nile-lab')).flush(NILE);
+      await settle();
+      TestBed.tick();
+      await settle();
+      const list = backend.expectOne((request) => request.url === ANNOUNCEMENT_API.publicList);
+      expect(list.request.params.get('placement')).toBe('SignIn');
+      expect(list.request.params.get('laboratory')).toBe('nile-lab');
+      if (announcements === null) {
+        list.flush(null, { status: 503, statusText: 'Unavailable' });
+      } else {
+        list.flush(announcements);
+      }
+
+      await settle();
+    }
+
+    TestBed.tick();
+    await settle();
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('replaces the slogan with the announcement, counts one impression and a click on its link', async () => {
+    const root = await open('laboratory', [OFFER]);
+    backend.expectOne(ANNOUNCEMENT_API.impression('a1')).flush(null);
+
+    const hero = root.querySelector('.hero') as HTMLElement;
+    expect(hero.querySelector('h1')?.textContent).toContain('New analyser offer');
+    expect(hero.textContent).toContain('Ten percent off.');
+    expect(hero.textContent).not.toContain('auth.hero.title');
+    expect(hero.querySelector('img')?.getAttribute('src')).toBe(ANNOUNCEMENT_API.publicImage('a1', 2));
+    const link = hero.querySelector<HTMLAnchorElement>('a[target=_blank]');
+    expect(link?.getAttribute('href')).toBe('https://nationaltechnology.net/offer');
+    expect(link?.getAttribute('rel')).toContain('noopener');
+
+    link?.addEventListener('click', (event) => event.preventDefault());
+    link?.click();
+    backend.expectOne(ANNOUNCEMENT_API.click('a1')).flush(null);
+  });
+
+  it('keeps the slogan when there is no announcement or the read fails', async () => {
+    const none = await open('laboratory', []);
+    expect(none.querySelector('.hero h1')?.textContent).toContain('auth.hero.title');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(withInterceptors([problemDetailsInterceptor])), provideHttpClientTesting()],
+    });
+    backend = TestBed.inject(HttpTestingController);
+
+    const failed = await open('laboratory', null);
+    expect(failed.querySelector('.hero h1')?.textContent).toContain('auth.hero.title');
+  });
+
+  it('the Super Admin sign-in asks for no announcement', async () => {
+    const root = await open('admin', []);
+    expect(root.querySelector('.hero h1')?.textContent).toContain('auth.admin.title');
+    backend.expectNone((request) => request.url === ANNOUNCEMENT_API.publicList);
   });
 });

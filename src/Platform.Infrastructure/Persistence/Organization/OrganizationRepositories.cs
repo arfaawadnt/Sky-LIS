@@ -147,7 +147,7 @@ internal sealed class BranchRepository(AppDbContext context) : Repository<Branch
         var items = await Sorts.Apply(query, filter.Sort, rows => rows.OrderBy(branch => branch.Code))
             .Skip(page.Skip)
             .Take(page.PageSize)
-            .Select(branch => new BranchListItem(branch.Id, branch.Code, branch.Name.En, branch.Name.Ar, branch.CountryId, branch.GovernorateId, branch.Phone, branch.Email, branch.Currency, branch.IsActive))
+            .Select(branch => new BranchListItem(branch.Id, branch.Code, branch.Name.En, branch.Name.Ar, branch.CountryId, branch.GovernorateId, branch.Phone, branch.Email, branch.Currency, branch.IsActive, branch.CityId, branch.DistrictId, branch.AreaId))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -157,6 +157,6 @@ internal sealed class BranchRepository(AppDbContext context) : Repository<Branch
     public Task<BranchListItem?> GetListItemAsync(Guid id, CancellationToken cancellationToken) =>
         Set.AsNoTracking()
             .Where(branch => branch.Id == id)
-            .Select(branch => new BranchListItem(branch.Id, branch.Code, branch.Name.En, branch.Name.Ar, branch.CountryId, branch.GovernorateId, branch.Phone, branch.Email, branch.Currency, branch.IsActive))
+            .Select(branch => new BranchListItem(branch.Id, branch.Code, branch.Name.En, branch.Name.Ar, branch.CountryId, branch.GovernorateId, branch.Phone, branch.Email, branch.Currency, branch.IsActive, branch.CityId, branch.DistrictId, branch.AreaId))
             .FirstOrDefaultAsync(cancellationToken);
 }

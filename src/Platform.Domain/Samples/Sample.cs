@@ -104,6 +104,12 @@ public sealed class Sample : AggregateRoot, ITenantScoped
 
     public Guid? CollectedBranchId { get; private set; }
 
+    /// <summary>
+    /// LIS-CR-008 C-02: the sample was collected outside the laboratory (the registration tube was marked so); the label
+    /// prints "EXT" and the sample screens show an "Outside" tag. A replacement sample is collected again and carries false.
+    /// </summary>
+    public bool CollectedOutside { get; private set; }
+
     public DateTimeOffset? ReceivedAtUtc { get; private set; }
 
     public Guid? ReceivedByUserId { get; private set; }
@@ -235,6 +241,34 @@ public sealed class Sample : AggregateRoot, ITenantScoped
         MoveTo(SampleStatus.Collected, nowUtc);
         Append(SampleAction.Collected, nowUtc, actorUserId, branchId);
         Raise(new SampleCollected(Id, SampleNumber, TubeId, VisitId, Accession, branchId, actorUserId, nowUtc));
+    }
+
+    /// <summary>
+    /// T2b Collected outside (policy on <c>VisitRegistered</c> / <c>VisitLinesAdded</c>, LIS-CR-008 C-02): an Ordered sample
+    /// whose tube was marked "collected outside" is Collected at the time the clerk typed (else <paramref name="nowUtc"/>;
+    /// never later than it) whatever the auto-collect parameter says, and Received too when <paramref name="autoReceive"/>
+    /// is on; otherwise it waits for its receipt like any sample (the Received gate of BR-03 still applies). The
+    /// turnaround clock starts at the arrival: <see cref="SampleCollected"/> carries <paramref name="nowUtc"/>.
+    /// </summary>
+    public void ArriveCollectedOutside(DateTimeOffset? collectedAtUtc, bool autoReceive, Guid actorUserId, Guid branchId, DateTimeOffset nowUtc)
+    {
+        if (Status != SampleStatus.Ordered)
+        {
+            throw new InvalidStateTransitionException(SamplesCodes.NotOrdered, "sample", Status.ToString(), "collect");
+        }
+
+        var collectedAt = collectedAtUtc is { } typed && typed < nowUtc ? typed : nowUtc;
+        CollectedOutside = true;
+        CollectedAtUtc = collectedAt;
+        CollectedByUserId = actorUserId;
+        CollectedBranchId = branchId;
+        MoveTo(SampleStatus.Collected, nowUtc);
+        Append(SampleAction.Collected, collectedAt, actorUserId, branchId);
+        Raise(new SampleCollected(Id, SampleNumber, TubeId, VisitId, Accession, branchId, actorUserId, nowUtc));
+        if (autoReceive)
+        {
+            Receive(actorUserId, branchId, nowUtc);
+        }
     }
 
     /// <summary>T3 Receive (<c>samples.create</c>): Collected, or Ordered (the collection is recorded first, INV-SMP-003); else SMP-011.</summary>

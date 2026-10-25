@@ -118,8 +118,8 @@ internal sealed class CatalogueBCloner(AppDbContext context, ICurrentTenant tena
         """;
 
     private const string ReportTemplatesSql = $$"""
-        INSERT INTO app.report_templates (tenant_id, id, name_en, name_ar, type, logo_file_id, signature_file_id, show_qr, language, header_text_en, header_text_ar, footer_text_en, footer_text_ar, {{StampColumns}})
-        SELECT {1}, m.new_id, s.name_en, s.name_ar, s.type, NULL, NULL, s.show_qr, s.language, s.header_text_en, s.header_text_ar, s.footer_text_en, s.footer_text_ar, {{Stamp}}
+        INSERT INTO app.report_templates (tenant_id, id, name_en, name_ar, type, logo_file_id, signature_file_id, show_qr, language, header_text_en, header_text_ar, footer_text_en, footer_text_ar, design, {{StampColumns}})
+        SELECT {1}, m.new_id, s.name_en, s.name_ar, s.type, NULL, NULL, s.show_qr, s.language, s.header_text_en, s.header_text_ar, s.footer_text_en, s.footer_text_ar, s.design, {{Stamp}}
         FROM app.report_templates s
         {{Map}}
         WHERE s.tenant_id = {0}

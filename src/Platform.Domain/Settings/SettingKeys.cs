@@ -11,6 +11,9 @@ public static class SettingCodes
 
     /// <summary>A well-formed time-zone name this host does not know, e.g. <c>Mars/Olympus</c> (validation LIS-VR-002 round 4).</summary>
     public const string UnknownTimeZone = "SET-003";
+
+    /// <summary>A client flag (<see cref="SettingKeys.IsClientFlag"/>) is set by the Super Admin on SA-04 only, never through the Parameters pages (LIS-CR-013).</summary>
+    public const string SetByPlatformOnly = "SET-004";
 }
 
 /// <summary>The storage type of a setting value; every value is stored as text and parsed by its descriptor.</summary>
@@ -168,6 +171,9 @@ public static class SettingKeys
     public static readonly SettingDescriptor<int> LabelCopies = SettingDescriptor.Int("labelCopies", 1, "Label copies per sample.", 1, 10);
     public static readonly SettingDescriptor<string> ResultLanguage = SettingDescriptor.String("resultLanguage", "en", "The language of printed reports.", "en", "ar");
 
+    /// <summary>The laboratory's report design (LIS-CR-010, C-14); a report template or a payer contract may override it (<see cref="global::Platform.Domain.Catalogue.ReportDesigns.Resolve"/>).</summary>
+    public static readonly SettingDescriptor<string> ReportDesign = SettingDescriptor.String("reportDesign", global::Platform.Domain.Catalogue.ReportDesigns.DefaultSettingValue, "The layout of printed result reports: classic, modern, compact, letterhead or cumulative.", [.. global::Platform.Domain.Catalogue.ReportDesigns.SettingValues]);
+
     // Samples and results (CP-14…CP-20, BR-03, BR-18)
     public static readonly SettingDescriptor<bool> AutoCollect = SettingDescriptor.Bool("autoCollect", true, "Samples are marked Collected when the visit is saved.");
     public static readonly SettingDescriptor<bool> AutoReceive = SettingDescriptor.Bool("autoReceive", true, "Samples are marked Received when collected (emulates the Received gate, BR-03).");
@@ -192,14 +198,39 @@ public static class SettingKeys
     /// </summary>
     public static readonly SettingDescriptor<string> TimeZone = SettingDescriptor.TimeZone("timeZone", DefaultTimeZone, "IANA time zone of the laboratory's calendar day when its client record names no country zone.");
 
+    // Subscription (LIS-CR-013, C-17)
+    /// <summary>
+    /// The client opted out of the announcements of National Technology and its partners (decision D-4): no sign-in hero, no
+    /// welcome card. A <b>client flag</b> (<see cref="IsClientFlag"/>): set by the Super Admin on SA-04 only
+    /// (<c>PUT /api/v1/platform/clients/{id}/announcements</c>), stored as the laboratory's own row, and only that row is read —
+    /// <c>PUT /api/v1/settings</c> refuses it (SET-004), so neither a laboratory nor SA-19 (for every laboratory at once) sets it.
+    /// </summary>
+    public static readonly SettingDescriptor<bool> HideAnnouncements = SettingDescriptor.Bool("hideAnnouncements", false, "The client does not see the platform's announcements (sign-in hero, welcome card).");
+
+    // Subscription (LIS-CR-012, C-16)
+    /// <summary>
+    /// The grace period of an expired subscription in days (decision D-3, default 7, 0…60): after a trial ends (not activated) or
+    /// a wallet has stayed at or below zero for a plan period, the client keeps working this many days, then only its
+    /// administrators sign in, to the wallet (<see cref="PlatformAdmin.SubscriptionTerms"/>). A <b>platform</b> parameter: only
+    /// the platform tenant's row (SA-19) is read — a laboratory's own row is ignored, so a laboratory cannot extend its grace.
+    /// </summary>
+    public static readonly SettingDescriptor<int> SubscriptionGraceDays = SettingDescriptor.Int("subscriptionGraceDays", PlatformAdmin.SubscriptionTerms.DefaultGraceDays, "Days a client keeps working after its trial ended or its wallet stayed at or below zero for a plan period; then only its administrators sign in, to the wallet.", PlatformAdmin.SubscriptionTerms.MinGraceDays, PlatformAdmin.SubscriptionTerms.MaxGraceDays);
 
     private static readonly SettingDescriptor[] Catalogue =
     [
         MandatoryMobile, MandatoryDoctor, MandatoryNationalId, SimilarNameWarning, DiscountCapPercent, AccessionFormat,
-        AutoPrintLabels, AutoPrintJobOrder, AutoPrintReceipt, PrintUnverified, LabelCopies, ResultLanguage,
+        AutoPrintLabels, AutoPrintJobOrder, AutoPrintReceipt, PrintUnverified, LabelCopies, ResultLanguage, ReportDesign,
         AutoCollect, AutoReceive, NewBarcodeOnReject, ReviewBeforeVerify, DelayWarnPercent, DelayLatePercent,
         SessionTimeoutMinutes, OtpLength, PasswordMinLength, TrialDays, DefaultCurrency, DefaultLanguage, MasterDataUpdatePolicy, TimeZone,
+        SubscriptionGraceDays,
+        HideAnnouncements,
     ];
+
+    /// <summary>LIS-CR-013: client flags the Super Admin sets per client through its own endpoint; the Parameters pages never write them (SET-004).</summary>
+    private static readonly HashSet<string> ClientFlags = new(StringComparer.Ordinal) { HideAnnouncements.Key };
+
+    /// <summary>True for a client flag: <c>PUT /api/v1/settings</c> refuses it with <see cref="SettingCodes.SetByPlatformOnly"/>.</summary>
+    public static bool IsClientFlag(string key) => key is not null && ClientFlags.Contains(key);
 
     private static readonly Dictionary<string, SettingDescriptor> ByKey = Catalogue.ToDictionary(descriptor => descriptor.Key, StringComparer.Ordinal);
 

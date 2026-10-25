@@ -49,6 +49,11 @@ const SAMPLES: Readonly<Record<string, string>> = {
   number: 'TRQ-2026-00007',
   requester: 'Mona Hassan',
   treasury: 'MAIN',
+  // LIS-CR-012 (C-16): the subscription reminders (subscription-expiry, wallet-low, subscription-grace)
+  days: '3',
+  amount: '1,500.00 EGP',
+  laboratory: 'Al Noor Lab',
+  link: 'https://al-noor.skylis.app',
 };
 
 const CODE_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;

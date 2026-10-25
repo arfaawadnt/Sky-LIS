@@ -440,7 +440,7 @@ internal sealed class ReportTemplateRepository(AppDbContext context) : Repositor
     private static IReadOnlyList<ReportTemplateListItem> Map(IReadOnlyList<ReportTemplate> rows) =>
         rows.Select(row => new ReportTemplateListItem(
             row.Id, row.Name.En, row.Name.Ar, row.Type.ToString(), row.LogoFileId, row.SignatureFileId, row.ShowQr, row.Language.ToString(),
-            row.HeaderText?.En, row.HeaderText?.Ar, row.FooterText?.En, row.FooterText?.Ar, row.IsActive)).ToList();
+            row.HeaderText?.En, row.HeaderText?.Ar, row.FooterText?.En, row.FooterText?.Ar, row.IsActive, row.Design?.ToString())).ToList();
 }
 
 internal sealed class DrugTypeRepository(AppDbContext context) : Repository<DrugType>(context), IDrugTypeRepository

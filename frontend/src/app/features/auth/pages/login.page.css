@@ -107,3 +107,9 @@ h2 {
   margin: 0;
   color: var(--ink-2);
 }
+
+.lab-address {
+  margin: 2px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}

@@ -62,6 +62,9 @@ import { branchOf } from './receipt-document.component';
 
       <table class="avoid-break">
         <tbody>
+          <tr><th scope="row">{{ i18n.t('billing.closing.opening') }}</th><td class="num">{{ money(doc().totals.openingBalance ?? 0) }}</td></tr>
+          <tr><th scope="row">{{ i18n.t('billing.closing.cashIn') }}</th><td class="num">{{ money(doc().totals.cashIn ?? 0) }}</td></tr>
+          <tr><th scope="row">{{ i18n.t('billing.closing.cashOut') }}</th><td class="num">−{{ money(doc().totals.cashOut ?? 0) }}</td></tr>
           <tr class="totals"><th scope="row">{{ i18n.t('billing.closing.expectedCash') }}</th><td class="num">{{ money(doc().totals.expectedCash) }}</td></tr>
           <tr><th scope="row">{{ i18n.t('billing.closing.countedCash') }}</th><td class="num">{{ money(doc().countedCash) }}</td></tr>
           <tr class="totals"><th scope="row">{{ i18n.t('billing.closing.difference') }}</th><td class="num">{{ money(doc().difference) }}</td></tr>
@@ -95,7 +98,7 @@ import { branchOf } from './receipt-document.component';
               <td class="mono">{{ movement.accession ?? '—' }}</td>
               <td>{{ i18n.t('billing.method.' + movement.method) }}</td>
               <td>{{ movement.cashierName }}</td>
-              <td class="num">{{ movement.kind === 'Refund' ? '−' : '' }}{{ money(movement.amount) }}</td>
+              <td class="num">{{ movement.kind === 'Refund' || movement.kind === 'CashOut' ? '−' : '' }}{{ money(movement.amount) }}</td>
             </tr>
           } @empty {
             <tr><td colspan="6" class="muted">{{ i18n.t('billing.doc.none') }}</td></tr>

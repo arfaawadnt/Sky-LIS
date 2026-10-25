@@ -1,7 +1,8 @@
 namespace Platform.Application.PlatformAdmin;
 
 /// <summary>LIS-CR-005: a usable laboratory found by its address, with its active logo (if any).</summary>
-public sealed record PublicLaboratoryRecord(Guid TenantId, string Slug, string NameEn, string NameAr, PublicLaboratoryLogo? Logo);
+/// <remarks>LIS-CR-008 C-04: <c>AddressEn</c> / <c>AddressAr</c> = "Area, District, City, Governorate" when the laboratory has a city.</remarks>
+public sealed record PublicLaboratoryRecord(Guid TenantId, string Slug, string NameEn, string NameAr, PublicLaboratoryLogo? Logo, string? AddressEn = null, string? AddressAr = null);
 
 /// <summary>Where the laboratory's active logo is stored (the file store's key in the laboratory's own area) and its version.</summary>
 public sealed record PublicLaboratoryLogo(string StorageKey, string ContentType, int Version);

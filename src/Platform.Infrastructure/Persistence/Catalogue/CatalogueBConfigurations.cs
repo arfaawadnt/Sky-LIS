@@ -155,6 +155,7 @@ internal sealed class ReportTemplateConfiguration : IEntityTypeConfiguration<Rep
         builder.Property(template => template.ShowQr).IsRequired();
         CatalogueBMapping.Bilingual(builder, template => template.HeaderText, "header_text", CatalogueBGuard.MaxLongTextLength, required: false);
         CatalogueBMapping.Bilingual(builder, template => template.FooterText, "footer_text", CatalogueBGuard.MaxLongTextLength, required: false);
+        builder.Property(template => template.Design);   // nullable string, CHECK by the enum convention (LIS-CR-010)
         builder.HasIndex(template => new { template.TenantId, template.Type });
     }
 }

@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, resource, signal } from '@angular/core';
 
 import type { ContractPriceItem, ContractPricingDetail, ContractPricingReviewDocument, NegotiatePriceRequest, SetContractFormulaRequest } from '../../../core/api/pricing.contracts';
+import type { ReportDesign } from '../../../core/api/report-designs';
 import { mutation } from '../../../core/state/mutation';
 import { PricingApi } from '../data/pricing.api';
 import { ServiceNamesStore } from './service-names.store';
@@ -75,6 +76,11 @@ export class ContractPricingFacade {
     then: () => this.afterChange(false),
   });
 
+  /** C7 (LIS-CR-010): the tier's report design override. */
+  readonly setReportDesign = mutation((input: { tierId: string; design: ReportDesign | null }) => this.api.setReportDesign(input.tierId, input.design), {
+    then: () => this.afterChange(false),
+  });
+
   readonly copyFrom = mutation((input: { tierId: string; sourceTierId: string; factor: number }) => this.api.copyContractPricing(input.tierId, input.sourceTierId, input.factor), {
     then: () => this.afterChange(true),
   });
@@ -82,7 +88,7 @@ export class ContractPricingFacade {
   select(tierId: string | null): void {
     if (this.tierId() !== tierId) {
       this.search.set('');
-      for (const action of [this.saveFormula, this.apply, this.negotiate, this.clearExclusion, this.setAlert, this.copyFrom]) {
+      for (const action of [this.saveFormula, this.apply, this.negotiate, this.clearExclusion, this.setAlert, this.setReportDesign, this.copyFrom]) {
         action.reset();
       }
 

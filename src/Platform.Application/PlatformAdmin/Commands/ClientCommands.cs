@@ -34,7 +34,10 @@ public sealed record ProvisionClientCommand(
     string? PortalSlug,
     string? Language,
     string AdminUsername,
-    string AdminPassword) : ICommand<ProvisionedClient>, IPlatformAdministrationRequest;
+    string AdminPassword,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null) : ICommand<ProvisionedClient>, IPlatformAdministrationRequest;
 
 public sealed class ProvisionClientValidator : AbstractValidator<ProvisionClientCommand>
 {
@@ -77,16 +80,18 @@ public sealed class ProvisionClientHandler(
     INotificationSender sender,
     ISecurityEventLog events,
     IUnitOfWork unitOfWork,
-    IClock clock) : ICommandHandler<ProvisionClientCommand, ProvisionedClient>
+    IClock clock,
+    ILocalityLookup localities) : ICommandHandler<ProvisionClientCommand, ProvisionedClient>
 {
     public async Task<ProvisionedClient> Handle(ProvisionClientCommand command, CancellationToken cancellationToken)
     {
         PlatformAdminScope.Require(currentTenant);
+        var locality = await LocalityChecks.ResolveAsync(localities, command.GovernorateId, command.CityId, command.DistrictId, command.AreaId, cancellationToken);
         var provisioner = new TenantProvisioner(tenants, wallets, countries, governorates, plans, users, branches, administrators, masterData, hasher, settings, tenantScope, clock);
         var spec = new ProvisionTenantSpec(
             command.NameEn, command.NameAr, command.CountryId, command.GovernorateId, command.Address, command.Mobile, command.LicenceNo,
             command.ManagerName, command.ManagerMobile, command.Email, command.PlanId, command.PortalSlug, TenantSource.Manual, command.Language,
-            command.AdminUsername, command.AdminPassword);
+            command.AdminUsername, command.AdminPassword, locality);
 
         var prepared = await provisioner.PrepareAsync(spec, cancellationToken);
         await provisioningScope.RunAsync(prepared.Tenant.Id, async ct =>
@@ -101,7 +106,7 @@ public sealed class ProvisionClientHandler(
     }
 }
 
-/// <summary>P4/P5 Edit a client's details and plan.</summary>
+/// <summary>P4/P5 Edit a client's details and plan; LIS-CR-008 C-04: the optional city / district / area (none clears them).</summary>
 [RequirePermissionPolicy(PermissionCatalog.Tenancy, PermissionAction.Edit)]
 public sealed record UpdateClientCommand(
     Guid ClientId,
@@ -116,7 +121,10 @@ public sealed record UpdateClientCommand(
     string ManagerMobile,
     string? Email,
     Guid PlanId,
-    string? Language) : ICommand, IPlatformAdministrationRequest;
+    string? Language,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null) : ICommand, IPlatformAdministrationRequest;
 
 public sealed class UpdateClientValidator : AbstractValidator<UpdateClientCommand>
 {
@@ -145,7 +153,8 @@ public sealed class UpdateClientHandler(
     IPlanRepository plans,
     ICurrentTenant currentTenant,
     IUnitOfWork unitOfWork,
-    IClock clock) : ICommandHandler<UpdateClientCommand>
+    IClock clock,
+    ILocalityLookup localities) : ICommandHandler<UpdateClientCommand>
 {
     public async Task Handle(UpdateClientCommand command, CancellationToken cancellationToken)
     {
@@ -160,6 +169,7 @@ public sealed class UpdateClientHandler(
 
         var profile = ClientProfile.Create(command.NameEn, command.NameAr, country, governorate.Id, command.Address, command.Mobile, command.LicenceNo, command.ManagerName, command.ManagerMobile, command.Email);
         tenant.UpdateProfile(profile, country, governorate, command.Language ?? tenant.PreferredLanguage);
+        tenant.Locate(await LocalityChecks.ResolveAsync(localities, governorate.Id, command.CityId, command.DistrictId, command.AreaId, cancellationToken));   // LIS-CR-008 C-04
         tenant.ChangePlan(plan, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }

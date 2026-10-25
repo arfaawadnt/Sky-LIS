@@ -37,6 +37,7 @@ export function sampleItem(overrides: Partial<SampleListItem> = {}): SampleListI
     rejectedAtUtc: null,
     replacedBySampleId: null,
     replacesSampleId: null,
+    collectedOutside: false,
     ...overrides,
   };
 }

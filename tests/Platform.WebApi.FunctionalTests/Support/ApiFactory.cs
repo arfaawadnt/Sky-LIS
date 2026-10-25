@@ -307,7 +307,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["Lis:DataProtection:MasterKey"] = MasterKey,
                 ["Lis:Security:AllowedOrigins:0"] = "http://localhost",
                 ["Lis:Outbox:Enabled"] = "false",   // the loop stays idle unless a test turns it on through Overrides
-                ["Lis:Jobs:WalletCharge:Enabled"] = "false",   // no background wallet charges under the tests' balances; SA-05 "Run charges now" still runs the pass
+                ["Lis:Jobs:WalletCharge:Enabled"] = "false",
+                ["Lis:Jobs:SubscriptionReminders:Enabled"] = "false",   // LIS-CR-012: the reminder loop stays idle; SubscriptionRemindersFlowTests runs the pass by hand   // no background wallet charges under the tests' balances; SA-05 "Run charges now" still runs the pass
             };
             foreach (var (key, value) in Overrides)
             {

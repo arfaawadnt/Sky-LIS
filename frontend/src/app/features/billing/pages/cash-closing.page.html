@@ -41,6 +41,9 @@
         <app-stat-card [label]="i18n.t('billing.closing.cashPayments')" [value]="money(preview.totals.cashPayments)" tone="ok" />
         <app-stat-card [label]="i18n.t('billing.closing.nonCash')" [value]="money(nonCash())" tone="info" [hint]="i18n.t('billing.closing.nonCashHint')" />
         <app-stat-card [label]="i18n.t('billing.closing.refunds')" [value]="money(preview.totals.totalRefunds)" tone="warn" [hint]="i18n.t('billing.method.Cash') + ' ' + money(preview.totals.cashRefunds)" />
+        <app-stat-card [label]="i18n.t('billing.closing.opening')" [value]="money(preview.totals.openingBalance ?? 0)" tone="info" />
+        <app-stat-card [label]="i18n.t('billing.closing.cashIn')" [value]="money(preview.totals.cashIn ?? 0)" tone="ok" />
+        <app-stat-card [label]="i18n.t('billing.closing.cashOut')" [value]="money(preview.totals.cashOut ?? 0)" tone="warn" />
         <app-stat-card [label]="i18n.t('billing.closing.expectedCash')" [value]="money(preview.totals.expectedCash)" tone="brand" [hint]="preview.currency" />
         <app-stat-card [label]="i18n.t('billing.closing.outstanding')" [value]="money(preview.totals.outstandingBalance)" tone="bad" [hint]="i18n.tc('billing.closing.visitCount', preview.totals.visitCount, { count: num(preview.totals.visitCount) })" />
         <app-stat-card [label]="i18n.t('billing.closing.discounts')" [value]="money(preview.totals.discountTotal)" tone="info" />

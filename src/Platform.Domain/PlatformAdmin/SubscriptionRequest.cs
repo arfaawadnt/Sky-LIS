@@ -57,6 +57,13 @@ public sealed class SubscriptionRequest : AggregateRoot
 
     public string Address { get; private set; }
 
+    /// <summary>LIS-CR-008 C-04: the city (markaz) under the governorate, optional; checked by <see cref="Locate"/> and again at completion.</summary>
+    public Guid? CityId { get; private set; }
+
+    public Guid? DistrictId { get; private set; }
+
+    public Guid? AreaId { get; private set; }
+
     public string Mobile { get; private set; }
 
     public string? LicenceNo { get; private set; }
@@ -104,6 +111,20 @@ public sealed class SubscriptionRequest : AggregateRoot
         var request = new SubscriptionRequest(Guid.CreateVersion7(), profile, lang, nowUtc);
         request.Raise(new SubscriptionRequested(request.Id, country.Id, nowUtc));
         return request;
+    }
+
+    /// <summary>
+    /// LIS-CR-008 C-04: the city / district / area the wizard picked under the governorate (step 1, while Pending); the locality
+    /// was checked by <see cref="Locality.Resolve"/> against this request's governorate (GEO-020 otherwise).
+    /// </summary>
+    public void Locate(Locality locality)
+    {
+        ArgumentNullException.ThrowIfNull(locality);
+        RequireStatus(SubscriptionRequestStatus.Pending, PlatformAdminCodes.SubscriptionNotPending, "change the locality");
+        locality.EnsureIn(GovernorateId);
+        CityId = locality.CityId;
+        DistrictId = locality.DistrictId;
+        AreaId = locality.AreaId;
     }
 
     /// <summary>S1' Re-send the code: Pending and alive, at most <see cref="MaxCodesSent"/> codes per request (SUB-004).</summary>

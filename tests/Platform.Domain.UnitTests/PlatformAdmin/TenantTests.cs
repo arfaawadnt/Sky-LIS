@@ -31,7 +31,8 @@ public sealed class TenantTests
         Assert.Equal(TenantStatus.Trial, client.Status);
         Assert.Equal(Now.AddDays(14), client.TrialEndsAtUtc);
         Assert.True(client.IsUsableAt(Now.AddDays(13)));
-        Assert.False(client.IsUsableAt(Now.AddDays(14)));
+        Assert.True(client.IsUsableAt(Now.AddDays(14)));   // LIS-CR-012 (D-3): an ended trial runs its grace; the subscription state decides, not CLI-020
+        Assert.Equal(SubscriptionLevel.Grace, client.SubscriptionState(Now.AddDays(14), SubscriptionTerms.DefaultGraceDays, null).Level);
     }
 
     [Fact]

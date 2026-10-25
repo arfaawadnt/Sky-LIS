@@ -59,6 +59,25 @@ public static class PlatformAdminCodes
     public const string ManagerMobileInvalidForCountry = "GEO-014";
     /// <summary>A city, district or area is created or reactivated only under an active parent (change request 2026-10-19, A2).</summary>
     public const string LocationParentInactive = "GEO-015";
+
+    // LIS-CR-008 C-04 (P-ADR): the locality of a laboratory, a wizard request or a branch, and the locality import (SA-11).
+    /// <summary>The picked city is unknown, or does not belong to the governorate (or no governorate is chosen).</summary>
+    public const string LocalityCityNotInGovernorate = "GEO-020";
+
+    /// <summary>The picked district is unknown, does not belong to the city, or is sent without its city.</summary>
+    public const string LocalityDistrictNotInCity = "GEO-021";
+
+    /// <summary>The picked area is unknown, does not belong to the district, or is sent without its district.</summary>
+    public const string LocalityAreaNotInDistrict = "GEO-022";
+
+    /// <summary>The locality file cannot be read: empty, no recognised header, a malformed line (SA-11 import).</summary>
+    public const string LocalityImportFileInvalid = "GEO-023";
+
+    /// <summary>The locality file exceeds the size or row limit.</summary>
+    public const string LocalityImportTooLarge = "GEO-024";
+
+    /// <summary>A row of the locality file is refused: no city, an area without its district, a name too long.</summary>
+    public const string LocalityImportRowInvalid = "GEO-025";
     public const string IsoCodeExists = "GEO-100";
     public const string GovernorateExists = "GEO-101";
     public const string CityExists = "GEO-102";

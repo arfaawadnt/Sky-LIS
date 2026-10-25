@@ -234,6 +234,12 @@ internal sealed class FakeReferences : IResultReferenceLookup
     public Task<IReadOnlyDictionary<Guid, NamedReference>> BranchesAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyDictionary<Guid, NamedReference>>(new Dictionary<Guid, NamedReference>());
 
     public Task<IReadOnlyDictionary<Guid, NamedReference>> PatientConditionsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyDictionary<Guid, NamedReference>>(new Dictionary<Guid, NamedReference>());
+
+    /// <summary>The report design override per contract tier (LIS-CR-010).</summary>
+    public Dictionary<Guid, ReportDesign> ContractDesigns { get; } = [];
+
+    public Task<ReportDesign?> ContractReportDesignAsync(Guid contractTierId, CancellationToken cancellationToken) =>
+        Task.FromResult<ReportDesign?>(ContractDesigns.TryGetValue(contractTierId, out var design) ? design : null);
 }
 
 /// <summary>Privileges with result rights for listed groups in every branch, and the two special rights.</summary>

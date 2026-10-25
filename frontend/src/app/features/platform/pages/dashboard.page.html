@@ -31,6 +31,13 @@
       <app-stat-card [label]="i18n.tf('platform.dashboard.silent', { days: d.silentDays })" [value]="number(d.silentClients)"
                      [hint]="i18n.tc('platform.dashboard.silentTrial', d.silentTrialClients)" [tone]="d.silentClients > 0 ? 'bad' : 'ok'" icon="alert" />
     </a>
+    <!-- LIS-CR-012 (C-16): clients whose trial, wallet cover or grace ends within 7 days; the list is the Clients page's Subscription filter -->
+    <a class="kpi-link" routerLink="../clients" [queryParams]="{ subscription: 'expiring' }" data-testid="expiring-tile"
+       [attr.aria-label]="i18n.tf('platform.subscription.tileOpen', { count: d.expiringSoonClients ?? 0 })">
+      <app-stat-card [label]="i18n.t('platform.subscription.tile')" [value]="number(d.expiringSoonClients ?? 0)"
+                     [hint]="i18n.tf('platform.subscription.tileHint', { grace: d.graceClients ?? 0, expired: d.expiredClients ?? 0 })"
+                     [tone]="(d.expiredClients ?? 0) > 0 ? 'bad' : (d.expiringSoonClients ?? 0) > 0 ? 'warn' : 'ok'" icon="zap" />
+    </a>
   </div>
 
   <div class="grid-2">

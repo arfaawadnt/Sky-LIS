@@ -51,6 +51,13 @@ public sealed class Wallet : AggregateRoot
 
     public bool IsAtOrBelowZero => Balance <= 0;
 
+    /// <summary>
+    /// LIS-CR-012: when a debit last left the balance at or below zero (null while the balance is positive, and for a new wallet
+    /// that was never debited). A client whose wallet stays so for longer than the plan period enters the grace period
+    /// (<see cref="SubscriptionTerms"/>). A top-up that brings the balance above zero clears it.
+    /// </summary>
+    public DateTimeOffset? AtOrBelowZeroSinceUtc { get; private set; }
+
     /// <summary>Opens the empty wallet of a new client; the first charge falls due at <paramref name="firstChargeAtUtc"/>.</summary>
     public static Wallet Open(Guid tenantId, string currencyCode, DateTimeOffset firstChargeAtUtc)
     {
@@ -71,6 +78,7 @@ public sealed class Wallet : AggregateRoot
         }
 
         Balance += credited;
+        TrackZero(nowUtc);
         var transaction = WalletTransaction.Record(Id, WalletTransactionKind.TopUp, credited, Balance, cleanedReference, Note(note), actorUserId, nowUtc);
         _transactions.Add(transaction);
         fulfils?.Complete(transaction.Id, nowUtc);
@@ -83,6 +91,7 @@ public sealed class Wallet : AggregateRoot
     {
         var debit = DomainText.Money(monthlyFee, PlatformAdminCodes.AmountInvalid, "The monthly fee", allowZero: true);
         Balance -= debit;
+        TrackZero(nowUtc, debited: debit > 0);
         var transaction = WalletTransaction.Record(Id, WalletTransactionKind.Subscription, -debit, Balance, DomainText.Required(reference, MaxReferenceLength, PlatformAdminCodes.ReferenceRequired, "The charge reference"), null, null, nowUtc);
         _transactions.Add(transaction);
         NextChargeAtUtc = NextChargeAtUtc.AddMonths(1);
@@ -96,6 +105,7 @@ public sealed class Wallet : AggregateRoot
         var debit = DomainText.Money(amount, PlatformAdminCodes.AmountInvalid, "The usage amount", allowZero: false);
         Require(Balance >= debit, PlatformAdminCodes.InsufficientBalance, "The wallet balance does not cover this usage; metered services pause at zero.", DomainFault.Conflict);
         Balance -= debit;
+        TrackZero(nowUtc, debited: true);
         var transaction = WalletTransaction.Record(Id, WalletTransactionKind.Usage, -debit, Balance, DomainText.Required(reference, MaxReferenceLength, PlatformAdminCodes.ReferenceRequired, "The usage reference"), null, null, nowUtc);
         _transactions.Add(transaction);
         Raise(new WalletDebited(Id, TenantId, transaction.Id, transaction.Kind.ToString(), debit, Balance, nowUtc));
@@ -130,6 +140,22 @@ public sealed class Wallet : AggregateRoot
             _topUpRequests.Add(request);
         }
     }
+
+    /// <summary>LIS-CR-012: a positive balance clears the zero mark; a debit that leaves it at or below zero starts one (an earlier mark stays).</summary>
+    private void TrackZero(DateTimeOffset nowUtc, bool debited = false)
+    {
+        if (Balance > 0)
+        {
+            AtOrBelowZeroSinceUtc = null;
+        }
+        else if (debited && AtOrBelowZeroSinceUtc is null)
+        {
+            AtOrBelowZeroSinceUtc = nowUtc;
+        }
+    }
+
+    /// <summary>The figures of the subscription state (LIS-CR-012) for a plan fee.</summary>
+    public WalletPosition PositionFor(decimal monthlyFee) => new(Balance, monthlyFee, CurrencyCode, AtOrBelowZeroSinceUtc, NextChargeAtUtc);
 
     private static string? Note(string? note) => DomainText.Optional(note, MaxNoteLength, PlatformAdminCodes.WalletNoteInvalid, "The note");
 }

@@ -14,7 +14,7 @@ const CLIP = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
 /**
  * Barcode labels of a visit (CP-06 "save prints labels", LDM §2.2 label content): unit letter, accession, date/time,
  * patient, the sample number as Code 128, sample type · condition, branch and the services; the marks "!" (urgent) and
- * "BIO" (biohazard); the date in Latin digits in every language, like the printed reports; one `.print-page` per label
+ * "BIO" (biohazard) and "EXT" (sample collected outside the laboratory, LIS-CR-008 C-02); the date in Latin digits in every language, like the printed reports; one `.print-page` per label
  * and copy, sized for 50 × 25 mm stock. Inline styles so the rendered HTML carries the layout into the print frame.
  */
 @Component({
@@ -32,6 +32,10 @@ const CLIP = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
           @if (label.biohazard) {
             <!-- plain text in a box: every label font and thermal printer has it, unlike the ☣ glyph (validation 2026-10-11) -->
             <b class="biohazard" style="border:0.25mm solid #000;padding:0 0.5mm;">BIO</b>
+          }
+          @if (label.collectedOutside) {
+            <!-- LIS-CR-008 C-02: the sample was collected outside the laboratory -->
+            <b class="outside" style="border:0.25mm solid #000;padding:0 0.5mm;">EXT</b>
           }
           <span style="margin-inline-start:auto;">{{ when(label) }}</span>
         </div>
@@ -179,6 +183,9 @@ export class RegistrationLabelsDocument {
                 <b>{{ tube.unitCode }}</b> · {{ name(tube.sampleTypeNameEn, tube.sampleTypeNameAr) }}
                 @if (tube.sampleConditionNameEn) {
                   · {{ name(tube.sampleConditionNameEn, tube.sampleConditionNameAr) }}
+                }
+                @if (tube.collectedOutside) {
+                  <b> · EXT</b>
                 }
               </div>
               <app-code128 [value]="tube.sampleNumber" [height]="34" />

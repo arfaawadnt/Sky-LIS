@@ -6,9 +6,9 @@ const moduleOf = (key: string): PermissionCatalogue['modules'][number] => ({ key
 
 /** Validation v0.5.0 O-7: the privilege matrix of the role editor offers the modules of the delivered release only. */
 describe('Role permission scope (O-7)', () => {
-  it('maps the six Release 2 modules of the report, and every other module to Release 1', () => {
-    expect(Object.keys(PERMISSION_MODULE_RELEASE).sort()).toEqual(['automation', 'claims', 'integration', 'quality', 'support', 'wallet']);
-    expect([permissionRelease('claims.view'), permissionRelease('wallet'), permissionRelease('registration.create'), permissionRelease('samples.view')]).toEqual(['R2', 'R2', 'R1', 'R1']);
+  it('maps the five Release 2 modules of the report (the wallet is Release 1 since LIS-CR-012), and every other module to Release 1', () => {
+    expect(Object.keys(PERMISSION_MODULE_RELEASE).sort()).toEqual(['automation', 'claims', 'integration', 'quality', 'support']);
+    expect([permissionRelease('claims.view'), permissionRelease('wallet'), permissionRelease('registration.create'), permissionRelease('samples.view')]).toEqual(['R2', 'R1', 'R1', 'R1']);
     expect([permissionInScope('quality.manage', 'R1'), permissionInScope('quality.manage', 'R2'), permissionInScope('catalogue.edit', 'R1')]).toEqual([false, true, true]);
   });
 
@@ -16,7 +16,7 @@ describe('Role permission scope (O-7)', () => {
     const conflicts = NAV_REGISTRY.filter((entry) => entry.release === 'R1' && entry.permission !== null && permissionRelease(entry.permission) === 'R2').map((entry) => entry.path);
     expect(conflicts).toEqual([]);
     // and each Release 2 module has pages, all of them Release 2 (the mapping is not stale)
-    for (const key of ['integration', 'support', 'wallet']) {
+    for (const key of ['integration', 'support']) {
       const entries = NAV_REGISTRY.filter((entry) => entry.permission?.startsWith(`${key}.`));
       expect([key, entries.length > 0 && entries.every((entry) => entry.release === 'R2')]).toEqual([key, true]);
     }
@@ -28,6 +28,6 @@ describe('Role permission scope (O-7)', () => {
     expect(catalogueInScope(catalogue, 'R2').modules).toHaveLength(4);
 
     const split = splitByScope(['claims.view', 'registration.view', 'wallet.manage'], 'R1');
-    expect([[...split.shown], split.kept]).toEqual([['registration.view'], ['claims.view', 'wallet.manage']]);
+    expect([[...split.shown], split.kept]).toEqual([['registration.view', 'wallet.manage'], ['claims.view']]);
   });
 });

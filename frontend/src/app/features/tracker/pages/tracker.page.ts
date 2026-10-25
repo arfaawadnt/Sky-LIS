@@ -23,7 +23,7 @@ import { PeriodPickerComponent } from '../ui/period-picker.component';
 import { PipelineStripComponent } from '../ui/pipeline-strip.component';
 import { StatusPillComponent } from '../ui/status-pill.component';
 import { type BoardLane, TrackerBoardComponent } from '../ui/tracker-board.component';
-import { type StatusLook, clockTime, delayEdge, localToday, num, patientLine, payerLine, paymentLook, resultsLook, samplesLook, timeLeftLook } from '../ui/tracker-format';
+import { type StatusLook, clockTime, delayEdge, localToday, num, outsideLook, patientLine, payerLine, paymentLook, resultsLook, samplesLook, timeLeftLook } from '../ui/tracker-format';
 import { ViewTabsComponent } from '../ui/view-tabs.component';
 
 /**
@@ -154,6 +154,11 @@ export class TrackerPage {
 
   protected samples(row: LabTrackerItem): StatusLook | null {
     return samplesLook(row, this.i18n);
+  }
+
+  /** The "ext" tag of the samples cell (LIS-CR-008 C-02). */
+  protected outside(row: LabTrackerItem): StatusLook | null {
+    return outsideLook(row, this.i18n);
   }
 
   protected results(row: LabTrackerItem): StatusLook | null {

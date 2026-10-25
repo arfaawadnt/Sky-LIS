@@ -48,7 +48,8 @@ public sealed class PlatformClientsController(ISender sender) : ControllerBase
         var created = await sender.Send(
             new ProvisionClientCommand(
                 request.NameEn, request.NameAr, request.CountryId, request.GovernorateId, request.Address, request.Mobile, request.LicenceNo, request.ManagerName,
-                request.ManagerMobile, request.Email, request.PlanId, request.PortalSlug, request.Language, request.AdminUsername, request.AdminPassword),
+                request.ManagerMobile, request.Email, request.PlanId, request.PortalSlug, request.Language, request.AdminUsername, request.AdminPassword,
+                request.CityId, request.DistrictId, request.AreaId),
             cancellationToken);
         return Created($"/api/v1/platform/clients/{created.Id}", created);
     }
@@ -58,7 +59,8 @@ public sealed class PlatformClientsController(ISender sender) : ControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
         await sender.Send(
-            new UpdateClientCommand(id, request.NameEn, request.NameAr, request.CountryId, request.GovernorateId, request.Address, request.Mobile, request.LicenceNo, request.ManagerName, request.ManagerMobile, request.Email, request.PlanId, request.Language),
+            new UpdateClientCommand(id, request.NameEn, request.NameAr, request.CountryId, request.GovernorateId, request.Address, request.Mobile, request.LicenceNo, request.ManagerName, request.ManagerMobile, request.Email, request.PlanId, request.Language,
+                request.CityId, request.DistrictId, request.AreaId),
             cancellationToken);
         return NoContent();
     }

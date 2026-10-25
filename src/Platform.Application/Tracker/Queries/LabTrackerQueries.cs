@@ -255,7 +255,7 @@ internal static class TrackerRows
             progress.DelayState?.ToString(),
             new LabTrackerRegistration(row.LiveLines, row.CancelledLines),
             sections.Samples
-                ? new LabTrackerSamples(row.Samples.Total, row.Samples.Ordered, row.Samples.Collected, row.Samples.Received, row.Samples.Rejected, row.FirstRejectionReasonEn, row.FirstRejectionReasonAr)
+                ? new LabTrackerSamples(row.Samples.Total, row.Samples.Ordered, row.Samples.Collected, row.Samples.Received, row.Samples.Rejected, row.FirstRejectionReasonEn, row.FirstRejectionReasonAr, row.Samples.CollectedOutside)
                 : null,
             sections.Results
                 ? new LabTrackerResults(

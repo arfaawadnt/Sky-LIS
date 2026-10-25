@@ -154,6 +154,11 @@ export interface CashClosingTotals {
   readonly outstandingBalance: number;
   readonly discountTotal: number;
   readonly visitCount: number;
+  /** Cash ledger (LIS-CR-011): the cash in the drawer when the period starts and the cash entries in / out of it; 0 on closings made before. */
+  readonly openingBalance?: number;
+  readonly cashIn?: number;
+  readonly cashOut?: number;
+  readonly entryCount?: number;
 }
 
 export interface CashClosingListItem {
@@ -173,7 +178,8 @@ export interface CashClosingListItem {
   readonly closedAtUtc: string;
 }
 
-export type DrawerMovementKind = 'Payment' | 'Refund';
+/** A cash entry of the cash ledger (LIS-CR-011) is a movement too: CashIn / CashOut, without a visit. */
+export type DrawerMovementKind = 'Payment' | 'Refund' | 'CashIn' | 'CashOut';
 
 export interface DrawerMovement {
   readonly kind: DrawerMovementKind;
@@ -187,6 +193,8 @@ export interface DrawerMovement {
   readonly cashierUserId: string;
   readonly cashierName: string;
   readonly status: PaymentStatus;
+  /** A cash entry's reason (LIS-CR-011). */
+  readonly text?: string | null;
 }
 
 export interface DrawerCashier {
@@ -517,6 +525,126 @@ export interface BillingPrintSettings {
   readonly autoPrintReceipt: boolean;
 }
 
+// ---- cash ledger (CP-70, change request LIS-CR-011 point C-15) ------------------------------------------------------
+
+export type CashEntryKind = 'CashOut' | 'CashIn';
+
+export type CashEntryCategory = 'Supplier' | 'PettyCash' | 'BankDeposit' | 'OpeningFloat' | 'OtherIncome' | 'Other';
+
+/** The categories a kind accepts (the server refuses another with BIL-062). */
+export const CASH_ENTRY_CATEGORIES: Readonly<Record<CashEntryKind, readonly CashEntryCategory[]>> = {
+  CashOut: ['Supplier', 'PettyCash', 'BankDeposit', 'Other'],
+  CashIn: ['OpeningFloat', 'OtherIncome', 'Other'],
+};
+
+/** Money out of (or into) the drawer without a visit; cashier and branch from the session; the method defaults to cash. */
+export interface PostCashEntryRequest {
+  readonly kind: CashEntryKind;
+  readonly category: CashEntryCategory;
+  readonly amount: number;
+  readonly reason: string;
+  readonly method?: PaymentMethod | null;
+  readonly methodCode?: string | null;
+  readonly reference?: string | null;
+  readonly note?: string | null;
+}
+
+export interface CashEntryCreated {
+  readonly id: string;
+  readonly number: string;
+}
+
+/** Own drawer (User) or the branch: one cashier or every cashier (needs `canViewBranchCollections`). */
+export type CashLedgerScope = 'User' | 'Branch';
+
+/** `fromDay` / `toDay` are laboratory days (`yyyy-MM-dd`, inclusive); null = today. */
+export interface CashLedgerRequest {
+  readonly fromDay: string | null;
+  readonly toDay: string | null;
+  readonly scope: CashLedgerScope;
+  readonly cashierUserId: string | null;
+}
+
+export interface CashLedgerMethodAmounts {
+  readonly cash: number;
+  readonly card: number;
+  readonly pos: number;
+  readonly transfer: number;
+  readonly total: number;
+}
+
+export interface CashLedgerSummary {
+  readonly openingBalance: number;
+  readonly openingClosingNumber: string | null;
+  readonly openingClosedThroughUtc: string | null;
+  readonly receipts: CashLedgerMethodAmounts;
+  readonly receiptCount: number;
+  readonly refunds: CashLedgerMethodAmounts;
+  readonly refundCount: number;
+  readonly voidedCount: number;
+  readonly voidedAmount: number;
+  readonly cashIn: number;
+  readonly cashOut: number;
+  readonly entryCount: number;
+  readonly countDifferences: number;
+  readonly closingCount: number;
+  readonly closingBalance: number;
+  readonly netCash: number;
+}
+
+export type CashLedgerRowKind = 'Receipt' | 'Refund' | 'CashIn' | 'CashOut' | 'Closing';
+
+/** One line in time order; `moneyIn` / `moneyOut` are what it did to the drawer (cash only), `balance` the cash after it. */
+export interface CashLedgerRow {
+  readonly kind: CashLedgerRowKind;
+  readonly id: string;
+  readonly number: string;
+  readonly atUtc: string;
+  readonly visitId: string | null;
+  readonly accession: string | null;
+  readonly method: PaymentMethod | null;
+  readonly methodCode: string | null;
+  readonly category: CashEntryCategory | null;
+  readonly text: string | null;
+  readonly amount: number;
+  readonly status: PaymentStatus;
+  readonly moneyIn: number;
+  readonly moneyOut: number;
+  readonly balance: number;
+  readonly cashierUserId: string;
+  readonly cashierName: string | null;
+  readonly expected: number | null;
+  readonly counted: number | null;
+  readonly difference: number | null;
+}
+
+/** The period a day close from the ledger covers: after the scope's last closing (or the day's start) up to the read. */
+export interface CashLedgerCloseWindow {
+  readonly fromUtc: string;
+  readonly toUtc: string;
+}
+
+/** The ledger and its printed twin, the A4 "Daily cash sheet". */
+export interface CashLedgerView {
+  readonly letterhead: DocumentLetterhead;
+  readonly branchId: string;
+  readonly scope: CashLedgerScope;
+  readonly cashierUserId: string | null;
+  readonly cashierName: string | null;
+  readonly fromDay: string;
+  readonly toDay: string;
+  readonly fromUtc: string;
+  readonly toUtc: string;
+  readonly timeZone: string;
+  readonly summary: CashLedgerSummary;
+  readonly rows: readonly CashLedgerRow[];
+  readonly closeWindow: CashLedgerCloseWindow | null;
+  readonly cashiers: readonly DrawerCashier[];
+  readonly currency: string;
+  readonly printedBy: string;
+  readonly printedAtUtc: string;
+}
+
 export const BILLING_API = {
   payments: '/api/v1/billing/payments',
   refunds: '/api/v1/billing/refunds',
@@ -525,6 +653,8 @@ export const BILLING_API = {
   cashClosings: '/api/v1/billing/cash-closings',
   printSettings: '/api/v1/billing/print-settings',
   collectionsReport: '/api/v1/billing/collections-report',
+  cashLedger: '/api/v1/billing/cash-ledger',
+  cashEntries: '/api/v1/billing/cash-entries',
   refundReasons: '/api/v1/catalogue/reasons',
   paymentMethods: '/api/v1/billing/payment-methods',
   paymentMethodOptions: '/api/v1/billing/payment-methods/options',
@@ -537,6 +667,9 @@ export const BILLING_PERMISSIONS = {
   refund: 'billing.approve',
   void: 'billing.cancel',
   close: 'billing.manage',
+  /** Cash ledger (LIS-CR-011): posting a cash entry is billing.create, voiding it billing.approve. */
+  cashEntry: 'billing.create',
+  voidCashEntry: 'billing.approve',
   manage: 'billing.manage',
   export: 'billing.export',
 } as const;

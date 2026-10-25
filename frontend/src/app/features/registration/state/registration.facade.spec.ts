@@ -199,6 +199,8 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
         preparationAnswers: [{ preparationId: 'prep-fast', answer: 'Yes' }],
         discount: null,
         confirmFrequencyWarnings: true,
+        collectedOutside: false,
+        samples: null,
       }),
     );
     post.flush({ id: 'v-9', accession: 'ACC-2026-00009', tubeCount: 1, warnings: [] }, { status: 201, statusText: 'Created' });
@@ -211,6 +213,37 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     pay.flush({ id: 'pay-1', receiptNumber: 'RCT-2026-00001' }, { status: 201, statusText: 'Created' });
     expect(await paying).toEqual({ id: 'pay-1', receiptNumber: 'RCT-2026-00001' });
     backend.verify();
+  });
+
+  it('marks samples collected outside one by one or all at once and sends them by tube key with the typed time (LIS-CR-008 C-02)', async () => {
+    await startNewVisit();
+    facade.addServices([{ serviceId: 's-cbc', code: 'CBC', nameEn: '', nameAr: '' }, { serviceId: 's-glu', code: 'GLU', nameEn: '', nameAr: '' }]);
+    await runEffects();
+    const tubes = [
+      { key: 'g-haem:st-blood:-', existingTubeId: null, sampleNumber: null, unitCode: 'H', clinicalGroupNameEn: 'Haematology', clinicalGroupNameAr: 'أمراض الدم', sampleTypeNameEn: 'Whole blood', sampleTypeNameAr: 'دم كامل', sampleConditionNameEn: null, sampleConditionNameAr: null, serviceIds: ['s-cbc'] },
+      { key: 'g-chem:st-serum:-', existingTubeId: null, sampleNumber: null, unitCode: 'C', clinicalGroupNameEn: 'Chemistry', clinicalGroupNameAr: 'الكيمياء', sampleTypeNameEn: 'Serum', sampleTypeNameAr: 'مصل', sampleConditionNameEn: null, sampleConditionNameAr: null, serviceIds: ['s-glu'] },
+    ];
+    backend.expectOne(REGISTRATION_API.check).flush(checkResult({ tubes }));
+    await runEffects();
+
+    expect(facade.sampleRows().map((row) => [row.key, row.outside])).toEqual([['g-haem:st-blood:-', false], ['g-chem:st-serum:-', false]]);
+    expect(facade.registerRequest(false).samples).toBeNull();
+
+    facade.setOutside('g-chem:st-serum:-', true);
+    facade.setCollectedAt('g-chem:st-serum:-', '2026-10-24T08:30');
+    expect(facade.registerRequest(false).samples).toEqual([{ tubeKey: 'g-chem:st-serum:-', sampleTypeId: null, collectedOutside: true, collectedAtUtc: new Date('2026-10-24T08:30').toISOString() }]);
+    expect(facade.registerRequest(false).collectedOutside).toBe(false);
+
+    facade.setAllOutside(true);
+    expect(facade.sampleRows().every((row) => row.outside)).toBe(true);
+    expect(facade.registerRequest(false).samples?.map((sample) => [sample.tubeKey, sample.collectedAtUtc === null])).toEqual([['g-haem:st-blood:-', true], ['g-chem:st-serum:-', false]]);
+
+    facade.setAllOutside(false);
+    expect(facade.registerRequest(false).samples).toBeNull();
+
+    facade.setOutside('g-haem:st-blood:-', true);
+    facade.reset();
+    expect(facade.outside()).toEqual({});
   });
 
   it('keeps the refusal code of a registration as its problem (REG-102 asks for confirmation)', async () => {
@@ -259,6 +292,20 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     expect(facade.totals()).toEqual(expect.objectContaining({ due: 90, paid: 180, refunded: 90, remaining: 0 }));
   });
 
+  it('lists the saved tubes as recorded on a saved visit, collected outside or not (LIS-CR-008 C-02, read-only)', async () => {
+    facade.open('v-1');
+    await runEffects();
+    const tube = { id: 'tube-1', sampleNumber: 'SMP-2026-00001', unitCode: 'H', clinicalGroupId: 'g-haem', clinicalGroupNameEn: 'Haematology', clinicalGroupNameAr: 'أمراض الدم', sampleTypeId: 'st-blood', sampleTypeNameEn: 'Whole blood', sampleTypeNameAr: 'دم كامل', sampleConditionNameEn: null, sampleConditionNameAr: null, isLive: true, serviceCodes: ['CBC'], collectedOutside: true, collectedOutsideAtUtc: '2026-10-24T06:30:00Z' };
+    backend.expectOne(`${REGISTRATION_API.visits}/v-1`).flush(visitDetail({ tubes: [tube, { ...tube, id: 'tube-2', sampleNumber: 'SMP-2026-00002', collectedOutside: false, collectedOutsideAtUtc: null }, { ...tube, id: 'tube-3', isLive: false }] }));
+    flushReferenceLists(backend, { tiers: [insurerTier] });
+    await runEffects();
+
+    expect(facade.sampleRows().map((row) => [row.key, row.sampleNumber, row.outside, row.collectedAt])).toEqual([
+      ['tube-1', 'SMP-2026-00001', true, '2026-10-24T06:30:00Z'],
+      ['tube-2', 'SMP-2026-00002', false, ''],
+    ]);
+  });
+
   it('opens a saved visit in edit mode: the visit loads, the contract is the saved one, and only added services, details and discount are sent', async () => {
     facade.open('v-1');
     await runEffects();
@@ -303,7 +350,7 @@ describe('RegistrationFacade (CP-06, WF-02)', () => {
     await settle();
     const put = backend.expectOne(`${REGISTRATION_API.visits}/v-1/details`);
     expect(put.request.method).toBe('PUT');
-    expect(put.request.body).toEqual({ treatmentNo: 'T-2', referringDoctorId: null, insuranceId: null, urgent: false, biohazard: false, collectedOutside: false });
+    expect(put.request.body).toEqual({ treatmentNo: 'T-2', referringDoctorId: null, insuranceId: null, urgent: false, biohazard: false });
     put.flush(null, { status: 204, statusText: 'No Content' });
     expect(await updating).toBeUndefined();
 

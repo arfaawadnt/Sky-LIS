@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { type LabTrackerItem, TRACKER_LINKS } from '../../../core/api/tracker.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { StatusPillComponent } from './status-pill.component';
-import { cardFlag, num, patientLine, payerLine, paymentLook, progressLabel, progressOf, timeLeftLook } from './tracker-format';
+import { cardFlag, num, outsideLook, patientLine, payerLine, paymentLook, progressLabel, progressOf, timeLeftLook } from './tracker-format';
 
 /**
  * A visit on the board (layout B): accession and time left, patient, one-line detail, payment and flag pills, and the
@@ -28,6 +28,9 @@ import { cardFlag, num, patientLine, payerLine, paymentLook, progressLabel, prog
         }
         @if (flag(); as flag) {
           <app-tracker-pill [look]="flag" />
+        }
+        @if (outside(); as ext) {
+          <app-tracker-pill [look]="ext" />
         }
       </div>
       <div class="bar" role="img" [attr.aria-label]="progressText()">
@@ -134,6 +137,7 @@ export class VisitCardComponent {
   protected readonly patient = computed(() => patientLine(this.item(), this.i18n));
   protected readonly payment = computed(() => paymentLook(this.item(), this.i18n));
   protected readonly flag = computed(() => cardFlag(this.item(), this.i18n));
+  protected readonly outside = computed(() => outsideLook(this.item(), this.i18n));
   protected readonly urgent = computed(() => ({ tone: 'bad' as const, icon: 'zap' as const, text: this.i18n.t('tracker.urgent') }));
   protected readonly progress = computed(() => progressOf(this.item()));
   protected readonly progressText = computed(() => progressLabel(this.progress(), this.i18n));

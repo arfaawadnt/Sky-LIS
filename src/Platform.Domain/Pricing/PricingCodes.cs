@@ -42,6 +42,9 @@ public static class PricingCodes
     public const string AdjustScopeUnknown = "PRC-045";
     public const string AdjustResultOutOfRange = "PRC-046";
 
+    // report design of a contract (LIS-CR-010 C-14)
+    public const string ReportDesignInvalid = "PRC-047";
+
     // 100–199: conflicts with existing data
     public const string SearchKeyExists = "PRC-100";
     public const string ListCodeExists = "PRC-101";

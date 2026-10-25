@@ -12,9 +12,10 @@ using Platform.SharedKernel.Primitives;
 namespace Platform.Application.Organization.Commands;
 
 // Branches (SRS CP-36; transitions B1–B4 of intake LIS-INT-ORG-001). Each handler: load, call the aggregate, commit once.
+// LIS-CR-008 C-04: create and update take the optional city / district / area (none clears them; GEO-020…022).
 
 [RequirePermissionPolicy(PermissionCatalog.Organization, PermissionAction.Create)]
-public sealed record CreateBranchCommand(string Code, string NameEn, string NameAr, Guid? CountryId, Guid? GovernorateId, string? Phone, string? Email, string Currency) : ICommand<CreatedResource>;
+public sealed record CreateBranchCommand(string Code, string NameEn, string NameAr, Guid? CountryId, Guid? GovernorateId, string? Phone, string? Email, string Currency, Guid? CityId = null, Guid? DistrictId = null, Guid? AreaId = null) : ICommand<CreatedResource>;
 
 public sealed class CreateBranchValidator : AbstractValidator<CreateBranchCommand>
 {
@@ -41,6 +42,7 @@ public sealed class CreateBranchHandler(IBranchRepository branches, IBranchGeogr
 
         var branch = Branch.Create(code, new LocalizedText(command.NameEn, command.NameAr), command.CountryId, command.GovernorateId, command.Phone, command.Email, command.Currency, clock.UtcNow);
         await OrganizationGuards.EnsureGovernorateInCountryAsync(geography, branch.CountryId, branch.GovernorateId, cancellationToken);
+        branch.Locate(await OrganizationGuards.ResolveLocalityAsync(geography, branch.GovernorateId, command.CityId, command.DistrictId, command.AreaId, cancellationToken));
         branches.Add(branch);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new CreatedResource(branch.Id);
@@ -48,7 +50,7 @@ public sealed class CreateBranchHandler(IBranchRepository branches, IBranchGeogr
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Organization, PermissionAction.Edit)]
-public sealed record UpdateBranchCommand(Guid BranchId, string NameEn, string NameAr, Guid? CountryId, Guid? GovernorateId, string? Phone, string? Email, string Currency) : ICommand;
+public sealed record UpdateBranchCommand(Guid BranchId, string NameEn, string NameAr, Guid? CountryId, Guid? GovernorateId, string? Phone, string? Email, string Currency, Guid? CityId = null, Guid? DistrictId = null, Guid? AreaId = null) : ICommand;
 
 public sealed class UpdateBranchValidator : AbstractValidator<UpdateBranchCommand>
 {
@@ -72,6 +74,7 @@ public sealed class UpdateBranchHandler(IBranchRepository branches, IBranchGeogr
 
         branch.Update(new LocalizedText(command.NameEn, command.NameAr), command.CountryId, command.GovernorateId, command.Phone, command.Email, command.Currency);
         await OrganizationGuards.EnsureGovernorateInCountryAsync(geography, branch.CountryId, branch.GovernorateId, cancellationToken);
+        branch.Locate(await OrganizationGuards.ResolveLocalityAsync(geography, branch.GovernorateId, command.CityId, command.DistrictId, command.AreaId, cancellationToken));
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

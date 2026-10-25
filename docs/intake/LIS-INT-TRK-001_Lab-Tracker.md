@@ -1,6 +1,6 @@
 # LIS-INT-TRK-001 — Lab Tracker (change request LIS-CR-006)
 
-Version 1.0 · 2026-10-22 · package P-API (backend). Source: `docs/build/CR-2026-10-22_Lab-Tracker.md` §0/§2, decision of the business
+Version 1.1 · 2026-10-24 (LIS-CR-008 P-SMP: "ext" on the samples cell, §18) · 1.0 · 2026-10-22 · package P-API (backend). Source: `docs/build/CR-2026-10-22_Lab-Tracker.md` §0/§2, decision of the business
 owner of 2026-10-22. Read with the Registration (REG), Samples (SMP), Results (RES) and Billing (BIL) intakes.
 
 ## 1. Purpose
@@ -94,3 +94,11 @@ No new code. `TENANT-004` (no session branch), `AUTHZ-001` (403) without `regist
 | Q6 | May a user look at another branch? | Yes, as the visits register (any branch of the laboratory); the default is the session branch. |
 | Q7 | `payment.paid` | Net of refunds (posted payments − refunds), so share − paid = remaining. |
 | Q8 | Very large days | Read whole into memory (≈ 0.2 ms per visit); a day above a few thousand visits may need SQL paging later. |
+
+## 18. Change request 2026-10-24 (LIS-CR-008, package P-SMP, reviewer point C-02) — "ext" on the samples cell
+
+`LabTrackerSamples.CollectedOutside` counts the live samples (Cancelled and Replaced excluded) collected outside the laboratory
+(`app.samples.collected_outside`, one more aggregate of the reader's `sample_counts`, appended as the last column of the statement);
+`VisitSampleCounts.CollectedOutside` / `AnyCollectedOutside` in `VisitProgress.cs`. The stage, next step and flags do not change: an
+outside sample is followed like any other. The SPA shows an "ext" pill (`tracker.samples.ext`, title `tracker.samples.extTitle`) beside
+the samples pill in the table and on the board card when the count is above zero; present only with `samples.view`, like the section.

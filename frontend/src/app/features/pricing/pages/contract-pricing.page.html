@@ -123,6 +123,15 @@
     </form>
   </app-section-card>
 
+  @if (current.exists) {
+    <app-section-card [title]="i18n.t('pricing.contract.design.title')" [subtitle]="i18n.t('pricing.contract.design.subtitle')">
+      @if (facade.setReportDesign.problem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem.code) }}</p>
+      }
+      <app-contract-report-design [design]="current.reportDesign" [pending]="facade.setReportDesign.pending()" (save)="saveReportDesign($event)" />
+    </app-section-card>
+  }
+
   <app-section-card [padded]="false" [title]="i18n.t('pricing.contract.derived')" [subtitle]="i18n.t('pricing.contract.derivedHelp')">
     <app-toolbar>
       <app-search-box toolbarFilters [placeholder]="i18n.t('pricing.contract.searchPlaceholder')" (searchChange)="onSearch($event)" />

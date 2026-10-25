@@ -1,3 +1,4 @@
+using Platform.Domain.PlatformAdmin;
 using Platform.SharedKernel.Localization;
 using Platform.SharedKernel.MultiTenancy;
 using Platform.SharedKernel.Primitives;
@@ -47,6 +48,15 @@ public sealed class Branch : AggregateRoot, ITenantScoped
 
     public Guid? GovernorateId { get; private set; }
 
+    /// <summary>LIS-CR-008 C-04: the city (markaz) of the branch under its governorate (saas.cities by id), optional.</summary>
+    public Guid? CityId { get; private set; }
+
+    /// <summary>LIS-CR-008 C-04: the district under the city, optional.</summary>
+    public Guid? DistrictId { get; private set; }
+
+    /// <summary>LIS-CR-008 C-04: the area (village) under the district, optional.</summary>
+    public Guid? AreaId { get; private set; }
+
     public string? Phone { get; private set; }
 
     public string? Email { get; private set; }
@@ -73,6 +83,20 @@ public sealed class Branch : AggregateRoot, ITenantScoped
     {
         ArgumentNullException.ThrowIfNull(name);
         ApplyDetails(name, countryId, governorateId, phone, email, currency);
+    }
+
+    /// <summary>
+    /// LIS-CR-008 C-04 (B1/B2): places the branch in a city / district / area of its governorate. The locality was checked by
+    /// <see cref="Locality.Resolve"/> (chain GEO-020…022); one checked against another governorate, or set on a branch without a
+    /// governorate, is refused GEO-020. Call after <see cref="Create"/> / <see cref="Update"/>; <see cref="Locality.None"/> clears it.
+    /// </summary>
+    public void Locate(Locality locality)
+    {
+        ArgumentNullException.ThrowIfNull(locality);
+        locality.EnsureIn(GovernorateId);
+        CityId = locality.CityId;
+        DistrictId = locality.DistrictId;
+        AreaId = locality.AreaId;
     }
 
     /// <summary>B3 Deactivate (<c>organization.manage</c>). Idempotent. The handler refuses the last active branch (ORG-110).</summary>

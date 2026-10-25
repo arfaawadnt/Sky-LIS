@@ -113,6 +113,13 @@ public static class SecurityConfiguration
         return configuration.GetSection(Root + ":Jobs:WalletCharge").Get<WalletChargeOptions>() ?? new WalletChargeOptions();
     }
 
+    /// <summary><c>Lis:Jobs:SubscriptionReminders</c> (LIS-CR-012): <c>Enabled</c> (default true), <c>PollInterval</c> (default one hour).</summary>
+    public static SubscriptionReminderOptions ReadSubscriptionReminders(IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        return configuration.GetSection(Root + ":Jobs:SubscriptionReminders").Get<SubscriptionReminderOptions>() ?? new SubscriptionReminderOptions();
+    }
+
     /// <summary><c>Lis:Notifications</c>: pickup directory, SMTP and HTTP SMS gateway (NotificationOptions); nothing configured = the logging sender.</summary>
     public static NotificationOptions ReadNotifications(IConfiguration configuration)
     {

@@ -95,7 +95,7 @@ internal sealed class ReportTemplateLookup(AppDbContext context) : IReportTempla
 
     private static ReportTemplateView View(ReportTemplate template) => new(
         template.Id, template.Name.En, template.Name.Ar, template.Type, template.Language, template.LogoFileId, template.SignatureFileId, template.ShowQr,
-        template.HeaderText?.En, template.HeaderText?.Ar, template.FooterText?.En, template.FooterText?.Ar, template.IsActive);
+        template.HeaderText?.En, template.HeaderText?.Ar, template.FooterText?.En, template.FooterText?.Ar, template.IsActive, template.Design);
 }
 
 /// <summary><see cref="IDoctorLookup"/> over <c>app.doctors</c>.</summary>

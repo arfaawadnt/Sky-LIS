@@ -10,6 +10,7 @@ using Platform.Application.Samples;
 using Platform.Contracts.Common;
 using Platform.Contracts.Results;
 using Platform.Domain.Authorization;
+using Platform.Domain.Catalogue;
 using Platform.Domain.Results;
 using Platform.Domain.Samples;
 using Platform.SharedKernel.Abstractions;
@@ -49,7 +50,8 @@ public sealed class GetResultCaseHandler(
     IResultReferenceLookup references,
     IDoctorLookup doctors,
     ITenantSettings settings,
-    IClock clock) : IQueryHandler<GetResultCaseQuery, ResultCaseView>
+    IClock clock,
+    IReportTemplateLookup templates) : IQueryHandler<GetResultCaseQuery, ResultCaseView>
 {
     public async Task<ResultCaseView> Handle(GetResultCaseQuery query, CancellationToken cancellationToken)
     {
@@ -94,14 +96,39 @@ public sealed class GetResultCaseHandler(
         var patientView = ResultVip.IsMasked(header.Patient, privileges) ? ResultVip.Mask(header.PatientView) : header.PatientView;
         // C-08: the expected range of rows not entered yet, with the profile entry uses (same day rule as ResultEntryEngine).
         var profile = PatientProfile.From(header.Patient, DateOnly.FromDateTime(clock.UtcNow.UtcDateTime));
+        var designs = await ResultReportDesign.LoadAsync(header.Visit?.ContractTierId, references, settings, cancellationToken);
         return new ResultCaseView(
             header.VisitView,
             patientView,
-            ResultViews.Units(visible, hidden, context, privileges, profile),
+            await WithDesignsAsync(ResultViews.Units(visible, hidden, context, privileges, profile), context, designs, cancellationToken),
             hiddenUnits,
             hiddenResults,
             scanned,
             await ResultSettings.ReadAsync(settings, cancellationToken));
+    }
+
+    /// <summary>The design each unit's report prints in (LIS-CR-010): contract → the unit group's template → laboratory.</summary>
+    private async Task<IReadOnlyList<ReportUnitView>> WithDesignsAsync(IReadOnlyList<ReportUnitView> units, ResultReadContext context, ResultReportDesign designs, CancellationToken cancellationToken)
+    {
+        var templateDesigns = new Dictionary<Guid, ReportDesign?>();
+        var designed = new List<ReportUnitView>(units.Count);
+        foreach (var unit in units)
+        {
+            ReportDesign? templateDesign = null;
+            if (context.Groups.GetValueOrDefault(unit.ClinicalGroupId)?.ReportTemplateId is { } templateId)
+            {
+                if (!templateDesigns.TryGetValue(templateId, out templateDesign))
+                {
+                    templateDesign = (await templates.GetAsync(templateId, cancellationToken))?.Design;
+                    templateDesigns[templateId] = templateDesign;
+                }
+            }
+
+            var choice = designs.For(templateDesign);
+            designed.Add(unit with { Design = choice.Design.ToString(), DesignSource = choice.Source.ToString() });
+        }
+
+        return designed;
     }
 }
 

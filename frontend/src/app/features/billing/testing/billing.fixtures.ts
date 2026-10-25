@@ -2,7 +2,7 @@
 
 import type { HttpTestingController } from '@angular/common/http/testing';
 
-import { BILLING_API, type CashClosingPreview, type CollectionsReportDocument, type CollectionsReportRow, type PaymentMethodOption, type VisitAccountView } from '../../../core/api/billing.contracts';
+import { BILLING_API, type CashClosingPreview, type CashLedgerRow, type CashLedgerView, type CollectionsReportDocument, type CollectionsReportRow, type PaymentMethodOption, type VisitAccountView } from '../../../core/api/billing.contracts';
 import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
 
 export function account(overrides: Partial<VisitAccountView> = {}): VisitAccountView {
@@ -161,3 +161,74 @@ export const methodOptions: readonly PaymentMethodOption[] = [
   { id: 'pm-pos', code: 'POS', nameEn: 'POS', nameAr: 'نقطة بيع', kind: 'Pos', requiresReference: true },
   { id: 'pm-transfer', code: 'TRANSFER', nameEn: 'Bank transfer', nameAr: 'تحويل بنكي', kind: 'Transfer', requiresReference: true },
 ];
+
+/** A line of the cash ledger (CP-70, LIS-CR-011): a cash receipt of 300 by default. */
+export function ledgerRow(overrides: Partial<CashLedgerRow> = {}): CashLedgerRow {
+  return {
+    kind: 'Receipt',
+    id: 'r-1',
+    number: 'RCT-2026-00001',
+    atUtc: '2026-10-09T08:00:00Z',
+    visitId: 'v-1',
+    accession: 'ACC-2026-00001',
+    method: 'Cash',
+    methodCode: 'CASH',
+    category: null,
+    text: null,
+    amount: 300,
+    status: 'Posted',
+    moneyIn: 300,
+    moneyOut: 0,
+    balance: 400,
+    cashierUserId: 'u-1',
+    cashierName: 'Cashier One',
+    expected: null,
+    counted: null,
+    difference: null,
+    ...overrides,
+  };
+}
+
+/** Today's own ledger: opening 100 from CLS-2026-00003, a cash receipt of 300, a supplier paid 40 in cash; balance 360. */
+export function ledgerView(overrides: Partial<CashLedgerView> = {}): CashLedgerView {
+  return {
+    letterhead: { labNameEn: 'Sky Lab', labNameAr: 'مختبر سكاي', branchNameEn: 'Main branch', branchNameAr: 'الفرع الرئيسي' },
+    branchId: 'b-1',
+    scope: 'User',
+    cashierUserId: 'u-1',
+    cashierName: 'Cashier One',
+    fromDay: '2026-10-09',
+    toDay: '2026-10-09',
+    fromUtc: '2026-10-08T21:00:00Z',
+    toUtc: '2026-10-09T21:00:00Z',
+    timeZone: 'Africa/Cairo',
+    summary: {
+      openingBalance: 100,
+      openingClosingNumber: 'CLS-2026-00003',
+      openingClosedThroughUtc: '2026-10-08T18:00:00Z',
+      receipts: { cash: 300, card: 0, pos: 0, transfer: 0, total: 300 },
+      receiptCount: 1,
+      refunds: { cash: 0, card: 0, pos: 0, transfer: 0, total: 0 },
+      refundCount: 0,
+      voidedCount: 0,
+      voidedAmount: 0,
+      cashIn: 0,
+      cashOut: 40,
+      entryCount: 1,
+      countDifferences: 0,
+      closingCount: 0,
+      closingBalance: 360,
+      netCash: 260,
+    },
+    rows: [
+      ledgerRow(),
+      ledgerRow({ kind: 'CashOut', id: 'e-1', number: 'CSH-2026-00001', atUtc: '2026-10-09T09:00:00Z', visitId: null, accession: null, methodCode: null, category: 'Supplier', text: 'Courier', amount: 40, moneyIn: 0, moneyOut: 40, balance: 360 }),
+    ],
+    closeWindow: { fromUtc: '2026-10-08T21:00:00Z', toUtc: '2026-10-09T10:00:00Z' },
+    cashiers: [],
+    currency: 'EGP',
+    printedBy: 'Cashier One',
+    printedAtUtc: '2026-10-09T10:00:00Z',
+    ...overrides,
+  };
+}

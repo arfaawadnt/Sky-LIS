@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 
+import { AnnouncementsFacade } from './state/announcements.facade';
 import { ClientsFacade } from './state/clients.facade';
 import { DashboardFacade } from './state/dashboard.facade';
 import { LoginLogsFacade } from './state/login-logs.facade';
@@ -50,6 +51,12 @@ export const PLATFORM_ROUTES: Routes = [
     path: 'notification-templates',
     providers: [TemplatesFacade],
     loadComponent: () => import('./pages/notification-templates.page').then((m) => m.NotificationTemplatesPage),
+  },
+  {
+    // SA-22 Announcements (LIS-CR-013, C-17): nav entry in the Operations group, platform.view.
+    path: 'announcements',
+    providers: [AnnouncementsFacade],
+    loadComponent: () => import('./pages/announcements.page').then((m) => m.AnnouncementsPage),
   },
   {
     path: 'parameters',

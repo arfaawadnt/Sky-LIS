@@ -1,4 +1,5 @@
 using Platform.Contracts.Results;
+using Platform.Domain.Catalogue;
 
 namespace Platform.Application.Results;
 
@@ -8,7 +9,7 @@ namespace Platform.Application.Results;
 // (catalogue B lists, payers, branches, patient conditions, the tenant) are read through their entity types.
 
 /// <summary>A visit as the results header needs it, from Registration's <c>IVisitLookup</c>.</summary>
-public sealed record ResultVisitInfo(Guid VisitId, string Accession, Guid PatientId, Guid BranchId, Guid? PayerId, DateTimeOffset RegisteredAtUtc, bool Urgent, Guid? DoctorId);
+public sealed record ResultVisitInfo(Guid VisitId, string Accession, Guid PatientId, Guid BranchId, Guid? PayerId, DateTimeOffset RegisteredAtUtc, bool Urgent, Guid? DoctorId, Guid? ContractTierId = null);
 
 public sealed record AnalyserOption(Guid Id, string Code, string NameEn, string NameAr);
 
@@ -57,4 +58,7 @@ public interface IResultReferenceLookup
     Task<IReadOnlyDictionary<Guid, NamedReference>> BranchesAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
 
     Task<IReadOnlyDictionary<Guid, NamedReference>> PatientConditionsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+
+    /// <summary>The report design override of the contract tier's pricing (LIS-CR-010), or <see langword="null"/> when the tier has none or no pricing.</summary>
+    Task<ReportDesign?> ContractReportDesignAsync(Guid contractTierId, CancellationToken cancellationToken);
 }

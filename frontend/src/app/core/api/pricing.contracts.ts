@@ -1,6 +1,7 @@
 /** Pricing module contracts mirrored from `Platform.Contracts.Pricing` (bootstrap until the OpenAPI generator lands, 01 §6.2). */
 
 import type { SortRequest } from './paging';
+import type { ReportDesign } from './report-designs';
 
 export type { Paged } from './paging';
 
@@ -265,6 +266,13 @@ export interface ContractPricingDetail {
   readonly currency: string;
   readonly terms: readonly PricingFormulaTermView[];
   readonly prices: readonly ContractPriceItem[];
+  /** C7 (LIS-CR-010): the tier's report design override; null when the reports follow the template and the laboratory. */
+  readonly reportDesign?: ReportDesign | null;
+}
+
+/** C7 body: a design or null to clear the override. */
+export interface SetContractReportDesignRequest {
+  readonly design: ReportDesign | null;
 }
 
 export interface ContractPricingListItem {

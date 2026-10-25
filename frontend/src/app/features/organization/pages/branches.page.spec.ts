@@ -8,7 +8,7 @@ import { ProblemCodes, ProblemError, type ProblemDetails } from '../../../core/a
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import type { MasterDataFilter } from '../../../shared/ui/master-data-page/master-data.types';
-import { BranchesPage } from './branches.page';
+import { BranchesPage, toBranchRequest } from './branches.page';
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -72,6 +72,19 @@ describe('BranchesPage (CP-36)', () => {
 
     return error;
   }
+
+  it('LIS-CR-008 C-04: the drawer value carries the city / district / area, never a lower level without its parent', () => {
+    const base = { code: 'EAST', name: { en: 'East', ar: 'الشرق' }, countryId: 'eg', governorateId: 'cairo', phone: '', email: '', currency: 'EGP' };
+    expect(toBranchRequest({ ...base, cityId: 'nasr', districtId: 'zone1', areaId: 'block7' })).toMatchObject({ cityId: 'nasr', districtId: 'zone1', areaId: 'block7' });
+    expect(toBranchRequest({ ...base, cityId: null, districtId: 'zone1', areaId: 'block7' })).toMatchObject({ cityId: null, districtId: null, areaId: null });
+    expect(toBranchRequest({ ...base, cityId: 'nasr', districtId: '', areaId: 'block7' })).toMatchObject({ cityId: 'nasr', districtId: null, areaId: null });
+  });
+
+  it('LIS-CR-008 C-04: a broken locality chain marks its own field (GEO-020 city, GEO-022 area)', async () => {
+    const page = await open();
+    expect((await refusedWith(page, 'GEO-020')).problem.errors?.['cityId']).toBeTruthy();
+    expect((await refusedWith(page, 'GEO-022')).problem.errors?.['areaId']).toBeTruthy();
+  });
 
   it('marks the e-mail field with the refusal instead of a general banner (UAT B-03)', async () => {
     const page = await open();

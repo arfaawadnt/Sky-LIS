@@ -128,6 +128,9 @@ public static class InfrastructureServiceRegistration
         services.TryAddSingleton(new WalletChargeOptions());
         services.AddSingleton<WalletChargeJob>();
         services.TryAddSingleton<IWalletChargeRun>(provider => provider.GetRequiredService<WalletChargeJob>());
+        services.TryAddSingleton(new SubscriptionReminderOptions());
+        services.AddSingleton<SubscriptionReminderJob>();
+        services.TryAddSingleton<ISubscriptionReminderRun>(provider => provider.GetRequiredService<SubscriptionReminderJob>());
 
         // Business modules register by convention (01 §3.1): every concrete class under Platform.Infrastructure.Persistence
         // or Platform.Infrastructure.Services that implements a port declared in Platform.Application is a scoped adapter.

@@ -31,6 +31,7 @@ public sealed class RecordPaymentHandler(
     IBillableVisitLookup visits,
     IPaymentMethodRepository methods,
     IVisitAccountRepository accounts,
+    ICashClosingRepository closings,
     IReferenceNumbers numbers,
     IUnitOfWork unitOfWork,
     ICurrentUser user,
@@ -45,11 +46,13 @@ public sealed class RecordPaymentHandler(
         var visit = await visits.GetAsync(command.VisitId, cancellationToken) ?? throw BillingNotFound.Visit();
         var method = await BillingMethods.ResolveAsync(methods, command.Method, command.MethodCode, cancellationToken);
 
+        var now = clock.UtcNow;
+        ClosedPeriods.RequireOpen(await closings.CoversAsync(cashier.BranchId, cashier.UserId, now, cancellationToken));   // BIL-061 (LIS-CR-011)
+
         var existing = await accounts.GetForUpdateAsync(visit.VisitId, cancellationToken);
         var account = existing ?? VisitAccount.Open(visit.VisitId);
         account.CheckPayment(command.Amount, method, command.Reference, cashier, visit.Charge);
 
-        var now = clock.UtcNow;
         var number = await numbers.NextAsync(Payment.NumberKind, Payment.NumberPrefix, now, cancellationToken);
         var payment = account.RecordPayment(number, command.Amount, method, command.Reference, cashier, visit.Charge, now);
         if (existing is null)
@@ -109,6 +112,7 @@ public sealed class PayBatchHandler(
     IBillableVisitLookup visits,
     IPaymentMethodRepository methods,
     IVisitAccountRepository accounts,
+    ICashClosingRepository closings,
     IReferenceNumbers numbers,
     IUnitOfWork unitOfWork,
     ICurrentUser user,
@@ -122,6 +126,8 @@ public sealed class PayBatchHandler(
         var cashier = BillingCashier.Of(actor, user);
         var batch = await visits.GetBatchAsync(command.BatchId, cancellationToken) ?? throw BillingNotFound.Batch();
         var method = await BillingMethods.ResolveAsync(methods, command.Method, command.MethodCode, cancellationToken);
+        var now = clock.UtcNow;
+        ClosedPeriods.RequireOpen(await closings.CoversAsync(cashier.BranchId, cashier.UserId, now, cancellationToken));   // BIL-061 (LIS-CR-011)
 
         var members = await visits.BatchMembersAsync(batch.BatchId, cancellationToken);
         var existing = await accounts.GetManyForUpdateAsync(members.Select(member => member.VisitId).ToList(), cancellationToken);
@@ -140,7 +146,6 @@ public sealed class PayBatchHandler(
             return (Share: share, Member: member, Account: account, IsNew: isNew);
         }).ToList();
 
-        var now = clock.UtcNow;
         var payments = new List<BatchMemberPayment>(plan.Count);
         foreach (var (share, member, account, isNew) in plan)
         {

@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Platform.Application.PlatformAdmin;
 using Platform.Application.PlatformAdmin.Commands;
 using Platform.Application.PlatformAdmin.Queries;
 using Platform.Contracts.Common;
@@ -114,6 +115,24 @@ public sealed class PlatformLocationsController(ISender sender) : ControllerBase
         ArgumentNullException.ThrowIfNull(request);
         var created = await sender.Send(new CreateCityCommand(id, request.NameEn, request.NameAr), cancellationToken);
         return Created($"/api/v1/platform/cities/{created.Id}", created);
+    }
+
+    /// <summary>The import body: the 4 MB file plus the multipart envelope.</summary>
+    public const long LocalityImportRequestLimit = LocalityCsv.MaxBytes + (1024 * 1024);
+
+    /// <summary>
+    /// LIS-CR-008 C-04 (D-2) "Import CSV": multipart field <c>file</c> (UTF-8 CSV, header <c>city_en,city_ar,district_en,district_ar,area_en,area_ar</c>,
+    /// district and area optional), <c>?dryRun=true</c> to check only. All-or-nothing and idempotent; the answer counts created /
+    /// existing / refused rows per level and lists the refused lines (GEO-023 unreadable file, GEO-024 too large).
+    /// </summary>
+    [HttpPost("governorates/{id:guid}/localities/import")]
+    [RequestSizeLimit(LocalityImportRequestLimit)]
+    [RequestFormLimits(MultipartBodyLengthLimit = LocalityImportRequestLimit)]
+    public async Task<ActionResult<LocalityImportResult>> ImportLocalities(Guid id, IFormFile file, [FromQuery] bool dryRun, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        await using var content = file.OpenReadStream();
+        return Ok(await sender.Send(new ImportLocalitiesCommand(id, content, file.Length, dryRun), cancellationToken));
     }
 
     [HttpPut("cities/{id:guid}")]

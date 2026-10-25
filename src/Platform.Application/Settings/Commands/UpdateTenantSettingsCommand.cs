@@ -16,6 +16,7 @@ namespace Platform.Application.Settings.Commands;
 /// every value well-formed for its type and range (<c>SET-002</c>; a time-zone name the host does not know <c>SET-003</c>); the whole request is refused before anything is
 /// staged, then committed once. A null value removes the tenant's own row ("Use default", validation F-13): the key reads the
 /// inherited value again (the platform's, else the code default); removing a row that does not exist changes nothing.
+/// A client flag (<c>hideAnnouncements</c>, LIS-CR-013) is refused with <c>SET-004</c> whatever the tenant: the Super Admin sets it per client on SA-04.
 /// Returns the full, effective parameter list.
 /// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Settings, PermissionAction.Manage)]
@@ -46,6 +47,12 @@ public sealed class UpdateTenantSettingsCommandHandler(ITenantSettingsStore stor
             .ToList();
         foreach (var (key, value) in cleaned)
         {
+            if (SettingKeys.IsClientFlag(key))
+            {
+                // LIS-CR-013: a client flag (hideAnnouncements) is the Super Admin's, set per client on SA-04 only.
+                throw new DomainException(SettingCodes.SetByPlatformOnly, $"'{key}' is set by the platform for each client, not on the Parameters page.", DomainFault.Refused);
+            }
+
             if (value is null)
             {
                 _ = SettingKeys.Find(key) ?? throw new DomainException(SettingCodes.UnknownKey, $"Unknown setting '{key}'.", DomainFault.Validation);

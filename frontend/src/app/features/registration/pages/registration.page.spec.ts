@@ -230,6 +230,23 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
     backend.verify();
   });
 
+  it('lists the samples of the order once services are entered, and a sample marked outside is sent with the visit (LIS-CR-008 C-02)', async () => {
+    const page = await open('/registration/new');
+    await typedVisit(page);
+    harness.detectChanges();
+    const view = harness.routeNativeElement!;
+
+    expect(view.querySelectorAll('app-reg-visit-flags button').length).toBe(2);   // urgent, biohazard: the outside flag moved to the samples
+    const flags = view.querySelector('app-reg-sample-flags');
+    expect(flags?.querySelectorAll('li.row').length).toBe(1);
+    const toggle = flags!.querySelector<HTMLInputElement>('input[role="switch"]')!;
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change'));
+    await tick();
+
+    expect(facade().registerRequest(false).samples).toEqual([{ tubeKey: 'g-haem:st-blood:', sampleTypeId: null, collectedOutside: true, collectedAtUtc: null }]);
+  });
+
   it('asks to confirm a frequency alert (REG-201) and retries a REG-102 refusal with the confirmation', async () => {
     const page = await open('/registration/new');
     await typedVisit(page, [{ code: 'REG-201', serviceId: 's-cbc', serviceCode: 'CBC', serviceNameEn: null, serviceNameAr: null, detail: 'HB', detailAr: null, lastOrderedAtUtc: '2026-10-01T08:00:00Z', lastAccession: 'ACC-2026-00001', windowDays: 30 }]);

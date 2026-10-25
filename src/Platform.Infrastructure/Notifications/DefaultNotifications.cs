@@ -19,6 +19,14 @@ public sealed class DefaultNotificationTemplateSource : INotificationTemplateSou
         new NotificationTemplate(NotificationTemplateCodes.PortalUrl, "ar", "بوابة Sky LIS الخاصة بك", "{labName}: بوابتك جاهزة على {url}. سجّل الدخول باسم المستخدم {username}."),
         new NotificationTemplate(NotificationTemplateCodes.PanicValue, "en", "Panic value", "Panic value for {patient} ({accession}): {test} = {value}."),
         new NotificationTemplate(NotificationTemplateCodes.PanicValue, "ar", "قيمة حرجة", "قيمة حرجة للمريض {patient} ({accession}): {test} = {value}."),
+
+        // LIS-CR-012 (C-16): subscription reminders, sent by SMS and e-mail to the laboratory's manager
+        new NotificationTemplate(NotificationTemplateCodes.SubscriptionExpiry, "en", "Your Sky LIS trial is ending", "{labName}: your Sky LIS trial ends in {days} day(s). Top up {amount} to keep working without interruption: {url}"),
+        new NotificationTemplate(NotificationTemplateCodes.SubscriptionExpiry, "ar", "الفترة التجريبية لـ Sky LIS على وشك الانتهاء", "{labName}: تنتهي الفترة التجريبية في Sky LIS خلال {days} يوم. اشحن المحفظة بمبلغ {amount} لمواصلة العمل دون انقطاع: {url}"),
+        new NotificationTemplate(NotificationTemplateCodes.WalletLow, "en", "Your Sky LIS wallet is running low", "{labName}: your Sky LIS wallet balance is low. Top up {amount} within {days} day(s) to avoid an interruption: {url}"),
+        new NotificationTemplate(NotificationTemplateCodes.WalletLow, "ar", "رصيد محفظة Sky LIS منخفض", "{labName}: رصيد محفظة Sky LIS منخفض. اشحن {amount} خلال {days} يوم لتجنب انقطاع الخدمة: {url}"),
+        new NotificationTemplate(NotificationTemplateCodes.SubscriptionGrace, "en", "Your Sky LIS subscription is about to stop", "{labName}: the grace period of your Sky LIS subscription ends in {days} day(s). After that only your administrators can sign in, to the wallet. Top up {amount}: {url}"),
+        new NotificationTemplate(NotificationTemplateCodes.SubscriptionGrace, "ar", "اشتراك Sky LIS على وشك التوقف", "{labName}: تنتهي فترة السماح لاشتراك Sky LIS خلال {days} يوم. بعدها يستطيع المسؤولون فقط الدخول إلى المحفظة. اشحن {amount}: {url}"),
     }.ToDictionary(template => (template.Code, template.Language));
 
     public Task<NotificationTemplate?> FindAsync(string code, string language, CancellationToken cancellationToken)

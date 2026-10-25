@@ -49,6 +49,7 @@
   "column.reason": "السبب",
   "column.note": "ملاحظة",
   "column.rejectedAt": "تاريخ الرفض",
+  "outside": "من الخارج",
   "allStatuses": "الكل",
   "searchPlaceholder": "رقم العينة أو الزيارة…",
   "exportCsv": "تصدير CSV",

@@ -4,7 +4,7 @@
 | --- | --- |
 | Module | `billing` (Sky LIS Client Portal, pages CP-23 Payments, CP-24 Refunds, CP-27 Batch payment, CP-30 Cash closing; business rules BR-14, BR-16, BR-26, BR-27; workflow WF-09 and the payment steps of WF-02 / WF-04) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), MODULES.md (LIS-BM-001 §1, §3, §5) and the LDM synthesis. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.3 — 2026-10-19 (payment methods set-up list CP-30b, change request LIS-CR-003 P-C10, §17; 1.2 — 2026-10-13 collections report of the Payments register: change request item 2; 1.1 — 2026-10-10 CP-37 special rights enforced) |
+| Version | 1.4 — 2026-10-24 (cash ledger CP-70, cash entries and the day close, change request LIS-CR-011 P-CSH, §19; 1.3 — 2026-10-19 payment methods set-up list CP-30b, change request LIS-CR-003 P-C10, §17; 1.2 — 2026-10-13 collections report of the Payments register: change request item 2; 1.1 — 2026-10-10 CP-37 special rights enforced) |
 | Slot / wave | `bill`, wave 2 (built in parallel with Registration, Samples and Account) |
 | Implemented in | `src/Platform.Domain/Billing`, `src/Platform.Contracts/Billing`, `src/Platform.Application/Billing` (+ `Platform.Application/Registration/IVisitBalanceLookup.cs`), `src/Platform.Infrastructure/Persistence/Billing`, `src/Platform.WebApi/Controllers/Billing`, `frontend/src/app/features/billing`, `frontend/src/app/core/api/billing.contracts.ts` |
 
@@ -438,3 +438,86 @@ already compares those columns with `IS DISTINCT FROM`, so nothing in it changes
 | --- | --- | --- |
 | Q28 | May a cashier without `billing.manage` preview or close their own drawer? | No (unchanged): preview, close and the cashiers list stay under `billing.manage`; the cashier's own figures are in the collections report (`billing.view`). |
 | Q29 | Does a closing made under a treasury block a new per-cashier closing of the same branch and period? | Yes: closings now overlap by branch, so an old "all cashiers of treasury X" closing intersects any new closing of its branch for that period (no double count across drawers of the same branch). |
+
+## 19. Change request 2026-10-24 — Cash ledger and day close (LIS-CR-011, package P-CSH, point C-15)
+
+Source: reviewer point C-15 "simplified cash ledger for the lab" (`docs/review/Sky-LIS_Reviewer-Comments_Response_V1.html`), wave
+brief `docs/build/CR-2026-10-24_Review-Features.md` §5. One page a laboratory owner reads at a glance: the day book of money in and
+out of a drawer with a running balance and a one-click day close. New SRS page **CP-70 Cash ledger** (`/billing/cash-ledger`,
+Finance, Release 1); CP-30 Cash closing stays as the closings register and moves to Release 1.
+
+**New aggregate `CashEntry`** (`app.cash_entries`, tenant-scoped, RLS): money taken out of the drawer without a visit (kind
+`CashOut`: categories `Supplier`, `PettyCash`, `BankDeposit`, `Other`) or put into it (kind `CashIn`: `OpeningFloat`,
+`OtherIncome`, `Other`); `Amount` (numeric 14,2, > 0), `Method` (kind) + `MethodCode?` (a payment method definition: its kind and
+reference rule win; default cash), `Reference?` (required when the method requires it, BIL-003), `Reason` (free text, required,
+≤ 200), `Note?` (≤ 500), `CashierUserId` = the session user, `BranchId` = the session branch, `PostedAtUtc` = the moment it is
+recorded (no back-dating), `Status` Posted | Voided with `VoidReason` / `VoidedByUserId` / `VoidedAtUtc`. Number `CSH-yyyy-nnnnn`
+(reference kind `cash-entry`), unique per tenant. Only entries of kind cash move the drawer. A trigger keeps the row immutable
+except for its one void (`Billing.migration.sql`, 2026-10-24 block). The Reasons list (Catalogue B) gets no new kind: the reason is
+free text and the category is the structured part (assumption Q31).
+
+| Transition | Permission | Guards (code) | Event |
+| --- | --- | --- | --- |
+| T6 Post cash entry | `billing.create` | cashier and branch known (AUTH-001 / TENANT-004); not inside a closed period of the cashier (BIL-061); amount (BIL-001/002); category of the kind (BIL-062); reason (BIL-060); reference (BIL-003); lengths (BIL-007) | `CashEntryPosted` |
+| T7 Void cash entry | `billing.approve` | Posted (BIL-063); not inside a closed closing (BIL-061); reason (BIL-005) | `CashEntryVoided` |
+
+**Closed periods are read-only (BIL-061).** A payment (T1, T4), a refund (T3) or a cash entry (T6) whose moment falls inside a
+closed cash closing of the cashier and branch is refused, and an entry inside one cannot be voided. A payment inside a closed
+period keeps its own code BIL-013 on void. Movements made after a close fall into the next period (a close covers `[from, now)`).
+
+**Opening balance and BR-16 extended.** The opening balance of a drawer at an instant is the counted cash (else the expected cash)
+of the scope's previous closing plus the cash moved between that closing's end and the instant; 0 when the drawer was never closed.
+A drawer's scope is the branch + one cashier, or the branch + every cashier: these are separate books (a cashier's closing is not
+the branch's and vice versa). `ClosingTotals` gains `OpeningBalance`, `CashIn`, `CashOut`, `EntryCount` (stored on the closing,
+columns `opening_balance`, `cash_in`, `cash_out`, `entry_count`, 0 on closings made before) and **expected cash = opening balance +
+cash payments − cash refunds + cash in − cash out**; without an earlier closing and entries this is the original BR-16. The
+preview, the closing sheet and the CP-30 page show the three new figures; the drawer's movements list the cash entries too
+(`DrawerMovement.Kind` CashIn / CashOut, `Text` = the reason, no visit).
+
+**The ledger (`CashLedgerQuery`, `billing.view`).** `GET /api/v1/billing/cash-ledger?from&to&scope&cashierUserId`: the session branch
+(TENANT-004), `scope` User (default: the current user's drawer) or Branch (one cashier, or every cashier when `cashierUserId` is
+omitted; BIL-044 without the CP-37 right "view branch collections"); whole laboratory days (default today; one day when only `from`
+is given; BIL-030 reversed, BIL-033 longer than 31 days, BIL-045 before the member's earliest report day); at most 10,000 lines
+(BIL-064). One read port `ICashLedgerReader` runs one UNION ALL over the scope's payments (posted and voided), refunds, cash entries
+(posted and voided) and closings, plus the opening. The domain (`CashLedger.Build`) orders the lines (time; a closing at the end of
+its period before a movement of the same instant), walks them from the opening — cash receipts and cash in add, cash refunds and
+cash out remove, voided and non-cash lines show but count nowhere, a closing with a count sets the balance to the counted cash (its
+adjustment is a "count difference") — and sums receipts and refunds per method, voids, cash in / out and the closing balance. The
+answer carries the letterhead (the page prints it as the A4 "Daily cash sheet"), the cashiers of the branch over the period
+(Branch scope) and the **close window**: from the end of the scope's last closing (or the start of the period) to the moment of the
+read, present only while the period includes the present and something is left to close.
+
+**Day close from the ledger.** *Close the day* previews the scope's drawer over the close window (`GET …/cash-closings/preview`)
+and closes it with `POST /api/v1/billing/cash-closings` (CP-30, `billing.manage`, unchanged rules BIL-030…034, BIL-120); the
+closing sheet prints. The ledger then shows the closing line and the next close window starts at its end.
+
+**Endpoints.** `POST /api/v1/billing/cash-entries` `{kind, category, amount, reason, method?, methodCode?, reference?, note?}` → 201
+`{id, number}`; `POST /api/v1/billing/cash-entries/{id}/void` `{reason}` → 204; `GET /api/v1/billing/cash-ledger` → `CashLedgerView`.
+Changed answers (fields added): `CashClosingTotalsView.{openingBalance, cashIn, cashOut, entryCount}`, `DrawerMovement.text`.
+
+**New codes.** BIL-060 reason required, BIL-061 closed period, BIL-062 category of another kind, BIL-063 entry not posted, BIL-064
+ledger too large, BIL-411 cash entry not found.
+
+**SPA.** `features/billing/pages/cash-ledger.page.*` (`CashLedgerFacade`; period, scope and cashier filters; stat cards; lines with
+running balance, browser-paged; *Add cash in / out* dialogs `ui/cash-entry-dialog.component`; void through the reason prompt;
+*Close the day* dialog `ui/day-close-dialog.component`; Excel through `exceljs` loaded on demand, `data/cash-ledger-excel.ts`;
+A4 "Daily cash sheet" `ui/documents/cash-sheet-document.component`); keys `billing.ledger.*`, `billing.closing.{opening,cashIn,
+cashOut}`, `billing.closing.kind.{CashIn,CashOut}`, `billing.doc.cashSheetTitle`, errors above. Route `cash-ledger` in
+`billing.routes.ts`; the nav entry and CP-30's move to Release 1 are the integrator's.
+
+**Acceptance scenarios** (tests named after them): L1 running balance from the opening, cash only; L2 voided lines listed, counted
+nowhere; L3 a closing resets the balance to its count; L4 close window; L5 limits (lines, 31 days); L6 one effect rule; T6/T7 of
+`CashEntryTests`; `CashLedgerUseCaseTests` (scope, rights, BIL-061 for entries, payments and refunds); `CashLedgerModuleTests`
+(RLS, unique numbers, trigger, UNION ALL, opening, closing totals); `CashLedgerFlowTests` (post, ledger, void, branch scope, close,
+read-only period).
+
+**Open questions and the assumptions built on.**
+
+| # | Question | Assumption |
+| --- | --- | --- |
+| Q30 | Who closes the day: `billing.approve` (as C-15 suggests) or `billing.manage` (as CP-30 today)? | `billing.manage`, unchanged, so existing roles keep their meaning; the business owner may move the close to `billing.approve` (one attribute on two requests). |
+| Q31 | A Reasons kind "Cash entry" in the Reasons list (CP-53)? | Not now: Catalogue B owns the kinds; a free-text reason plus the fixed category covers the reviewer's examples (supplier, petty cash, bank deposit). |
+| Q32 | May an entry be back-dated to a past day? | No: an entry is posted at the moment it is recorded; a forgotten expense is recorded today with its reason (closed periods stay untouched). |
+| Q33 | Does the opening carry history when the drawer was never closed? | No: without a previous closing the opening is 0 and the ledger starts with the period's own movements; the first day close starts the chain. |
+| Q34 | May a cashier read the whole branch's ledger? | Only with the CP-37 right "view branch collections" (as the collections report); otherwise the own drawer. Another branch is read by changing the session branch. |
+| Q35 | Do card / POS / transfer entries move the drawer? | No: they are listed (method shown) but only cash moves the balance, like receipts. |

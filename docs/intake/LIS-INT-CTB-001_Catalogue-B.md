@@ -319,3 +319,24 @@ property, typed `dr-003` skipped by the counter, refusals spend no number, a sec
 | A17 | Prefix and width of the generated code | `DR` and three digits, no year, per laboratory (reviewer's example). |
 | A18 | Does the Super Admin portal (platform tenant) generate codes too? | Yes: the same command serves it, with the platform tenant's own counter. Doctors are not copied to new laboratories (no provisioning path creates them). |
 | A19 | Should a typed code of the form `DR-nnn` advance the counter? | No: the counter only moves when it issues a number; it skips a number a typed code already holds. |
+
+## 19. Change request 2026-10-24 — Report design of a template (LIS-CR-010, package P-RPT, reviewer point C-14, CP-54 / SA-12)
+
+**Model.** `ReportTemplate.Design` (`ReportDesign?`, column `app.report_templates.design`, nullable string with the enum
+convention's CHECK; the wave migration `ReviewFeatures` adds it, no seed). Set by T1 Create and T2 Edit
+(`ReportTemplateRequest.design`, optional; null or absent clears it, so a full edit without the field follows the laboratory
+again). Only the templates of result reports carry one: `Results`, `Culture`, `Text`; any other type with a design is refused
+**`CAT-273`** (422). An unknown name is a shape error (400). The design is part of the register row
+(`ReportTemplateListItem.design`) and of the read port (`ReportTemplateView.Design`); the platform clone copies it
+(`CatalogueBCloner`). Precedence: a payer contract's design wins over the template's, which wins over the laboratory parameter
+(Results intake §18).
+
+**SPA.** The edit drawer gains *Report design* (select, empty = the laboratory's). The drawer *Logo, signature and preview*
+shows the sample report in the chosen design: buttons try each design live (nothing is saved), and **Use this design**
+(`catalogue.edit`) saves it on the template (a T2 edit of the template as it is). Cumulative previews carry fictitious previous
+values. Specs: `report-template-images.component.spec.ts`, `catalogue-b-pages.spec.ts`.
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| A20 | Should a receipt or label template accept a design for later use? | No: refused (`CAT-273`) so the choice is not mistaken for an effect. |
+| A21 | Does the CSV export list the design? | Not in this change (columns unchanged). |

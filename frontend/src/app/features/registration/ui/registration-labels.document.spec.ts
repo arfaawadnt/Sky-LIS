@@ -25,6 +25,7 @@ function label(overrides: Partial<SampleLabel> = {}): SampleLabel {
     urgent: false,
     serviceCodes: ['GLU'],
     biohazard: false,
+    collectedOutside: false,
     ...overrides,
   };
 }
@@ -51,6 +52,14 @@ describe('RegistrationLabelsDocument (sample labels)', () => {
     expect(pages[0]?.querySelector('.biohazard')?.textContent?.trim()).toBe('BIO');
     expect(pages[0]?.textContent).toContain('!');
     expect(pages[1]?.querySelector('.biohazard')).toBeNull();
+  });
+
+  it('prints "EXT" on the label of a sample collected outside the laboratory only (LIS-CR-008 C-02)', () => {
+    const host = render([label({ collectedOutside: true }), label({ tubeId: 'tube-2', sampleNumber: 'SMP-2026-00002' })]);
+
+    const pages = host.querySelectorAll('.print-page');
+    expect(pages[0]?.querySelector('.outside')?.textContent?.trim()).toBe('EXT');
+    expect(pages[1]?.querySelector('.outside')).toBeNull();
   });
 
   it('keeps the Latin digits of the printed documents in Arabic', () => {

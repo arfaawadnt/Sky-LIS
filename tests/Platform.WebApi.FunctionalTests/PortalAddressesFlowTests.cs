@@ -114,7 +114,9 @@ public sealed class PortalAddressesFlowTests : IClassFixture<ApiFactory>
 
         var (endedMember, _, _) = await _factory.SeedUserAsync(tenantId: endedId);
         var (inactiveMember, _, _) = await _factory.SeedUserAsync(tenantId: inactiveId);
-        await AssertRefusedAsync(auth, endedMember, SignInTarget.At(endedSlug), PlatformAdminCodes.ClientInactive);
+        // LIS-CR-012 (D-3): a trial that ended 16 days ago is past its 7 days of grace: a member who is not an administrator is refused SUB-020 (403)
+        var expired = await auth.SignInAsync(endedMember, ApiFactory.Password, SignInTarget.At(endedSlug));
+        Assert.Equal((HttpStatusCode.Forbidden, SubscriptionCodes.Expired), (expired.StatusCode, await AuthClient.CodeOf(expired)));
         await AssertRefusedAsync(auth, inactiveMember, SignInTarget.At(inactiveSlug), PlatformAdminCodes.ClientInactive);
         await AssertRefusedAsync(auth, trialMember, SignInTarget.At(inactiveSlug), ProblemCodes.InvalidCredentials);   // not a member: nothing revealed
     }
@@ -132,8 +134,9 @@ public sealed class PortalAddressesFlowTests : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.OK, card.StatusCode);
         Assert.Equal(new PublicLaboratory(activeSlug, "Lab " + activeSlug, "مختبر " + activeSlug, null), await card.Content.ReadFromJsonAsync<PublicLaboratory>());
         Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync($"{Card}/{trialSlug}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync($"{Card}/{endedSlug}")).StatusCode);   // LIS-CR-012: its administrators still sign in there (to the wallet)
 
-        foreach (var missing in new[] { endedSlug, inactiveSlug, "no-such-lab", "ab", "al_noor" })
+        foreach (var missing in new[] { inactiveSlug, "no-such-lab", "ab", "al_noor" })
         {
             var refused = await anonymous.GetAsync($"{Card}/{missing}");
             Assert.Equal((HttpStatusCode.NotFound, PlatformAdminCodes.LaboratoryAddressNotFound), (refused.StatusCode, await AuthClient.CodeOf(refused)));

@@ -46,6 +46,7 @@ const sample: SampleListItem = {
   rejectedAtUtc: null,
   replacedBySampleId: null,
   replacesSampleId: null,
+  collectedOutside: true,
 };
 
 class PrinterStub {
@@ -161,6 +162,7 @@ describe('VisitSamplesDialogComponent (CP-10 samples, R1)', () => {
     const host = fixture.nativeElement as HTMLElement;
     expect(host.querySelectorAll('table.samples tbody tr').length).toBe(1);
     expect(host.textContent).toContain('SMP-2026-00001');
+    expect(host.querySelector('table.samples tbody tr app-badge[tone="info"]')?.textContent).toContain('registration.sampleFlags.outside');   // LIS-CR-008 C-02
 
     host.querySelector<HTMLButtonElement>('table.samples button')!.click();
     await settle();

@@ -37,7 +37,7 @@ public static class SubscriptionOtp
     }
 }
 
-/// <summary>S1 Start: validates the details against the country and sends a code to the manager's mobile.</summary>
+/// <summary>S1 Start: validates the details against the country (and, LIS-CR-008 C-04, the optional city / district / area under the governorate) and sends a code to the manager's mobile.</summary>
 [AllowUnauthenticated]
 public sealed record StartSubscriptionCommand(
     string LabNameEn,
@@ -50,7 +50,10 @@ public sealed record StartSubscriptionCommand(
     string ManagerName,
     string ManagerMobile,
     string? Email,
-    string? Language) : ICommand<SubscriptionStarted>;
+    string? Language,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null) : ICommand<SubscriptionStarted>;
 
 public sealed class StartSubscriptionValidator : AbstractValidator<StartSubscriptionCommand>
 {
@@ -78,7 +81,8 @@ public sealed class StartSubscriptionHandler(
     SessionPolicy sessionPolicy,
     ISecurityEventLog events,
     IUnitOfWork unitOfWork,
-    IClock clock) : ICommandHandler<StartSubscriptionCommand, SubscriptionStarted>
+    IClock clock,
+    ILocalityLookup localities) : ICommandHandler<StartSubscriptionCommand, SubscriptionStarted>
 {
     public async Task<SubscriptionStarted> Handle(StartSubscriptionCommand command, CancellationToken cancellationToken)
     {
@@ -89,6 +93,7 @@ public sealed class StartSubscriptionHandler(
 
         var profile = ClientProfile.Create(command.LabNameEn, command.LabNameAr, country, governorate.Id, command.Address, command.Mobile, command.LicenceNo, command.ManagerName, command.ManagerMobile, command.Email);
         var request = SubscriptionRequest.Start(profile, country, governorate, command.Language ?? country.Language, clock.UtcNow);
+        request.Locate(await LocalityChecks.ResolveAsync(localities, governorate.Id, command.CityId, command.DistrictId, command.AreaId, cancellationToken));
         requests.Add(request);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -186,18 +191,21 @@ public sealed class CompleteSubscriptionHandler(
     INotificationSender sender,
     ISecurityEventLog events,
     IUnitOfWork unitOfWork,
-    IClock clock) : ICommandHandler<CompleteSubscriptionCommand, SubscriptionCompletedResponse>
+    IClock clock,
+    ILocalityLookup localities) : ICommandHandler<CompleteSubscriptionCommand, SubscriptionCompletedResponse>
 {
     public async Task<SubscriptionCompletedResponse> Handle(CompleteSubscriptionCommand command, CancellationToken cancellationToken)
     {
         var request = await SubscriptionLookup.RequireAsync(requests, command.SubscriptionId, cancellationToken);
         request.EnsureCanComplete(clock.UtcNow);
 
+        // LIS-CR-008 C-04: the locality picked at step 1, checked again (rows may have moved on since; inactive ones stay accepted)
+        var locality = await LocalityChecks.ResolveAsync(localities, request.GovernorateId, request.CityId, request.DistrictId, request.AreaId, cancellationToken);
         var provisioner = new TenantProvisioner(tenants, wallets, countries, governorates, plans, users, branches, administrators, masterData, hasher, settings, tenantScope, clock);
         var spec = new ProvisionTenantSpec(
             request.NameEn, request.NameAr, request.CountryId, request.GovernorateId, request.Address, request.Mobile, request.LicenceNo,
             request.ManagerName, request.ManagerMobile, request.Email, PlanId: null, PortalSlug: null, TenantSource.Subscription, request.Language,
-            command.Username, command.Password);
+            command.Username, command.Password, locality);
 
         var prepared = await provisioner.PrepareAsync(spec, cancellationToken);
         await provisioningScope.RunAsync(prepared.Tenant.Id, async ct =>

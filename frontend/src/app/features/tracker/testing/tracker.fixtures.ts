@@ -28,7 +28,7 @@ export function trackerItem(overrides: Partial<LabTrackerItem> = {}): LabTracker
     minutesLeft: 80,
     delayState: 'OnTime',
     registration: { lines: 3, cancelledLines: 0 },
-    samples: { total: 2, ordered: 0, collected: 0, received: 2, rejected: 0, firstRejectionReason: null, firstRejectionReasonAr: null },
+    samples: { total: 2, ordered: 0, collected: 0, received: 2, rejected: 0, firstRejectionReason: null, firstRejectionReasonAr: null, collectedOutside: 0 },
     results: { total: 3, ordered: 2, complete: 1, reviewed: 0, verified: 0, printed: 0, hidden: 0, panic: 0, delta: 0, firstPanicTest: null, firstPanicTestAr: null },
     payment: { status: 'Paid', patientShare: 150, paid: 150, remaining: 0 },
     ...overrides,

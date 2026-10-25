@@ -10,7 +10,8 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
 import { MobileInputComponent } from '../../../shared/forms/mobile-input/mobile-input.component';
 import { problemMessage } from '../../../shared/forms/problem-text';
-import { problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
+import { LocalityFieldsComponent, type LocalityLabels, localityRequest } from '../../../shared/forms/locality-fields/locality-fields.component';
+import { SERVER_ERROR_KEY, problemToFormErrors } from '../../../shared/forms/problem-to-form-errors';
 import { requiredText } from '../../../shared/forms/validators';
 import { FormFieldComponent } from '../../../shared/ui/form-field/form-field.component';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
@@ -29,7 +30,7 @@ const CODE_PATTERN = /^\d{4,8}$/;
  */
 @Component({
   selector: 'app-subscribe-page',
-  imports: [ReactiveFormsModule, RouterLink, FormFieldComponent, IconComponent, MobileInputComponent, PublicHeaderComponent],
+  imports: [ReactiveFormsModule, RouterLink, FormFieldComponent, IconComponent, LocalityFieldsComponent, MobileInputComponent, PublicHeaderComponent],
   templateUrl: './subscribe.page.html',
   styleUrl: './subscribe.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -53,6 +54,10 @@ export class SubscribePage {
     labNameAr: new FormControl('', { nonNullable: true, validators: [requiredText, Validators.maxLength(200)] }),
     countryId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     governorateId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    // LIS-CR-008 C-04: optional city (markaz) → district → area (village) under the governorate
+    cityId: new FormControl('', { nonNullable: true }),
+    districtId: new FormControl('', { nonNullable: true }),
+    areaId: new FormControl('', { nonNullable: true }),
     address: new FormControl('', { nonNullable: true, validators: [requiredText, Validators.maxLength(300)] }),
     mobile: new FormControl('', { nonNullable: true, validators: [requiredText, countryMobileValidator(() => this.facade.country(), (country) => this.mobileMessage('public.wizard.validation.mobileLength', country))] }),
     licenceNo: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64)] }),
@@ -60,6 +65,19 @@ export class SubscribePage {
     managerMobile: new FormControl('', { nonNullable: true, validators: [requiredText, countryMobileValidator(() => this.facade.country(), (country) => this.mobileMessage('public.wizard.validation.managerMobileLength', country))] }),
     email: new FormControl('', { nonNullable: true, validators: [Validators.email, Validators.maxLength(254)] }),
   });
+
+  protected readonly localityControls = { cityId: this.details.controls.cityId, districtId: this.details.controls.districtId, areaId: this.details.controls.areaId };
+
+  /** LIS-CR-008 C-04: the governorate the locality selects list cities of (a dedicated signal of the one control). */
+  protected readonly governorateValue = toSignal(this.details.controls.governorateId.valueChanges, { initialValue: this.details.controls.governorateId.value });
+
+  protected readonly localityLabels = computed<LocalityLabels>(() => ({
+    city: this.i18n.t('public.field.city'),
+    district: this.i18n.t('public.field.district'),
+    area: this.i18n.t('public.field.area'),
+    none: this.i18n.t('public.wizard.localityNone'),
+    hint: this.i18n.t('public.wizard.optional'),
+  }));
 
   protected readonly code = new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.pattern(CODE_PATTERN)] });
 
@@ -144,11 +162,22 @@ export class SubscribePage {
       managerMobile: value.managerMobile.trim(),
       email: value.email.trim() === '' ? null : value.email.trim(),
       language: this.i18n.lang(),
+      ...localityRequest(value),
     });
     if (started === null) {
       problemToFormErrors(this.facade.start.problem(), this.details);
+      this.markLocality(this.facade.start.problem());
     } else {
       this.code.reset();
+    }
+  }
+
+  /** GEO-020…022 (LIS-CR-008 C-04): the locality level the server refused is marked under its own select. */
+  private markLocality(problem: ProblemDetails | null): void {
+    const control = problem?.code === 'GEO-020' ? this.details.controls.cityId : problem?.code === 'GEO-021' ? this.details.controls.districtId : problem?.code === 'GEO-022' ? this.details.controls.areaId : null;
+    if (control !== null && problem !== null) {
+      control.setErrors({ ...(control.errors ?? {}), [SERVER_ERROR_KEY]: this.problemText(problem) });
+      control.markAsTouched();
     }
   }
 

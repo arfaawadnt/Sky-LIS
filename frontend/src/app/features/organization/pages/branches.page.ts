@@ -4,7 +4,9 @@ import { type BranchListItem, type CreateBranchRequest, type LookupOption, ORGAN
 import { ProblemCodes, ProblemError } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
+import { localityRequest } from '../../../shared/forms/locality-fields/locality-fields.component';
 import { problemMessage } from '../../../shared/forms/problem-text';
+import { PatientLookupApi } from '../../../shared/patient/patient-lookup.api';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { sortParams } from '../../../shared/forms/paging';
 import { localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
@@ -24,11 +26,16 @@ const FIELD_OF_CODE: Readonly<Record<string, string>> = {
   'ORG-015': 'phone',
   'ORG-016': 'email',
   'ORG-017': 'governorateId',
+  // LIS-CR-008 C-04: the locality chain under the governorate
+  'GEO-020': 'cityId',
+  'GEO-021': 'districtId',
+  'GEO-022': 'areaId',
 };
 
 /**
  * Branches (SRS CP-36) on the generic master-data page: code (immutable), bilingual name, country and governorate
- * (platform lists), phone, e-mail, currency and activation. A branch is never deleted, only deactivated; the server
+ * (platform lists), the optional city / district / area under the governorate (LIS-CR-008 C-04, cascading selects over
+ * the public lookups), phone, e-mail, currency and activation. A branch is never deleted, only deactivated; the server
  * refuses the last active branch (ORG-110).
  */
 @Component({
@@ -44,6 +51,7 @@ const FIELD_OF_CODE: Readonly<Record<string, string>> = {
 export class BranchesPage {
   private readonly i18n = inject(I18nService);
   private readonly api = inject(OrganizationApi);
+  private readonly lookup = inject(PatientLookupApi);
 
   protected readonly permissions = ORGANIZATION_PERMISSIONS;
 
@@ -65,6 +73,9 @@ export class BranchesPage {
       { name: 'name', kind: 'localizedText', required: true, maxLength: 200 },
       { name: 'countryId', kind: 'select', options: () => this.countryOptions() },
       { name: 'governorateId', kind: 'select', options: () => this.governorateOptions(), hint: 'organization.branches.hint.governorate' },
+      { name: 'cityId', kind: 'select', dependsOn: 'governorateId', dependentOptions: async (governorateId) => (await this.lookup.cities(governorateId)).map(toOption), hint: 'organization.branches.hint.locality' },
+      { name: 'districtId', kind: 'select', dependsOn: 'cityId', dependentOptions: async (cityId) => (await this.lookup.districts(cityId)).map(toOption) },
+      { name: 'areaId', kind: 'select', dependsOn: 'districtId', dependentOptions: async (districtId) => (await this.lookup.areas(districtId)).map(toOption) },
       { name: 'phone', kind: 'text', maxLength: 20 },
       { name: 'email', kind: 'text', maxLength: 254 },
       { name: 'currency', kind: 'code', required: true, maxLength: 3, immutable: false, defaultValue: DEFAULT_CURRENCY, hint: 'organization.branches.hint.currency' },
@@ -76,12 +87,25 @@ export class BranchesPage {
       },
       create: (dto) => this.onField(this.api.createBranch(dto)),
       update: (id, dto) =>
-        this.onField(this.api.updateBranch(id, { nameEn: dto.nameEn, nameAr: dto.nameAr, countryId: dto.countryId, governorateId: dto.governorateId, phone: dto.phone, email: dto.email, currency: dto.currency })),
+        this.onField(
+          this.api.updateBranch(id, {
+            nameEn: dto.nameEn,
+            nameAr: dto.nameAr,
+            countryId: dto.countryId,
+            governorateId: dto.governorateId,
+            phone: dto.phone,
+            email: dto.email,
+            currency: dto.currency,
+            cityId: dto.cityId ?? null,
+            districtId: dto.districtId ?? null,
+            areaId: dto.areaId ?? null,
+          }),
+        ),
       setActive: (id, active) => this.api.setBranchActive(id, active),
     },
     toDto: (value) => toBranchRequest(value),
     // B-01: ORG-017 judges the pair; correcting either field clears the error so the next save re-checks it.
-    linkedFields: [['countryId', 'governorateId']],
+    linkedFields: [['countryId', 'governorateId'], ['governorateId', 'cityId', 'districtId', 'areaId']],
     permissions: { create: ORGANIZATION_PERMISSIONS.create, update: ORGANIZATION_PERMISSIONS.edit, activate: ORGANIZATION_PERMISSIONS.manage },
   };
 
@@ -160,7 +184,7 @@ export class BranchesPage {
   }
 }
 
-function toOption(option: LookupOption): SelectOption {
+function toOption(option: Pick<LookupOption, 'id' | 'nameEn' | 'nameAr'>): SelectOption {
   return { value: option.id, label: option.nameEn, labelAr: option.nameAr };
 }
 
@@ -180,5 +204,7 @@ export function toBranchRequest(value: FormValue): CreateBranchRequest {
     phone: textOrNull(value['phone']),
     email: textOrNull(value['email']),
     currency: typeof value['currency'] === 'string' ? value['currency'] : DEFAULT_CURRENCY,
+    // LIS-CR-008 C-04: a lower level never travels without its parent
+    ...localityRequest({ cityId: textOrNull(value['cityId']) ?? '', districtId: textOrNull(value['districtId']) ?? '', areaId: textOrNull(value['areaId']) ?? '' }),
   };
 }

@@ -104,7 +104,7 @@ export class CashClosingPage {
     { key: 'atUtc', header: 'billing.column.date', value: (row) => formatDateTime(row.atUtc, this.i18n.lang()) },
     { key: 'accession', header: 'billing.column.accession', mono: true, secondary: true },
     { key: 'method', header: 'billing.column.method' },
-    { key: 'amount', header: 'billing.column.amount', align: 'end', value: (row) => `${row.kind === 'Refund' ? '−' : ''}${this.money(row.amount)}` },
+    { key: 'amount', header: 'billing.column.amount', align: 'end', value: (row) => `${row.kind === 'Refund' || row.kind === 'CashOut' ? '−' : ''}${this.money(row.amount)}` },
     { key: 'cashierName', header: 'billing.column.cashier', secondary: true },
     { key: 'status', header: 'billing.column.status', width: '110px' },
   ];

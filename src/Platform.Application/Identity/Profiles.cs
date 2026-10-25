@@ -2,6 +2,7 @@ using Platform.Application.Abstractions.Security;
 using Platform.Application.Identity.Commands;
 using Platform.Contracts.Identity;
 using Platform.Domain.Identity;
+using Platform.Domain.PlatformAdmin;
 
 namespace Platform.Application.Identity;
 
@@ -28,7 +29,30 @@ public static class Profiles
             principal.SessionTimeoutMinutes,
             principal.ResultsDensity,
             principal.IsPrimaryAdministrator,
-            principal.PortalSlug);
+            principal.PortalSlug,
+            NoticeOf(principal));
+    }
+
+    /// <summary>LIS-CR-012: the subscription notice of the profile; null while the subscription is Ok.</summary>
+    public static SubscriptionNotice? NoticeOf(SessionPrincipal principal)
+    {
+        ArgumentNullException.ThrowIfNull(principal);
+        var state = principal.Subscription;
+        if (state.Level == SubscriptionLevel.Ok)
+        {
+            return null;
+        }
+
+        return new SubscriptionNotice(
+            state.Level.ToString(),
+            state.Reason.ToString(),
+            state.DaysLeft,
+            state.EndsAtUtc,
+            state.AmountToTopUp,
+            state.CurrencyCode,
+            state.TrialEndsAtUtc,
+            principal.IsSubscriptionAdministrator,
+            state.CallsForModal);
     }
 
     public static SessionResponse ToSession(SessionPrincipal principal)

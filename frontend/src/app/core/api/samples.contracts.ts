@@ -50,6 +50,8 @@ export interface SampleListItem {
   readonly rejectedAtUtc: string | null;
   readonly replacedBySampleId: string | null;
   readonly replacesSampleId: string | null;
+  /** Collected outside the laboratory (LIS-CR-008 C-02): an "Outside" tag on the sample screens. */
+  readonly collectedOutside: boolean;
 }
 
 export interface SampleServiceView {
@@ -157,6 +159,8 @@ export interface SampleLabelDocument {
   readonly labelAtUtc: string;
   readonly services: readonly SampleServiceView[];
   readonly copies: number;
+  /** The label prints "EXT" (LIS-CR-008 C-02). */
+  readonly collectedOutside: boolean;
 }
 
 export interface VisitLabelsDocument {

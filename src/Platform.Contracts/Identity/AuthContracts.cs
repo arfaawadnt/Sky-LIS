@@ -101,7 +101,29 @@ public sealed record AuthProfile(
     int? SessionTimeoutMinutes = null,
     string? ResultsDensity = null,
     bool IsPrimaryAdministrator = false,
-    string? PortalSlug = null);
+    string? PortalSlug = null,
+    SubscriptionNotice? SubscriptionNotice = null);
+
+/// <summary>
+/// LIS-CR-012 (C-16): the subscription state of the session's laboratory, read in the session principal's one query; null when
+/// there is nothing to say (an active client whose wallet covers at least a week, a trial with more than a week left, the
+/// platform tenant). <see cref="Level"/>: <c>Warning</c> | <c>Grace</c> | <c>Expired</c>; <see cref="Reason"/>: <c>Trial</c> |
+/// <c>Wallet</c> | <c>WalletAtZero</c>; <see cref="DaysLeft"/> whole days to <see cref="EndsAtUtc"/> (trial end, end of the cover, start or end of the
+/// grace); <see cref="AmountToTopUp"/> in <see cref="CurrencyCode"/> brings the wallet back to one month of the plan fee.
+/// <see cref="CanManage"/>: the user is an administrator of the laboratory (primary administrator or <c>organization.manage</c>),
+/// who sees the banner and, once expired, may still sign in to the wallet (<c>SUB-021</c> elsewhere). <see cref="ShowModal"/>:
+/// fewer than three days left, in grace or expired — the SPA shows the sign-in modal.
+/// </summary>
+public sealed record SubscriptionNotice(
+    string Level,
+    string Reason,
+    int? DaysLeft,
+    DateTimeOffset? EndsAtUtc,
+    decimal? AmountToTopUp,
+    string? CurrencyCode,
+    DateTimeOffset? TrialEndsAtUtc,
+    bool CanManage,
+    bool ShowModal);
 
 /// <summary>The current session as the server sees it (GET /api/v1/auth/me).</summary>
 public sealed record SessionResponse(

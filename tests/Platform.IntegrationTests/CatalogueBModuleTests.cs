@@ -197,7 +197,7 @@ public sealed class CatalogueBModuleTests(DatabaseFixture fixture)
         await SaveAsync(tenant, context =>
         {
             var doctor = Doctor.Create("D1", Text("Dr. A"), null, null, [branch], 15m, null, Now);
-            var template = ReportTemplate.Create(Text("Culture A4"), ReportTemplateType.Culture, false, ReportTemplateLanguage.En, null, Text("Footer"), Now);
+            var template = ReportTemplate.Create(Text("Culture A4"), ReportTemplateType.Culture, false, ReportTemplateLanguage.En, null, Text("Footer"), Now, ReportDesign.Modern);
             (doctorId, templateId) = (doctor.Id, template.Id);
             context.Add(doctor);
             context.Add(template);
@@ -212,6 +212,7 @@ public sealed class CatalogueBModuleTests(DatabaseFixture fixture)
 
         var templates = scope.ServiceProvider.GetRequiredService<IReportTemplateLookup>();
         Assert.Equal("Footer", (await templates.GetAsync(templateId, CancellationToken.None))!.FooterTextEn);
+        Assert.Equal(ReportDesign.Modern, (await templates.GetAsync(templateId, CancellationToken.None))!.Design);   // LIS-CR-010: app.report_templates.design
         Assert.Single(await templates.ActiveOfTypeAsync(ReportTemplateType.Culture, CancellationToken.None));
         Assert.Empty(await templates.ActiveOfTypeAsync(ReportTemplateType.Receipt, CancellationToken.None));
     }

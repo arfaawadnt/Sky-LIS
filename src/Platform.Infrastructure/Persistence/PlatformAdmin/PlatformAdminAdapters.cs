@@ -66,9 +66,14 @@ internal sealed class TenantStatusLookup(ITenantRepository tenants, IClock clock
         return status is not { } found || IsUsable(found.Status, found.TrialEndsAtUtc, clock.UtcNow);
     }
 
-    /// <summary>INV-PLT-003 (<see cref="Tenant.IsUsableAt"/> over the stored columns): Active, or Trial before its end. The one rule of sign-in, the principal and the public card.</summary>
+    /// <summary>
+    /// INV-PLT-003 (<see cref="Tenant.IsUsableAt"/> over the stored columns): not deactivated. The one rule of sign-in, the
+    /// principal and the public card. LIS-CR-012 (D-3): a trial past its end is no longer refused here — it runs its grace and
+    /// then expires, and the subscription state decides what its users may do (<c>SUB-020</c> / <c>SUB-021</c>); the
+    /// administrators of an expired laboratory still need its sign-in address and card.
+    /// </summary>
     internal static bool IsUsable(TenantStatus status, DateTimeOffset? trialEndsAtUtc, DateTimeOffset nowUtc) =>
-        status == TenantStatus.Active || (status == TenantStatus.Trial && (trialEndsAtUtc is null || trialEndsAtUtc > nowUtc));
+        status != TenantStatus.Inactive;   // trialEndsAtUtc / nowUtc stay in the signature for the callers; the trial end no longer blocks by itself
 }
 
 /// <summary>
@@ -101,7 +106,7 @@ internal sealed class PublicLaboratoryDirectory(AppDbContext context, ILaborator
         var value = Tenant.NormaliseAddress(slug);
         var row = await context.Set<Tenant>().AsNoTracking()
             .Where(tenant => tenant.PortalSlug == value && tenant.Id != TenantIds.Platform)
-            .Select(tenant => new { tenant.Id, tenant.PortalSlug, NameEn = tenant.Name.En, NameAr = tenant.Name.Ar, tenant.Status, tenant.TrialEndsAtUtc })
+            .Select(tenant => new { tenant.Id, tenant.PortalSlug, NameEn = tenant.Name.En, NameAr = tenant.Name.Ar, tenant.Status, tenant.TrialEndsAtUtc, tenant.GovernorateId, tenant.CityId, tenant.DistrictId, tenant.AreaId })
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
         if (row is null || !TenantStatusLookup.IsUsable(row.Status, row.TrialEndsAtUtc, clock.UtcNow))
@@ -115,7 +120,16 @@ internal sealed class PublicLaboratoryDirectory(AppDbContext context, ILaborator
             logo = await logos.FindActiveAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        return new PublicLaboratoryRecord(row.Id, row.PortalSlug, row.NameEn, row.NameAr, logo is null ? null : new PublicLaboratoryLogo(logo.StorageKey, logo.ContentType, logo.Version));
+        // LIS-CR-008 C-04: the card's address line, when the laboratory has a city
+        string? addressEn = null, addressAr = null;
+        if (row.CityId is not null)
+        {
+            var governorate = await context.Set<Governorate>().AsNoTracking().Where(item => item.Id == row.GovernorateId).Select(item => new { item.Name.En, item.Name.Ar }).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+            var names = await LocalityReads.NamesAsync(context, [row.CityId], [row.DistrictId], [row.AreaId], cancellationToken).ConfigureAwait(false);
+            (addressEn, addressAr) = LocalityReads.Line(names, row.CityId, row.DistrictId, row.AreaId, governorate?.En, governorate?.Ar);
+        }
+
+        return new PublicLaboratoryRecord(row.Id, row.PortalSlug, row.NameEn, row.NameAr, logo is null ? null : new PublicLaboratoryLogo(logo.StorageKey, logo.ContentType, logo.Version), addressEn, addressAr);
     }
 }
 

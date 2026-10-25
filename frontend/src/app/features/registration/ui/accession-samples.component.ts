@@ -42,7 +42,13 @@ import { dateTime, pick } from '../data/registration-format';
                 <tr [attr.data-sample]="sample.sampleNumber">
                   <td class="mono">{{ sample.sampleNumber }}</td>
                   <td>{{ sample.unitCode ?? '' }}</td>
-                  <td>{{ name(sample.sampleTypeNameEn, sample.sampleTypeNameAr) }}<span class="small muted block">{{ name(sample.sampleConditionNameEn, sample.sampleConditionNameAr) }}</span></td>
+                  <td>
+                    {{ name(sample.sampleTypeNameEn, sample.sampleTypeNameAr) }}
+                    @if (sample.collectedOutside) {
+                      <app-badge tone="info">{{ i18n.t('registration.sampleFlags.outside') }}</app-badge>
+                    }
+                    <span class="small muted block">{{ name(sample.sampleConditionNameEn, sample.sampleConditionNameAr) }}</span>
+                  </td>
                   <td>
                     <app-badge [status]="sample.status">{{ i18n.t('shared.status.' + sample.status) }}</app-badge>
                     @if (sample.status === 'Rejected') {

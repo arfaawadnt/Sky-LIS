@@ -227,7 +227,11 @@ internal sealed class BillableVisitLookup(AppDbContext context) : IBillableVisit
     }
 }
 
-/// <summary>The drawer figures of CP-30 (BR-16): sums per method of posted payments and refunds, the visits touched and their outstanding balance and discounts.</summary>
+/// <summary>
+/// The drawer figures of CP-30 (BR-16): sums per method of posted payments and refunds, the visits touched and their outstanding
+/// balance and discounts; since the cash ledger (LIS-CR-011, C-15) also the posted cash entries of the scope (in / out, cash method)
+/// and the opening balance (the previous closing of the same scope plus the cash moved since, <see cref="CashLedgerSql"/>).
+/// </summary>
 internal sealed class CashDrawerQueries(AppDbContext context) : ICashDrawerQueries
 {
     private const string VisitFiguresSql = """
@@ -270,7 +274,17 @@ internal sealed class CashDrawerQueries(AppDbContext context) : ICashDrawerQueri
             visits = rows.Count == 0 ? visits : rows[0];
         }
 
+        var entries = await Entries(scope).Where(entry => entry.Status == CashEntryStatus.Posted)
+            .GroupBy(entry => new { entry.Kind, entry.Method })
+            .Select(group => new { group.Key.Kind, group.Key.Method, Sum = group.Sum(entry => entry.Amount), Count = group.Count() })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var opening = scope.LegacyTreasuryId is null
+            ? await CashLedgerSql.OpeningAsync(context, scope.BranchId, scope.CashierUserId, scope.FromUtc, cancellationToken).ConfigureAwait(false)
+            : CashLedgerOpening.None;
+
         decimal Paid(PaymentMethod method) => paymentSums.Where(sum => sum.Method == method).Sum(sum => sum.Sum);
+        decimal Entered(CashEntryKind kind) => entries.Where(sum => sum.Kind == kind && sum.Method == PaymentMethod.Cash).Sum(sum => sum.Sum);
         decimal Returned(PaymentMethod method) => refundSums.Where(sum => sum.Method == method).Sum(sum => sum.Sum);
 
         return new ClosingTotals(
@@ -286,7 +300,11 @@ internal sealed class CashDrawerQueries(AppDbContext context) : ICashDrawerQueri
             refundSums.Sum(sum => sum.Count),
             visits.OutstandingBalance,
             visits.DiscountTotal,
-            visits.VisitCount);
+            visits.VisitCount,
+            opening.Balance,
+            Entered(CashEntryKind.CashIn),
+            Entered(CashEntryKind.CashOut),
+            entries.Sum(sum => sum.Count));
     }
 
     public async Task<IReadOnlyList<DrawerMovement>> MovementsAsync(DrawerScope scope, int maxRows, CancellationToken cancellationToken)
@@ -304,10 +322,17 @@ internal sealed class CashDrawerQueries(AppDbContext context) : ICashDrawerQueri
             select new { refund.Id, refund.Number, refund.VisitId, refund.Method, refund.Amount, refund.RefundedAtUtc, refund.CashierUserId, cashier.DisplayName })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+        var entries = await (
+            from entry in Entries(scope).OrderBy(entry => entry.PostedAtUtc).Take(maxRows)
+            join cashier in context.PlatformUsers.AsNoTracking() on entry.CashierUserId equals cashier.Id
+            select new { entry.Id, entry.Number, entry.Kind, entry.Method, entry.Amount, entry.PostedAtUtc, entry.CashierUserId, cashier.DisplayName, entry.Status, entry.Reason })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
 
         return payments
             .Select(row => new DrawerMovement("Payment", row.Id, row.ReceiptNumber, row.VisitId, null, row.Method.ToString(), row.Amount, row.PaidAtUtc, row.CashierUserId, row.DisplayName, row.Status.ToString()))
             .Concat(refunds.Select(row => new DrawerMovement("Refund", row.Id, row.Number, row.VisitId, null, row.Method.ToString(), row.Amount, row.RefundedAtUtc, row.CashierUserId, row.DisplayName, nameof(PaymentStatus.Posted))))
+            .Concat(entries.Select(row => new DrawerMovement(row.Kind.ToString(), row.Id, row.Number, Guid.Empty, null, row.Method.ToString(), row.Amount, row.PostedAtUtc, row.CashierUserId, row.DisplayName, row.Status.ToString(), row.Reason)))
             .OrderBy(movement => movement.AtUtc)
             .ThenBy(movement => movement.Number, StringComparer.Ordinal)
             .Take(maxRows)
@@ -317,7 +342,9 @@ internal sealed class CashDrawerQueries(AppDbContext context) : ICashDrawerQueri
     public async Task<IReadOnlyList<DrawerCashier>> CashiersAsync(Guid branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken)
     {
         var scope = new DrawerScope(branchId, null, fromUtc, toUtc);
-        var ids = Payments(scope).Select(payment => payment.CashierUserId).Union(Refunds(scope).Select(refund => refund.CashierUserId));
+        var ids = Payments(scope).Select(payment => payment.CashierUserId)
+            .Union(Refunds(scope).Select(refund => refund.CashierUserId))
+            .Union(Entries(scope).Select(entry => entry.CashierUserId));
         return await context.PlatformUsers.AsNoTracking()
             .Where(user => ids.Contains(user.Id))
             .OrderBy(user => user.DisplayName)
@@ -363,6 +390,19 @@ internal sealed class CashDrawerQueries(AppDbContext context) : ICashDrawerQueri
         }
 
         return scope.CashierUserId is { } cashier ? query.Where(refund => refund.CashierUserId == cashier) : query;
+    }
+
+    /// <summary>The cash entries of the scope (LIS-CR-011); a legacy treasury scope has none (entries post after the treasury was removed).</summary>
+    private IQueryable<CashEntry> Entries(DrawerScope scope)
+    {
+        var query = context.Set<CashEntry>().AsNoTracking()
+            .Where(entry => entry.BranchId == scope.BranchId && entry.PostedAtUtc >= scope.FromUtc && entry.PostedAtUtc < scope.ToUtc);
+        if (scope.LegacyTreasuryId is not null)
+        {
+            query = query.Where(entry => entry.Id == Guid.Empty);
+        }
+
+        return scope.CashierUserId is { } cashier ? query.Where(entry => entry.CashierUserId == cashier) : query;
     }
 
     private sealed class VisitFiguresRow

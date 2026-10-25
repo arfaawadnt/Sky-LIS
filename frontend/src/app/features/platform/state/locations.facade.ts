@@ -1,6 +1,6 @@
 import { Injectable, type WritableSignal, computed, inject, resource, signal } from '@angular/core';
 
-import type { GovernorateListItem, LocationLevel, LocationListItem, LocationRequest } from '../../../core/api/platform.contracts';
+import type { GovernorateListItem, LocalityImportResult, LocationLevel, LocationListItem, LocationRequest } from '../../../core/api/platform.contracts';
 import { mutation } from '../../../core/state/mutation';
 import { PlatformApi } from '../data/platform.api';
 
@@ -16,6 +16,12 @@ export interface LocationSave {
   readonly parentId: string;
   readonly id: string | null;
   readonly request: LocationRequest;
+}
+
+/** LIS-CR-008 C-04: a locality file for the open governorate, checked (`dryRun`) or imported. */
+export interface LocalityImport {
+  readonly file: File;
+  readonly dryRun: boolean;
 }
 
 export interface LocationToggle {
@@ -83,11 +89,32 @@ export class LocationsFacade {
     this.reload(input.level);
   });
 
+  /**
+   * LIS-CR-008 C-04 (D-2): the CSV import of the open governorate. A real run that applied reloads the three columns
+   * (new rows may sit at every level).
+   */
+  readonly importFile = mutation<LocalityImport, LocalityImportResult>(async (input) => {
+    const governorate = this.governorate();
+    if (governorate === null) {
+      throw new Error('No governorate is open.');
+    }
+
+    const result = await this.api.importLocalities(governorate.id, input.file, input.dryRun);
+    if (result.applied) {
+      this.cities.reload();
+      this.districts.reload();
+      this.areas.reload();
+    }
+
+    return result;
+  });
+
   /** The selected city row (null once it left the list, e.g. hidden by the search). */
   readonly selectedCity = computed(() => this.rowOf(this.cities.hasValue() ? this.cities.value() : [], this.cityId()));
   readonly selectedDistrict = computed(() => this.rowOf(this.districts.hasValue() ? this.districts.value() : [], this.districtId()));
 
   open(governorate: GovernorateListItem): void {
+    this.importFile.reset();
     this.save.reset();
     this.toggle.reset();
     this.activeLevel.set(null);

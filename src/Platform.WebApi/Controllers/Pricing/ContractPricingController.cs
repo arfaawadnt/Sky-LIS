@@ -60,6 +60,15 @@ public sealed class ContractPricingController(ISender sender) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>C7 (LIS-CR-010): sets or, with a null design, clears the tier's report design override.</summary>
+    [HttpPut("{tierId:guid}/report-design")]
+    public async Task<IActionResult> SetReportDesign(Guid tierId, [FromBody] SetContractReportDesignRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        await sender.Send(new SetContractReportDesignCommand(tierId, request.Design), cancellationToken);
+        return NoContent();
+    }
+
     /// <summary>C6: copies another tier's formula, prices, exclusions and alerts, optionally scaled.</summary>
     [HttpPost("{tierId:guid}/copy-from/{otherTierId:guid}")]
     public async Task<IActionResult> CopyFrom(Guid tierId, Guid otherTierId, [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] CopyContractPricingRequest? request, CancellationToken cancellationToken)

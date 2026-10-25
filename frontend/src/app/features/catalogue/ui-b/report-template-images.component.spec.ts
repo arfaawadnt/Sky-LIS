@@ -18,7 +18,7 @@ const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve,
 /** Stands in for the results report renderer: shows what it was given. */
 @Component({
   selector: 'app-renderer-stub',
-  template: `<div class="stub-doc">{{ doc().language }}|{{ doc().template?.headerTextEn }}|{{ doc().template?.footerTextAr }}|{{ images()?.logoUrl }}|{{ images()?.signatureUrl }}</div><div class="stub-texts">{{ texts()?.lang }}|{{ texts()?.t('results.report.patient') }}</div>`,
+  template: `<div class="stub-doc">{{ doc().language }}|{{ doc().template?.headerTextEn }}|{{ doc().template?.footerTextAr }}|{{ images()?.logoUrl }}|{{ images()?.signatureUrl }}</div><div class="stub-texts">{{ texts()?.lang }}|{{ texts()?.t('results.report.patient') }}</div><div class="stub-design">{{ doc().design }}|{{ doc().sections[0]?.lines?.[0]?.previous?.length ?? 0 }}</div>`,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 class RendererStubComponent {
@@ -200,5 +200,62 @@ describe('ReportTemplateImagesComponent (SA-12 / CP-54, validation F-02)', () =>
     await stable();
     expect(host.querySelector('.stub-texts')?.textContent).toBe('ar|المريض');
     expect(host.querySelector('.stub-doc')?.textContent?.startsWith('ar|')).toBe(true);
+  });
+
+  it('LIS-CR-010: previews each design live and saves the chosen one on the template for an editor', async () => {
+    const host = await render(['catalogue.view', 'catalogue.edit'], { ...template, logoFileId: null, design: 'Modern' });
+    await stable();
+    expect(host.querySelector('.stub-design')?.textContent).toBe('Modern|0');
+    const buttons = (): HTMLButtonElement[] => [...host.querySelectorAll<HTMLButtonElement>('.designs button')];
+    expect(buttons().map((button) => button.textContent?.trim())).toEqual([
+      'catalogue-b.reportTemplates.design.Classic',
+      'catalogue-b.reportTemplates.design.Modern',
+      'catalogue-b.reportTemplates.design.Compact',
+      'catalogue-b.reportTemplates.design.Letterhead',
+      'catalogue-b.reportTemplates.design.Cumulative',
+    ]);
+    expect(host.querySelector('.use-design')).toBeNull();   // the saved design is shown: nothing to save
+
+    buttons()[4]!.click();
+    await stable();
+    expect(host.querySelector('.stub-design')?.textContent).toBe('Cumulative|3');   // the sample carries previous values
+    backend.expectNone(`${CATALOGUE_B_API.reportTemplates}/t1`);   // trying a design saves nothing
+
+    host.querySelector<HTMLButtonElement>('.use-design')!.click();
+    await settle();
+    const update = backend.expectOne((request) => request.method === 'PUT' && request.url === `${CATALOGUE_B_API.reportTemplates}/t1`);
+    expect(update.request.body).toEqual({
+      nameEn: 'Results A4',
+      nameAr: 'النتائج',
+      type: 'Results',
+      showQr: true,
+      language: 'Ar',
+      headerTextEn: 'Header',
+      headerTextAr: 'رأس',
+      footerTextEn: 'Footer',
+      footerTextAr: 'تذييل',
+      design: 'Cumulative',
+    });
+    update.flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+    backend.expectOne(`${CATALOGUE_B_API.reportTemplates}/t1`).flush({ ...template, logoFileId: null, design: 'Cumulative' });
+    await stable();
+    expect(toasts.success).toHaveBeenCalledWith('catalogue-b.reportTemplates.preview.designSaved');
+    expect(host.querySelector('.use-design')).toBeNull();
+  });
+
+  it('LIS-CR-010: a template of another document offers no design, and a viewer cannot save one', async () => {
+    const receipt = await render(['catalogue.view', 'catalogue.edit'], { ...template, type: 'Receipt', logoFileId: null });
+    await stable();
+    expect(receipt.querySelector('.designs')).toBeNull();
+  });
+
+  it('LIS-CR-010: a viewer tries the designs but has no save button', async () => {
+    const host = await render(['catalogue.view'], { ...template, logoFileId: null });
+    await stable();
+    [...host.querySelectorAll<HTMLButtonElement>('.designs button')][2]!.click();
+    await stable();
+    expect(host.querySelector('.stub-design')?.textContent).toBe('Compact|0');
+    expect(host.querySelector('.use-design')).toBeNull();
   });
 });

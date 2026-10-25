@@ -305,7 +305,8 @@ internal sealed class SampleRepository(AppDbContext context, ITenantContextAcces
                 rejection?.Note,
                 rejection?.AtUtc,
                 sample.ReplacedBySampleId,
-                sample.ReplacesSampleId);
+                sample.ReplacesSampleId,
+                sample.CollectedOutside);
         })];
     }
 
@@ -342,7 +343,8 @@ internal sealed class SampleRepository(AppDbContext context, ITenantContextAcces
                 branch?.NameAr,
                 sample.CollectedAtUtc ?? sample.OrderedAtUtc,
                 serviceViews,
-                Math.Clamp(Math.Max(labelCopies, serviceCopies), 1, 10));
+                Math.Clamp(Math.Max(labelCopies, serviceCopies), 1, 10),
+                sample.CollectedOutside);
         })];
     }
 

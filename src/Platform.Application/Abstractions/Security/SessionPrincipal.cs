@@ -77,6 +77,20 @@ public sealed record SessionPrincipal(
 
     public TimeSpan IdleTimeout => TimeSpan.FromMinutes(SessionTimeoutMinutes);
 
+    /// <summary>
+    /// LIS-CR-012 (C-16): the subscription state of the session's laboratory, read in the same elevated query (client status,
+    /// trial end, wallet, plan fee and the platform's grace days); <see cref="Platform.Domain.PlatformAdmin.SubscriptionStatus.None"/>
+    /// for the platform tenant and for a tenant without a client record.
+    /// </summary>
+    public Platform.Domain.PlatformAdmin.SubscriptionStatus Subscription { get; init; } = Platform.Domain.PlatformAdmin.SubscriptionStatus.None;
+
+    /// <summary>
+    /// LIS-CR-012 (D-3): the member administers the laboratory — primary administrator, or effective <c>organization.manage</c>
+    /// (who could grant itself anything). Only such a member keeps a live session once the subscription expired, and reaches
+    /// only the wallet (<c>SUB-021</c>, <c>SubscriptionExpiredGateMiddleware</c>).
+    /// </summary>
+    public bool IsSubscriptionAdministrator { get; init; }
+
     /// <summary>A rotated session still authenticates its own access token until it expires; a revoked or expired one never does, nor one whose user's access ended.</summary>
     public bool IsLiveAt(DateTimeOffset nowUtc) =>
         !IsRevoked && UserActive && ExpiresAtUtc > nowUtc && AbsoluteExpiresAtUtc > nowUtc && (TenantId is null || MembershipActive)

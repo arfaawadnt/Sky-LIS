@@ -1,0 +1,53 @@
+/* SA-22 Announcements: the editor's client list, image row and two-language preview (the rest is platform-pages.css and the kit). */
+
+.client-list {
+  display: grid;
+  gap: 2px;
+  max-block-size: 200px;
+  margin: 0;
+  padding: var(--sp-2);
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.client-list label {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.image-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  align-items: center;
+}
+
+.image-box {
+  display: grid;
+  place-items: center;
+  inline-size: 200px;
+  block-size: 110px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+
+.image-box img {
+  max-inline-size: 190px;
+  max-block-size: 100px;
+  object-fit: contain;
+}
+
+.row-gap label.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--sp-3);
+}

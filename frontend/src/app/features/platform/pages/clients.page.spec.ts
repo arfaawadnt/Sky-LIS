@@ -115,6 +115,23 @@ describe('ClientsPage (SA-04)', () => {
     return { fixture, host: fixture.nativeElement as HTMLElement };
   }
 
+  /** LIS-CR-008 C-04: answers the drawer's public locality lookups (cities, districts, areas) until none is pending. */
+  async function flushLocalities(answers: Partial<Record<'cities' | 'districts' | 'areas', readonly unknown[]>> = {}): Promise<void> {
+    for (let round = 0; round < 5; round++) {
+      TestBed.tick();
+      await settle();
+      const pending = backend.match((request) => request.url.startsWith('/api/v1/public/'));
+      if (pending.length === 0 && round > 1) {
+        return;
+      }
+
+      for (const request of pending) {
+        const level = request.request.url.split('/').pop() as 'cities' | 'districts' | 'areas';
+        request.flush(answers[level] ?? []);
+      }
+    }
+  }
+
   it('shows the client with its portal, manager mobile and a negative wallet', async () => {
     const { host } = await render();
 
@@ -142,6 +159,8 @@ describe('ClientsPage (SA-04)', () => {
     TestBed.tick();
     await settle();
     backend.match((request) => request.url === PLATFORM_API.governorates).forEach((request) => request.flush(page([])));
+    backend.match('/api/v1/platform/clients/t1/announcements').forEach((request) => request.flush({ hidden: false }));   // LIS-CR-013 opt-out switch
+    await flushLocalities();
     await fixture.whenStable();
     const legacy = options().find((text) => text.startsWith('LEGACY'));
     expect(legacy).toMatch(/inactive|planInactive/);   // the text, or its key when the dictionary is not loaded
@@ -215,6 +234,50 @@ describe('ClientsPage (SA-04)', () => {
     input.dispatchEvent(new Event('input'));
     expect(form.get('managerMobile')?.value).toBe('+201112223333');
     expect(form.get('managerMobile')?.valid).toBe(true);
+  });
+
+  it('LIS-CR-008 C-04: the drawer edits the city / district / area and the register prints the address line', async () => {
+    const { fixture } = await render([plan('p-old', 'LEGACY', true)], [egypt]);
+    const view = fixture.componentInstance as unknown as DrawerAccess;
+    const host = fixture.nativeElement as HTMLElement;
+
+    const opening = view.openEdit(client);
+    await settle();
+    backend.expectOne(`${PLATFORM_API.clients}/t1`).flush({ ...detail, cityId: 'nasr', districtId: 'zone1', areaId: null });
+    await opening;
+    TestBed.tick();
+    await settle();
+    backend.match('/api/v1/platform/clients/t1/announcements').forEach((request) => request.flush({ hidden: false }));   // LIS-CR-013 opt-out switch
+    backend.match((request) => request.url === PLATFORM_API.governorates).forEach((request) => request.flush(page([])));
+    await flushLocalities({
+      cities: [{ id: 'nasr', governorateId: 'cairo', nameEn: 'Nasr City', nameAr: 'مدينة نصر' }],
+      districts: [{ id: 'zone1', cityId: 'nasr', nameEn: 'First Zone', nameAr: 'المنطقة الأولى' }],
+    });
+    await fixture.whenStable();
+    expect(document.querySelector<HTMLSelectElement>('select[data-level=city]')?.value).toBe('nasr');
+    expect(document.querySelector<HTMLSelectElement>('select[data-level=district]')?.value).toBe('zone1');
+
+    const saving = view.save();
+    await settle();
+    const put = backend.expectOne({ method: 'PUT', url: `${PLATFORM_API.clients}/t1` });
+    expect(put.request.body).toMatchObject({ governorateId: 'cairo', cityId: 'nasr', districtId: 'zone1', areaId: null });
+    put.flush({ type: 'about:blank', title: 'Unprocessable', status: 422, code: 'GEO-021' }, { status: 422, statusText: 'Unprocessable Entity' });
+    await saving;
+    expect(view.form()?.get('districtId')?.errors?.['server']).toBeTruthy();
+    expect(view.saveProblem()).toBeNull();
+    expect(host).toBeTruthy();
+  });
+
+  it('LIS-CR-008 C-04: a client with a city shows "Country · Area, District, City, Governorate"', async () => {
+    const fixture = TestBed.createComponent(ClientsPage);
+    TestBed.tick();
+    await settle();
+    backend.expectOne((request) => request.method === 'GET' && request.url === PLATFORM_API.clients).flush(page([{ ...client, addressLineEn: 'Block 7, First Zone, Nasr City, Cairo', addressLineAr: 'بلوك 7، المنطقة الأولى، مدينة نصر، القاهرة' }]));
+    backend.expectOne((request) => request.url === PLATFORM_API.plans).flush(page([]));
+    backend.expectOne((request) => request.url === PLATFORM_API.countries).flush(page([]));
+    await settle();
+    await fixture.whenStable();
+    expect((fixture.nativeElement as HTMLElement).querySelector('tbody tr[data-row="t1"]')?.textContent).toContain('Egypt · Block 7, First Zone, Nasr City, Cairo');
   });
 
   it('deactivates a trial client with the reason the operator typed', async () => {

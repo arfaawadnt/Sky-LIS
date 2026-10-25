@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, re
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
+import type { PublicAnnouncement } from '../../../core/api/announcement.contracts';
 import type { SignInTarget } from '../../../core/api/auth.contracts';
 import { statusOf } from '../../../core/api/problem-details';
 import { PUBLIC_LABORATORY_API } from '../../../core/api/public-laboratory.contracts';
@@ -21,9 +22,11 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { PortalService } from '../../../core/portal/portal.service';
 import { mutation } from '../../../core/state/mutation';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
+import { PublicAnnouncementsApi } from '../data/public-announcements.api';
 import { PublicLaboratoryApi } from '../data/public-laboratory.api';
 import { AuthFrameComponent } from '../ui/auth-frame.component';
 import { KeepAddressComponent } from '../ui/keep-address.component';
+import { SignInAnnouncementComponent } from '../ui/sign-in-announcement.component';
 
 /** Where a client-portal session without a branch goes first (CP-04); the account module owns the page. */
 export const SELECT_BRANCH_PATH = '/account/select-branch';
@@ -46,7 +49,7 @@ type AddressState = 'loading' | 'found' | 'missing' | 'unavailable';
  */
 @Component({
   selector: 'app-login-page',
-  imports: [ReactiveFormsModule, RouterLink, IconComponent, AuthFrameComponent, KeepAddressComponent],
+  imports: [ReactiveFormsModule, RouterLink, IconComponent, AuthFrameComponent, KeepAddressComponent, SignInAnnouncementComponent],
   templateUrl: './login.page.html',
   styleUrl: './login.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -57,6 +60,7 @@ export class LoginPage {
   private readonly portal = inject(PortalService);
   private readonly router = inject(Router);
   private readonly laboratories = inject(PublicLaboratoryApi);
+  private readonly announcementsApi = inject(PublicAnnouncementsApi);
 
   protected readonly findPath = SIGN_IN_PATH;
 
@@ -110,6 +114,17 @@ export class LoginPage {
 
   protected readonly card = computed(() => (this.laboratory.hasValue() ? this.laboratory.value() : null));
 
+  /**
+   * LIS-CR-013 (C-17): the laboratory's live SignIn announcements once its card is found (none on the Super Admin sign-in); the
+   * first replaces the hero's slogan. A failed read is no announcement.
+   */
+  protected readonly announcements = resource({
+    params: () => (!this.isAdmin() && this.state() === 'found' ? this.card()?.slug : undefined),
+    loader: ({ params }) => this.announcementsApi.forLaboratory(params),
+  });
+
+  protected readonly heroAnnouncement = computed<PublicAnnouncement | null>(() => (this.announcements.hasValue() ? (this.announcements.value()[0] ?? null) : null));
+
   protected readonly laboratoryName = computed(() => {
     const card = this.card();
     if (card === null) {
@@ -117,6 +132,17 @@ export class LoginPage {
     }
 
     return this.i18n.lang() === 'ar' && card.nameAr.trim() !== '' ? card.nameAr : card.nameEn;
+  });
+
+  /** The laboratory's address line (area, district, city, governorate) of the public card, when a city is set (LIS-CR-008 C-04). */
+  protected readonly laboratoryAddress = computed(() => {
+    const card = this.card();
+    if (card === null) {
+      return null;
+    }
+
+    const line = this.i18n.lang() === 'ar' ? (card.addressAr ?? card.addressEn) : (card.addressEn ?? card.addressAr);
+    return line !== undefined && line !== null && line.trim() !== '' ? line : null;
   });
 
   private readonly logoFailed = signal(false);

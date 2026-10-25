@@ -53,7 +53,8 @@ public sealed class SessionPolicy
 }
 
 /// <summary>A user's active memberships across tenants (D-06), in laboratories that are usable (INV-PLT-003). Elevated read: sign-in picks the membership of the tenant its address names (LIS-CR-005); Organization checks sole tenancy.</summary>
-public sealed record MembershipSummary(Guid TenantId, Guid MembershipId, string DisplayNameEn, string DisplayNameAr, string Language, IReadOnlyList<Guid> BranchIds);
+/// <remarks>LIS-CR-012: <paramref name="IsSubscriptionAdministrator"/> = primary administrator or effective <c>organization.manage</c> (the members who still sign in to an expired client, D-3).</remarks>
+public sealed record MembershipSummary(Guid TenantId, Guid MembershipId, string DisplayNameEn, string DisplayNameAr, string Language, IReadOnlyList<Guid> BranchIds, bool IsSubscriptionAdministrator = false);
 
 public interface IMembershipDirectory
 {

@@ -35,6 +35,7 @@ public sealed class RecordRefundHandler(
     IRefundReasonLookup reasons,
     IPaymentMethodRepository methods,
     IVisitAccountRepository accounts,
+    ICashClosingRepository closings,
     IReferenceNumbers numbers,
     IUnitOfWork unitOfWork,
     ICurrentUser user,
@@ -53,11 +54,13 @@ public sealed class RecordRefundHandler(
             throw new DomainException(BillingCodes.RefundReasonInvalid, "Choose an active reason of kind Refund.", DomainFault.Validation);
         }
 
+        var now = clock.UtcNow;
+        ClosedPeriods.RequireOpen(await closings.CoversAsync(cashier.BranchId, cashier.UserId, now, cancellationToken));   // BIL-061 (LIS-CR-011)
+
         var existing = await accounts.GetForUpdateAsync(visit.VisitId, cancellationToken);
         var account = existing ?? VisitAccount.Open(visit.VisitId);
         account.CheckRefund(command.Amount, method, command.Reference, command.ReasonId, command.Note, cashier, visit.Charge);
 
-        var now = clock.UtcNow;
         var number = await numbers.NextAsync(Refund.NumberKind, Refund.NumberPrefix, now, cancellationToken);
         var refund = account.RecordRefund(number, command.Amount, method, command.Reference, command.ReasonId, command.Note, cashier, visit.Charge, now);
         if (existing is null)

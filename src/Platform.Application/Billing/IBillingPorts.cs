@@ -62,20 +62,42 @@ public interface ICashClosingRepository : IRepository<CashClosing>
 /// <param name="LegacyTreasuryId">Narrows the scope to one treasury of the branch: only for the sheet of a closing made before LIS-CR-004.</param>
 public sealed record DrawerScope(Guid BranchId, Guid? CashierUserId, DateTimeOffset FromUtc, DateTimeOffset ToUtc, Guid? LegacyTreasuryId = null);
 
-/// <summary>The figures of a drawer (CP-30, BR-16) over <c>app.payments</c>, <c>app.refunds</c> and, for outstanding balances and discounts, <c>app.visits</c>.</summary>
+/// <summary>The figures of a drawer (CP-30, BR-16) over <c>app.payments</c>, <c>app.refunds</c>, <c>app.cash_entries</c>, the previous closing (opening balance) and, for outstanding balances and discounts, <c>app.visits</c>.</summary>
 public interface ICashDrawerQueries
 {
-    /// <summary>Posted payments and refunds per method, counts, and the outstanding balance and discounts of the visits touched.</summary>
+    /// <summary>Posted payments and refunds per method, counts, the outstanding balance and discounts of the visits touched, cash entries in / out and the opening balance of the scope (LIS-CR-011).</summary>
     Task<ClosingTotals> TotalsAsync(DrawerScope scope, CancellationToken cancellationToken);
 
-    /// <summary>Payments (posted and voided) and refunds of the scope in time order, at most <paramref name="maxRows"/>; accessions left empty.</summary>
+    /// <summary>Payments (posted and voided), refunds and cash entries (LIS-CR-011) of the scope in time order, at most <paramref name="maxRows"/>; accessions left empty.</summary>
     Task<IReadOnlyList<DrawerMovement>> MovementsAsync(DrawerScope scope, int maxRows, CancellationToken cancellationToken);
 
-    /// <summary>The cashiers who moved money in the branch in the period.</summary>
+    /// <summary>The cashiers who moved money in the branch in the period (payments, refunds and cash entries).</summary>
     Task<IReadOnlyList<DrawerCashier>> CashiersAsync(Guid branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken);
 
     /// <summary>Display names of platform users, keyed by id (unknown ids are absent).</summary>
     Task<IReadOnlyDictionary<Guid, string>> UserNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
+}
+
+/// <summary>Cash entries of the cash ledger (CP-70, change request LIS-CR-011): the write side only; the ledger reads them through <see cref="ICashLedgerReader"/>.</summary>
+public interface ICashEntryRepository : IRepository<CashEntry>
+{
+}
+
+/// <summary>The scope of a cash ledger: the session branch, one cashier or every cashier (<see langword="null"/>), and a half-open UTC period.</summary>
+public sealed record CashLedgerScope(Guid BranchId, Guid? CashierUserId, DateTimeOffset FromUtc, DateTimeOffset ToUtc);
+
+/// <summary>
+/// The cash ledger (change request LIS-CR-011, C-15) over one UNION ALL of <c>app.payments</c>, <c>app.refunds</c>,
+/// <c>app.cash_entries</c> and <c>app.cash_closings</c> of the scope. A closing belongs to a scope when its cashier is the scope's
+/// (one cashier) or empty (every cashier): the drawer of one cashier and the drawer of the branch are separate books.
+/// </summary>
+public interface ICashLedgerReader
+{
+    /// <summary>The lines of the scope in time order, at most <paramref name="maxLines"/>; accessions and names are left to the handler.</summary>
+    Task<IReadOnlyList<CashLedgerLine>> LinesAsync(CashLedgerScope scope, int maxLines, CancellationToken cancellationToken);
+
+    /// <summary>The cash in the scope's drawer at <paramref name="atUtc"/>: the previous closing's count plus the cash moved since its end (<see cref="CashLedgerOpening.None"/> when never closed).</summary>
+    Task<CashLedgerOpening> OpeningAsync(Guid branchId, Guid? cashierUserId, DateTimeOffset atUtc, CancellationToken cancellationToken);
 }
 
 /// <summary>

@@ -67,7 +67,16 @@ public static class NotificationTemplateCodes
     /// <summary>A panic value was verified (CP-20). Placeholders: <c>patient</c>, <c>test</c>, <c>value</c>, <c>accession</c>.</summary>
     public const string PanicValue = "panic-value";
 
-    public static readonly IReadOnlyList<string> All = [Otp, PasswordRecovery, PortalUrl, PanicValue];
+    /// <summary>LIS-CR-012: the trial ends in 7 / 3 / 1 days or today, or has ended (grace). Placeholders: <c>labName</c>, <c>days</c>, <c>amount</c>, <c>url</c>.</summary>
+    public const string SubscriptionExpiry = "subscription-expiry";
+
+    /// <summary>LIS-CR-012: the wallet covers fewer than 7 / 3 / 1 days of the plan fee, or is at or below zero. Placeholders: <c>labName</c>, <c>days</c>, <c>amount</c>, <c>url</c>.</summary>
+    public const string WalletLow = "wallet-low";
+
+    /// <summary>LIS-CR-012: the grace period ends in 3 / 1 days; then only the administrators sign in. Placeholders: <c>labName</c>, <c>days</c>, <c>amount</c>, <c>url</c>.</summary>
+    public const string SubscriptionGrace = "subscription-grace";
+
+    public static readonly IReadOnlyList<string> All = [Otp, PasswordRecovery, PortalUrl, PanicValue, SubscriptionExpiry, WalletLow, SubscriptionGrace];
 }
 
 /// <summary>

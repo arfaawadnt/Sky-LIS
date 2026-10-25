@@ -106,3 +106,41 @@ GRANT SELECT, INSERT, UPDATE ON saas.cities, saas.districts, saas.areas TO lis_a
 CREATE UNIQUE INDEX IF NOT EXISTS ux_cities_governorate_name ON saas.cities (governorate_id, lower(name_en));
 CREATE UNIQUE INDEX IF NOT EXISTS ux_districts_city_name ON saas.districts (city_id, lower(name_en));
 CREATE UNIQUE INDEX IF NOT EXISTS ux_areas_district_name ON saas.areas (district_id, lower(name_en));
+
+-- Change request 2026-10-24 (LIS-CR-013 C-17, P-ANN, migration ReviewFeatures): announcements of National Technology and its
+--    partners (SA-22). Grant for the runtime role on the new saas table (no deletes: an announcement is deactivated; the public
+--    counters are UPDATEs). Idempotent.
+GRANT SELECT, INSERT, UPDATE ON saas.announcements TO lis_app;
+
+-- Change request 2026-10-24 (LIS-CR-012 C-16, P-REM, migration ReviewFeatures): subscription reminders and grace.
+--    (a) Grants on the reminder log: SELECT, INSERT only (append-only: a reminder row is never changed or deleted).
+--    (b) Backfill of saas.wallets.at_or_below_zero_since_utc for wallets already at or below zero: the time of the first debit
+--        that left the balance at or below zero after the last positive balance (null when never debited). Idempotent: only
+--        rows still null are touched.
+--    (c) The three editable reminder templates of SA-20 (channel Email so both subjects exist; the SMS uses the same text).
+GRANT SELECT, INSERT ON saas.subscription_reminders TO lis_app;
+
+UPDATE saas.wallets AS w
+SET at_or_below_zero_since_utc = (
+    SELECT min(t.at_utc)
+    FROM saas.wallet_transactions AS t
+    WHERE t.wallet_id = w.id
+      AND t.amount < 0
+      AND t.balance_after <= 0
+      AND t.at_utc > COALESCE(
+          (SELECT max(p.at_utc) FROM saas.wallet_transactions AS p WHERE p.wallet_id = w.id AND p.balance_after > 0),
+          '-infinity'::timestamptz))
+WHERE w.balance <= 0 AND w.at_or_below_zero_since_utc IS NULL;
+
+INSERT INTO saas.notification_templates (id, code, channel, subject_en, subject_ar, text_en, text_ar, is_active, created_at_utc, created_by_display_name)
+VALUES
+    (md5('lis:template:subscription-expiry')::uuid, 'subscription-expiry', 'Email', 'Your Sky LIS trial is ending', 'الفترة التجريبية لـ Sky LIS على وشك الانتهاء',
+     '{laboratory}: your Sky LIS trial ends in {days} day(s). Top up {amount} to keep working without interruption: {link}',
+     '{laboratory}: تنتهي الفترة التجريبية في Sky LIS خلال {days} يوم. اشحن المحفظة بمبلغ {amount} لمواصلة العمل دون انقطاع: {link}', true, now(), 'seed'),
+    (md5('lis:template:wallet-low')::uuid, 'wallet-low', 'Email', 'Your Sky LIS wallet is running low', 'رصيد محفظة Sky LIS منخفض',
+     '{laboratory}: your Sky LIS wallet balance is low. Top up {amount} within {days} day(s) to avoid an interruption: {link}',
+     '{laboratory}: رصيد محفظة Sky LIS منخفض. اشحن {amount} خلال {days} يوم لتجنب انقطاع الخدمة: {link}', true, now(), 'seed'),
+    (md5('lis:template:subscription-grace')::uuid, 'subscription-grace', 'Email', 'Your Sky LIS subscription is about to stop', 'اشتراك Sky LIS على وشك التوقف',
+     '{laboratory}: the grace period of your Sky LIS subscription ends in {days} day(s). After that only your administrators can sign in, to the wallet. Top up {amount}: {link}',
+     '{laboratory}: تنتهي فترة السماح لاشتراك Sky LIS خلال {days} يوم. بعدها يستطيع المسؤولون فقط الدخول إلى المحفظة. اشحن {amount}: {link}', true, now(), 'seed')
+ON CONFLICT (code) DO NOTHING;

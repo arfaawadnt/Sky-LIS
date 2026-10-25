@@ -31,6 +31,7 @@ function label(overrides: Partial<SampleLabelDocument> = {}): SampleLabelDocumen
       { id: 's2', code: null, nameEn: 'Urea', nameAr: 'يوريا' },
     ],
     copies: 2,
+    collectedOutside: false,
     ...overrides,
   };
 }
@@ -55,6 +56,16 @@ describe('SampleLabelsDocumentComponent (CP-15 labels)', () => {
     expect(first).toContain('PAT-2026-00001 · منى عادل');
     expect(first).toContain('مصل · صائم — الرئيسي');
     expect(first).toContain('GLU, يوريا');
+  });
+
+  it('prints "EXT" on a sample collected outside the laboratory (LIS-CR-008 C-02)', async () => {
+    const fixture = TestBed.createComponent(SampleLabelsDocumentComponent);
+    fixture.componentRef.setInput('labels', [label({ copies: 1, collectedOutside: true }), label({ sampleId: 'smp-2', sampleNumber: 'SMP-2026-00002', copies: 1 })]);
+    await fixture.whenStable();
+
+    const pages = (fixture.nativeElement as HTMLElement).querySelectorAll('.print-page');
+    expect(pages[0]?.querySelector('.outside')?.textContent?.trim()).toBe('EXT');
+    expect(pages[1]?.querySelector('.outside')).toBeNull();
   });
 
   it('sizes the text for the small label', async () => {

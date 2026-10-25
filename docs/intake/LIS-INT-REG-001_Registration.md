@@ -7,7 +7,7 @@
 | Workflows / rules | WF-02 (walk-in), WF-03 (home visit), WF-04 (batch and lab-to-lab, registration steps), WF-09 (transfer and cancellation steps), WF-10 (price query side); BR-01, BR-02, BR-05, BR-06, BR-12, BR-13, BR-15, BR-24, BR-26 |
 | Domain reference | LDM synthesis `docs/knowledge/ldm/LDM_Business_Knowledge.md` §2.1 (identifiers), §2.2 (tube generation), §2.3 (Reserved), §2.4 (Rank/Relative), §3.4 (duration, frequency check, test days), §3.8 (panels, test rules, shortcuts, diagnosis), §4.1–§4.9 (registration family), §7.2 (Query, Money Transfer, Delete Patient), §13 (weaknesses) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001), MODULES.md and the LDM synthesis. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.4 — 2026-10-20 (CP-10b: no Cancel on a line with a verified or printed result); 1.3 — 2026-10-19 (change request LIS-CR-003 P-C9: Accession details page CP-10b and the C11 menu links, §18); 1.2 — 2026-10-12 (validation LIS-VR-002 open points: test-level duplicates Q23, labels Q13, VIP on the worklist Q12; v0.5.0: VIP on the opened result case Q12, Latin digits on the job order and counted wording Q13, mobile search with the trunk 0) |
+| Version | 1.5 — 2026-10-24 (change request LIS-CR-008 P-SMP: "collected outside" per sample, §20); 1.4 — 2026-10-20 (CP-10b: no Cancel on a line with a verified or printed result); 1.3 — 2026-10-19 (change request LIS-CR-003 P-C9: Accession details page CP-10b and the C11 menu links, §18); 1.2 — 2026-10-12 (validation LIS-VR-002 open points: test-level duplicates Q23, labels Q13, VIP on the worklist Q12; v0.5.0: VIP on the opened result case Q12, Latin digits on the job order and counted wording Q13, mobile search with the trunk 0) |
 | Implemented in | `src/Platform.Domain/Registration`, `src/Platform.Contracts/Registration`, `src/Platform.Application/Registration` (commands, queries, `OrderPlanner`, read ports, policies), `src/Platform.Infrastructure/Persistence/Registration` (+ `Registration.migration.sql`), `src/Platform.WebApi/Controllers/Registration`, `frontend/src/app/features/registration`, `frontend/src/app/core/api/registration.contracts.ts`, `frontend/public/i18n/registration.{en,ar}.json` |
 | Codes | `REG-001`…`REG-099` validation and privilege refusals, `REG-100`…`REG-199` conflicts, `REG-201`…`REG-299` advisory warnings (never thrown), `REG-404`/`405`/`406` not found |
 
@@ -508,3 +508,47 @@ Backend facts only (the SPA side is package P-SPA-REG): the payment captured on 
 session branch, so no treasury, device id or approved access is needed any more (BR-27 withdrawn, intake LIS-INT-TRS-001). The
 accession details page (CP-10b, §18) lists the payments and refunds of the visit without a treasury column; rows posted before the
 change keep their treasury id in the database only. `GET /api/v1/billing/my-treasuries` is gone (404).
+
+## 20. Change request 2026-10-24 (LIS-CR-008, package P-SMP, reviewer point C-02) — "collected outside the laboratory" per sample
+
+**Change.** The flag moves from the visit to each tube: `VisitTube.CollectedOutside` (`app.visit_tubes.collected_outside`, boolean,
+default false) and `VisitTube.CollectedOutsideAtUtc` (`collected_outside_at_utc`, the collection time the clerk typed, null = the
+registration time). The visit keeps a **derived** `Visit.AnyCollectedOutside` (not stored) that the visit detail, the job order, the
+visits register row and `IVisitLookup` return as `collectedOutside`. `app.visits.collected_outside` stays as history: since this
+change it is written once, at registration, and is true only when the old visit-level field marked every tube.
+
+**Order contract.** `POST /api/v1/registration/visits` takes `samples[]` = `{ tubeKey?, sampleTypeId?, collectedOutside,
+collectedAtUtc? }`: an entry names one tube of the dry run (`TubePreview.key`, `group:type:condition`) or, without a key, every tube of
+the sample type; only entries with `collectedOutside: true` count. The old visit-level `collectedOutside` is kept for one release: sent
+true **without** `samples[]`, it marks every tube (batch members keep using it). `PUT …/visits/{id}/details` still accepts
+`collectedOutside` and ignores it (the flag is set at registration only); `VisitDetails` lost the field. The tube event
+`RegisteredTube` carries `CollectedOutside` and `CollectedAtUtc` (defaults keep older outbox payloads readable); tubes added later to a
+saved visit are collected in the laboratory.
+
+**Codes.** `REG-040` (422) an entry that matches no tube of the order (stale key, a type not ordered, a text that is not a key, a
+reserved service, which has no tube) or names neither; `REG-041` (422) a collection time more than 5 minutes ahead (a time inside the
+skew is kept as the registration time) or older than 30 days. Shape: at most 200 entries, key of at most 100 characters, key or type
+required (VALIDATION-400).
+
+**Documents.** The label of an outside tube prints "EXT" (`SampleLabel.CollectedOutside`) beside "!" and "BIO"; the job order marks the
+tube "· EXT" and keeps the visit line "Sample collected outside the laboratory" when any tube is outside.
+
+**CP-06.** The visit chip is gone; once the dry run plans tubes, `ui/sample-flags` lists one row per new tube (unit letter, sample type,
+condition) with a "Collected outside the laboratory" switch and, when on, an optional "Collected at" (`datetime-local`, not later than
+now; empty = registration time); "All outside" / "None outside" switch every tube (shown with two or more tubes). The edit page
+(CP-10 › Edit) shows the saved live tubes read-only: "Outside" with the recorded time, or "Collected in the laboratory". The samples
+dialog of CP-10 and the samples card of the accession page (CP-10b) show an "Outside" tag per tube.
+
+**Migration (integrator, `ReviewFeatures`).** Columns `app.visit_tubes.collected_outside` (boolean not null default false),
+`app.visit_tubes.collected_outside_at_utc` (timestamptz null), `app.samples.collected_outside` (boolean not null default false); then the
+dated block of `Persistence/Registration/Registration.migration.sql` (visit flag to every tube of the visit; tube flag to its
+generation-0 sample). The tube guard (`app.visit_tubes_guard`) protects number and key only, so the backfill passes it.
+
+**Open questions (assumed answers).**
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| C02-Q1 | The prototype speaks of a tube "colour"; the catalogue has none. | Rows show the unit letter, the sample type and the condition; a tube colour waits for a catalogue field. |
+| C02-Q2 | May the flag change after save (edit page)? | No: it is set at registration; the edit page lists it read-only. A mistake is corrected by cancelling and re-ordering the service. |
+| C02-Q3 | How far back may the collection time lie? | 30 days; never in the future (5 minutes of clock skew tolerated). |
+| C02-Q4 | Turnaround clock of an outside sample | Starts at its arrival (registration), not at the outside collection time. |

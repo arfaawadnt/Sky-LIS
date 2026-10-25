@@ -8,7 +8,7 @@ import organizationAr from '../../../../../public/i18n/organization.ar.json';
 import organizationEn from '../../../../../public/i18n/organization.en.json';
 import platformAr from '../../../../../public/i18n/platform.ar.json';
 import platformEn from '../../../../../public/i18n/platform.en.json';
-import { ORGANIZATION_API } from '../../../core/api/organization.contracts';
+import { ORGANIZATION_API, PARAMETER_GROUPS } from '../../../core/api/organization.contracts';
 import type { TenantSettingItem } from '../../../core/api/settings.contracts';
 import { LaboratoryBrandService } from '../../../core/brand/laboratory-brand.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
@@ -165,5 +165,19 @@ describe('ParametersPage (CP-57)', () => {
     expect(isValidParameter({ key: 'resultLanguage', input: 'select', options: ['en', 'ar'] }, 'fr')).toBe(false);
     expect(isValidParameter({ key: 'accessionFormat', input: 'text', maxLength: 200 }, ' ')).toBe(false);
     expect(isValidParameter({ key: 'autoCollect', input: 'switch' }, 'true')).toBe(true);
+  });
+
+  it('LIS-CR-010: Printing offers the report design with its five values, each labelled in both languages', () => {
+    const printing = PARAMETER_GROUPS.find((group) => group.id === 'printing')!;
+    const design = printing.parameters.find((parameter) => parameter.key === 'reportDesign')!;
+    expect(design.options).toEqual(['classic', 'modern', 'compact', 'letterhead', 'cumulative']);
+    expect(isValidParameter(design, 'cumulative')).toBe(true);
+    expect(isValidParameter(design, 'Modern')).toBe(false);
+    for (const dictionary of [organizationEn, organizationAr] as Record<string, string>[]) {
+      expect(dictionary['parameters.key.reportDesign']).toBeTruthy();
+      for (const option of design.options ?? []) {
+        expect(dictionary[`parameters.option.reportDesign.${option}`]).toBeTruthy();
+      }
+    }
   });
 });

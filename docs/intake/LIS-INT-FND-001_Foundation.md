@@ -136,3 +136,40 @@ address and the Super Admin at its own; the address decides where one signs in a
   laboratory a record with slug `t<tenant id N>`.
 - **Assumption A11**: a tenant without a client record (pre-CR development data) can no longer be signed into until it is
   registered (decision of the integrator, 2026-10-20).
+
+## 10. Change request 2026-10-24 — subscription notice and the expired-subscription gate (LIS-CR-012 C-16, package P-REM)
+
+Business rules in LIS-INT-PLT-001 §21 (state, grace, reminders). What the foundation carries:
+
+- **Profile**: `AuthProfile.subscriptionNotice` (sign-in, refresh, `me`) = `{ level: Warning | Grace | Expired, reason: Trial | Wallet |
+  WalletAtZero, daysLeft, endsAtUtc, amountToTopUp, currencyCode, trialEndsAtUtc, canManage, showModal }`, `null` while the subscription
+  is Ok and for the platform tenant. Read in the session principal's **one** elevated query (`SessionPrincipalQuery`): scalar subqueries
+  on `saas.tenants` (status, trial end), `saas.plans` (fee, through the tenant's plan), `saas.wallets` (balance, currency, zero mark,
+  next charge) and the platform row of `app.tenant_settings` (`subscriptionGraceDays`) — no second elevated call; evaluated with the
+  clock (`IClock`, a new constructor dependency of `SessionPrincipalQuery`). `SessionPrincipal.Subscription` and
+  `SessionPrincipal.IsSubscriptionAdministrator` (primary administrator or effective `organization.manage`) carry it to the pipeline.
+  `canManage` = that flag; `showModal` = fewer than three days left, in grace or expired.
+- **Liveness**: a member who is not an administrator of an **expired** laboratory has `MembershipActive = false` in the principal, so
+  the access token stops authenticating within the cache lifetime (≤ 10 s) and the refresh fails — the same mechanism as a deactivated
+  laboratory. Sign-in refuses such a member before opening a session: `403 SUB-020` (`ISubscriptionStateLookup`, reason
+  `subscription_expired` in `SIGN_IN_FAILED`). `MembershipSummary.IsSubscriptionAdministrator` (computed in `MembershipDirectory`'s
+  elevated read, one extra query for the memberships' active roles) decides it.
+- **Gate** `SubscriptionExpiredGateMiddleware` (WebApi `Middleware/`; proposed position in `PipelineOrder`: right after
+  `PasswordChangeGate`, before `Authorization`, name `SubscriptionExpiredGate`): for a principal whose subscription is Expired, every
+  `/api` request outside the allow-list is `403 SUB-021` for an administrator and `403 SUB-020` for anyone else (defensive: such a
+  principal is not live). Allow-list (administrator): `/api/v1/auth/**`; `GET /api/v1/account/profile`, `POST /api/v1/account/password`,
+  `PUT /api/v1/account/preferences`, `GET /api/v1/account/laboratory/logo`; `/api/v1/account/wallet/**`,
+  `/api/v1/account/subscription/**`, `/api/v1/wallet/**` (CP-66), `/api/v1/support/tickets/**` (CP-67); `GET
+  /api/v1/organization/me/privileges`, `GET /api/v1/organization/branches/selectable`. Non-API paths and anonymous requests pass. An
+  "expired" principal is re-read once (cache evicted) before refusing, so a top-up takes effect on the next request.
+- **SPA** (`features/account/ui/subscription-notice/`, exported from its `index.ts`): `app-subscription-banner` (under the top bar of the
+  client portal; administrators only; dismissable for the session in memory, not when expired; links to `/account/wallet`) and
+  `app-subscription-modal` (application root, like `app-idle-warning`; shown once per session and notice when `showModal`; an
+  administrator is offered the wallet, anyone else is told to ask the administrator). Dismissals live in the root
+  `SubscriptionNoticeState` (signals, no web storage).
+- **Tests**: `SubscriptionExpiredGateTests` (functional project, no database: allow-list, SUB-021, SUB-020, grace not gated, re-read,
+  anonymous), `SubscriptionReminderTests.SUB_PRF_1` (profile notice), `SubscriptionRemindersFlowTests` (end to end once the gate is
+  wired), `subscription-notice.spec.ts` (banner, modal, sentences).
+- **Assumption A12**: the SPA's guards are not changed by this package; once the gate is wired, an expired administrator who opens
+  another page sees the page's own error (`account.error.SUB-021`) — the integrator may route such a user to `/account/wallet`
+  (like the forced password change goes to the profile).

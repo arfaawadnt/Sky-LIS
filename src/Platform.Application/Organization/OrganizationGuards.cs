@@ -3,6 +3,7 @@ using Platform.Application.Identity;
 using Platform.Contracts.Common;
 using Platform.Contracts.Organization;
 using Platform.Domain.Organization;
+using Platform.Domain.PlatformAdmin;
 using Platform.SharedKernel.MultiTenancy;
 using Platform.SharedKernel.Primitives;
 
@@ -42,6 +43,20 @@ public static class OrganizationGuards
         {
             throw new DomainException(OrganizationCodes.GovernorateNotInCountry, "The governorate must belong to the chosen country.", DomainFault.Validation);
         }
+    }
+
+    /// <summary>
+    /// LIS-CR-008 C-04: the branch's city / district / area checked as a chain under its governorate (GEO-020…022; a locality on a
+    /// branch without a governorate is GEO-020). Nothing picked is <see cref="Locality.None"/> without reading anything.
+    /// </summary>
+    public static async Task<Locality> ResolveLocalityAsync(IBranchGeography geography, Guid? governorateId, Guid? cityId, Guid? districtId, Guid? areaId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(geography);
+        var (city, district, area) = Locality.Clean(cityId, districtId, areaId);
+        var rows = city is null && district is null && area is null
+            ? LocalityRows.None
+            : await geography.LocalityRowsAsync(city, district, area, cancellationToken).ConfigureAwait(false);
+        return Locality.Resolve(governorateId, city, district, area, rows);
     }
 
     /// <summary>SOD-ORG-001: an administrator does not administer their own access.</summary>

@@ -305,6 +305,8 @@
   "report.reprint": "Reprint ({count} copies printed)",
   "report.reprintOne": "Reprint (1 copy printed)",
   "report.printList": "Print list",
+  "report.current": "Result",
+  "report.previousResults": "Previous results",
 
   "error.RES-001": "A reference of the result is missing.",
   "error.RES-002": "A value is required.",

@@ -9,6 +9,14 @@ namespace Platform.Domain.Billing;
 /// </summary>
 /// <param name="OutstandingBalance">Σ positive remaining of the visits touched in the period, as of closing (intake Q7).</param>
 /// <param name="DiscountTotal">Σ visit discount of the visits touched in the period (intake Q7).</param>
+/// <param name="OpeningBalance">
+/// The cash in the drawer when the period starts (change request LIS-CR-011, C-15): the counted cash (else the expected cash) of the
+/// previous closing of the same scope plus the cash moved between its end and the start of this period; 0 when the drawer was
+/// never closed. 0 on closings made before the change.
+/// </param>
+/// <param name="CashIn">Σ posted cash entries of kind CashIn paid in cash (opening float, other income).</param>
+/// <param name="CashOut">Σ posted cash entries of kind CashOut paid in cash (supplier, petty cash, bank deposit).</param>
+/// <param name="EntryCount">The posted cash entries of the period, whatever their method.</param>
 public sealed record ClosingTotals(
     decimal CashPayments,
     decimal CardPayments,
@@ -22,7 +30,11 @@ public sealed record ClosingTotals(
     int RefundCount,
     decimal OutstandingBalance,
     decimal DiscountTotal,
-    int VisitCount)
+    int VisitCount,
+    decimal OpeningBalance = 0m,
+    decimal CashIn = 0m,
+    decimal CashOut = 0m,
+    int EntryCount = 0)
 {
     public static ClosingTotals Empty { get; } = new(0m, 0m, 0m, 0m, 0, 0m, 0m, 0m, 0m, 0, 0m, 0m, 0);
 
@@ -30,8 +42,12 @@ public sealed record ClosingTotals(
 
     public decimal TotalRefunds => CashRefunds + CardRefunds + PosRefunds + TransferRefunds;
 
-    /// <summary>BR-16: expected cash = cash payments − cash refunds; card, POS and transfer amounts are not in the drawer.</summary>
-    public decimal ExpectedCash => CashPayments - CashRefunds;
+    /// <summary>
+    /// BR-16 as extended by the cash ledger (LIS-CR-011, C-15): expected cash = opening balance + cash payments − cash refunds
+    /// + cash in − cash out; card, POS and transfer amounts are not in the drawer. Without an earlier closing and cash entries
+    /// this is the original rule (cash payments − cash refunds).
+    /// </summary>
+    public decimal ExpectedCash => OpeningBalance + CashPayments - CashRefunds + CashIn - CashOut;
 }
 
 /// <summary>

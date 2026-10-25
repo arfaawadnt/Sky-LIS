@@ -209,6 +209,9 @@ public interface ICityRepository : IRepository<City>
     Task<IReadOnlyList<LocationListItem>> ListAsync(Guid governorateId, string? search, bool? isActive, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<PublicCity>> ListPublicAsync(Guid? governorateId, CancellationToken cancellationToken);
+
+    /// <summary>LIS-CR-008 C-04 import: every city of the governorate, active or not, untracked (an import only adds rows).</summary>
+    Task<IReadOnlyList<City>> ListForImportAsync(Guid governorateId, CancellationToken cancellationToken);
 }
 
 public interface IDistrictRepository : IRepository<District>
@@ -221,6 +224,9 @@ public interface IDistrictRepository : IRepository<District>
     Task<IReadOnlyList<LocationListItem>> ListAsync(Guid cityId, string? search, bool? isActive, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<PublicDistrict>> ListPublicAsync(Guid? cityId, CancellationToken cancellationToken);
+
+    /// <summary>LIS-CR-008 C-04 import: every district of the cities, active or not, untracked.</summary>
+    Task<IReadOnlyList<District>> ListForImportAsync(IReadOnlyCollection<Guid> cityIds, CancellationToken cancellationToken);
 }
 
 public interface IAreaRepository : IRepository<Area>
@@ -230,4 +236,7 @@ public interface IAreaRepository : IRepository<Area>
     Task<IReadOnlyList<LocationListItem>> ListAsync(Guid districtId, string? search, bool? isActive, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<PublicArea>> ListPublicAsync(Guid? districtId, CancellationToken cancellationToken);
+
+    /// <summary>LIS-CR-008 C-04 import: every area of the districts, active or not, untracked.</summary>
+    Task<IReadOnlyList<Area>> ListForImportAsync(IReadOnlyCollection<Guid> districtIds, CancellationToken cancellationToken);
 }

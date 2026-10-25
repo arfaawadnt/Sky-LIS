@@ -9,9 +9,10 @@ public sealed record LabTrackerRegistration(int Lines, int CancelledLines);
 /// <summary>
 /// The live samples of the visit (Cancelled and Replaced excluded) by status; <see cref="FirstRejectionReason"/> is the
 /// reason of the earliest rejection still waiting for a new sample (English, <see cref="FirstRejectionReasonAr"/> Arabic).
-/// Present only with <c>samples.view</c>.
+/// Present only with <c>samples.view</c>. <see cref="CollectedOutside"/> counts the live samples collected outside the
+/// laboratory (LIS-CR-008 C-02; the cell shows "ext").
 /// </summary>
-public sealed record LabTrackerSamples(int Total, int Ordered, int Collected, int Received, int Rejected, string? FirstRejectionReason, string? FirstRejectionReasonAr);
+public sealed record LabTrackerSamples(int Total, int Ordered, int Collected, int Received, int Rejected, string? FirstRejectionReason, string? FirstRejectionReasonAr, int CollectedOutside = 0);
 
 /// <summary>
 /// The live results the user may see (result rights per clinical group and branch, the worklist's rule) by status;

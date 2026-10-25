@@ -53,6 +53,11 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.HasOne<Country>().WithMany().HasForeignKey(tenant => tenant.CountryId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Governorate>().WithMany().HasForeignKey(tenant => tenant.GovernorateId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Plan>().WithMany().HasForeignKey(tenant => tenant.PlanId).OnDelete(DeleteBehavior.Restrict);
+
+        // LIS-CR-008 C-04: the optional locality under the governorate (rows are deactivated, never deleted)
+        builder.HasOne<City>().WithMany().HasForeignKey(tenant => tenant.CityId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<District>().WithMany().HasForeignKey(tenant => tenant.DistrictId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Area>().WithMany().HasForeignKey(tenant => tenant.AreaId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -251,6 +256,7 @@ internal sealed class SubscriptionRequestConfiguration : IEntityTypeConfiguratio
         builder.Property(request => request.Language).HasMaxLength(5).IsRequired();
         builder.Property(request => request.Status).IsRequired();
         builder.HasIndex(request => request.ExpiresAtUtc);
+        // LIS-CR-008 C-04: city_id / district_id / area_id are plain nullable columns (transient rows, no FKs, like the governorate)
     }
 }
 

@@ -55,7 +55,8 @@ public sealed record ReportTemplateView(
     string? HeaderTextAr,
     string? FooterTextEn,
     string? FooterTextAr,
-    bool IsActive);
+    bool IsActive,
+    ReportDesign? Design = null);
 
 /// <summary>Print templates for Results, Billing and Reporting (CP-19, CP-54).</summary>
 public interface IReportTemplateLookup

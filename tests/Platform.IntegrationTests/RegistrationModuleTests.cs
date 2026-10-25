@@ -82,6 +82,28 @@ public sealed class RegistrationModuleTests(DatabaseFixture fixture)
     }
 
     [DatabaseFact]
+    public async Task Collected_outside_is_stored_per_tube_and_derived_for_the_visit_LIS_CR_008()
+    {
+        var world = await SeedAsync(Guid.CreateVersion7());
+
+        var legacy = await HandleAsync<RegisterVisitHandler, VisitRegisteredResponse>(world, handler => handler.Handle(
+            Register(world, [new OrderLineRequest(world.Glucose, false)]) with { CollectedOutside = true }, CancellationToken.None));
+        var plain = await HandleAsync<RegisterVisitHandler, VisitRegisteredResponse>(world, handler => handler.Handle(
+            Register(world, [new OrderLineRequest(world.Urea, false)]), CancellationToken.None));
+
+        using var reader = fixture.AppScope(world.Tenant, world.Actor, branchId: world.Branch);
+        var context = reader.ServiceProvider.GetRequiredService<AppDbContext>();
+        var tube = await context.Set<VisitTube>().AsNoTracking().SingleAsync(candidate => candidate.VisitId == legacy.Id);
+        Assert.True(tube.CollectedOutside);
+        Assert.Null(tube.CollectedOutsideAtUtc);
+        Assert.False((await context.Set<VisitTube>().AsNoTracking().SingleAsync(candidate => candidate.VisitId == plain.Id)).CollectedOutside);
+
+        var lookup = reader.ServiceProvider.GetRequiredService<IVisitLookup>();
+        Assert.True((await lookup.GetByAccessionAsync(legacy.Accession, CancellationToken.None))!.CollectedOutside);
+        Assert.False((await lookup.GetByAccessionAsync(plain.Accession, CancellationToken.None))!.CollectedOutside);
+    }
+
+    [DatabaseFact]
     public async Task The_frequency_check_reads_previous_visits_of_the_patient()
     {
         var world = await SeedAsync(Guid.CreateVersion7(), glucoseFrequencyDays: 30);

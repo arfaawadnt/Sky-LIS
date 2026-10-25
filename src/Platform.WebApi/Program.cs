@@ -25,6 +25,8 @@ builder.Services.AddSingleton(provider => SecurityConfiguration.ReadNotification
 builder.Services.AddHostedService<OutboxHostedService>();   // 01 §7; Lis:Outbox:Enabled=false keeps the loop idle
 builder.Services.AddSingleton(provider => SecurityConfiguration.ReadWalletCharge(provider.GetRequiredService<IConfiguration>()));
 builder.Services.AddHostedService<WalletChargeHostedService>();   // W2 monthly subscription charge; Lis:Jobs:WalletCharge:Enabled=false keeps it idle
+builder.Services.AddSingleton(provider => SecurityConfiguration.ReadSubscriptionReminders(provider.GetRequiredService<IConfiguration>()));
+builder.Services.AddHostedService<SubscriptionReminderHostedService>();   // LIS-CR-012 reminders and grace; Lis:Jobs:SubscriptionReminders:Enabled=false keeps it idle
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(provider =>
@@ -64,6 +66,7 @@ foreach (var step in PipelineOrder.Sequence)
         case PipelineOrder.TenantResolution: app.UseMiddleware<TenantResolutionMiddleware>(); break;
         case PipelineOrder.MfaEnrollmentGate: app.UseMiddleware<MfaEnrollmentGateMiddleware>(); break;
         case PipelineOrder.PasswordChangeGate: app.UseMiddleware<PasswordChangeGateMiddleware>(); break;
+        case PipelineOrder.SubscriptionExpiredGate: app.UseMiddleware<SubscriptionExpiredGateMiddleware>(); break;
         case PipelineOrder.Authorization: app.UseAuthorization(); break;
         case PipelineOrder.Endpoints:
             app.MapControllers();

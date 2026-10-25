@@ -1,9 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 
-import type { CollectionsReportDocument } from '../../../core/api/billing.contracts';
+import type { CashLedgerView, CollectionsReportDocument } from '../../../core/api/billing.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PrintService } from '../../../shared/print/print.service';
 import { BillingApi } from '../data/billing.api';
+import { CashSheetDocumentComponent } from '../ui/documents/cash-sheet-document.component';
 import { ClosingSheetDocumentComponent } from '../ui/documents/closing-sheet-document.component';
 import { CollectionsReportDocumentComponent } from '../ui/documents/collections-report-document.component';
 import { InvoiceDocumentComponent } from '../ui/documents/invoice-document.component';
@@ -55,6 +56,11 @@ export class BillingPrinter {
   async closingSheet(closingId: string): Promise<void> {
     const doc = await this.api.closingSheet(closingId);
     await this.print.print({ title: `${this.i18n.t('billing.doc.closingTitle')} ${doc.number}`, size: 'A4', component: { type: ClosingSheetDocumentComponent, inputs: { doc } } });
+  }
+
+  /** The "Daily cash sheet" of the ledger the page already loaded (A4; change request LIS-CR-011). */
+  async cashSheet(doc: CashLedgerView): Promise<void> {
+    await this.print.print({ title: `${this.i18n.t('billing.doc.cashSheetTitle')} ${doc.fromDay}${doc.toDay === doc.fromDay ? '' : ` – ${doc.toDay}`}`, size: 'A4', component: { type: CashSheetDocumentComponent, inputs: { doc } } });
   }
 
   /** The collections report the dialog already loaded (A4; change request 2026-10-13, item 2). */

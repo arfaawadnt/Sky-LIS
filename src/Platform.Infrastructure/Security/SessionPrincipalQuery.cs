@@ -8,6 +8,7 @@ using Platform.Domain.PlatformAdmin;
 using Platform.Domain.Settings;
 using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Persistence.Settings;
+using Platform.SharedKernel.Abstractions;
 using Platform.SharedKernel.MultiTenancy;
 
 namespace Platform.Infrastructure.Security;
@@ -24,7 +25,13 @@ namespace Platform.Infrastructure.Security;
 /// of <c>app.tenant_settings</c> (readable here because the query is elevated), resolved as <c>ITenantSettings</c> does; a
 /// changed value applies to a session within the cache lifetime.
 /// </summary>
-public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAccessor tenant, IMemoryCache cache, ITenantStatusLookup tenantStatus) : ISessionPrincipalQuery
+/// <remarks>
+/// LIS-CR-012 (C-16, D-3): the same read carries the subscription state of the session's laboratory — client status and trial
+/// end, the wallet (balance, currency, zero mark, next charge), the plan fee and the platform's grace days (the platform row of
+/// <c>subscriptionGraceDays</c> only: a laboratory cannot extend its own grace) — as scalar subqueries, evaluated by
+/// <see cref="SubscriptionTerms"/>. A member who is not an administrator of an expired laboratory has no live session.
+/// </remarks>
+public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAccessor tenant, IMemoryCache cache, ITenantStatusLookup tenantStatus, IClock clock) : ISessionPrincipalQuery
 {
     public static readonly TimeSpan CacheLifetime = TimeSpan.FromSeconds(10);
 
@@ -38,6 +45,7 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
 
         SessionPrincipal? principal;
         var timeoutKey = SettingKeys.SessionTimeoutMinutes.Key;
+        var graceKey = SettingKeys.SubscriptionGraceDays.Key;
         var platformTenant = TenantIds.Platform;
         using (tenant.Elevate())
         {
@@ -81,6 +89,16 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                     PlatformTimeout = context.Set<TenantSetting>().Where(s => s.TenantId == platformTenant && s.Key == timeoutKey).Select(s => s.Value).FirstOrDefault(),
                     // LIS-CR-005: the laboratory address of the session's tenant (none for the platform tenant), a scalar subquery of this one read
                     PortalSlug = context.Set<Tenant>().Where(t => t.Id == session.TenantId && t.Id != platformTenant).Select(t => t.PortalSlug).FirstOrDefault(),
+                    // LIS-CR-012: the subscription state's figures, scalar subqueries of this one read (saas tables: no RLS)
+                    ClientStatus = context.Set<Tenant>().Where(t => t.Id == session.TenantId && t.Id != platformTenant).Select(t => (TenantStatus?)t.Status).FirstOrDefault(),
+                    TrialEndsAtUtc = context.Set<Tenant>().Where(t => t.Id == session.TenantId && t.Id != platformTenant).Select(t => t.TrialEndsAtUtc).FirstOrDefault(),
+                    MonthlyFee = context.Set<Tenant>().Where(t => t.Id == session.TenantId && t.Id != platformTenant)
+                        .Join(context.Set<Plan>(), t => t.PlanId, p => p.Id, (t, p) => (decimal?)p.MonthlyFee).FirstOrDefault(),
+                    WalletBalance = context.Set<Wallet>().Where(w => w.TenantId == session.TenantId).Select(w => (decimal?)w.Balance).FirstOrDefault(),
+                    WalletCurrency = context.Set<Wallet>().Where(w => w.TenantId == session.TenantId).Select(w => w.CurrencyCode).FirstOrDefault(),
+                    WalletZeroSince = context.Set<Wallet>().Where(w => w.TenantId == session.TenantId).Select(w => w.AtOrBelowZeroSinceUtc).FirstOrDefault(),
+                    WalletNextCharge = context.Set<Wallet>().Where(w => w.TenantId == session.TenantId).Select(w => (DateTimeOffset?)w.NextChargeAtUtc).FirstOrDefault(),
+                    PlatformGrace = context.Set<TenantSetting>().Where(s => s.TenantId == platformTenant && s.Key == graceKey).Select(s => s.Value).FirstOrDefault(),
                 }).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
 
             if (row is null)
@@ -96,6 +114,20 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                     role = await context.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.TenantId == roleTenant && r.Id == roleId && r.IsActive, cancellationToken).ConfigureAwait(false);
                 }
 
+                // LIS-CR-012 (D-3): an administrator = primary administrator or effective organization.manage; once the client
+                // expired only such a member keeps a live session (and the gate lets it reach the wallet only, SUB-021).
+                var permissionKeys = EffectivePrivileges.PermissionKeys(role?.PermissionKeys, row.AddedPermissionKeys, row.RemovedPermissionKeys, row.TenantId == TenantIds.Platform);
+                var subscriptionAdministrator = (row.IsPrimaryAdministrator ?? false) || permissionKeys.Contains(SubscriptionAdministrators.OrganizationManage);
+                var subscription = row.ClientStatus is { } clientStatus
+                    ? SubscriptionTerms.Evaluate(
+                        clientStatus,
+                        row.TrialEndsAtUtc,
+                        row.WalletBalance is { } balance ? new WalletPosition(balance, row.MonthlyFee ?? 0m, row.WalletCurrency ?? string.Empty, row.WalletZeroSince, row.WalletNextCharge) : null,
+                        SettingKeys.SubscriptionGraceDays.Resolve(null, row.PlatformGrace),
+                        clock.UtcNow)
+                    : SubscriptionStatus.None;
+                var lockedOutBySubscription = subscription.IsExpired && !subscriptionAdministrator;
+
                 principal = new SessionPrincipal(
                     row.Id,
                     row.UserId,
@@ -108,10 +140,10 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                     row.AbsoluteExpiresAtUtc,
                     row.IsRevoked,
                     row.ReauthenticatedAtUtc,
-                    (row.MembershipActive ?? false) && (row.TenantId is not { } clientTenant || await tenantStatus.IsActiveAsync(clientTenant, cancellationToken).ConfigureAwait(false)),   // an inactive laboratory ends its users' sessions (SA-04)
+                    (row.MembershipActive ?? false) && !lockedOutBySubscription && (row.TenantId is not { } clientTenant || await tenantStatus.IsActiveAsync(clientTenant, cancellationToken).ConfigureAwait(false)),   // an inactive laboratory ends its users' sessions (SA-04); an expired one its non-administrators' (LIS-CR-012)
                     row.PreferredLanguage ?? "en",
                     role?.Name.En,
-                    EffectivePrivileges.PermissionKeys(role?.PermissionKeys, row.AddedPermissionKeys, row.RemovedPermissionKeys, row.TenantId == TenantIds.Platform),
+                    permissionKeys,
                     row.BranchIds ?? [],
                     row.DepartmentIds ?? [],
                     row.BranchId)
@@ -129,6 +161,8 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                     PasswordExpiresAtUtc = row.PasswordExpiresAtUtc,
                     SessionTimeoutMinutes = SettingKeys.SessionTimeoutMinutes.Resolve(row.OwnTimeout, row.PlatformTimeout),
                     PortalSlug = row.PortalSlug,
+                    Subscription = subscription,
+                    IsSubscriptionAdministrator = subscriptionAdministrator,
                 };
             }
         }
@@ -161,7 +195,7 @@ public sealed class MembershipDirectory(AppDbContext context, ITenantContextAcce
             var memberships = await context.TenantMemberships.AsNoTracking()
                 .Where(m => m.PlatformUserId == platformUserId && m.IsActive)
                 .OrderBy(m => m.TenantId)
-                .Select(m => new { m.TenantId, m.Id, NameEn = m.FullName.En, NameAr = m.FullName.Ar, m.PreferredLanguage, m.BranchIds })
+                .Select(m => new { m.TenantId, m.Id, NameEn = m.FullName.En, NameAr = m.FullName.Ar, m.PreferredLanguage, m.BranchIds, m.IsPrimaryAdministrator, m.RoleId, m.AddedPermissionKeys, m.RemovedPermissionKeys })
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
@@ -187,6 +221,17 @@ public sealed class MembershipDirectory(AppDbContext context, ITenantContextAcce
                     .ToListAsync(cancellationToken)
                     .ConfigureAwait(false);
 
+            // LIS-CR-012 (D-3): who administers each laboratory (primary administrator or effective organization.manage), for the
+            // sign-in of an expired laboratory; the active roles of the memberships in one read.
+            var roleIds = memberships.Where(m => m.RoleId is not null).Select(m => m.RoleId!.Value).Distinct().ToList();
+            var roles = roleIds.Count == 0
+                ? []
+                : await context.Roles.AsNoTracking()
+                    .Where(role => roleIds.Contains(role.Id) && role.IsActive)
+                    .Select(role => new { role.TenantId, role.Id, role.PermissionKeys })
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
             return memberships
                 .Select(m => new MembershipSummary(
                     m.TenantId,
@@ -194,7 +239,14 @@ public sealed class MembershipDirectory(AppDbContext context, ITenantContextAcce
                     m.NameEn,
                     m.NameAr,
                     m.PreferredLanguage,
-                    m.BranchIds.Length > 0 ? m.BranchIds : activeBranches.Where(branch => branch.TenantId == m.TenantId).Select(branch => branch.Id).ToArray()))
+                    m.BranchIds.Length > 0 ? m.BranchIds : activeBranches.Where(branch => branch.TenantId == m.TenantId).Select(branch => branch.Id).ToArray(),
+                    SubscriptionAdministrators.Includes(
+                        m.IsPrimaryAdministrator,
+                        EffectivePrivileges.PermissionKeys(
+                            roles.FirstOrDefault(role => role.TenantId == m.TenantId && role.Id == m.RoleId)?.PermissionKeys,
+                            m.AddedPermissionKeys,
+                            m.RemovedPermissionKeys,
+                            TenantIds.IsPlatform(m.TenantId)))))
                 .ToList();
         }
     }

@@ -46,7 +46,7 @@ internal sealed class BranchLookup(AppDbContext context) : IBranchLookup
     }
 }
 
-/// <summary><see cref="IBranchGeography"/> over <c>saas.governorates</c> (platform reference data: no tenant filter, no RLS, read-only here).</summary>
+/// <summary><see cref="IBranchGeography"/> over <c>saas.governorates</c> and (LIS-CR-008 C-04) <c>saas.cities / districts / areas</c> (platform reference data: no tenant filter, no RLS, read-only here).</summary>
 internal sealed class BranchGeography(AppDbContext context) : IBranchGeography
 {
     public Task<Guid?> CountryOfGovernorateAsync(Guid governorateId, CancellationToken cancellationToken) =>
@@ -54,6 +54,9 @@ internal sealed class BranchGeography(AppDbContext context) : IBranchGeography
             .Where(governorate => governorate.Id == governorateId)
             .Select(governorate => (Guid?)governorate.CountryId)
             .FirstOrDefaultAsync(cancellationToken);
+
+    public Task<LocalityRows> LocalityRowsAsync(Guid? cityId, Guid? districtId, Guid? areaId, CancellationToken cancellationToken) =>
+        Persistence.PlatformAdmin.LocalityReads.RowsAsync(context, cityId, districtId, areaId, cancellationToken);
 }
 
 /// <summary><see cref="IUserDirectory"/>: the membership's bilingual name in the current tenant, else the platform display name.</summary>

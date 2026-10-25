@@ -102,6 +102,9 @@ public sealed record NegotiatePriceRequest(decimal PatientShare, decimal PayerSh
 
 public sealed record SetPriceAlertRequest(string? AlertCondition);
 
+/// <summary>C7 (LIS-CR-010): <c>Classic</c>, <c>Modern</c>, <c>Compact</c>, <c>Letterhead</c> or <c>Cumulative</c>; null clears the override.</summary>
+public sealed record SetContractReportDesignRequest(string? Design);
+
 public sealed record CopyContractPricingRequest(decimal? Factor);
 
 public sealed record ContractApplyResult(int Priced, int Added, int Updated, int Removed, int ExcludedKept);
@@ -125,6 +128,7 @@ public sealed record ContractPriceItem(
 /// <summary>
 /// The page of one tier (CP-34). <paramref name="Exists"/> is false while the tier has no formula yet (then the dates are
 /// null and the lists empty). <paramref name="InEffect"/> compares today with the effective dates (intake Q5).
+/// <paramref name="ReportDesign"/> (LIS-CR-010): the tier's report design override, null when the reports follow the template and the laboratory.
 /// </summary>
 public sealed record ContractPricingDetail(
     bool Exists,
@@ -145,7 +149,8 @@ public sealed record ContractPricingDetail(
     DateTimeOffset? AppliedAtUtc,
     string Currency,
     IReadOnlyList<PricingFormulaTermView> Terms,
-    IReadOnlyList<ContractPriceItem> Prices);
+    IReadOnlyList<ContractPriceItem> Prices,
+    string? ReportDesign = null);
 
 public sealed record ContractPricingListItem(
     Guid Id,

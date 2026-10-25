@@ -95,14 +95,23 @@ internal sealed class TenantRepository(AppDbContext context) : Repository<Tenant
                 tenant.Source,
                 tenant.Status,
                 tenant.TrialEndsAtUtc,
+                tenant.CityId,
+                tenant.DistrictId,
+                tenant.AreaId,
             }).ToListAsync(cancellationToken).ConfigureAwait(false);
 
+        // LIS-CR-008 C-04: "Area, District, City, Governorate" for the rows of the page (one read of the names)
+        var names = await LocalityReads.NamesAsync(Context, rows.Select(row => row.CityId), rows.Select(row => row.DistrictId), rows.Select(row => row.AreaId), cancellationToken).ConfigureAwait(false);
         var items = rows
             .OrderBy(row => position[row.Id])
-            .Select(row => new ClientListItem(
-                row.Id, row.NameEn, row.NameAr, row.PortalSlug, Tenant.PortalUrlOf(row.PortalSlug, portalBaseUrl), row.CountryId, row.CountryEn, row.CountryAr,
-                row.GovernorateId, row.GovernorateEn, row.GovernorateAr, row.ManagerName, row.ManagerMobile, row.PlanId, row.PlanCode, row.PlanEn, row.PlanAr,
-                row.Balance, row.Currency.Trim(), 0, 0, row.CreatedAtUtc, row.Source.ToString(), row.Status.ToString(), row.TrialEndsAtUtc))
+            .Select(row =>
+            {
+                var (lineEn, lineAr) = LocalityReads.Line(names, row.CityId, row.DistrictId, row.AreaId, row.GovernorateEn, row.GovernorateAr);
+                return new ClientListItem(
+                    row.Id, row.NameEn, row.NameAr, row.PortalSlug, Tenant.PortalUrlOf(row.PortalSlug, portalBaseUrl), row.CountryId, row.CountryEn, row.CountryAr,
+                    row.GovernorateId, row.GovernorateEn, row.GovernorateAr, row.ManagerName, row.ManagerMobile, row.PlanId, row.PlanCode, row.PlanEn, row.PlanAr,
+                    row.Balance, row.Currency.Trim(), 0, 0, row.CreatedAtUtc, row.Source.ToString(), row.Status.ToString(), row.TrialEndsAtUtc, lineEn, lineAr);
+            })
             .ToList();
         return new Paged<ClientListItem>(items, page.Page, page.PageSize, total);
     }
@@ -121,8 +130,9 @@ internal sealed class TenantRepository(AppDbContext context) : Repository<Tenant
         var row = await (
             from tenant in Set.AsNoTracking().Where(tenant => tenant.Id == id)
             join country in Context.Set<Country>().AsNoTracking() on tenant.CountryId equals country.Id
+            join governorate in Context.Set<Governorate>().AsNoTracking() on tenant.GovernorateId equals governorate.Id
             from wallet in Context.Set<Wallet>().AsNoTracking().Where(wallet => wallet.TenantId == tenant.Id).DefaultIfEmpty()
-            select new { Tenant = tenant, CountryCurrency = country.CurrencyCode, Balance = wallet == null ? 0m : wallet.Balance, WalletCurrency = wallet == null ? null : wallet.CurrencyCode })
+            select new { Tenant = tenant, CountryCurrency = country.CurrencyCode, GovernorateEn = governorate.Name.En, GovernorateAr = governorate.Name.Ar, Balance = wallet == null ? 0m : wallet.Balance, WalletCurrency = wallet == null ? null : wallet.CurrencyCode })
             .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
         if (row is null)
         {
@@ -130,10 +140,13 @@ internal sealed class TenantRepository(AppDbContext context) : Repository<Tenant
         }
 
         var t = row.Tenant;
+        var names = await LocalityReads.NamesAsync(Context, [t.CityId], [t.DistrictId], [t.AreaId], cancellationToken).ConfigureAwait(false);
+        var (lineEn, lineAr) = LocalityReads.Line(names, t.CityId, t.DistrictId, t.AreaId, row.GovernorateEn, row.GovernorateAr);
         return new ClientDetail(
             t.Id, t.Name.En, t.Name.Ar, t.CountryId, t.GovernorateId, t.Address, t.Mobile, t.LicenceNo, t.ManagerName, t.ManagerMobile, t.Email, t.PlanId,
             t.PortalSlug, t.PortalUrl(portalBaseUrl), t.PreferredLanguage, t.Source.ToString(), t.Status.ToString(), t.CreatedAtUtc, t.TrialEndsAtUtc, t.ActivatedAtUtc,
-            t.DeactivatedAtUtc, t.DeactivationReason, t.AdministratorUserId, t.AdministratorUsername, row.Balance, (row.WalletCurrency ?? row.CountryCurrency).Trim(), 0, 0);
+            t.DeactivatedAtUtc, t.DeactivationReason, t.AdministratorUserId, t.AdministratorUsername, row.Balance, (row.WalletCurrency ?? row.CountryCurrency).Trim(), 0, 0,
+            t.CityId, t.DistrictId, t.AreaId, lineEn, lineAr);
     }
 
     public async Task<(TenantStatus Status, DateTimeOffset? TrialEndsAtUtc)?> FindStatusAsync(Guid id, CancellationToken cancellationToken)
@@ -620,6 +633,9 @@ internal sealed class CityRepository(AppDbContext context) : Repository<City>(co
             .OrderBy(city => city.Name.En).ThenBy(city => city.Id).Take(LocationQueries.MaxRows)
             .Select(city => new PublicCity(city.Id, city.GovernorateId, city.Name.En, city.Name.Ar))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<City>> ListForImportAsync(Guid governorateId, CancellationToken cancellationToken) =>
+        await Set.AsNoTracking().Where(city => city.GovernorateId == governorateId).ToListAsync(cancellationToken).ConfigureAwait(false);
 }
 
 internal sealed class DistrictRepository(AppDbContext context) : Repository<District>(context), IDistrictRepository
@@ -657,6 +673,18 @@ internal sealed class DistrictRepository(AppDbContext context) : Repository<Dist
             .OrderBy(district => district.Name.En).ThenBy(district => district.Id).Take(LocationQueries.MaxRows)
             .Select(district => new PublicDistrict(district.Id, district.CityId, district.Name.En, district.Name.Ar))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<District>> ListForImportAsync(IReadOnlyCollection<Guid> cityIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(cityIds);
+        if (cityIds.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = cityIds.ToList();
+        return await Set.AsNoTracking().Where(district => ids.Contains(district.CityId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
 }
 
 internal sealed class AreaRepository(AppDbContext context) : Repository<Area>(context), IAreaRepository
@@ -691,6 +719,18 @@ internal sealed class AreaRepository(AppDbContext context) : Repository<Area>(co
             .OrderBy(area => area.Name.En).ThenBy(area => area.Id).Take(LocationQueries.MaxRows)
             .Select(area => new PublicArea(area.Id, area.DistrictId, area.Name.En, area.Name.Ar))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<Area>> ListForImportAsync(IReadOnlyCollection<Guid> districtIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(districtIds);
+        if (districtIds.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = districtIds.ToList();
+        return await Set.AsNoTracking().Where(area => ids.Contains(area.DistrictId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
 }
 
 /// <summary>What the three location repositories share.</summary>

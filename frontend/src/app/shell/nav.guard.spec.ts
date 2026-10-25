@@ -67,7 +67,9 @@ describe('navRegistryGuard (A-08, C-15)', () => {
     expect(guard('/billing/payments')).toBe(true);
     // R1-01: refunds are an action of Payments in Release 1 (this test used to expect them refused, the regression)
     expect(guard('/billing/refunds?visitId=v1')).toBe(true);
-    for (const url of ['/billing/batch-payment', '/billing/cash-closing', '/account/wallet', '/samples/collection', '/samples/track/S-1', '/integration/analysers']) {
+    expect(guard('/billing/cash-closing')).toBe(true); // Release 1 since LIS-CR-011
+    expect(guard('/account/wallet')).toBe(true); // Release 1 since LIS-CR-012
+    for (const url of ['/billing/batch-payment', '/samples/collection', '/samples/track/S-1', '/integration/analysers']) {
       expect((guard(url) as UrlTree).toString()).toBe('/');
     }
 

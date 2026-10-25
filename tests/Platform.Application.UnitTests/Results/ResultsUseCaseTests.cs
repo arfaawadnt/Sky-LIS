@@ -1,5 +1,6 @@
 using Platform.Application.Catalogue;
 using Platform.Application.Catalogue.Services;
+using Platform.Application.Registration;
 using Platform.Application.Results;
 using Platform.Application.Results.Commands;
 using Platform.Application.Results.Policies;
@@ -287,6 +288,70 @@ public sealed class ResultsUseCaseTests
     }
 
     [Fact]
+    public async Task RD_RES_01_the_report_and_the_case_follow_the_laboratory_design_and_a_contract_override_wins()
+    {
+        // LIS-CR-010 (C-14): contract → template → laboratory parameter; the classic report stays the default.
+        var world = new World();
+        var glucose = world.AddTest("GLU");
+        var current = await world.OrderedAsync(glucose);
+        world.Samples.Received(world.Tube, world.Visit);
+        await world.SaveAsync(new ResultValueItem(current.Id, 5m, null, null, null));
+        var key = ReportUnits.ForGroup(world.Visit, world.Group);
+
+        var classic = await world.ReportAsync(key, preview: true);
+        Assert.Equal(("Classic", "Laboratory"), (classic.Design, classic.DesignSource));
+        Assert.Null(Assert.Single(Assert.Single(classic.Sections).Lines).Previous);
+
+        world.Settings.Values[SettingKeys.ReportDesign.Key] = "modern";
+        var modern = await world.ReportAsync(key, preview: true);
+        Assert.Equal(("Modern", "Laboratory"), (modern.Design, modern.DesignSource));
+
+        var tier = Guid.CreateVersion7();
+        world.Visits.Items[world.Visit] = new VisitView(
+            world.Visit, "ACC-2026-00009", world.Patient, null, world.Branch, "Laboratory", Guid.CreateVersion7(), tier, null, null, null, null, "Registered",
+            false, false, false, Registered, Guid.CreateVersion7(), null, 0m, 0m, 0m, 0m, 0, [], []);
+        world.References.ContractDesigns[tier] = ReportDesign.Letterhead;
+        var letterhead = await world.ReportAsync(key, preview: true);
+        Assert.Equal(("Letterhead", "Contract"), (letterhead.Design, letterhead.DesignSource));
+
+        var unit = Assert.Single((await world.CaseAsync()).Units);
+        Assert.Equal(("Letterhead", "Contract"), (unit.Design, unit.DesignSource));
+    }
+
+    [Fact]
+    public async Task RD_RES_02_the_cumulative_design_prints_the_last_three_signed_values_of_earlier_visits_newest_first()
+    {
+        var world = new World();
+        var glucose = world.AddTest("GLU");
+        var current = await world.OrderedAsync(glucose);
+        world.Samples.Received(world.Tube, world.Visit);
+        var oldest = await world.OrderedInNewVisitAsync(glucose, "ACC-2026-00001", Registered.AddDays(-40));
+        var third = await world.OrderedInNewVisitAsync(glucose, "ACC-2026-00002", Registered.AddDays(-30));
+        var second = await world.OrderedInNewVisitAsync(glucose, "ACC-2026-00003", Registered.AddDays(-20));
+        var first = await world.OrderedInNewVisitAsync(glucose, "ACC-2026-00004", Registered.AddDays(-10));
+        var unsigned = await world.OrderedInNewVisitAsync(glucose, "ACC-2026-00005", Registered.AddDays(-5));
+        var later = await world.OrderedInNewVisitAsync(glucose, "ACC-2026-00010", Registered.AddDays(1));
+        await world.SaveAsync(
+            new ResultValueItem(oldest.Id, 4.1m, null, null, null),
+            new ResultValueItem(third.Id, 4.2m, null, null, null),
+            new ResultValueItem(second.Id, 4.3m, null, null, null),
+            new ResultValueItem(first.Id, 4.4m, null, null, null),
+            new ResultValueItem(unsigned.Id, 4.5m, null, null, null),
+            new ResultValueItem(later.Id, 4.9m, null, null, null),
+            new ResultValueItem(current.Id, 5m, null, null, null));
+        await world.VerifyAsync(oldest.Id, third.Id, second.Id, first.Id, later.Id);
+        world.Settings.Values[SettingKeys.ReportDesign.Key] = "cumulative";
+
+        var report = await world.ReportAsync(ReportUnits.ForGroup(world.Visit, world.Group), preview: true);
+
+        Assert.Equal(("Cumulative", "Laboratory"), (report.Design, report.DesignSource));
+        var previous = Assert.Single(Assert.Single(report.Sections).Lines).Previous!;
+        Assert.Equal(["ACC-2026-00004", "ACC-2026-00003", "ACC-2026-00002"], previous.Select(value => value.Accession));
+        Assert.Equal(["4.4", "4.3", "4.2"], previous.Select(value => value.Value));
+        Assert.Equal(Registered.AddDays(-10), previous[0].RegisteredAtUtc);
+    }
+
+    [Fact]
     public async Task R_PREVIEW_refused_while_a_value_is_missing_and_hidden_helpers_never_print()
     {
         var world = new World();
@@ -522,6 +587,8 @@ public sealed class ResultsUseCaseTests
 
         public ResultsClock Clock { get; } = new(Registered.AddHours(2));
 
+        public FakeReferences References { get; } = new();
+
         public World()
         {
             Privileges.Grant(Group);
@@ -551,19 +618,21 @@ public sealed class ResultsUseCaseTests
         public Task RegisterAsync(Guid tube, params RegisteredLine[] lines) => RegisterVisitAsync(Visit, "ACC-2026-00009", tube, lines);
 
         /// <summary>Another visit of the same patient (its own tube, received), with one result of <paramref name="test"/>.</summary>
-        public async Task<Result> OrderedInNewVisitAsync(CatalogueTestInfo test, string accession)
+        public async Task<Result> OrderedInNewVisitAsync(CatalogueTestInfo test, string accession, DateTimeOffset? registeredAt = null)
         {
             var visit = Guid.CreateVersion7();
             var tube = Guid.CreateVersion7();
-            await RegisterVisitAsync(visit, accession, tube, new RegisteredLine(Guid.CreateVersion7(), AddService(ServiceType.Test, test.Id).Id, tube, "Ordered", []));
+            await RegisterVisitAtAsync(visit, accession, tube, registeredAt ?? Registered, new RegisteredLine(Guid.CreateVersion7(), AddService(ServiceType.Test, test.Id).Id, tube, "Ordered", []));
             Samples.Received(tube, visit);
             return Results.Items.Single(result => result.VisitId == visit && result.TestId == test.Id);
         }
 
-        public Task RegisterVisitAsync(Guid visit, string accession, Guid tube, params RegisteredLine[] lines)
+        public Task RegisterVisitAsync(Guid visit, string accession, Guid tube, params RegisteredLine[] lines) => RegisterVisitAtAsync(visit, accession, tube, Registered, lines);
+
+        public Task RegisterVisitAtAsync(Guid visit, string accession, Guid tube, DateTimeOffset registeredAt, params RegisteredLine[] lines)
         {
             var services = lines.Select(line => line.ServiceId).ToList();
-            var registered = new VisitRegistered(visit, accession, Branch, Patient, null, null, false, Actor, [new RegisteredTube(tube, "SMP-1", Group, Guid.CreateVersion7(), null, services)], lines, Registered);
+            var registered = new VisitRegistered(visit, accession, Branch, Patient, null, null, false, Actor, [new RegisteredTube(tube, "SMP-1", Group, Guid.CreateVersion7(), null, services)], lines, registeredAt);
             return new CreateResultsOnVisitRegisteredPolicy(Results, Catalogue, Samples, Visits, UnitOfWork).HandleAsync(registered, CancellationToken.None);
         }
 
@@ -597,14 +666,14 @@ public sealed class ResultsUseCaseTests
             Patients.Items[Patient] = FakePatients.Patient(Patient, "Female", 30) with { Number = "PAT-2026-00010", FullName = "V14 Walk-in Two", NameAr = "ووك إن", DateOfBirth = new DateOnly(1996, 1, 1), IsVip = true };
 
         public Task<ResultCaseView> CaseAsync() =>
-            new GetResultCaseHandler(Results, Samples, Catalogue, Patients, new FakeDirectory(), Privileges, Visits, new FakeReferences(), new NoDoctors(), Settings, Clock)
+            new GetResultCaseHandler(Results, Samples, Catalogue, Patients, new FakeDirectory(), Privileges, Visits, References, new NoDoctors(), Settings, Clock, new NoTemplates())
                 .Handle(new GetResultCaseQuery(null, Visit, null), CancellationToken.None);
 
         public Task PrintAsync(string key) =>
             new PrintReportUnitHandler(Results, Settings, Privileges, new FakeDirectory(), Patients, UnitOfWork, User, Clock).Handle(new PrintReportUnitCommand(key), CancellationToken.None);
 
         public Task<LaboratoryReportDocument> ReportAsync(string key, bool preview) =>
-            new GetReportDocumentHandler(Results, Catalogue, Samples, new FakeDirectory(), Patients, Visits, new FakeReferences(), new NoDoctors(), new NoTemplates(), Settings, Privileges, User, Clock)
+            new GetReportDocumentHandler(Results, Catalogue, Samples, new FakeDirectory(), Patients, Visits, References, new NoDoctors(), new NoTemplates(), Settings, Privileges, User, Clock)
                 .Handle(new GetReportDocumentQuery(key, preview), CancellationToken.None);
     }
 

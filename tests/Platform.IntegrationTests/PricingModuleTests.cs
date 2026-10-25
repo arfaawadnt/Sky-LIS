@@ -244,6 +244,41 @@ public sealed class PricingModuleTests(DatabaseFixture fixture)
         Assert.Empty(known);
     }
 
+    [DatabaseFact]
+    public async Task A_tier_report_design_is_stored_projected_and_read_by_the_results_port_in_its_tenant_only()
+    {
+        // LIS-CR-010 (C-14): app.contract_pricings.report_design, nullable, CHECK by the enum convention.
+        var (tenant, other) = (Guid.CreateVersion7(), Guid.CreateVersion7());
+        var (payerId, tierId) = await CreatePayerWithTierAsync(tenant, "RD");
+        var listId = await CreateListAsync(tenant, "PLRD", 2026, active: true, (Cbc, 50m));
+        var pricing = ContractPricing.Create(payerId, tierId, new DateOnly(2026, 1, 1), null, [new PricingFormulaTerm(listId, 1m, 0m)], Now);
+        pricing.SetReportDesign(Platform.Domain.Catalogue.ReportDesign.Cumulative, Now);
+        await AddAsync(tenant, pricing);
+
+        using (var scope = fixture.AppScope(tenant))
+        {
+            Assert.Equal(Platform.Domain.Catalogue.ReportDesign.Cumulative, (await scope.ServiceProvider.GetRequiredService<IContractPricingRepository>().GetViewByTierAsync(tierId, CancellationToken.None))!.ReportDesign);
+            var port = scope.ServiceProvider.GetRequiredService<Platform.Application.Results.IResultReferenceLookup>();
+            Assert.Equal(Platform.Domain.Catalogue.ReportDesign.Cumulative, await port.ContractReportDesignAsync(tierId, CancellationToken.None));
+            Assert.Null(await port.ContractReportDesignAsync(Guid.CreateVersion7(), CancellationToken.None));
+        }
+
+        using (var scope = fixture.AppScope(other))
+        {
+            Assert.Null(await scope.ServiceProvider.GetRequiredService<Platform.Application.Results.IResultReferenceLookup>().ContractReportDesignAsync(tierId, CancellationToken.None));
+        }
+
+        using (var scope = fixture.AppScope(tenant))
+        {
+            var stored = (await scope.ServiceProvider.GetRequiredService<IContractPricingRepository>().GetForUpdateByTierAsync(tierId, CancellationToken.None))!;
+            stored.SetReportDesign(null, Now);
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
+        }
+
+        using var cleared = fixture.AppScope(tenant);
+        Assert.Null(await cleared.ServiceProvider.GetRequiredService<Platform.Application.Results.IResultReferenceLookup>().ContractReportDesignAsync(tierId, CancellationToken.None));
+    }
+
     private async Task AddAsync<TAggregate>(Guid tenantId, TAggregate aggregate)
         where TAggregate : AggregateRoot
     {

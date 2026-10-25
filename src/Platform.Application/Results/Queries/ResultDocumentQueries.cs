@@ -30,10 +30,12 @@ public sealed record ResultReportPorts(
     IResultReferenceLookup References,
     IDoctorLookup Doctors,
     IReportTemplateLookup Templates,
-    ITenantSettings Settings)
+    ITenantSettings Settings,
+    IResultRepository Results,
+    ResultVisibility Visibility)
 {
     internal ResultReportBuilder Builder() =>
-        new(new ResultReadContextLoader(Catalogue, Samples, Users), new ResultHeaderLoader(Patients, Visits, References, Doctors), Catalogue, Templates, References, Settings);
+        new(new ResultReadContextLoader(Catalogue, Samples, Users), new ResultHeaderLoader(Patients, Visits, References, Doctors), Catalogue, Templates, References, Settings, Results, Visibility);
 }
 
 /// <summary>
@@ -94,7 +96,7 @@ public sealed class GetReportDocumentHandler(
         }
 
         var printedBy = await ResultsActor.NameOfAsync(user, users, cancellationToken);
-        var ports = new ResultReportPorts(catalogue, samples, users, patients, visits, references, doctors, templates, settings);
+        var ports = new ResultReportPorts(catalogue, samples, users, patients, visits, references, doctors, templates, settings, results, ResultRights.VisibilityOf(privileges));
         var document = await ports.Builder().BuildAsync(query.ReportUnitKey, unit, query.Preview, clock.UtcNow, printedBy, cancellationToken);
         return masked ? document with { Patient = ResultVip.Mask(document.Patient) } : document;
     }

@@ -23,6 +23,14 @@ describe('Catalogue B page helpers', () => {
       headerTextAr: 'رأس',
       footerTextEn: null,
       footerTextAr: null,
+      design: null,
     });
+  });
+
+  it('LIS-CR-010: sends the chosen report design, and null (follow the laboratory) when none is chosen', () => {
+    const base = { name: { en: 'Results A4', ar: 'النتائج' }, type: 'Results', language: 'Both', showQr: false };
+    expect(toRequest({ ...base, design: 'Cumulative' }).design).toBe('Cumulative');
+    expect(toRequest({ ...base, design: null }).design).toBeNull();
+    expect(toRequest(base).design).toBeNull();
   });
 });

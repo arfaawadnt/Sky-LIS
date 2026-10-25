@@ -66,6 +66,8 @@
   "samples.toCollect": "سُحب {done} من {total}",
   "samples.allReceived": "استُلمت جميعها",
   "samples.received": "استُلم {done} من {total}",
+  "samples.ext": "خارجي",
+  "samples.extTitle": "سُحبت عينة خارج المعمل",
   "results.none": "لا توجد نتائج",
   "results.allHidden": "خارج صلاحياتك",
   "results.printed": "مطبوعة",

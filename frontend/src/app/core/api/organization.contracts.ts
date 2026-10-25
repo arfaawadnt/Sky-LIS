@@ -23,6 +23,10 @@ export interface BranchListItem {
   readonly email: string | null;
   readonly currency: string;
   readonly isActive: boolean;
+  /** LIS-CR-008 C-04: the optional city (markaz) / district / area under the governorate. */
+  readonly cityId?: string | null;
+  readonly districtId?: string | null;
+  readonly areaId?: string | null;
 }
 
 export interface CreateBranchRequest {
@@ -34,6 +38,10 @@ export interface CreateBranchRequest {
   readonly phone: string | null;
   readonly email: string | null;
   readonly currency: string;
+  /** LIS-CR-008 C-04: optional, chain-checked on the server (GEO-020…022); null clears. */
+  readonly cityId?: string | null;
+  readonly districtId?: string | null;
+  readonly areaId?: string | null;
 }
 
 export type UpdateBranchRequest = Omit<CreateBranchRequest, 'code'>;
@@ -390,6 +398,7 @@ export const PARAMETER_GROUPS: readonly ParameterGroup[] = [
       { key: 'printUnverified', input: 'switch' },
       { key: 'labelCopies', input: 'number', min: 1, max: 10 },
       { key: 'resultLanguage', input: 'select', options: ['en', 'ar'] },
+      { key: 'reportDesign', input: 'select', options: ['classic', 'modern', 'compact', 'letterhead', 'cumulative'] },
     ],
   },
   {

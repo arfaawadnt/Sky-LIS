@@ -31,10 +31,12 @@ import {
   type PriceLineRequest,
   type ServicePricesView,
   type SetContractFormulaRequest,
+  type SetContractReportDesignRequest,
   type TierOption,
   type UpdateBasePriceListRequest,
   type UpsertPriceLinesResult,
 } from '../../../core/api/pricing.contracts';
+import type { ReportDesign } from '../../../core/api/report-designs';
 import { toHttpParams } from '../../../shared/forms/paging';
 import { allPages } from './csv';
 
@@ -178,6 +180,12 @@ export class PricingApi {
 
   setAlert(tierId: string, serviceId: string, alertCondition: string | null): Promise<void> {
     return firstValueFrom(this.http.put<void>(`${this.contract(tierId)}/prices/${encodeURIComponent(serviceId)}/alert`, { alertCondition }), { defaultValue: undefined }).then(noContent);
+  }
+
+  /** C7 (LIS-CR-010): the tier's report design override; null clears it. */
+  setReportDesign(tierId: string, design: ReportDesign | null): Promise<void> {
+    const body: SetContractReportDesignRequest = { design };
+    return firstValueFrom(this.http.put<void>(`${this.contract(tierId)}/report-design`, body), { defaultValue: undefined }).then(noContent);
   }
 
   copyContractPricing(tierId: string, sourceTierId: string, factor: number | null): Promise<void> {

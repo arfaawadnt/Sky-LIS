@@ -136,7 +136,7 @@ public sealed class GetContractPricingHandler(IPayerLookup payers, IContractPric
             view is not null, view?.Id, payer.Id, payer.NameEn, payer.NameAr, payer.Type, payer.IsActive,
             tier.Id, tier.NameEn, tier.NameAr, tier.IsActive, tier.IsDefault,
             view?.EffectiveFrom, view?.EffectiveTo, inEffect, view?.AppliedAtUtc, currency,
-            view?.Terms ?? [], view?.Prices ?? []);
+            view?.Terms ?? [], view?.Prices ?? [], view?.ReportDesign?.ToString());
     }
 }
 

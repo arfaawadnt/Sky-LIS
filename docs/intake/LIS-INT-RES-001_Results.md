@@ -421,3 +421,52 @@ entered visit keeps 3.5 – 5.0, a new visit shows the new band provisionally); 
 | --- | --- | --- |
 | Q23 | Should a result whose value was cleared (or a cancelled line) show the provisional range again? | A result with a stored range keeps it; a result without a value and without a stored range shows the provisional one, whatever its status. |
 | Q24 | Should the provisional range follow a VIP-masked case? | Yes: masking hides identity only; sex and age stay (Q19), so the range is resolved the same way. |
+
+## 18. Change request 2026-10-24 — Five report designs (LIS-CR-010, package P-RPT, reviewer point C-14, CP-13 / CP-19)
+
+**Need.** A laboratory chooses how its result reports look: today's layout, a modern one, a dense one, one for its own
+pre-printed paper, and one that shows the patient's earlier values beside today's (reviewer point C-14, LIS-RC-001 §4).
+
+**Model.** `Platform.Domain.Catalogue.ReportDesign` = `Classic` (the report before the change) · `Modern` · `Compact` ·
+`Letterhead` · `Cumulative`, shared by Results, Catalogue and Pricing. Selection order (`ReportDesigns.Resolve`, BR candidate):
+
+1. the payer contract tier's override `ContractPricing.ReportDesign` (the visit's `ContractTierId`, read through the new port
+   method `IResultReferenceLookup.ContractReportDesignAsync`; Pricing intake §20);
+2. else the override of the report template of the unit's clinical group, `ReportTemplate.Design` (Catalogue B intake §19);
+3. else the laboratory parameter `reportDesign` (Printing group, Release 1, values `classic|modern|compact|letterhead|cumulative`,
+   default `classic`; an unknown stored value reads Classic).
+
+**Reads.** `GET /api/v1/results/report-units/{key}/documents/report` answers `design` and `designSource`
+(`Laboratory|Template|Contract`); the case view (`GET /api/v1/results?…`) answers both per unit (`ReportUnitView.design`,
+`designSource`). Under `Cumulative` every printable line other than a culture or a formatted text carries `previous`: the
+patient's last **three** values of the same test from **earlier** visits (registered before this one), **signed** (Verified or
+Printed), with a value, of groups the user may see — newest first, each with accession, registration time, value, unit and flag.
+They come from the existing history reader `IResultRepository.ReadPreviousAsync` (window of 20 per test, one query per printable
+line, only for the Cumulative design). No new permission, no new endpoint.
+
+**SPA.** `ui/report.document.ts` keeps its selector and inputs (`doc`, `images`, `texts`) and dispatches on `doc.design` to
+`ui/documents/designs/report-{classic,modern,compact,letterhead,cumulative}.component.ts`, all extending `ReportDesignBase`
+(one view model) and sharing `report-rich-line` (cultures, formatted texts) and `report-signature`. Layouts are fluid (A4 and
+Letter), logical properties only (Arabic RTL), Latin digits on paper, each stylesheet under the 4 kB budget:
+
+| Design | Layout |
+| --- | --- |
+| Classic | Unchanged: bilingual letterhead with logo, facts table with QR, one table per profile. |
+| Modern | Two-column header cards (patient / visit) with QR, navy table head, a coloured flag bar on the inline start of each row (normal / out of range / critical, a panic value is critical) and a range bar per numeric result (normal zone 25–75 % of the track, marker clamped 2–98 %). |
+| Compact | One-line letterhead, facts as a six-column grid, every section in one table (profile headings as rows), 10 px type. |
+| Letterhead | No logo and no laboratory header: a blank band so the content starts 45 mm below the sheet's top edge (10 mm page margin + 10 mm page padding + 25 mm band); title, facts, results, signature, printed-by line. |
+| Cumulative | Classic letterhead, two-column facts, and three previous-value columns (value + flag, day below) after the range. |
+
+**Tests.** Domain `ReportDesignTests` (RD-01…RD-10), application `ResultsUseCaseTests.RD_RES_01/02` (laboratory → contract
+precedence on the report and the case; cumulative picks the last three signed earlier values), functional
+`ResultsReportDesignFlowTests` (parameter, template override, CAT-273, cumulative history over the API), integration
+`PricingModuleTests.A_tier_report_design_…` (column, projection, Results port, tenant isolation); specs `report-designs.spec.ts`
+(dispatcher, each design renders the sample case, Arabic RTL, range bars, letterhead band, compact table, cumulative columns)
+and `report-design-format.spec.ts`.
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| Q25 | Do previous values include unverified results or later visits? | No: signed values of earlier visits only, so a reprint of an old report never shows the future. |
+| Q26 | Should the Cumulative design show the history of cultures and formatted texts? | No: they print across the table without history. |
+| Q27 | Letter paper: a separate parameter? | No: the designs are fluid and print on A4 or Letter; the print kit keeps its A4 page rule until a paper-size parameter is asked for. |
+| Q28 | Where does the template preview take the design from? | The template's own override, else Classic; buttons try every design on the sample, "Use this design" saves it on the template. |

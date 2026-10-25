@@ -1,0 +1,200 @@
+<app-page-header [title]="i18n.t('platform.announcements.title')" [subtitle]="i18n.t('platform.announcements.subtitle')">
+  <button pageActions type="button" class="btn primary" *appCan="permissions.platformManage" (click)="openEdit(null)"><app-icon name="plus" [size]="16" />{{ i18n.t('platform.announcements.add') }}</button>
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <app-search-box toolbarFilters [placeholder]="i18n.t('platform.announcements.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+    <label toolbarFilters class="inline-filter">
+      <span class="visually-hidden">{{ i18n.t('platform.announcements.column.placement') }}</span>
+      <select class="inp" (change)="onPlacementFilter($event)">
+        <option value="all">{{ i18n.t('platform.announcements.allPlacements') }}</option>
+        @for (placement of placements; track placement) {
+          <option [value]="placement">{{ placementLabel(placement) }}</option>
+        }
+      </select>
+    </label>
+    <label toolbarFilters class="inline-filter">
+      <span class="visually-hidden">{{ i18n.t('platform.announcements.column.state') }}</span>
+      <select class="inp" (change)="onActive($event)">
+        <option value="all">{{ i18n.t('platform.all') }}</option>
+        <option value="active">{{ i18n.t('platform.status.Active') }}</option>
+        <option value="inactive">{{ i18n.t('platform.status.Inactive') }}</option>
+      </select>
+    </label>
+    <button toolbarActions type="button" class="btn ghost" (click)="facade.announcements.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('platform.refresh') }}</button>
+  </app-toolbar>
+
+  @if (facade.announcements.error()) {
+    <p class="problem list-problem" role="alert">{{ i18n.t('platform.loadError') }}</p>
+  }
+
+  <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.announcements.isLoading()" [emptyTitle]="i18n.t('platform.announcements.empty')"
+                  [caption]="i18n.t('platform.announcements.title')" [sort]="facade.sort()" [serverSort]="true" (sortChange)="facade.setSort($event)" (rowActivate)="openEdit($event)">
+    <ng-template appCell="placement" [appCellOf]="facade.rows()" let-row>
+      <app-badge [tone]="row.placement === 'SignIn' ? 'violet' : 'info'">{{ placementLabel(row.placement) }}</app-badge>
+    </ng-template>
+    <ng-template appCell="state" [appCellOf]="facade.rows()" let-row>
+      <app-badge [tone]="stateTone(row)">{{ i18n.t('platform.announcements.state.' + state(row)) }}</app-badge>
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
+      <button type="button" class="row-btn" (click)="openEdit(row)" [attr.aria-label]="i18n.t(canManage() ? 'platform.announcements.edit' : 'platform.announcements.view')" [title]="i18n.t(canManage() ? 'platform.announcements.edit' : 'platform.announcements.view')"><app-icon [name]="canManage() ? 'edit' : 'eye'" [size]="15" /></button>
+      <button type="button" class="row-btn" [class.danger]="row.isActive" *appCan="permissions.platformManage" (click)="toggle(row)"
+              [attr.aria-label]="i18n.t(row.isActive ? 'platform.deactivate' : 'platform.activate')" [title]="i18n.t(row.isActive ? 'platform.deactivate' : 'platform.activate')"><app-icon name="power" [size]="15" /></button>
+    </ng-template>
+  </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="facade.announcements.value()?.totalCount ?? 0" (pageChange)="onPage($event)" />
+</app-section-card>
+
+<app-drawer [(open)]="drawerOpen" [title]="i18n.t(editing() === null ? 'platform.announcements.add' : canManage() ? 'platform.announcements.edit' : 'platform.announcements.view')" size="lg" (closed)="onDrawerClosed()">
+  @if (form(); as form) {
+    <form id="platform-announcement-form" [formGroup]="form" appSaveShortcut (appSaveShortcut)="save()" (ngSubmit)="save()" novalidate>
+      @if (blockedSave.blocked()) {
+        <p class="problem" role="alert">{{ i18n.t('shared.masterData.invalid') }}</p>
+      }
+      @if (saveProblem(); as problem) {
+        <p class="problem" role="alert">{{ problemText(problem) }}</p>
+      }
+      @if (editing(); as current) {
+        <p class="info-strip small">
+          {{ i18n.t('platform.announcements.state.' + state(current)) }} ·
+          {{ i18n.tf('platform.announcements.counters', { impressions: count(current.impressions), clicks: count(current.clicks) }) }}
+        </p>
+      } @else {
+        <p class="info-strip small">{{ i18n.t('platform.announcements.draftHint') }}</p>
+      }
+
+      <h3 class="section-title">{{ i18n.t('platform.announcements.section.content') }}</h3>
+      <div class="form-grid">
+        <app-form-field [label]="i18n.t('platform.announcements.field.titleEn')" [problem]="saveProblem()">
+          <input type="text" formControlName="titleEn" dir="ltr" lang="en" [maxLength]="limits.title" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.announcements.field.titleAr')" [problem]="saveProblem()">
+          <input type="text" formControlName="titleAr" dir="rtl" lang="ar" [maxLength]="limits.title" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.announcements.field.bodyEn')" [problem]="saveProblem()">
+          <textarea formControlName="bodyEn" rows="3" dir="ltr" lang="en" [maxLength]="limits.body"></textarea>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.announcements.field.bodyAr')" [problem]="saveProblem()">
+          <textarea formControlName="bodyAr" rows="3" dir="rtl" lang="ar" [maxLength]="limits.body"></textarea>
+        </app-form-field>
+        <app-form-field class="full" [label]="i18n.t('platform.announcements.field.linkUrl')" [hint]="i18n.t('platform.announcements.hint.linkUrl')" [problem]="saveProblem()">
+          <input type="url" formControlName="linkUrl" dir="ltr" [maxLength]="limits.link" placeholder="https://" autocomplete="off" spellcheck="false" />
+        </app-form-field>
+      </div>
+
+      <h3 class="section-title">{{ i18n.t('platform.announcements.section.placement') }}</h3>
+      <div class="form-grid">
+        <app-form-field [label]="i18n.t('platform.announcements.field.placement')" [hint]="i18n.t('platform.announcements.hint.placement')">
+          <select formControlName="placement">
+            @for (placement of placements; track placement) {
+              <option [value]="placement">{{ placementLabel(placement) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <span></span>
+        <app-form-field [label]="i18n.t('platform.announcements.field.from')" [problem]="saveProblem()">
+          <input type="datetime-local" formControlName="from" />
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.announcements.field.to')" [hint]="i18n.t('platform.announcements.hint.to')" [problem]="saveProblem()">
+          <input type="datetime-local" formControlName="to" />
+        </app-form-field>
+      </div>
+
+      <h3 class="section-title">{{ i18n.t('platform.announcements.section.audience') }}</h3>
+      <div class="form-grid">
+        <app-form-field [label]="i18n.t('platform.announcements.field.country')">
+          <select formControlName="countryId">
+            <option value="">{{ i18n.t('platform.announcements.audience.anyCountry') }}</option>
+            @for (country of facade.countryOptions(); track country.id) {
+              <option [value]="country.id">{{ name(country) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.announcements.field.plan')">
+          <select formControlName="planId">
+            <option value="">{{ i18n.t('platform.announcements.audience.anyPlan') }}</option>
+            @for (plan of facade.planOptions(); track plan.id) {
+              <option [value]="plan.id">{{ plan.code }} · {{ name(plan) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <app-form-field [label]="i18n.t('platform.announcements.field.status')">
+          <select formControlName="status">
+            @for (status of statuses; track status) {
+              <option [value]="status">{{ statusLabel(status) }}</option>
+            }
+          </select>
+        </app-form-field>
+        <div class="full stack">
+          <div class="row-gap">
+            <span class="small">{{ i18n.tf('platform.announcements.audience.picked', { count: count(pickedClients().size) }) }}</span>
+            @if (pickedClients().size > 0 && !form.disabled) {
+              <button type="button" class="btn sm ghost" (click)="clearClients(form)">{{ i18n.t('platform.announcements.audience.clear') }}</button>
+            }
+          </div>
+          <input type="search" class="inp" [value]="clientSearch()" (input)="onClientSearch($event)" [placeholder]="i18n.t('platform.announcements.audience.searchClients')" [attr.aria-label]="i18n.t('platform.announcements.audience.searchClients')" />
+          <ul class="client-list" [attr.aria-label]="i18n.t('platform.announcements.field.clients')">
+            @for (client of visibleClients(); track client.id) {
+              <li>
+                <label>
+                  <input type="checkbox" [checked]="pickedClients().has(client.id)" [disabled]="form.disabled" (change)="toggleClient(form, client.id, $event)" />
+                  <span>{{ name(client) }}</span>
+                  <span class="small muted mono">{{ client.portalSlug }}</span>
+                </label>
+              </li>
+            } @empty {
+              <li class="small muted">{{ i18n.t('platform.announcements.audience.noClients') }}</li>
+            }
+          </ul>
+          <span class="small muted">{{ i18n.t('platform.announcements.hint.clients') }}</span>
+        </div>
+      </div>
+
+      <h3 class="section-title">{{ i18n.t('platform.announcements.section.image') }}</h3>
+      @if (editing(); as current) {
+        <div class="image-row">
+          <div class="image-box">
+            @if (imageUrl(); as url) {
+              <img [src]="url" [alt]="i18n.t('platform.announcements.section.image')" />
+            } @else {
+              <span class="small muted">{{ i18n.t('platform.announcements.image.none') }}</span>
+            }
+          </div>
+          <div class="stack" *appCan="permissions.platformManage">
+            <div class="row-gap">
+              <label class="btn sm" [class.disabled]="facade.uploadImage.pending()">
+                <input class="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" [disabled]="facade.uploadImage.pending()" (change)="onImageSelected($event)" />
+                {{ i18n.t(current.imageVersion !== null ? 'platform.announcements.image.replace' : 'platform.announcements.image.upload') }}
+              </label>
+              @if (current.imageVersion !== null) {
+                <button type="button" class="btn sm ghost" [disabled]="facade.removeImage.pending()" (click)="removeImage()">{{ i18n.t('platform.announcements.image.remove') }}</button>
+              }
+            </div>
+            <span class="small muted">{{ i18n.t('platform.announcements.image.hint') }}</span>
+            @if (imageError(); as error) {
+              <p class="problem" role="alert">{{ error }}</p>
+            }
+          </div>
+        </div>
+      } @else {
+        <p class="small muted">{{ i18n.t('platform.announcements.image.afterSave') }}</p>
+      }
+
+      <h3 class="section-title">{{ i18n.t('platform.announcements.section.preview') }}</h3>
+      <div class="preview-grid">
+        <app-announcement-preview [placement]="previewPlacement()" [title]="formValue()?.titleEn ?? ''" [body]="formValue()?.bodyEn || null" [link]="formValue()?.linkUrl || null"
+                                  [linkLabel]="linkLabel('en')" [imageUrl]="imageUrl()" lang="en" dir="ltr" />
+        <app-announcement-preview [placement]="previewPlacement()" [title]="formValue()?.titleAr ?? ''" [body]="formValue()?.bodyAr || null" [link]="formValue()?.linkUrl || null"
+                                  [linkLabel]="linkLabel('ar')" [imageUrl]="imageUrl()" lang="ar" dir="rtl" />
+      </div>
+    </form>
+  }
+  <ng-container drawerFooter>
+    <button type="button" class="btn" (click)="drawerOpen.set(false)">{{ i18n.t('platform.close') }}</button>
+    <button type="submit" form="platform-announcement-form" class="btn primary" *appCan="permissions.platformManage" [disabled]="facade.save.pending()">
+      {{ facade.save.pending() ? i18n.t('platform.saving') : i18n.t('platform.save') }}
+    </button>
+  </ng-container>
+</app-drawer>

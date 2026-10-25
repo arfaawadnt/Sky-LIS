@@ -54,3 +54,6 @@ public sealed record ContractPriceNegotiated(Guid ContractPricingId, Guid Contra
 public sealed record ContractPriceExclusionCleared(Guid ContractPricingId, Guid ContractTierId, Guid ServiceId, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
 public sealed record ContractPricingCopied(Guid ContractPricingId, Guid ContractTierId, Guid SourceContractPricingId, Guid SourceTierId, decimal Factor, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+/// <summary>C7 Report design (LIS-CR-010, C-14): the tier's reports print in <paramref name="Design"/>; null = no override (template, then laboratory).</summary>
+public sealed record ContractReportDesignSet(Guid ContractPricingId, Guid ContractTierId, Catalogue.ReportDesign? Design, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);

@@ -64,6 +64,15 @@ public sealed class Tenant : AggregateRoot
 
     public string Address { get; private set; }
 
+    /// <summary>LIS-CR-008 C-04: the city (markaz) of the laboratory under its governorate, optional (<see cref="Locate"/>).</summary>
+    public Guid? CityId { get; private set; }
+
+    /// <summary>LIS-CR-008 C-04: the district under the city, optional.</summary>
+    public Guid? DistrictId { get; private set; }
+
+    /// <summary>LIS-CR-008 C-04: the area (village) under the district, optional.</summary>
+    public Guid? AreaId { get; private set; }
+
     /// <summary>E.164, validated by the country's mobile length.</summary>
     public string Mobile { get; private set; }
 
@@ -201,9 +210,35 @@ public sealed class Tenant : AggregateRoot
         Raise(new TenantDeactivated(Id, cleaned, nowUtc));
     }
 
-    /// <summary>INV-PLT-003: the client's users may sign in while Active, or in Trial before the trial ends.</summary>
-    public bool IsUsableAt(DateTimeOffset nowUtc) =>
-        Status == TenantStatus.Active || (Status == TenantStatus.Trial && (TrialEndsAtUtc is null || TrialEndsAtUtc > nowUtc));
+    /// <summary>
+    /// LIS-CR-008 C-04: places the laboratory in a city / district / area of its governorate (any state). The locality was
+    /// checked by <see cref="Locality.Resolve"/>; one resolved against another governorate is refused (GEO-020). Call after
+    /// <see cref="Provision"/> or <see cref="UpdateProfile"/>, so the check uses the governorate just set;
+    /// <see cref="Locality.None"/> clears it.
+    /// </summary>
+    public void Locate(Locality locality)
+    {
+        ArgumentNullException.ThrowIfNull(locality);
+        locality.EnsureIn(GovernorateId);
+        CityId = locality.CityId;
+        DistrictId = locality.DistrictId;
+        AreaId = locality.AreaId;
+    }
+
+    /// <summary>
+    /// INV-PLT-003 as amended by LIS-CR-012 (D-3): the client's users reach sign-in unless the client is deactivated (<c>CLI-020</c>).
+    /// A trial past its end is no longer refused here: it runs its grace period and then expires, and what an expired client's
+    /// users may do is decided by <see cref="SubscriptionState"/> (<c>SUB-020</c> / <c>SUB-021</c>).
+    /// </summary>
+    public bool IsUsableAt(DateTimeOffset nowUtc) => Status != TenantStatus.Inactive;
+
+    /// <summary>
+    /// LIS-CR-012: the subscription state at <paramref name="nowUtc"/> — Ok, Warning, Grace or Expired with the days left — from the
+    /// trial end, the wallet (<paramref name="wallet"/>: balance, plan fee, zero mark) and the platform's grace days
+    /// (<see cref="SubscriptionTerms.Evaluate"/>).
+    /// </summary>
+    public SubscriptionStatus SubscriptionState(DateTimeOffset nowUtc, int graceDays, WalletPosition? wallet) =>
+        SubscriptionTerms.Evaluate(Status, TrialEndsAtUtc, wallet, graceDays, nowUtc);
 
     /// <summary>LIS-CR-005: the laboratory's sign-in address, <c>{portalBaseUrl}/lab/{slug}</c>.</summary>
     public string PortalUrl(string portalBaseUrl) => PortalUrlOf(PortalSlug, portalBaseUrl);

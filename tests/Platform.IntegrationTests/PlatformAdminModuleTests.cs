@@ -139,7 +139,8 @@ public sealed class PlatformAdminModuleTests(DatabaseFixture fixture)
         Assert.True(await lookup.IsActiveAsync(Guid.CreateVersion7(), CancellationToken.None));   // no client record (development seeding)
         Assert.True(await lookup.IsActiveAsync(active, CancellationToken.None));
         Assert.False(await lookup.IsActiveAsync(inactive, CancellationToken.None));
-        Assert.False(await lookup.IsActiveAsync(trial, CancellationToken.None));                  // a one-day trial started a year ago
+        Assert.True(await lookup.IsActiveAsync(trial, CancellationToken.None));                   // a one-day trial started a year ago: LIS-CR-012, no longer CLI-020 — expired (SUB-020), decided by the subscription state
+        Assert.True((await scope.ServiceProvider.GetRequiredService<ISubscriptionStateLookup>().FindAsync(trial, CancellationToken.None)).IsExpired);
     }
 
     [DatabaseFact]

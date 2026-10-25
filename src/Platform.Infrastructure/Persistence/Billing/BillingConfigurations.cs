@@ -153,6 +153,12 @@ internal sealed class CashClosingConfiguration : IEntityTypeConfiguration<CashCl
             Money(totals.Property(value => value.OutstandingBalance).HasColumnName("outstanding_balance"));
             Money(totals.Property(value => value.DiscountTotal).HasColumnName("discount_total"));
             totals.Property(value => value.VisitCount).HasColumnName("visit_count").IsRequired();
+
+            // the cash ledger (LIS-CR-011, C-15): opening balance and cash entries of the period; 0 on closings made before
+            Money(totals.Property(value => value.OpeningBalance).HasColumnName("opening_balance"));
+            Money(totals.Property(value => value.CashIn).HasColumnName("cash_in"));
+            Money(totals.Property(value => value.CashOut).HasColumnName("cash_out"));
+            totals.Property(value => value.EntryCount).HasColumnName("entry_count").IsRequired();
         });
         builder.Navigation(closing => closing.Totals).IsRequired();
 

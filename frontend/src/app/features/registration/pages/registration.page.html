@@ -85,7 +85,6 @@
         class="flags"
         [urgent]="facade.header().urgent"
         [biohazard]="facade.header().biohazard"
-        [collectedOutside]="facade.header().collectedOutside"
         (toggled)="toggleFlag($event)"
       />
     </app-section-card>
@@ -208,7 +207,18 @@
         </table>
       </div>
 
-      @if ((facade.result()?.tubes ?? []).length > 0) {
+      <!-- LIS-CR-008 C-02: "collected outside the laboratory" per sample (new visit: switches; saved visit: as recorded) -->
+      @if (facade.sampleRows().length > 0) {
+        <app-reg-sample-flags
+          [rows]="facade.sampleRows()"
+          [readOnly]="facade.isEdit()"
+          (outsideChanged)="facade.setOutside($event.key, $event.outside)"
+          (collectedAtChanged)="facade.setCollectedAt($event.key, $event.collectedAt)"
+          (allChanged)="facade.setAllOutside($event)"
+        />
+      }
+
+      @if (facade.isEdit() && (facade.result()?.tubes ?? []).length > 0) {
         <p class="small tubes">
           <b>{{ i18n.t('registration.services.tubes') }}:</b>
           @for (tube of facade.result()?.tubes ?? []; track tube.key + (tube.existingTubeId ?? '')) {

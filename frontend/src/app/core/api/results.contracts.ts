@@ -1,6 +1,7 @@
 /** Results module contracts mirrored from `Platform.Contracts.Results` (bootstrap until the OpenAPI generator lands, 01 §6.2). */
 
 import type { SortRequest } from './paging';
+import type { ReportDesign, ReportDesignSource } from './report-designs';
 
 export type { Paged } from './paging';
 
@@ -263,6 +264,9 @@ export interface ReportUnitView {
   /** Results of this unit outside the user's result rights (a print-alone service spanning clinical groups), and their groups. */
   readonly hiddenResults: number;
   readonly hiddenGroups: readonly LookupOption[];
+  /** The design this unit's report prints in (LIS-CR-010). */
+  readonly design?: ReportDesign | null;
+  readonly designSource?: ReportDesignSource | null;
 }
 
 export interface ResultSettingsView {
@@ -461,6 +465,16 @@ export interface ReportLine {
   readonly paragraphs: readonly FormattedParagraphDto[] | null;
   readonly culture: CultureView | null;
   readonly methodology: string | null;
+  /** Cumulative design (LIS-CR-010): the last three signed values of earlier visits, newest first; absent otherwise. */
+  readonly previous?: readonly ReportPreviousValue[] | null;
+}
+
+export interface ReportPreviousValue {
+  readonly accession: string;
+  readonly registeredAtUtc: string;
+  readonly value: string | null;
+  readonly unit: string | null;
+  readonly flag: ResultFlag | null;
 }
 
 export interface ReportSection {
@@ -509,6 +523,9 @@ export interface LaboratoryReportDocument {
   readonly qrValue: string;
   readonly generatedAtUtc: string;
   readonly generatedBy: string | null;
+  /** The resolved layout (LIS-CR-010: contract → template → laboratory); older servers send none (Classic). */
+  readonly design?: ReportDesign;
+  readonly designSource?: ReportDesignSource;
 }
 
 export interface WorklistDocument {

@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, inject, input, output } from '@angu
 
 import { I18nService } from '../../../core/i18n/i18n.service';
 
-/** A visit flag of CP-06. */
-export type VisitFlag = 'urgent' | 'biohazard' | 'collectedOutside';
+/** A visit flag of CP-06 ("collected outside" moved to each sample, LIS-CR-008 C-02: `ui/sample-flags`). */
+export type VisitFlag = 'urgent' | 'biohazard';
 
 /**
  * The visit flags as toggle buttons (UX option B): one press turns a flag on or off, `aria-pressed` carries the state and
@@ -15,7 +15,6 @@ export type VisitFlag = 'urgent' | 'biohazard' | 'collectedOutside';
   template: `
     <button type="button" class="flag urgent" [attr.aria-pressed]="urgent()" (click)="toggled.emit('urgent')">{{ i18n.t('registration.flag.urgent') }}</button>
     <button type="button" class="flag" [attr.aria-pressed]="biohazard()" (click)="toggled.emit('biohazard')">{{ i18n.t('registration.flag.biohazard') }}</button>
-    <button type="button" class="flag" [attr.aria-pressed]="collectedOutside()" (click)="toggled.emit('collectedOutside')">{{ i18n.t('registration.flag.collectedOutside') }}</button>
   `,
   styles: `
     :host {
@@ -69,6 +68,5 @@ export class VisitFlagsComponent {
 
   readonly urgent = input(false);
   readonly biohazard = input(false);
-  readonly collectedOutside = input(false);
   readonly toggled = output<VisitFlag>();
 }

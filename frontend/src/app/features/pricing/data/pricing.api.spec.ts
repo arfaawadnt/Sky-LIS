@@ -32,6 +32,7 @@ describe('PricingApi empty answers', () => {
     ['negotiate a price', (a) => a.negotiatePrice('t1', 's1', {} as never), 'PUT', `${PRICING_API.contractPricing}/t1/prices/s1`],
     ['clear an exclusion', (a) => a.clearExclusion('t1', 's1'), 'DELETE', `${PRICING_API.contractPricing}/t1/prices/s1/exclusion`],
     ['set a price alert', (a) => a.setAlert('t1', 's1', null), 'PUT', `${PRICING_API.contractPricing}/t1/prices/s1/alert`],
+    ['set a report design (LIS-CR-010)', (a) => a.setReportDesign('t1', 'Letterhead'), 'PUT', `${PRICING_API.contractPricing}/t1/report-design`],
     ['copy a contract', (a) => a.copyContractPricing('t1', 't2', null), 'POST', `${PRICING_API.contractPricing}/t1/copy-from/t2`],
   ];
 

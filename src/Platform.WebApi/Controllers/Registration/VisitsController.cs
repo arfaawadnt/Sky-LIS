@@ -68,7 +68,8 @@ public sealed class VisitsController(ISender sender) : ControllerBase
                 body.PreparationAnswers,
                 body.Discount,
                 body.ConfirmFrequencyWarnings,
-                body.UtcOffsetMinutes),
+                body.UtcOffsetMinutes,
+                body.Samples),
             cancellationToken);
         return Created($"/api/v1/registration/visits/{created.Id}", created);
     }
@@ -112,7 +113,7 @@ public sealed class VisitsController(ISender sender) : ControllerBase
     public async Task<IActionResult> UpdateDetails(Guid id, [FromBody] UpdateVisitDetailsRequest body, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
-        await sender.Send(new UpdateVisitDetailsCommand(id, body.TreatmentNo, body.ReferringDoctorId, body.InsuranceId, body.Urgent, body.Biohazard, body.CollectedOutside), cancellationToken);
+        await sender.Send(new UpdateVisitDetailsCommand(id, body.TreatmentNo, body.ReferringDoctorId, body.InsuranceId, body.Urgent, body.Biohazard), cancellationToken);
         return NoContent();
     }
 

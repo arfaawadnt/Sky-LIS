@@ -137,6 +137,32 @@ describe('LocationsFacade (SA-11b Locations, LIS-CR-003 §3)', () => {
     expect(facade.toggle.problem()).toBeNull();
   });
 
+  it('LIS-CR-008 C-04: imports a locality file — a dry run writes nothing, an applied run reloads the columns', async () => {
+    await openCairo();
+    const file = new File(['city_en,city_ar\nShubra,شبرا\n'], 'cairo.csv', { type: 'text/csv' });
+    const counts = { created: 1, existing: 0, refused: 0 };
+    const none = { created: 0, existing: 0, refused: 0 };
+
+    const checking = facade.importFile.execute({ file, dryRun: true });
+    await settle();
+    const dry = backend.expectOne((r) => r.method === 'POST' && r.url === `${PLATFORM_API.governorates}/g-cairo/localities/import?dryRun=true`);
+    expect(dry.request.body instanceof FormData && (dry.request.body.get('file') as File).name).toBe('cairo.csv');
+    dry.flush({ rows: 1, cities: counts, districts: none, areas: none, dryRun: true, applied: false, errors: [] });
+    expect((await checking)?.cities.created).toBe(1);
+    TestBed.tick();
+    await settle();
+    backend.expectNone((r) => r.url.endsWith('/cities'));   // nothing written, nothing reloaded
+
+    const importing = facade.importFile.execute({ file, dryRun: false });
+    await settle();
+    backend.expectOne((r) => r.url.endsWith('/localities/import?dryRun=false')).flush({ rows: 1, cities: counts, districts: none, areas: none, dryRun: false, applied: true, errors: [] });
+    expect((await importing)?.applied).toBe(true);
+    TestBed.tick();
+    await settle();
+    backend.expectOne((r) => r.url === `${PLATFORM_API.governorates}/g-cairo/cities`).flush([nasr]);
+    await settle();
+  });
+
   it('forgets the previous governorate when another one opens', async () => {
     await openCairo();
     facade.select('cities', 'c-nasr');

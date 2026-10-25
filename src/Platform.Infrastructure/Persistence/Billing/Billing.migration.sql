@@ -121,3 +121,52 @@ $fn$;
 -- NULLs stays immutable like the others and its void still passes; app.billing_refuse_change() names no column. No
 -- function or trigger needs a change. app.treasuries and app.treasury_access_requests stay as orphan tables (history);
 -- old movements and closings keep their treasury_id and device_id. Nothing to backfill: new rows simply carry NULL.
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 2026-10-24 Cash ledger (change request LIS-CR-011, package P-CSH, point C-15). Appended to the ReviewFeatures migration
+-- after EF created app.cash_entries (with RLS declared in the migration) and added opening_balance, cash_in, cash_out and
+-- entry_count (NOT NULL DEFAULT 0) to app.cash_closings. Idempotent.
+-- ---------------------------------------------------------------------------------------------------------------------
+
+-- INV-BIL-004 for cash entries: never deleted, never edited; the only change is the void (Posted -> Voided with reason,
+-- voider and time), once.
+CREATE OR REPLACE FUNCTION app.billing_guard_cash_entry() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'cash entries are never deleted (entry %)', OLD.number;
+    END IF;
+
+    IF OLD.status = 'Voided' THEN
+        RAISE EXCEPTION 'a voided cash entry is frozen (entry %)', OLD.number;
+    END IF;
+
+    IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
+       OR NEW.id IS DISTINCT FROM OLD.id
+       OR NEW.number IS DISTINCT FROM OLD.number
+       OR NEW.kind IS DISTINCT FROM OLD.kind
+       OR NEW.category IS DISTINCT FROM OLD.category
+       OR NEW.amount IS DISTINCT FROM OLD.amount
+       OR NEW.method IS DISTINCT FROM OLD.method
+       OR NEW.method_code IS DISTINCT FROM OLD.method_code
+       OR NEW.reference IS DISTINCT FROM OLD.reference
+       OR NEW.reason IS DISTINCT FROM OLD.reason
+       OR NEW.note IS DISTINCT FROM OLD.note
+       OR NEW.cashier_user_id IS DISTINCT FROM OLD.cashier_user_id
+       OR NEW.branch_id IS DISTINCT FROM OLD.branch_id
+       OR NEW.posted_at_utc IS DISTINCT FROM OLD.posted_at_utc THEN
+        RAISE EXCEPTION 'a cash entry changes only by its void (entry %)', OLD.number;
+    END IF;
+
+    RETURN NEW;
+END
+$fn$;
+
+DROP TRIGGER IF EXISTS cash_entries_guard ON app.cash_entries;
+CREATE TRIGGER cash_entries_guard BEFORE UPDATE OR DELETE ON app.cash_entries FOR EACH ROW EXECUTE FUNCTION app.billing_guard_cash_entry();
+-- A row trigger never fires on TRUNCATE (validation 2026-10-11 D-01): refuse it with a statement trigger, as app.payments.
+DROP TRIGGER IF EXISTS cash_entries_no_truncate ON app.cash_entries;
+CREATE TRIGGER cash_entries_no_truncate BEFORE TRUNCATE ON app.cash_entries FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+
+-- Reviewed: app.cash_closings keeps its trigger cash_closings_immutable; ALTER TABLE ... ADD COLUMN ... DEFAULT 0 fires no row
+-- trigger, so existing closings read opening_balance = cash_in = cash_out = entry_count = 0 and their expected_cash (stored) is
+-- unchanged. Nothing to backfill.

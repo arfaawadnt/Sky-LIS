@@ -71,6 +71,16 @@ public sealed class VisitTube : Entity, ITenantScoped
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
+    /// <summary>
+    /// LIS-CR-008 C-02: the sample of this tube was collected outside the laboratory (brought by the patient or another
+    /// site). Set at registration only; Samples records the tube as Collected at <see cref="CollectedOutsideAtUtc"/>
+    /// (else the registration time) whatever the auto-collect parameter says; the label prints "EXT".
+    /// </summary>
+    public bool CollectedOutside { get; private set; }
+
+    /// <summary>The collection time the clerk typed for an outside sample; null = the registration time.</summary>
+    public DateTimeOffset? CollectedOutsideAtUtc { get; private set; }
+
     public TubeKey Key => new(ClinicalGroupId, SampleTypeId, SampleConditionId);
 
     internal static VisitTube Create(Guid visitId, string sampleNumber, TubeSpec spec, DateTimeOffset nowUtc)
@@ -82,6 +92,12 @@ public sealed class VisitTube : Entity, ITenantScoped
         }
 
         return new VisitTube(visitId, number, spec, nowUtc);
+    }
+
+    internal void MarkCollectedOutside(DateTimeOffset? collectedAtUtc)
+    {
+        CollectedOutside = true;
+        CollectedOutsideAtUtc = collectedAtUtc;
     }
 
     private static string Clip(string? value, int max)

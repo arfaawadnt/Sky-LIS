@@ -173,6 +173,34 @@ internal static class RegistrationRules
     }
 
     public static int UtcOffset(int? minutes) => Math.Clamp(minutes ?? 0, -Visit.MaxUtcOffsetMinutes, Visit.MaxUtcOffsetMinutes);
+
+    /// <summary>The longest tube key text (<c>group:type:condition</c> in the 32-digit form).</summary>
+    public const int MaxTubeKeyLength = 100;
+
+    /// <summary>
+    /// LIS-CR-008 C-02: the order's sample entries marked "collected outside" as the aggregate takes them; an entry whose
+    /// tube key is not a key is refused (REG-040). Entries with the switch off are ignored. Null when none is marked.
+    /// </summary>
+    public static IReadOnlyList<OutsideSample>? OutsideSamples(IReadOnlyList<OrderSampleRequest>? samples)
+    {
+        var marked = (samples ?? []).Where(sample => sample is { CollectedOutside: true }).ToList();
+        if (marked.Count == 0)
+        {
+            return null;
+        }
+
+        return [.. marked.Select(sample =>
+        {
+            if (string.IsNullOrWhiteSpace(sample.TubeKey))
+            {
+                return new OutsideSample(null, sample.SampleTypeId, sample.CollectedAtUtc);
+            }
+
+            var key = OrderPlanViews.ParseKey(sample.TubeKey)
+                ?? throw new DomainException(RegistrationCodes.OutsideSampleUnknown, "A sample marked as collected outside names an unknown tube.", DomainFault.Validation);
+            return new OutsideSample(key, null, sample.CollectedAtUtc);
+        })];
+    }
 }
 
 /// <summary>The ports a visit registration needs (V1, B4, T1, T2).</summary>
@@ -209,7 +237,8 @@ internal sealed record VisitRegistrationInput(
     bool ConfirmFrequencyWarnings,
     int UtcOffsetMinutes,
     Guid? CollectorUserId,
-    bool HeaderChecked = false);
+    bool HeaderChecked = false,
+    IReadOnlyList<OutsideSample>? OutsideSamples = null);
 
 /// <summary>
 /// V1 without the commit: every precondition of the transition table, the order plan, the numbers (accession, samples)
@@ -265,7 +294,8 @@ internal sealed class VisitRegistrar(RegistrarPorts ports)
                 input.Biohazard,
                 input.CollectedOutside,
                 input.UtcOffsetMinutes,
-                input.CollectorUserId),
+                input.CollectorUserId,
+                input.OutsideSamples),
             items,
             answers,
             discount,
@@ -297,6 +327,25 @@ internal static class OrderPlanViews
         new(question.PreparationId, question.Code, question.QuestionEn, question.QuestionAr, question.AnswerType.ToString(), question.Options, question.Gender.ToString(), question.ServiceIds);
 
     public static string KeyText(TubeKey key) => $"{key.ClinicalGroupId:N}:{key.SampleTypeId:N}:{key.SampleConditionId?.ToString("N") ?? "-"}";
+
+    /// <summary>The reverse of <see cref="KeyText"/> (<c>group:type:condition</c>, condition <c>-</c> when none); null when the text is not a key.</summary>
+    public static TubeKey? ParseKey(string? text)
+    {
+        var parts = (text ?? string.Empty).Trim().Split(':');
+        if (parts.Length != 3
+            || !Guid.TryParse(parts[0], out var group)
+            || !Guid.TryParse(parts[1], out var type))
+        {
+            return null;
+        }
+
+        if (parts[2] == "-")
+        {
+            return new TubeKey(group, type, null);
+        }
+
+        return Guid.TryParse(parts[2], out var condition) ? new TubeKey(group, type, condition) : null;
+    }
 
     private static string? KeyOf(VisitOrderItem item) =>
         !item.Reserved && item.Tube is not null && Visit.SampleCarryingTypes.Contains(item.ServiceType) ? KeyText(item.Tube.Key) : null;

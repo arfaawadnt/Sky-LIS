@@ -58,4 +58,14 @@ describe('TrackerBoardComponent (layout B · stage lanes)', () => {
     expect(host.querySelector('app-tracker-visit-card')?.textContent).toContain('tracker.flag.panic');
     expect(host.querySelector('app-tracker-visit-card a')?.getAttribute('href')).toBe('/registration/accession?visitId=visit-1');
   });
+
+  it('tags a card "ext" when a sample of the visit was collected outside the laboratory (LIS-CR-008 C-02)', async () => {
+    const samples = { total: 2, ordered: 0, collected: 1, received: 1, rejected: 0, firstRejectionReason: null, firstRejectionReasonAr: null };
+    await show([lane('InLab', { items: [trackerItem({ samples: { ...samples, collectedOutside: 1 } }), trackerItem({ visitId: 'visit-2', samples: { ...samples, collectedOutside: 0 } }), trackerItem({ visitId: 'visit-3', samples: null })], totalCount: 3 })]);
+
+    const cards = host.querySelectorAll('app-tracker-visit-card');
+    expect(cards[0]?.textContent).toContain('tracker.samples.ext');
+    expect(cards[1]?.textContent).not.toContain('tracker.samples.ext');
+    expect(cards[2]?.textContent).not.toContain('tracker.samples.ext');
+  });
 });

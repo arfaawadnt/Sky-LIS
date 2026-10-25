@@ -69,11 +69,14 @@ describe('VisitSamplesPage (CP-15)', () => {
     await render();
     backend
       .expectOne((request) => request.url === SAMPLES_API.samples && request.params.get('accession') === 'ACC-2026-00001')
-      .flush(page([sampleItem({ id: 'a', sampleNumber: 'SMP-1', status: 'Received' }), sampleItem({ id: 'b', sampleNumber: 'SMP-2', status: 'Replaced', unitCode: 'H' })]));
+      .flush(page([sampleItem({ id: 'a', sampleNumber: 'SMP-1', status: 'Received', collectedOutside: true }), sampleItem({ id: 'b', sampleNumber: 'SMP-2', status: 'Replaced', unitCode: 'H' })]));
     await render();
 
     expect(host.querySelectorAll('app-data-table tbody tr').length).toBe(2);
     expect(host.textContent).toContain('ACC-2026-00001');
+    const rows = host.querySelectorAll('app-data-table tbody tr');
+    expect(rows[0]?.textContent).toContain('samples.outside');   // LIS-CR-008 C-02: collected outside the laboratory
+    expect(rows[1]?.textContent).not.toContain('samples.outside');
     const printButtons = [...host.querySelectorAll<HTMLButtonElement>('app-data-table button')].filter((button) => button.textContent?.includes('samples.labels.printOne'));
     expect(printButtons.length).toBe(1); // the replaced tube prints no label
 

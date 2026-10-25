@@ -60,21 +60,30 @@ public sealed class ReportTemplate : CatalogueBRecord
 
     public LocalizedText? FooterText { get; private set; }
 
+    /// <summary>
+    /// The report design this template imposes on the reports of its clinical groups (LIS-CR-010, C-14), or
+    /// <see langword="null"/> to follow the laboratory parameter; a payer contract's design still wins
+    /// (<see cref="ReportDesigns.Resolve"/>). Only result report templates carry one (CAT-273).
+    /// </summary>
+    public ReportDesign? Design { get; private set; }
+
     /// <summary>T1 Create (<c>catalogue.create</c>): a new template has no images yet.</summary>
-    public static ReportTemplate Create(LocalizedText name, ReportTemplateType type, bool showQr, ReportTemplateLanguage language, LocalizedText? headerText, LocalizedText? footerText, DateTimeOffset nowUtc)
+    public static ReportTemplate Create(LocalizedText name, ReportTemplateType type, bool showQr, ReportTemplateLanguage language, LocalizedText? headerText, LocalizedText? footerText, DateTimeOffset nowUtc, ReportDesign? design = null)
     {
         var template = new ReportTemplate(Guid.CreateVersion7());
-        template.Update(name, type, showQr, language, headerText, footerText);
+        template.Update(name, type, showQr, language, headerText, footerText, design);
         template.Raise(new ReportTemplateCreated(template.Id, template.Type, template.Name.En, nowUtc));
         return template;
     }
 
-    /// <summary>T2 Edit (<c>catalogue.edit</c>): the texts and choices; the images are kept.</summary>
-    public void Update(LocalizedText name, ReportTemplateType type, bool showQr, ReportTemplateLanguage language, LocalizedText? headerText, LocalizedText? footerText)
+    /// <summary>T2 Edit (<c>catalogue.edit</c>): the texts and choices, the design override included (null clears it); the images are kept.</summary>
+    public void Update(LocalizedText name, ReportTemplateType type, bool showQr, ReportTemplateLanguage language, LocalizedText? headerText, LocalizedText? footerText, ReportDesign? design = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         Require(Enum.IsDefined(type), CatalogueBCodes.TextInvalid, "The template type is unknown.", DomainFault.Validation);
         Require(Enum.IsDefined(language), CatalogueBCodes.TextInvalid, "The template language is unknown.", DomainFault.Validation);
+        Require(design is null || Enum.IsDefined(design.Value), CatalogueBCodes.TextInvalid, "The report design is unknown.", DomainFault.Validation);
+        Require(design is null || ReportDesigns.AppliesTo(type), CatalogueBCodes.TemplateDesignNotApplicable, "Only the templates of result reports (results, culture, text) carry a report design.", DomainFault.Validation);
 
         Name = name;
         Type = type;
@@ -82,6 +91,7 @@ public sealed class ReportTemplate : CatalogueBRecord
         Language = language;
         HeaderText = headerText;
         FooterText = footerText;
+        Design = design;
     }
 
     /// <summary>The file id of one image, or <see langword="null"/> when none is attached.</summary>

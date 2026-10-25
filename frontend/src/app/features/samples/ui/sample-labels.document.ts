@@ -20,7 +20,8 @@ const CLIP = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
 
 /**
  * Barcode labels of samples (CP-15, LDM §2.2 label content): unit letter, accession, date/time, patient number and
- * name, the sample number as Code 128, sample type · condition, branch and service names; one `.print-page` per copy.
+ * name, the sample number as Code 128, sample type · condition, branch and service names, "EXT" for a sample collected
+ * outside the laboratory (LIS-CR-008 C-02); one `.print-page` per copy.
  * Printed through `PrintService` on the label page sizes; layout uses inline styles so the rendered HTML carries it
  * into the print frame unchanged.
  */
@@ -33,6 +34,10 @@ const CLIP = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
         <div [style]="line">
           <b style="font-size:1.35em;">{{ label.unitCode ?? '' }}</b>
           <span style="font-weight:600;">{{ label.accession }}</span>
+          @if (label.collectedOutside) {
+            <!-- LIS-CR-008 C-02: collected outside the laboratory -->
+            <b class="outside" style="border:0.25mm solid #000;padding:0 0.5mm;">EXT</b>
+          }
           <span style="margin-inline-start:auto;">{{ when(label) }}</span>
         </div>
         <div [style]="clip" style="font-weight:600;">{{ patient(label) }}</div>

@@ -378,6 +378,168 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Platform.Domain.Billing.CashEntry", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<Guid>("CashierUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cashier_user_id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_display_name");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("method");
+
+                    b.Property<string>("MethodCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("method_code");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("modified_by_display_name");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("number");
+
+                    b.Property<DateTimeOffset>("PostedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("posted_at_utc");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reference");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("void_reason");
+
+                    b.Property<DateTimeOffset?>("VoidedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voided_at_utc");
+
+                    b.Property<Guid?>("VoidedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voided_by_user_id");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_cash_entries");
+
+                    b.HasIndex("CashierUserId")
+                        .HasDatabaseName("ix_cash_entries_cashier_user_id");
+
+                    b.HasIndex("VoidedByUserId")
+                        .HasDatabaseName("ix_cash_entries_voided_by_user_id");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cash_entries_tenant_id_number");
+
+                    b.HasIndex("TenantId", "BranchId", "PostedAtUtc")
+                        .HasDatabaseName("ix_cash_entries_tenant_id_branch_id_posted_at_utc");
+
+                    b.HasIndex("TenantId", "CashierUserId", "PostedAtUtc")
+                        .HasDatabaseName("ix_cash_entries_tenant_id_cashier_user_id_posted_at_utc");
+
+                    b.ToTable("cash_entries", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_cash_entries_amount_positive", "amount > 0");
+
+                            t.HasCheckConstraint("ck_cash_entries_category_domain", "\"category\" IN ('Supplier', 'PettyCash', 'BankDeposit', 'OpeningFloat', 'OtherIncome', 'Other')");
+
+                            t.HasCheckConstraint("ck_cash_entries_category_of_kind", "(kind = 'CashOut' AND category IN ('Supplier', 'PettyCash', 'BankDeposit', 'Other')) OR (kind = 'CashIn' AND category IN ('OpeningFloat', 'OtherIncome', 'Other'))");
+
+                            t.HasCheckConstraint("ck_cash_entries_kind_domain", "\"kind\" IN ('CashOut', 'CashIn')");
+
+                            t.HasCheckConstraint("ck_cash_entries_method_domain", "\"method\" IN ('Cash', 'Card', 'Pos', 'Transfer')");
+
+                            t.HasCheckConstraint("ck_cash_entries_reference_for_non_cash", "method = 'Cash' OR method_code IS NOT NULL OR reference IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_cash_entries_status_domain", "\"status\" IN ('Posted', 'Voided')");
+
+                            t.HasCheckConstraint("ck_cash_entries_void_consistency", "(status = 'Voided') = (void_reason IS NOT NULL AND voided_at_utc IS NOT NULL AND voided_by_user_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Platform.Domain.Billing.Payment", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -1985,6 +2147,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_user_id");
 
+                    b.Property<string>("Design")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("design");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -2043,6 +2210,8 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.ToTable("report_templates", "app", t =>
                         {
+                            t.HasCheckConstraint("ck_report_templates_design_domain", "\"design\" IN ('Classic', 'Modern', 'Compact', 'Letterhead', 'Cumulative')");
+
                             t.HasCheckConstraint("ck_report_templates_language_domain", "\"language\" IN ('En', 'Ar', 'Both')");
 
                             t.HasCheckConstraint("ck_report_templates_type_domain", "\"type\" IN ('Results', 'Culture', 'Text', 'Claim', 'Receipt', 'Label', 'JobOrder')");
@@ -3652,6 +3821,14 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("AreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("area_id");
+
+                    b.Property<Guid?>("CityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("city_id");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -3680,6 +3857,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency");
+
+                    b.Property<Guid?>("DistrictId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("district_id");
 
                     b.Property<string>("Email")
                         .HasMaxLength(254)
@@ -4246,6 +4427,137 @@ namespace Platform.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_analyser_models_physical_link_domain", "\"physical_link\" IN ('Serial', 'Tcp', 'File')");
 
                             t.HasCheckConstraint("ck_analyser_models_protocol_domain", "\"protocol\" IN ('Astm', 'Hl7', 'Proprietary')");
+                        });
+                });
+
+            modelBuilder.Entity("Platform.Domain.PlatformAdmin.Announcement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AudienceCountryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("audience_country_id");
+
+                    b.Property<Guid?>("AudiencePlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("audience_plan_id");
+
+                    b.Property<string>("AudienceStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("audience_status");
+
+                    b.Property<string>("BodyAr")
+                        .HasMaxLength(600)
+                        .HasColumnType("character varying(600)")
+                        .HasColumnName("body_ar");
+
+                    b.Property<string>("BodyEn")
+                        .HasMaxLength(600)
+                        .HasColumnType("character varying(600)")
+                        .HasColumnName("body_en");
+
+                    b.Property<long>("Clicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("clicks");
+
+                    b.PrimitiveCollection<Guid[]>("ClientIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("client_ids");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_display_name");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("FromUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("from_utc");
+
+                    b.Property<string>("ImageContentType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("image_content_type");
+
+                    b.Property<long?>("ImageSizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("image_size_bytes");
+
+                    b.Property<string>("ImageStorageKey")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("image_storage_key");
+
+                    b.Property<int>("ImageVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("image_version");
+
+                    b.Property<long>("Impressions")
+                        .HasColumnType("bigint")
+                        .HasColumnName("impressions");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("LinkUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("link_url");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("modified_by_display_name");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<string>("Placement")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("placement");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset?>("ToUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("to_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_announcements");
+
+                    b.HasIndex("Placement", "IsActive", "FromUtc")
+                        .HasDatabaseName("ix_announcements_placement_is_active_from_utc");
+
+                    b.ToTable("announcements", "saas", t =>
+                        {
+                            t.HasCheckConstraint("ck_announcements_audience_status_domain", "\"audience_status\" IN ('Any', 'Trial', 'Active')");
+
+                            t.HasCheckConstraint("ck_announcements_placement_domain", "\"placement\" IN ('SignIn', 'Welcome')");
                         });
                 });
 
@@ -5025,6 +5337,93 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.ToTable("rule_templates", "saas");
                 });
 
+            modelBuilder.Entity("Platform.Domain.PlatformAdmin.SubscriptionReminder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Channels")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("channels");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_display_name");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("DueKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("due_key");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("modified_by_display_name");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at_utc");
+
+                    b.Property<string>("TemplateCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("template_code");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subscription_reminders");
+
+                    b.HasIndex("TenantId", "DueKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subscription_reminders_tenant_id_due_key");
+
+                    b.HasIndex("TenantId", "SentAtUtc")
+                        .HasDatabaseName("ix_subscription_reminders_tenant_id_sent_at_utc");
+
+                    b.ToTable("subscription_reminders", "saas", t =>
+                        {
+                            t.HasCheckConstraint("ck_subscription_reminders_kind_domain", "\"kind\" IN ('TrialEnding', 'TrialEnded', 'WalletLow', 'WalletAtZero', 'GraceEnding')");
+                        });
+                });
+
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.SubscriptionRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5037,6 +5436,14 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)")
                         .HasColumnName("address");
+
+                    b.Property<Guid?>("AreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("area_id");
+
+                    b.Property<Guid?>("CityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("city_id");
 
                     b.Property<int>("CodesSent")
                         .HasColumnType("integer")
@@ -5062,6 +5469,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid?>("DistrictId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("district_id");
 
                     b.Property<string>("Email")
                         .HasMaxLength(254)
@@ -5196,6 +5607,14 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("administrator_username");
 
+                    b.Property<Guid?>("AreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("area_id");
+
+                    b.Property<Guid?>("CityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("city_id");
+
                     b.Property<Guid>("CountryId")
                         .HasColumnType("uuid")
                         .HasColumnName("country_id");
@@ -5221,6 +5640,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("deactivation_reason");
+
+                    b.Property<Guid?>("DistrictId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("district_id");
 
                     b.Property<string>("Email")
                         .HasMaxLength(254)
@@ -5308,8 +5731,17 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_tenants");
 
+                    b.HasIndex("AreaId")
+                        .HasDatabaseName("ix_tenants_area_id");
+
+                    b.HasIndex("CityId")
+                        .HasDatabaseName("ix_tenants_city_id");
+
                     b.HasIndex("CountryId")
                         .HasDatabaseName("ix_tenants_country_id");
+
+                    b.HasIndex("DistrictId")
+                        .HasDatabaseName("ix_tenants_district_id");
 
                     b.HasIndex("GovernorateId")
                         .HasDatabaseName("ix_tenants_governorate_id");
@@ -5338,6 +5770,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AtOrBelowZeroSinceUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at_or_below_zero_since_utc");
 
                     b.Property<decimal>("Balance")
                         .HasPrecision(14, 2)
@@ -5697,6 +6133,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("payer_id");
 
+                    b.Property<string>("ReportDesign")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("report_design");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -5713,7 +6154,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "PayerId")
                         .HasDatabaseName("ix_contract_pricings_tenant_id_payer_id");
 
-                    b.ToTable("contract_pricings", "app");
+                    b.ToTable("contract_pricings", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_contract_pricings_report_design_domain", "\"report_design\" IN ('Classic', 'Modern', 'Compact', 'Letterhead', 'Cumulative')");
+                        });
                 });
 
             modelBuilder.Entity("Platform.Domain.Pricing.ContractTier", b =>
@@ -6827,6 +7271,14 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(400)")
                         .HasColumnName("clinical_group_name_en");
 
+                    b.Property<bool>("CollectedOutside")
+                        .HasColumnType("boolean")
+                        .HasColumnName("collected_outside");
+
+                    b.Property<DateTimeOffset?>("CollectedOutsideAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("collected_outside_at_utc");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -7377,6 +7829,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("CollectedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("collected_by_user_id");
+
+                    b.Property<bool>("CollectedOutside")
+                        .HasColumnType("boolean")
+                        .HasColumnName("collected_outside");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -8488,6 +8944,16 @@ namespace Platform.Infrastructure.Persistence.Migrations
                                 .HasColumnType("numeric(14,2)")
                                 .HasColumnName("card_refunds");
 
+                            b1.Property<decimal>("CashIn")
+                                .HasPrecision(14, 2)
+                                .HasColumnType("numeric(14,2)")
+                                .HasColumnName("cash_in");
+
+                            b1.Property<decimal>("CashOut")
+                                .HasPrecision(14, 2)
+                                .HasColumnType("numeric(14,2)")
+                                .HasColumnName("cash_out");
+
                             b1.Property<decimal>("CashPayments")
                                 .HasPrecision(14, 2)
                                 .HasColumnType("numeric(14,2)")
@@ -8502,6 +8968,15 @@ namespace Platform.Infrastructure.Persistence.Migrations
                                 .HasPrecision(14, 2)
                                 .HasColumnType("numeric(14,2)")
                                 .HasColumnName("discount_total");
+
+                            b1.Property<int>("EntryCount")
+                                .HasColumnType("integer")
+                                .HasColumnName("entry_count");
+
+                            b1.Property<decimal>("OpeningBalance")
+                                .HasPrecision(14, 2)
+                                .HasColumnType("numeric(14,2)")
+                                .HasColumnName("opening_balance");
 
                             b1.Property<decimal>("OutstandingBalance")
                                 .HasPrecision(14, 2)
@@ -8552,6 +9027,22 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Totals")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Platform.Domain.Billing.CashEntry", b =>
+                {
+                    b.HasOne("Platform.Domain.Identity.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("CashierUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cash_entries_platform_users_cashier_user_id");
+
+                    b.HasOne("Platform.Domain.Identity.PlatformUser", null)
+                        .WithMany()
+                        .HasForeignKey("VoidedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_cash_entries_platform_users_voided_by_user_id");
                 });
 
             modelBuilder.Entity("Platform.Domain.Billing.Payment", b =>
@@ -10256,6 +10747,39 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_patient_documents_patients_tenant_id_patient_id");
                 });
 
+            modelBuilder.Entity("Platform.Domain.PlatformAdmin.Announcement", b =>
+                {
+                    b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Title", b1 =>
+                        {
+                            b1.Property<Guid>("AnnouncementId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Ar")
+                                .IsRequired()
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)")
+                                .HasColumnName("title_ar");
+
+                            b1.Property<string>("En")
+                                .IsRequired()
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)")
+                                .HasColumnName("title_en");
+
+                            b1.HasKey("AnnouncementId");
+
+                            b1.ToTable("announcements", "saas");
+
+                            b1.WithOwner()
+                                .HasForeignKey("AnnouncementId")
+                                .HasConstraintName("fk_announcements_announcements_id");
+                        });
+
+                    b.Navigation("Title")
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.Area", b =>
                 {
                     b.HasOne("Platform.Domain.PlatformAdmin.District", null)
@@ -10501,14 +11025,42 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Platform.Domain.PlatformAdmin.SubscriptionReminder", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_reminders_tenant_tenant_id");
+                });
+
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.Tenant", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Area", null)
+                        .WithMany()
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenants_areas_area_id");
+
+                    b.HasOne("Platform.Domain.PlatformAdmin.City", null)
+                        .WithMany()
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenants_cities_city_id");
+
                     b.HasOne("Platform.Domain.PlatformAdmin.Country", null)
                         .WithMany()
                         .HasForeignKey("CountryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenants_countries_country_id");
+
+                    b.HasOne("Platform.Domain.PlatformAdmin.District", null)
+                        .WithMany()
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenants_districts_district_id");
 
                     b.HasOne("Platform.Domain.PlatformAdmin.Governorate", null)
                         .WithMany()

@@ -17,6 +17,7 @@ public static class PipelineOrder
     public const string TenantResolution = "TenantResolution";
     public const string MfaEnrollmentGate = "MfaEnrollmentGate";
     public const string PasswordChangeGate = "PasswordChangeGate";
+    public const string SubscriptionExpiredGate = "SubscriptionExpiredGate";
     public const string Authorization = "Authorization";
     public const string Endpoints = "Endpoints";
 
@@ -33,6 +34,7 @@ public static class PipelineOrder
         TenantResolution,
         MfaEnrollmentGate,
         PasswordChangeGate,     // C-04: a user who must change the password reaches only the change (02 §6.1, ORG-001 A13)
+        SubscriptionExpiredGate, // LIS-CR-012: administrators of an expired laboratory reach only the wallet and their profile (SUB-021)
         Authorization,
         Endpoints,
     ];

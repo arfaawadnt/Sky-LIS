@@ -238,6 +238,13 @@ internal sealed class ResultReferenceLookup(AppDbContext context) : IResultRefer
                 .ToDictionaryAsync(condition => condition.Id, cancellationToken)
                 .ConfigureAwait(false);
     }
+
+    public async Task<ReportDesign?> ContractReportDesignAsync(Guid contractTierId, CancellationToken cancellationToken) =>
+        await context.Set<ContractPricing>().AsNoTracking()
+            .Where(pricing => pricing.ContractTierId == contractTierId)
+            .Select(pricing => pricing.ReportDesign)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
 }
 
 /// <summary>The real adapter of Registration's port (MODULES.md §5): a line with a Verified or Printed result cannot be cancelled (CP-10 / CP-26).</summary>

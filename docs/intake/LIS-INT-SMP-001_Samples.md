@@ -5,7 +5,7 @@
 | Module | `samples` (Sky LIS Client Portal, pages CP-14 Collection & receipt, CP-15 Samples by visit, CP-16 Reject / unreject, CP-17 Sample tracking; workflow WF-05; business rules BR-01, BR-03, BR-15, BR-18) |
 | Slot / wave | `smp`, wave 2 (MODULES.md §2) |
 | Status | Derived by the development team from the Business SRS (LIS-SRS-001) and the LDM knowledge base. **For review by the business owner**; every assumption is listed in §16. |
-| Version | 1.0 — 2026-10-09 |
+| Version | 1.1 — 2026-10-24 (change request LIS-CR-008 P-SMP: samples collected outside, §17); 1.0 — 2026-10-09 |
 | Implemented in | `src/Platform.Domain/Samples`, `src/Platform.Contracts/Samples`, `src/Platform.Application/Samples` (+ `Policies/`, read port `ISampleStatusLookup`), `src/Platform.Infrastructure/Persistence/Samples`, `src/Platform.WebApi/Controllers/Samples`, `frontend/src/app/features/samples`, `frontend/src/app/core/api/samples.contracts.ts`, `frontend/public/i18n/samples.{en,ar}.json` |
 
 ## 1. Purpose and policy basis
@@ -300,3 +300,25 @@ Assumptions about other modules (same-wave raw-SQL reads, MODULES.md §5, column
 `app.sample_conditions(id, tenant_id, code, name_en, name_ar)`; `app.services(id, tenant_id, code, name_en, name_ar[, label_count])`;
 `app.reasons(id, tenant_id, kind, name_en, name_ar, is_active)`; `app.branches(id, tenant_id, code, name_en, name_ar)`.
 Each read checks that the table and columns exist and falls back to ids when they do not.
+
+## 17. Change request 2026-10-24 (LIS-CR-008, package P-SMP, reviewer point C-02) — samples collected outside the laboratory
+
+**Change.** `Sample.CollectedOutside` (`app.samples.collected_outside`, boolean, default false). The policy on `VisitRegistered` /
+`VisitLinesAdded` (P1) creates the sample of a tube marked outside and calls the new transition **T2b `ArriveCollectedOutside`**:
+Ordered to Collected at the time the clerk typed (never later than the arrival; the registration time when none), by the registering
+user at the registering branch, **whatever `autoCollect` says**; when `autoReceive` is on it is also received at the arrival, otherwise
+it waits for its receipt (scan, collect/receive all): the Received gate of BR-03 still applies. `SampleCollected` carries the arrival
+time, so the turnaround clock of its results starts when the sample reaches the laboratory. A sample that is not Ordered is refused
+`SMP-010`. A replacement sample (T6) is collected again in the laboratory and carries false.
+
+**Read side.** `SampleListItem.collectedOutside` (registers, CP-15, the CP-10 samples dialog, the accession page) and
+`SampleLabelDocument.collectedOutside`: the label prints "EXT". CP-15 shows an "Outside" tag beside the status
+(`samples.outside`). The timeline keeps the "Collected" step at the typed time; stage durations are clamped at 0.
+
+**Migration.** `app.samples.collected_outside`; backfill in the dated block of `Persistence/Registration/Registration.migration.sql`
+(generation-0 samples of tubes marked outside), run after the tube backfill.
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| C02-Q5 | Is an outside sample received automatically? | Only when `autoReceive` is on; otherwise it is received like any other (the reviewer: "still passes the Received gate"). |
+| C02-Q6 | Who is recorded as the collector? | The registering user and branch (who recorded it), with the typed time. |

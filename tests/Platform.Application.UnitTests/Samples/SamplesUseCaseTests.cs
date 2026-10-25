@@ -66,6 +66,35 @@ public sealed class SamplesUseCaseTests
     }
 
     [Fact]
+    public async Task S_C02_P1_a_tube_collected_outside_arrives_Collected_at_the_typed_time_whatever_auto_collect_says()
+    {
+        var outside = Tube("SMP-2026-00021") with { CollectedOutside = true, CollectedAtUtc = At.AddHours(-2) };
+        var inside = Tube("SMP-2026-00022");
+
+        await new CreateSamplesOnVisitRegisteredPolicy(_samples, ScanningLab(), _unitOfWork).HandleAsync(Registered(outside, inside), CancellationToken.None);
+
+        var collected = _samples.Items.Single(sample => sample.TubeId == outside.TubeId);
+        Assert.Equal(SampleStatus.Collected, collected.Status);
+        Assert.True(collected.CollectedOutside);
+        Assert.Equal((At.AddHours(-2), Registrar, Branch), (collected.CollectedAtUtc!.Value, collected.CollectedByUserId!.Value, collected.CollectedBranchId!.Value));
+        var ordered = _samples.Items.Single(sample => sample.TubeId == inside.TubeId);
+        Assert.Equal((SampleStatus.Ordered, false), (ordered.Status, ordered.CollectedOutside));
+        Assert.Equal(1, _unitOfWork.Commits);
+    }
+
+    [Fact]
+    public async Task S_C02_P1_a_tube_collected_outside_is_also_received_when_auto_receive_is_on()
+    {
+        var outside = Tube("SMP-2026-00023") with { CollectedOutside = true };
+
+        await new CreateSamplesOnVisitRegisteredPolicy(_samples, new FakeSettings().With(SettingKeys.AutoCollect, "false"), _unitOfWork).HandleAsync(Registered(outside), CancellationToken.None);
+
+        var sample = Assert.Single(_samples.Items);
+        Assert.Equal((SampleStatus.Received, true), (sample.Status, sample.CollectedOutside));
+        Assert.Equal((At, At), (sample.CollectedAtUtc!.Value, sample.ReceivedAtUtc!.Value));
+    }
+
+    [Fact]
     public async Task S_T1_idem_P1_handles_the_same_event_twice_without_a_second_sample()
     {
         var registered = Registered(Tube("SMP-2026-00001"));

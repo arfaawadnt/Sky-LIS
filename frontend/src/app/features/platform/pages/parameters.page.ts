@@ -38,7 +38,9 @@ const SPECS: Readonly<Record<string, ParameterSpec>> = {
   otpLength: { min: 4, max: 10 },
   passwordMinLength: { min: 8, max: 64 },
   trialDays: { min: 0, max: 365 },
+  subscriptionGraceDays: { min: 0, max: 60 },
   resultLanguage: { options: ['en', 'ar'] },
+  reportDesign: { options: ['classic', 'modern', 'compact', 'letterhead', 'cumulative'] },
   defaultLanguage: { options: ['en', 'ar'] },
   masterDataUpdatePolicy: { options: ['push', 'propose', 'ignore'] },
   defaultCurrency: { pattern: /^[A-Za-z]{3}$/, maxLength: 3 },
@@ -49,12 +51,15 @@ const SPECS: Readonly<Record<string, ParameterSpec>> = {
 /** SA-19 first (the platform-wide defaults the SRS names), then the laboratory defaults by area. */
 const GROUPS: readonly { readonly id: string; readonly keys: readonly string[] }[] = [
   { id: 'security', keys: ['otpLength', 'passwordMinLength', 'sessionTimeoutMinutes'] },
-  { id: 'subscription', keys: ['trialDays', 'defaultCurrency', 'defaultLanguage', 'masterDataUpdatePolicy', 'timeZone'] },
+  { id: 'subscription', keys: ['trialDays', 'subscriptionGraceDays', 'defaultCurrency', 'defaultLanguage', 'masterDataUpdatePolicy', 'timeZone'] },
   { id: 'thresholds', keys: ['delayWarnPercent', 'delayLatePercent', 'discountCapPercent'] },
   { id: 'registration', keys: ['mandatoryMobile', 'mandatoryDoctor', 'mandatoryNationalId', 'similarNameWarning', 'accessionFormat'] },
-  { id: 'printing', keys: ['autoPrintLabels', 'autoPrintJobOrder', 'autoPrintReceipt', 'printUnverified', 'labelCopies', 'resultLanguage'] },
+  { id: 'printing', keys: ['autoPrintLabels', 'autoPrintJobOrder', 'autoPrintReceipt', 'printUnverified', 'labelCopies', 'resultLanguage', 'reportDesign'] },
   { id: 'samples', keys: ['autoCollect', 'autoReceive', 'newBarcodeOnReject', 'reviewBeforeVerify'] },
 ];
+
+/** LIS-CR-013: client flags the Super Admin sets per client on SA-04 (the server refuses them here, SET-004), never shown on SA-19. */
+const CLIENT_FLAGS: ReadonlySet<string> = new Set(['hideAnnouncements']);
 
 /** `SettingCodes.UnknownTimeZone`: a well-formed zone name the server's host does not know. */
 const UNKNOWN_TIME_ZONE = 'SET-003';
@@ -96,7 +101,7 @@ export class ParametersPage {
     const byKey = new Map(items.map((item) => [item.key, item]));
     const known = new Set(GROUPS.flatMap((group) => group.keys));
     const views = GROUPS.map((group) => ({ id: group.id, items: group.keys.map((key) => byKey.get(key)).filter((item): item is TenantSettingItem => item !== undefined) }));
-    const others = items.filter((item) => !known.has(item.key));
+    const others = items.filter((item) => !known.has(item.key) && !CLIENT_FLAGS.has(item.key));
     return [...views, ...(others.length > 0 ? [{ id: 'other', items: others }] : [])].filter((group) => group.items.length > 0);
   });
 

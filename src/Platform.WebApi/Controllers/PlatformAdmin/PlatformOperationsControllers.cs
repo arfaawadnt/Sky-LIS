@@ -52,7 +52,8 @@ public sealed class PublicSubscriptionsController(ISender sender) : ControllerBa
     {
         ArgumentNullException.ThrowIfNull(request);
         return Ok(await sender.Send(
-            new StartSubscriptionCommand(request.LabNameEn, request.LabNameAr, request.CountryId, request.GovernorateId, request.Address, request.Mobile, request.LicenceNo, request.ManagerName, request.ManagerMobile, request.Email, request.Language),
+            new StartSubscriptionCommand(request.LabNameEn, request.LabNameAr, request.CountryId, request.GovernorateId, request.Address, request.Mobile, request.LicenceNo, request.ManagerName, request.ManagerMobile, request.Email, request.Language,
+                request.CityId, request.DistrictId, request.AreaId),
             cancellationToken));
     }
 

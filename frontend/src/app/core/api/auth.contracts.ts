@@ -39,6 +39,35 @@ export interface AuthProfile {
    * The SPA sends a signed-out or timed-out user back to that address. Optional only until the generator lands.
    */
   readonly portalSlug?: string | null;
+  /**
+   * LIS-CR-012 (C-16): the subscription state of the session's laboratory, read with the session; absent or null when there is
+   * nothing to say. The shell shows `app-subscription-banner` (administrators) and `app-subscription-modal` from it.
+   */
+  readonly subscriptionNotice?: SubscriptionNotice | null;
+}
+
+/** LIS-CR-012: how urgent the subscription is (`Ok` never reaches the SPA: the notice is then null). */
+export type SubscriptionLevel = 'Warning' | 'Grace' | 'Expired';
+
+/** LIS-CR-012: what drives the level — the trial end, a wallet covering less than a week, or a wallet at or below zero. */
+export type SubscriptionReason = 'Trial' | 'Wallet' | 'WalletAtZero';
+
+/**
+ * LIS-CR-012 (C-16, D-3): `daysLeft` whole days to `endsAtUtc` (trial end, end of the wallet cover, start or end of the grace);
+ * `amountToTopUp` in `currencyCode` brings the wallet back to one month of the plan fee; `canManage` = the user administers
+ * the laboratory (sees the banner; once expired still signs in, to the wallet only — `SUB-021` elsewhere); `showModal` = fewer
+ * than three days left, in grace or expired.
+ */
+export interface SubscriptionNotice {
+  readonly level: SubscriptionLevel;
+  readonly reason: SubscriptionReason;
+  readonly daysLeft: number | null;
+  readonly endsAtUtc: string | null;
+  readonly amountToTopUp: number | null;
+  readonly currencyCode: string | null;
+  readonly trialEndsAtUtc: string | null;
+  readonly canManage: boolean;
+  readonly showModal: boolean;
 }
 
 /** CP-04: binds the current session to one of `AuthProfile.branchIds`. */

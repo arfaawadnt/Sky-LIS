@@ -29,6 +29,7 @@ internal sealed class SampleConfiguration : IEntityTypeConfiguration<Sample>
         builder.Property(sample => sample.Status).IsRequired();
         builder.Property(sample => sample.OrderedAtUtc).IsRequired();
         builder.Property(sample => sample.StatusChangedAtUtc).IsRequired();
+        builder.Property(sample => sample.CollectedOutside).IsRequired();   // LIS-CR-008 C-02, default false; backfill in Registration.migration.sql
         builder.Property(sample => sample.CancellationReason).HasMaxLength(Sample.MaxReasonLength);
 
         builder.OwnsOne(sample => sample.Rejection, rejection =>

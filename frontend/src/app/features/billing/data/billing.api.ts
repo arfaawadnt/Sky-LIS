@@ -13,6 +13,9 @@ import {
   type CashClosingPreview,
   type CashClosingRegisterFilter,
   type CashClosingSheetDocument,
+  type CashEntryCreated,
+  type CashLedgerRequest,
+  type CashLedgerView,
   type CloseCashDrawerRequest,
   type CollectionsReportDocument,
   type CollectionsReportPrivileges,
@@ -31,6 +34,7 @@ import {
   type PaymentMethodRequest,
   type PaymentReceiptDocument,
   type PaymentRegisterFilter,
+  type PostCashEntryRequest,
   type RecordPaymentRequest,
   type RecordRefundRequest,
   type RefundCreated,
@@ -186,6 +190,27 @@ export class BillingApi {
   async collectionsReportPrivileges(signal?: AbortSignal): Promise<CollectionsReportPrivileges> {
     const mine = await this.require<MyPrivileges>(ORGANIZATION_API.myPrivileges, signal);
     return { canViewBranchCollections: mine.privileges.specialRights.canViewBranchCollections, reportDaysLimit: mine.privileges.specialRights.reportDaysLimit };
+  }
+
+  // ---- cash ledger (CP-70, change request LIS-CR-011 point C-15) ----------------------------------------------------
+
+  /** The ledger of the session branch: own drawer, one cashier or every cashier of the branch, whole laboratory days. */
+  cashLedger(request: CashLedgerRequest, signal?: AbortSignal): Promise<CashLedgerView> {
+    const params = toHttpParams({
+      from: request.fromDay,
+      to: request.toDay,
+      scope: request.scope,
+      cashierUserId: request.scope === 'Branch' ? request.cashierUserId : null,
+    });
+    return firstValueFrom(this.http.get<CashLedgerView>(BILLING_API.cashLedger, { params })).then(abortable(signal));
+  }
+
+  postCashEntry(request: PostCashEntryRequest): Promise<CashEntryCreated> {
+    return firstValueFrom(this.http.post<CashEntryCreated>(BILLING_API.cashEntries, request));
+  }
+
+  voidCashEntry(id: string, reason: string): Promise<void> {
+    return firstValueFrom(this.http.post<null>(`${BILLING_API.cashEntries}/${encodeURIComponent(id)}/void`, { reason }), { defaultValue: null }).then(() => undefined);   // 204: success is undefined
   }
 
   // ---- payment method definitions (set-up list CP-30b, change request 2026-10-19) ------------------------------------

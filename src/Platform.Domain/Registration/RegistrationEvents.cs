@@ -6,8 +6,12 @@ namespace Platform.Domain.Registration;
 // their policies on these shapes in parallel with the Visit aggregate: fields may be added, never removed or renamed.
 // The outbox stamps the tenant; the actor and branch travel in the event because readers need them.
 
-/// <summary>A tube generated at registration (BR-02: one per clinical group × sample type × condition).</summary>
-public sealed record RegisteredTube(Guid TubeId, string SampleNumber, Guid ClinicalGroupId, Guid SampleTypeId, Guid? SampleConditionId, IReadOnlyList<Guid> ServiceIds);
+/// <summary>
+/// A tube generated at registration (BR-02: one per clinical group × sample type × condition). <paramref name="CollectedOutside"/>
+/// (LIS-CR-008 C-02): the sample was collected outside the laboratory, at <paramref name="CollectedAtUtc"/> when the clerk typed
+/// it; Samples records it as Collected whatever the auto-collect parameter says. Defaults keep older outbox payloads readable.
+/// </summary>
+public sealed record RegisteredTube(Guid TubeId, string SampleNumber, Guid ClinicalGroupId, Guid SampleTypeId, Guid? SampleConditionId, IReadOnlyList<Guid> ServiceIds, bool CollectedOutside = false, DateTimeOffset? CollectedAtUtc = null);
 
 /// <summary>An ordered line of the visit; <paramref name="Status"/> is "Ordered" or "Reserved" (BR-05).</summary>
 public sealed record RegisteredLine(Guid LineId, Guid ServiceId, Guid? TubeId, string Status, IReadOnlyList<Guid> TestIds);

@@ -5,6 +5,7 @@ using Platform.Application.Abstractions.Messaging;
 using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Abstractions.Tokens;
+using Platform.Application.PlatformAdmin;
 using Platform.Contracts.Common;
 using Platform.Contracts.Identity;
 using Platform.Domain.Identity;
@@ -67,6 +68,7 @@ public sealed class SignInCommandHandler(
     IAccessTokenService accessTokens,
     ISecurityEventLog events,
     ISessionPrincipalQuery principals,
+    ISubscriptionStateLookup subscriptions,
     IUnitOfWork unitOfWork,
     IClock clock,
     SessionPolicy policy) : ICommandHandler<SignInCommand, SignInResult>
@@ -139,6 +141,16 @@ public sealed class SignInCommandHandler(
         }
 
         var membership = await SelectMembershipAsync(command, laboratory, user.Id, cancellationToken);
+
+        // LIS-CR-012 (D-3): once a laboratory's grace is over only its administrators sign in (and reach only the wallet,
+        // SUB-021); every other member is refused by name. Checked after the password, like the access end date.
+        if (!command.AtAdministration && !membership.IsSubscriptionAdministrator
+            && (await subscriptions.FindAsync(membership.TenantId, cancellationToken)).IsExpired)
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            await events.WriteAsync(new SecurityEvent(SecurityEvents.SignInFailed, SecurityEvent.Warning, membership.TenantId, user.Id, "subscription_expired"), cancellationToken);
+            throw new DomainException(SubscriptionCodes.Expired, "This laboratory's subscription has expired. Ask your laboratory administrator to top up the wallet, or contact National Technology.", DomainFault.Refused);
+        }
 
         // MFA is a capability whose policy is configuration (02 §4.5); until a policy requires it, sessions open with full scope.
         var secret = refreshTokens.NewSecret();

@@ -209,6 +209,30 @@ public sealed class BillingCashClosingsController(ISender sender) : ControllerBa
         Ok(await sender.Send(new GetCashClosingSheetQuery(id), cancellationToken));
 }
 
+/// <summary>Cash entries of the cash ledger (CP-70, change request LIS-CR-011): money out of or into the drawer without a visit.</summary>
+[ApiController]
+[Route("api/v1/billing/cash-entries")]
+public sealed class BillingCashEntriesController(ISender sender) : ControllerBase
+{
+    [HttpPost]
+    public async Task<ActionResult<CashEntryCreated>> Post([FromBody] PostCashEntryRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var created = await sender.Send(
+            new PostCashEntryCommand(request.Kind, request.Category, request.Amount, request.Reason, request.Method, request.MethodCode, request.Reference, request.Note),
+            cancellationToken);
+        return Created($"/api/v1/billing/cash-entries/{created.Id}", created);
+    }
+
+    [HttpPost("{id:guid}/void")]
+    public async Task<IActionResult> Void(Guid id, [FromBody] VoidCashEntryRequest body, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        await sender.Send(new VoidCashEntryCommand(id, body.Reason), cancellationToken);
+        return NoContent();
+    }
+}
+
 /// <summary>The cash desk's own reads: print parameters and the collections report (the treasury reads were removed by LIS-CR-004).</summary>
 [ApiController]
 [Route("api/v1/billing")]
@@ -224,6 +248,19 @@ public sealed class BillingDeskController(ISender sender) : ControllerBase
     /// laboratory days <c>from</c>…<c>to</c> (default today), <c>scope</c> User | Branch (BIL-044 without the right),
     /// <c>groupBy</c> Branch | User | Method; a period before the member's report days limit is refused with BIL-045.
     /// </summary>
+    /// <summary>
+    /// The cash ledger of the session branch (CP-70, change request LIS-CR-011): whole laboratory days <c>from</c>…<c>to</c> (default
+    /// today), <c>scope</c> User (own drawer, default) | Branch (one <c>cashierUserId</c> or every cashier; BIL-044 without the right).
+    /// </summary>
+    [HttpGet("cash-ledger")]
+    public async Task<ActionResult<CashLedgerView>> CashLedger(
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        [FromQuery] string? scope,
+        [FromQuery] Guid? cashierUserId,
+        CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new CashLedgerQuery(from, to, scope, cashierUserId), cancellationToken));
+
     [HttpGet("collections-report")]
     public async Task<ActionResult<CollectionsReportDocument>> CollectionsReport(
         [FromQuery] DateOnly? from,

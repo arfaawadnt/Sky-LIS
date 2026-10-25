@@ -19,7 +19,7 @@ public sealed class GetPublicLaboratoryHandler(IPublicLaboratoryDirectory labora
     public async Task<PublicLaboratory> Handle(GetPublicLaboratoryQuery query, CancellationToken cancellationToken)
     {
         var record = await PublicLaboratories.FindAsync(laboratories, query.Slug, cancellationToken);
-        return new PublicLaboratory(record.Slug, record.NameEn, record.NameAr, record.Logo?.Version);
+        return new PublicLaboratory(record.Slug, record.NameEn, record.NameAr, record.Logo?.Version, record.AddressEn, record.AddressAr);
     }
 }
 

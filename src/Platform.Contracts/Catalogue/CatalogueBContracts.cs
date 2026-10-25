@@ -89,6 +89,8 @@ public sealed record ReasonListItem(Guid Id, string Kind, string NameEn, string 
 /// <summary>
 /// Header and footer: both languages or none. Logo and signature are not part of the request: they are uploaded and
 /// removed on their own (<c>POST|DELETE …/report-templates/{id}/images/{logo|signature}</c>, intake A10).
+/// <c>Design</c> (LIS-CR-010): <c>Classic</c>, <c>Modern</c>, <c>Compact</c>, <c>Letterhead</c> or <c>Cumulative</c> overrides the laboratory's report
+/// design for the clinical groups printing with the template; null (or absent) follows the laboratory. Result templates only (CAT-273).
 /// </summary>
 public sealed record ReportTemplateRequest(
     string NameEn,
@@ -99,7 +101,8 @@ public sealed record ReportTemplateRequest(
     string? HeaderTextEn,
     string? HeaderTextAr,
     string? FooterTextEn,
-    string? FooterTextAr);
+    string? FooterTextAr,
+    string? Design = null);
 
 public sealed record ReportTemplateListItem(
     Guid Id,
@@ -114,7 +117,8 @@ public sealed record ReportTemplateListItem(
     string? HeaderTextAr,
     string? FooterTextEn,
     string? FooterTextAr,
-    bool IsActive);
+    bool IsActive,
+    string? Design = null);
 
 /// <summary>An image just attached to a report template: which one (<c>Logo</c>, <c>Signature</c>), its new file id, the detected type and the size.</summary>
 public sealed record ReportTemplateImageView(string Image, Guid FileId, string ContentType, long SizeBytes);

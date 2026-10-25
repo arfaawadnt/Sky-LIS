@@ -42,6 +42,8 @@ export interface LabTrackerSamples {
   /** The reason of the earliest rejection still waiting for a new sample (English / Arabic). */
   readonly firstRejectionReason: string | null;
   readonly firstRejectionReasonAr: string | null;
+  /** Live samples collected outside the laboratory (LIS-CR-008 C-02): the cell shows "ext". */
+  readonly collectedOutside: number;
 }
 
 /** Present only with `results.view`; counted over the results the user may see, `hidden` = the others. */

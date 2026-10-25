@@ -89,7 +89,8 @@ public static class CodeSystemCsv
     }
 
     /// <summary>RFC 4180 records: quoted fields may hold delimiters, line breaks and doubled quotes.</summary>
-    private static List<List<string>> Records(string content, char delimiter)
+    /// <remarks>Shared with <see cref="LocalityCsv"/> (LIS-CR-008 C-04); an unclosed quote is LIB-010 here.</remarks>
+    internal static List<List<string>> Records(string content, char delimiter)
     {
         var records = new List<List<string>>();
         var record = new List<string>();

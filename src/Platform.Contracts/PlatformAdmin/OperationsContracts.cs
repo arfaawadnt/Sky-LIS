@@ -56,4 +56,14 @@ public sealed record PlatformDashboard(
     IReadOnlyList<RecentClient> RecentClients,
     int SilentClients = 0,
     int SilentTrialClients = 0,
-    int SilentDays = 3);
+    int SilentDays = 3)
+{
+    /// <summary>LIS-CR-012 (C-16): Trial or Active clients whose trial, wallet cover or grace ends within 7 days (SA-04 filter <c>subscription=expiring</c>).</summary>
+    public int ExpiringSoonClients { get; init; }
+
+    /// <summary>LIS-CR-012: clients in their grace period (filter <c>subscription=grace</c>).</summary>
+    public int GraceClients { get; init; }
+
+    /// <summary>LIS-CR-012: clients whose grace is over; only their administrators sign in, to the wallet (filter <c>subscription=expired</c>).</summary>
+    public int ExpiredClients { get; init; }
+}

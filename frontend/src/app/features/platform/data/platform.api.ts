@@ -22,8 +22,10 @@ import {
   type GovernorateListItem,
   type GovernorateRequest,
   type LocationLevel,
+  type LocalityImportResult,
   type LocationListItem,
   type LocationRequest,
+  localityImportUrl,
   type NotificationTemplateListItem,
   type NotificationTemplateRequest,
   type Paged,
@@ -311,6 +313,13 @@ export class PlatformApi {
 
   setLocationActive(level: LocationLevel, id: string, active: boolean): Promise<void> {
     return this.send('post', `${PLATFORM_LOCATIONS_API[level].items}/${encodeURIComponent(id)}/${active ? 'reactivate' : 'deactivate'}`, null);
+  }
+
+  /** LIS-CR-008 C-04 (D-2): the locality CSV of a governorate; `dryRun` checks only. All-or-nothing on the server. */
+  importLocalities(governorateId: string, file: File, dryRun: boolean): Promise<LocalityImportResult> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return firstValueFrom(this.http.post<LocalityImportResult>(`${localityImportUrl(governorateId)}?dryRun=${dryRun}`, form));
   }
 
   private get<T>(url: string, query: Readonly<Record<string, string | number | boolean | null | undefined>>, signal?: AbortSignal): Promise<T> {

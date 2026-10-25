@@ -124,10 +124,10 @@ public sealed partial class NotificationTemplate : AggregateRoot
     public static class Placeholders
     {
         public static readonly IReadOnlyList<string> Canonical =
-            ["code", "minutes", "url", "username", "labName", "patient", "accession", "test", "value", "number", "requester", "treasury"];
+            ["code", "minutes", "url", "username", "labName", "patient", "accession", "test", "value", "number", "requester", "treasury", "days", "amount"];   // days, amount: LIS-CR-012 subscription reminders
 
         public static readonly IReadOnlyDictionary<string, string> Aliases =
-            new Dictionary<string, string>(StringComparer.Ordinal) { ["lab"] = "labName", ["acc"] = "accession" };
+            new Dictionary<string, string>(StringComparer.Ordinal) { ["lab"] = "labName", ["acc"] = "accession", ["laboratory"] = "labName", ["link"] = "url" };
 
         public static bool IsKnown(string token) => Canonical.Contains(token, StringComparer.Ordinal) || Aliases.ContainsKey(token);
 

@@ -240,7 +240,7 @@ public sealed class ReportTemplatesController(ISender sender) : ControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
         var created = await sender.Send(
-            new CreateReportTemplateCommand(request.NameEn, request.NameAr, request.Type, request.ShowQr, request.Language, request.HeaderTextEn, request.HeaderTextAr, request.FooterTextEn, request.FooterTextAr),
+            new CreateReportTemplateCommand(request.NameEn, request.NameAr, request.Type, request.ShowQr, request.Language, request.HeaderTextEn, request.HeaderTextAr, request.FooterTextEn, request.FooterTextAr, request.Design),
             cancellationToken);
         return Created($"/api/v1/catalogue/report-templates/{created.Id}", created);
     }
@@ -250,7 +250,7 @@ public sealed class ReportTemplatesController(ISender sender) : ControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
         await sender.Send(
-            new UpdateReportTemplateCommand(id, request.NameEn, request.NameAr, request.Type, request.ShowQr, request.Language, request.HeaderTextEn, request.HeaderTextAr, request.FooterTextEn, request.FooterTextAr),
+            new UpdateReportTemplateCommand(id, request.NameEn, request.NameAr, request.Type, request.ShowQr, request.Language, request.HeaderTextEn, request.HeaderTextAr, request.FooterTextEn, request.FooterTextAr, request.Design),
             cancellationToken);
         return NoContent();
     }

@@ -27,7 +27,7 @@ internal sealed class ResultHeaderLoader(IPatientLookup patients, IVisitLookup v
         ArgumentNullException.ThrowIfNull(anyResult);
         var patient = await patients.GetAsync(anyResult.PatientId, cancellationToken);
         var stored = await visits.GetAsync(anyResult.VisitId, cancellationToken);
-        var visit = stored is null ? null : new ResultVisitInfo(stored.Id, stored.Accession, stored.PatientId, stored.BranchId, stored.PayerId, stored.RegisteredAtUtc, stored.Urgent, stored.ReferringDoctorId);
+        var visit = stored is null ? null : new ResultVisitInfo(stored.Id, stored.Accession, stored.PatientId, stored.BranchId, stored.PayerId, stored.RegisteredAtUtc, stored.Urgent, stored.ReferringDoctorId, stored.ContractTierId);
         var payerId = visit?.PayerId ?? anyResult.PayerId;
         var branchId = visit?.BranchId ?? anyResult.BranchId;
         var payers = payerId is { } payer ? await references.PayersAsync([payer], cancellationToken) : new Dictionary<Guid, NamedReference>();
@@ -72,7 +72,9 @@ internal sealed class ResultReportBuilder(
     ICatalogueLookup catalogue,
     IReportTemplateLookup templates,
     IResultReferenceLookup references,
-    ITenantSettings settings)
+    ITenantSettings settings,
+    IResultRepository results,
+    ResultVisibility visibility)
 {
     public async Task<LaboratoryReportDocument> BuildAsync(string key, IReadOnlyList<Result> unit, bool preview, DateTimeOffset nowUtc, string? generatedBy, CancellationToken cancellationToken)
     {
@@ -92,7 +94,12 @@ internal sealed class ResultReportBuilder(
             language = "ar";
         }
 
-        var report = new ReportHeader(header.Patient, header.Visit, header.Payer, header.Doctor, letterhead, template, language);
+        // LIS-CR-010: contract → template → laboratory; the Cumulative design adds the previous values of each printable line.
+        var design = (await ResultReportDesign.LoadAsync(header.Visit?.ContractTierId, references, settings, cancellationToken)).For(template?.Design);
+        var history = design.Design == ReportDesign.Cumulative
+            ? await ResultCumulativeHistory.LoadAsync(results, visibility, unit.Where(result => result.IsLive && !result.IsHiddenHelper), cancellationToken)
+            : null;
+        var report = new ReportHeader(header.Patient, header.Visit, header.Payer, header.Doctor, letterhead, template, language, design, history);
         return ResultDocuments.Report(key, unit, context, report, preview, nowUtc, generatedBy);
     }
 }

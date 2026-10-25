@@ -27,6 +27,17 @@ export interface VisitDiscountRequest {
   readonly reasonId: string;
 }
 
+/**
+ * A sample of the order collected outside the laboratory (LIS-CR-008 C-02): one tube of the dry run (`tubeKey` =
+ * `TubePreview.key`) or every tube of a sample type; `collectedAtUtc` is the time the clerk typed (null = now).
+ */
+export interface OrderSampleRequest {
+  readonly tubeKey: string | null;
+  readonly sampleTypeId: string | null;
+  readonly collectedOutside: boolean;
+  readonly collectedAtUtc: string | null;
+}
+
 export interface RegisterVisitRequest {
   readonly patientId: string;
   readonly treatmentNo: string | null;
@@ -38,12 +49,15 @@ export interface RegisterVisitRequest {
   readonly bookingId: string | null;
   readonly urgent: boolean;
   readonly biohazard: boolean;
+  /** The old visit-level flag (every tube), kept for one release; the page sends false and marks samples one by one in `samples`. */
   readonly collectedOutside: boolean;
   readonly lines: readonly OrderLineRequest[];
   readonly preparationAnswers: readonly PreparationAnswerRequest[] | null;
   readonly discount: VisitDiscountRequest | null;
   readonly confirmFrequencyWarnings: boolean;
   readonly utcOffsetMinutes: number | null;
+  /** The samples collected outside the laboratory (LIS-CR-008 C-02); null = none. */
+  readonly samples?: readonly OrderSampleRequest[] | null;
 }
 
 export interface OrderWarning {
@@ -200,7 +214,6 @@ export interface UpdateVisitDetailsRequest {
   readonly insuranceId: string | null;
   readonly urgent: boolean;
   readonly biohazard: boolean;
-  readonly collectedOutside: boolean;
 }
 
 export interface SetVisitDiscountRequest {
@@ -316,6 +329,9 @@ export interface VisitTubeItem {
   readonly sampleConditionNameAr: string | null;
   readonly isLive: boolean;
   readonly serviceCodes: readonly string[];
+  /** Collected outside the laboratory (LIS-CR-008 C-02), at `collectedOutsideAtUtc` when the clerk typed a time. */
+  readonly collectedOutside: boolean;
+  readonly collectedOutsideAtUtc: string | null;
 }
 
 export interface PreparationAnswerItem {
@@ -373,6 +389,7 @@ export interface VisitDetail {
   readonly batchNumber: string | null;
   readonly urgent: boolean;
   readonly biohazard: boolean;
+  /** Derived (LIS-CR-008 C-02): at least one tube was collected outside the laboratory. */
   readonly collectedOutside: boolean;
   readonly registeredAtUtc: string;
   readonly registeredByName: string | null;
@@ -443,6 +460,8 @@ export interface SampleLabel {
   readonly serviceCodes: readonly string[];
   /** The visit is flagged biohazard: the label prints "BIO" (validation 2026-10-11). */
   readonly biohazard: boolean;
+  /** The sample was collected outside the laboratory: the label prints "EXT" (LIS-CR-008 C-02). */
+  readonly collectedOutside: boolean;
 }
 
 export interface VisitLabelsDocument {

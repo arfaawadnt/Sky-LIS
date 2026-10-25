@@ -48,6 +48,18 @@ internal static class OrderShape
         }).When(command => read(command) is not null);
     }
 
+    /// <summary>LIS-CR-008 C-02: the per-sample entries of an order (shape only; the aggregate matches them to the tubes).</summary>
+    public static void Samples<T>(AbstractValidator<T> validator, Expression<Func<T, IReadOnlyList<OrderSampleRequest>?>> samples)
+    {
+        validator.RuleFor(samples).Must(value => value is null || value.Count <= Visit.MaxLines).WithMessage($"At most {Visit.MaxLines} sample entries.");
+        validator.RuleForEach(Each(samples)).ChildRules(sample =>
+        {
+            sample.RuleFor(value => value.TubeKey).MaximumLength(RegistrationRules.MaxTubeKeyLength);
+            sample.RuleFor(value => value).Must(value => !string.IsNullOrWhiteSpace(value.TubeKey) || value.SampleTypeId is { } type && type != Guid.Empty)
+                .WithName("tubeKey").WithMessage("A sample entry names its tube key or its sample type.");
+        });
+    }
+
     /// <summary>The same member as a sequence (expression trees are invariant), so the rule keeps the member name.</summary>
     private static Expression<Func<T, IEnumerable<TElement>>> Each<T, TElement>(Expression<Func<T, IReadOnlyList<TElement>?>> list) =>
         Expression.Lambda<Func<T, IEnumerable<TElement>>>(Expression.Convert(list.Body, typeof(IEnumerable<TElement>)), list.Parameters);
@@ -76,7 +88,8 @@ public sealed record RegisterVisitCommand(
     IReadOnlyList<PreparationAnswerRequest>? PreparationAnswers,
     VisitDiscountRequest? Discount,
     bool ConfirmFrequencyWarnings,
-    int? UtcOffsetMinutes) : ICommand<VisitRegisteredResponse>;
+    int? UtcOffsetMinutes,
+    IReadOnlyList<OrderSampleRequest>? Samples = null) : ICommand<VisitRegisteredResponse>;
 
 public sealed class RegisterVisitValidator : AbstractValidator<RegisterVisitCommand>
 {
@@ -93,6 +106,7 @@ public sealed class RegisterVisitValidator : AbstractValidator<RegisterVisitComm
         OrderShape.Answers(this, command => command.PreparationAnswers);
         OrderShape.Discount(this, command => command.Discount);
         OrderShape.Offset(this, command => command.UtcOffsetMinutes);
+        OrderShape.Samples(this, command => command.Samples);
     }
 }
 
@@ -142,13 +156,14 @@ public sealed class RegisterVisitHandler(
                 null,
                 command.Urgent,
                 command.Biohazard,
-                command.CollectedOutside,
+                command.CollectedOutside && command.Samples is not { Count: > 0 },   // the old visit-level field counts only without samples[] (LIS-CR-008 C-02)
                 command.Lines,
                 command.PreparationAnswers,
                 command.Discount,
                 command.ConfirmFrequencyWarnings,
                 RegistrationRules.UtcOffset(command.UtcOffsetMinutes),
-                booking?.PhlebotomistUserId),
+                booking?.PhlebotomistUserId,
+                OutsideSamples: RegistrationRules.OutsideSamples(command.Samples)),
             actor,
             branch,
             now,
@@ -349,7 +364,7 @@ public sealed class CancelVisitLinesHandler(
 }
 
 [RequirePermissionPolicy(PermissionCatalog.Registration, PermissionAction.Edit)]
-public sealed record UpdateVisitDetailsCommand(Guid VisitId, string? TreatmentNo, Guid? ReferringDoctorId, string? InsuranceId, bool Urgent, bool Biohazard, bool CollectedOutside) : ICommand;
+public sealed record UpdateVisitDetailsCommand(Guid VisitId, string? TreatmentNo, Guid? ReferringDoctorId, string? InsuranceId, bool Urgent, bool Biohazard) : ICommand;
 
 public sealed class UpdateVisitDetailsValidator : AbstractValidator<UpdateVisitDetailsCommand>
 {
@@ -373,7 +388,7 @@ public sealed class UpdateVisitDetailsHandler(IVisitRepository visits, IDoctorLo
             await RegistrationRules.CheckDoctorAsync(doctors, settings, command.ReferringDoctorId, visit.BranchId, cancellationToken);
         }
 
-        visit.UpdateDetails(new VisitDetails(command.TreatmentNo, command.ReferringDoctorId, command.InsuranceId, command.Urgent, command.Biohazard, command.CollectedOutside));
+        visit.UpdateDetails(new VisitDetails(command.TreatmentNo, command.ReferringDoctorId, command.InsuranceId, command.Urgent, command.Biohazard));
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

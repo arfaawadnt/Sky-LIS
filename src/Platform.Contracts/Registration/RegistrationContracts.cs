@@ -13,7 +13,20 @@ public sealed record PreparationAnswerRequest(Guid PreparationId, string Answer)
 /// <summary><paramref name="Kind"/> is <c>Amount</c> or <c>Percent</c>; the reason is a catalogue reason of kind Discount.</summary>
 public sealed record VisitDiscountRequest(string Kind, decimal Value, Guid ReasonId);
 
-/// <summary>CP-06 Save. <paramref name="UtcOffsetMinutes"/> is the desk's offset (east positive) for test days (BR-13).</summary>
+/// <summary>
+/// A sample of the order marked at registration (LIS-CR-008 C-02): one tube of the dry run (<paramref name="TubeKey"/> =
+/// <c>TubePreview.Key</c>) or, without a key, every tube of <paramref name="SampleTypeId"/>. Only entries with
+/// <paramref name="CollectedOutside"/> true count; <paramref name="CollectedAtUtc"/> is the collection time the clerk typed
+/// (optional, default the registration time; REG-041 in the future or older than 30 days).
+/// </summary>
+public sealed record OrderSampleRequest(string? TubeKey, Guid? SampleTypeId, bool CollectedOutside, DateTimeOffset? CollectedAtUtc);
+
+/// <summary>
+/// CP-06 Save. <paramref name="UtcOffsetMinutes"/> is the desk's offset (east positive) for test days (BR-13).
+/// <paramref name="Samples"/> marks the samples collected outside the laboratory one by one (LIS-CR-008 C-02); the
+/// visit-level <paramref name="CollectedOutside"/> is the old contract, kept for one release: sent true without
+/// <paramref name="Samples"/>, it marks every tube.
+/// </summary>
 public sealed record RegisterVisitRequest(
     Guid PatientId,
     string? TreatmentNo,
@@ -30,7 +43,8 @@ public sealed record RegisterVisitRequest(
     IReadOnlyList<PreparationAnswerRequest>? PreparationAnswers,
     VisitDiscountRequest? Discount,
     bool ConfirmFrequencyWarnings,
-    int? UtcOffsetMinutes);
+    int? UtcOffsetMinutes,
+    IReadOnlyList<OrderSampleRequest>? Samples = null);
 
 public sealed record VisitRegisteredResponse(Guid Id, string Accession, int TubeCount, IReadOnlyList<OrderWarning> Warnings);
 
@@ -125,7 +139,8 @@ public sealed record ReleaseLinesRequest(IReadOnlyList<Guid> LineIds);
 /// <summary>V4: a reason id of kind Cancellation or a free-text reason (one of them).</summary>
 public sealed record CancelLinesRequest(IReadOnlyList<Guid> LineIds, Guid? ReasonId, string? Reason);
 
-public sealed record UpdateVisitDetailsRequest(string? TreatmentNo, Guid? ReferringDoctorId, string? InsuranceId, bool Urgent, bool Biohazard, bool CollectedOutside);
+/// <summary>V5. <paramref name="CollectedOutside"/> is accepted and ignored since LIS-CR-008 C-02: the flag belongs to each tube and is set at registration.</summary>
+public sealed record UpdateVisitDetailsRequest(string? TreatmentNo, Guid? ReferringDoctorId, string? InsuranceId, bool Urgent, bool Biohazard, bool? CollectedOutside = null);
 
 /// <summary>V6: <paramref name="Discount"/> null clears it (<paramref name="Reason"/> optional then).</summary>
 public sealed record SetVisitDiscountRequest(VisitDiscountRequest? Discount, string? Reason);
@@ -245,7 +260,9 @@ public sealed record VisitTubeItem(
     string? SampleConditionNameEn,
     string? SampleConditionNameAr,
     bool IsLive,
-    IReadOnlyList<string> ServiceCodes);
+    IReadOnlyList<string> ServiceCodes,
+    bool CollectedOutside = false,
+    DateTimeOffset? CollectedOutsideAtUtc = null);
 
 public sealed record PreparationAnswerItem(Guid PreparationId, string QuestionEn, string QuestionAr, string Answer, DateTimeOffset AnsweredAtUtc);
 
@@ -554,7 +571,8 @@ public sealed record SampleLabel(
     string? BranchNameAr,
     bool Urgent,
     IReadOnlyList<string> ServiceCodes,
-    bool Biohazard);
+    bool Biohazard,
+    bool CollectedOutside = false);
 
 public sealed record VisitLabelsDocument(RegistrationLetterhead Letterhead, string Accession, int Copies, int UtcOffsetMinutes, IReadOnlyList<SampleLabel> Labels);
 

@@ -73,6 +73,7 @@ internal sealed class VisitConfiguration : IEntityTypeConfiguration<Visit>
         builder.Navigation(visit => visit.Transfers).HasField("_transfers").UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.Ignore(visit => visit.LiveServiceIds);
+        builder.Ignore(visit => visit.AnyCollectedOutside);   // derived from the tubes (LIS-CR-008 C-02); collected_outside stays as history
     }
 }
 
@@ -141,6 +142,7 @@ internal sealed class VisitTubeConfiguration : IEntityTypeConfiguration<VisitTub
         builder.Property(tube => tube.SampleConditionNameEn).HasMaxLength(VisitTube.MaxNameLength);
         builder.Property(tube => tube.SampleConditionNameAr).HasMaxLength(VisitTube.MaxNameLength);
         builder.Property(tube => tube.CreatedAtUtc).IsRequired();
+        builder.Property(tube => tube.CollectedOutside).IsRequired();   // LIS-CR-008 C-02, default false; backfill in Registration.migration.sql
         builder.HasIndex(tube => new { tube.TenantId, tube.VisitId }).HasDatabaseName("ix_visit_tubes_visit");
 
         builder.Ignore(tube => tube.Key);

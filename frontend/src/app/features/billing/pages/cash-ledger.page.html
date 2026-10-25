@@ -1,0 +1,121 @@
+<app-page-header [title]="i18n.t('billing.ledger.title')" [subtitle]="i18n.t('billing.ledger.subtitle')">
+  <button pageActions type="button" class="btn ghost" (click)="reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('billing.refresh') }}</button>
+  @if (view(); as current) {
+    <button pageActions type="button" class="btn ghost" (click)="printSheet(current)"><app-icon name="printer" [size]="15" />{{ i18n.t('billing.ledger.printSheet') }}</button>
+  }
+  @if (view(); as current) {
+    <button pageActions type="button" class="btn ghost" *appCan="permissions.export" (click)="exportExcel(current)"><app-icon name="arrow-down" [size]="15" />{{ i18n.t('billing.ledger.exportExcel') }}</button>
+  }
+</app-page-header>
+
+<app-section-card [padded]="false">
+  <app-toolbar>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('billing.filter.from') }}</span>
+      <input class="inp" type="date" [value]="facade.request().fromDay ?? today" [attr.min]="earliest()" (change)="onFrom($event)" />
+    </label>
+    <label toolbarFilters class="filter">
+      <span>{{ i18n.t('billing.filter.to') }}</span>
+      <input class="inp" type="date" [value]="facade.request().toDay ?? facade.request().fromDay ?? today" [attr.min]="earliest()" (change)="onTo($event)" />
+    </label>
+    @if (canViewBranch()) {
+      <label toolbarFilters class="filter">
+        <span>{{ i18n.t('billing.collections.scope') }}</span>
+        <select class="inp scope-select" [value]="facade.request().scope" (change)="onScope($event)">
+          <option value="User">{{ i18n.t('billing.ledger.scopeUser') }}</option>
+          <option value="Branch">{{ i18n.t('billing.ledger.scopeBranch') }}</option>
+        </select>
+      </label>
+    }
+    @if (canViewBranch() && facade.request().scope === 'Branch') {
+      <label toolbarFilters class="filter">
+        <span>{{ i18n.t('billing.field.cashier') }}</span>
+        <select class="inp" [value]="facade.request().cashierUserId ?? ''" (change)="onCashier($event)">
+          <option value="">{{ i18n.t('billing.closing.allCashiers') }}</option>
+          @for (cashier of view()?.cashiers ?? []; track cashier.userId) {
+            <option [value]="cashier.userId">{{ cashier.name }}</option>
+          }
+        </select>
+      </label>
+    }
+  </app-toolbar>
+  @if (view(); as current) {
+    <div class="ledger-actions">
+      @if (canAddEntries()) {
+        <button type="button" class="btn ghost" *appCan="permissions.cashEntry" (click)="openEntry('CashIn')"><app-icon name="plus" [size]="15" />{{ i18n.t('billing.ledger.addCashIn') }}</button>
+        <button type="button" class="btn ghost" *appCan="permissions.cashEntry" (click)="openEntry('CashOut')"><app-icon name="arrow-down" [size]="15" />{{ i18n.t('billing.ledger.addCashOut') }}</button>
+      }
+      @if (current.closeWindow !== null) {
+        <button type="button" class="btn primary" *appCan="permissions.close" (click)="openClose(current)"><app-icon name="check" [size]="15" />{{ i18n.t('billing.ledger.closeDay') }}</button>
+      }
+    </div>
+  }
+</app-section-card>
+
+@if (problem(); as failure) {
+  <p class="problem" role="alert">{{ problemText(failure) }}</p>
+}
+
+@if (view(); as current) {
+  <p class="muted scope-line">{{ scopeLabel() }} · {{ current.fromDay === current.toDay ? current.fromDay : current.fromDay + ' – ' + current.toDay }} · {{ current.currency }}</p>
+  <div class="totals-grid">
+    <app-stat-card [label]="i18n.t('billing.ledger.opening')" [value]="money(current.summary.openingBalance)" tone="info" [hint]="current.summary.openingClosingNumber ?? i18n.t('billing.ledger.neverClosed')" />
+    <app-stat-card [label]="i18n.t('billing.ledger.receipts')" [value]="money(current.summary.receipts.total)" tone="ok" [hint]="i18n.t('billing.method.Cash') + ' ' + money(current.summary.receipts.cash)" />
+    <app-stat-card [label]="i18n.t('billing.ledger.refunds')" [value]="money(current.summary.refunds.total)" tone="warn" [hint]="i18n.t('billing.method.Cash') + ' ' + money(current.summary.refunds.cash)" />
+    <app-stat-card [label]="i18n.t('billing.ledger.cashIn')" [value]="money(current.summary.cashIn)" tone="ok" />
+    <app-stat-card [label]="i18n.t('billing.ledger.cashOut')" [value]="money(current.summary.cashOut)" tone="warn" />
+    <app-stat-card [label]="i18n.t('billing.ledger.voided')" [value]="money(current.summary.voidedAmount)" tone="info" [hint]="i18n.tc('billing.ledger.voidedCount', current.summary.voidedCount, { count: count(current.summary.voidedCount) })" />
+    <app-stat-card [label]="i18n.t('billing.ledger.closingBalance')" [value]="money(current.summary.closingBalance)" tone="brand" [hint]="current.summary.countDifferences === 0 ? null : i18n.t('billing.ledger.countDifferences') + ' ' + money(current.summary.countDifferences)" />
+  </div>
+  <p class="muted small">{{ i18n.t('billing.ledger.equation') }}</p>
+  @if (current.closeWindow === null && current.toDay < today) {
+    <p class="info-strip">{{ i18n.t('billing.ledger.readOnly') }}</p>
+  }
+}
+
+<app-section-card [title]="i18n.t('billing.ledger.lines')" [padded]="false">
+  <app-data-table [columns]="columns" [rows]="pagedRows()" [loading]="facade.ledger.isLoading()" [interactive]="false" [compact]="true" [emptyTitle]="i18n.t('billing.ledger.empty')" [caption]="i18n.t('billing.ledger.lines')">
+    <ng-template appCell="kind" [appCellOf]="pagedRows()" let-row>
+      <app-badge [tone]="tone(row)">{{ i18n.t('billing.ledger.kind.' + row.kind) }}</app-badge>
+      @if (row.status === 'Voided') {
+        <span class="muted small">{{ i18n.t('billing.status.Voided') }}</span>
+      }
+    </ng-template>
+    <ng-template appRowActions [appRowActionsOf]="pagedRows()" let-row>
+      @if (canPrint(row)) {
+        <button type="button" class="btn sm ghost icon" [title]="i18n.t('billing.reprint')" [attr.aria-label]="i18n.t('billing.reprint') + ' ' + row.number" (click)="printLine(row)"><app-icon name="printer" [size]="14" /></button>
+      }
+      @if (row.visitId !== null) {
+        <button type="button" class="btn sm ghost icon" [title]="i18n.t('billing.openVisit')" [attr.aria-label]="i18n.t('billing.openVisit') + ' ' + (row.accession ?? row.number)" (click)="openVisit(row)"><app-icon name="eye" [size]="14" /></button>
+      }
+      @if (canVoid(row)) {
+        <button type="button" class="btn sm ghost" *appCan="permissions.voidCashEntry" (click)="voidEntry(row)">{{ i18n.t('billing.void.action') }}</button>
+      }
+    </ng-template>
+  </app-data-table>
+  <app-paginator [page]="page().page" [pageSize]="page().pageSize" [totalCount]="rows().length" (pageChange)="onPage($event)" />
+</app-section-card>
+
+<app-billing-cash-entry-dialog
+  [open]="entryOpen()"
+  (openChange)="entryOpen.set($event)"
+  [kind]="entryKind()"
+  [methods]="desk.methodOptions()"
+  [currency]="view()?.currency ?? ''"
+  [pending]="facade.postEntry.pending()"
+  [problem]="facade.postEntry.problem()"
+  (submitted)="postEntry($event)"
+/>
+
+@if (view(); as current) {
+  <app-billing-day-close-dialog
+    [open]="closeOpen()"
+    (openChange)="onCloseOpen($event)"
+    [preview]="facade.currentClosePreview()"
+    [loading]="facade.closePreview.isLoading()"
+    [pending]="facade.close.pending()"
+    [problem]="facade.close.problem()"
+    [cashierLabel]="closeCashierLabel(current)"
+    (closeRequested)="closeDay($event)"
+  />
+}

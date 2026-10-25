@@ -150,6 +150,9 @@ export class MasterDataPageComponent<TItem, TDto> {
   protected readonly blocked = signal(false);
   /** The form value when the server errors arrived: a linked field that differs from it clears them (B-01). */
   private serverErrorSnapshot: Readonly<Record<string, unknown>> | null = null;
+  /** LIS-CR-008 C-04: the parent value each `dependsOn` field's options were last loaded for, and a sequence per field (the latest load wins). */
+  private dependentParents: Record<string, string | null> = {};
+  private readonly dependentLoads: Record<string, number> = {};
   protected readonly options = signal<Readonly<Record<string, readonly SelectOption[]>>>({});
 
   /** The user may change an existing record: the config's `update` permission, or no gate at all (the server decides regardless). */
@@ -249,6 +252,7 @@ export class MasterDataPageComponent<TItem, TDto> {
     }
 
     this.markPatternFieldsAsTyped(form);
+    this.followDependentFields(form, false);
     const groups = this.config().linkedFields ?? [];
     if (this.serverErrorSnapshot !== null && groups.length > 0 && clearLinkedServerErrors(form, groups, this.serverErrorSnapshot)) {
       this.serverErrorSnapshot = null;
@@ -276,6 +280,7 @@ export class MasterDataPageComponent<TItem, TDto> {
   openCreate(): void {
     this.editing.set(null);
     this.form.set(this.buildForm(null));
+    this.followDependentFields(this.form(), true);
     this.resetDrawerState();
     this.drawerOpen.set(true);
   }
@@ -288,6 +293,7 @@ export class MasterDataPageComponent<TItem, TDto> {
     }
 
     this.form.set(form);
+    this.followDependentFields(form, true);
     this.resetDrawerState();
     this.drawerOpen.set(true);
   }
@@ -534,6 +540,59 @@ export class MasterDataPageComponent<TItem, TDto> {
     return dto as TDto;
   };
 
+  /**
+   * LIS-CR-008 C-04 cascading selects: in field order, a `dependsOn` field whose parent value changed since its options were
+   * loaded is cleared (unless `opening`: a drawer opens on the stored values) and its options are loaded for the new value.
+   * Clearing a field changes the parent value of the fields below it, which the same pass then follows.
+   */
+  private followDependentFields(form: DynamicForm | null, opening: boolean): void {
+    if (form === null) {
+      return;
+    }
+
+    if (opening) {
+      this.dependentParents = {};
+    }
+
+    for (const field of this.config().fields) {
+      if (field.dependsOn === undefined || field.dependentOptions === undefined) {
+        continue;
+      }
+
+      const parentValue = parentKey(form.controls[field.dependsOn]?.getRawValue());
+      if (field.name in this.dependentParents && this.dependentParents[field.name] === parentValue) {
+        continue;
+      }
+
+      if (!opening && field.name in this.dependentParents) {
+        const control = form.controls[field.name];
+        if (control && control.getRawValue() !== null && control.getRawValue() !== '') {
+          control.setValue(null);
+        }
+      }
+
+      this.dependentParents[field.name] = parentValue;
+      void this.loadDependentOptions(field, parentValue);
+    }
+  }
+
+  private async loadDependentOptions(field: FieldSchema, parentValue: string | null): Promise<void> {
+    const sequence = (this.dependentLoads[field.name] ?? 0) + 1;
+    this.dependentLoads[field.name] = sequence;
+    let options: readonly SelectOption[] = [];
+    if (parentValue !== null && field.dependentOptions !== undefined) {
+      try {
+        options = await field.dependentOptions(parentValue);
+      } catch {
+        options = [];
+      }
+    }
+
+    if (this.dependentLoads[field.name] === sequence) {
+      this.options.update((current) => ({ ...current, [field.name]: options }));
+    }
+  }
+
   private async loadOptions(fields: readonly FieldSchema[]): Promise<void> {
     for (const field of fields) {
       if ((field.kind !== 'select' && field.kind !== 'multiSelect') || typeof field.options !== 'function') {
@@ -548,4 +607,9 @@ export class MasterDataPageComponent<TItem, TDto> {
       }
     }
   }
+}
+
+/** A parent field's value as the key of its children's options: a non-blank string, else null. */
+function parentKey(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
 }

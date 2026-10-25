@@ -125,6 +125,7 @@ internal sealed class ContractPricingConfiguration : IEntityTypeConfiguration<Co
         builder.ToTable("contract_pricings", AppDbContext.AppSchema);
 
         builder.Property(pricing => pricing.EffectiveFrom).IsRequired();
+        builder.Property(pricing => pricing.ReportDesign);   // nullable string, CHECK by the enum convention (LIS-CR-010)
         builder.HasIndex(pricing => new { pricing.TenantId, pricing.ContractTierId }).IsUnique().HasDatabaseName("ux_contract_pricings_tier");
         builder.HasIndex(pricing => new { pricing.TenantId, pricing.PayerId });
 

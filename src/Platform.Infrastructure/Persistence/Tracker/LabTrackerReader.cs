@@ -45,6 +45,7 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
                    count(*) FILTER (WHERE s.status = 'Collected')::int AS collected,
                    count(*) FILTER (WHERE s.status = 'Received')::int AS received,
                    count(*) FILTER (WHERE s.status = 'Rejected')::int AS rejected,
+                   count(*) FILTER (WHERE s.status NOT IN ('Cancelled', 'Replaced') AND s.collected_outside)::int AS outside,
                    (array_agg(s.rejection_reason_name_en ORDER BY s.rejected_at_utc, s.sample_number) FILTER (WHERE s.status = 'Rejected'))[1] AS rejection_en,
                    (array_agg(s.rejection_reason_name_ar ORDER BY s.rejected_at_utc, s.sample_number) FILTER (WHERE s.status = 'Rejected'))[1] AS rejection_ar
             FROM app.samples s
@@ -112,7 +113,8 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
                t.name_en, t.name_ar,
                rc.vis_starts, rc.vis_expected, rc.all_starts, rc.all_expected,
                d.patient_share_total, COALESCE(pd.amount, 0), COALESCE(rf.amount, 0),
-               COALESCE(b.kind = 'LabToLab', false)
+               COALESCE(b.kind = 'LabToLab', false),
+               COALESCE(sc.outside, 0)
         FROM day_visits d
         LEFT JOIN app.patients pt ON pt.tenant_id = d.tenant_id AND pt.id = d.patient_id
         LEFT JOIN app.payers py ON py.tenant_id = d.tenant_id AND py.id = d.payer_id
@@ -225,7 +227,7 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
             reader.GetGuid(20),
             reader.GetInt32(21),
             reader.GetInt32(22),
-            new VisitSampleCounts(reader.GetInt32(23), reader.GetInt32(24), reader.GetInt32(25), reader.GetInt32(26), reader.GetInt32(27)),
+            new VisitSampleCounts(reader.GetInt32(23), reader.GetInt32(24), reader.GetInt32(25), reader.GetInt32(26), reader.GetInt32(27), reader.GetInt32(53)),
             Text(28),
             Text(29),
             new VisitResultCounts(reader.GetInt32(30), reader.GetInt32(31), reader.GetInt32(32), reader.GetInt32(33), reader.GetInt32(34)),

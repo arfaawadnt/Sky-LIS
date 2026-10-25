@@ -44,6 +44,12 @@ public static class RegistrationCodes
     public const string ReasonInvalid = "REG-037";
     public const string TransferSameContract = "REG-038";
     public const string NothingToDiscount = "REG-039";
+
+    /// <summary>LIS-CR-008 C-02: a "collected outside" sample entry names no tube of the order (stale tube key or sample type).</summary>
+    public const string OutsideSampleUnknown = "REG-040";
+
+    /// <summary>LIS-CR-008 C-02: the time a sample was collected outside lies in the future or more than 30 days back.</summary>
+    public const string OutsideCollectedAtInvalid = "REG-041";
     public const string ExportTooLarge = "REG-050";
 
     /// <summary>Privilege refusals (403): the special rights of the actor's role (Organization, CP-37).</summary>

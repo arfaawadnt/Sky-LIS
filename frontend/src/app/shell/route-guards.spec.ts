@@ -37,7 +37,7 @@ const MIRROR: Routes = [
     canActivateChild: shellRoute?.canActivateChild ?? [],
     children: [
       { path: '', pathMatch: 'full', canActivate: [tenantGuard, homeRedirect], component: BlankPage },
-      { path: 'billing', canActivate: [tenantGuard], children: ['payments', 'payment-methods', 'refunds', 'cash-closing'].map((path) => ({ path, component: BlankPage })) },
+      { path: 'billing', canActivate: [tenantGuard], children: ['payments', 'payment-methods', 'refunds', 'cash-closing', 'batch-payment'].map((path) => ({ path, component: BlankPage })) },
       { path: 'registration', canActivate: [tenantGuard], children: ['visits', 'visits/:id/job-order'].map((path) => ({ path, component: BlankPage })) },
       { path: 'tracker', canActivate: [tenantGuard], component: BlankPage },
       { path: 'account', canActivate: [tenantGuard], children: ['select-branch', 'profile', 'dashboard'].map((path) => ({ path, component: BlankPage })) },
@@ -89,7 +89,7 @@ describe('route guards composed on the shell (R1-01, R1-04, R2-01)', () => {
     await signIn({ permissions: ['billing.view'] }, false);
 
     expect(await open('/billing/refunds?visitId=v1')).toBe('/billing/refunds?visitId=v1');
-    expect(await open('/billing/cash-closing')).toBe('/billing/payments'); // refused → home → first menu entry
+    expect(await open('/billing/batch-payment')).toBe('/billing/payments'); // refused → home → first menu entry
   });
 
   it('lands a user without the dashboard on their first menu entry when a URL is refused (R1-04)', async () => {

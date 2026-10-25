@@ -237,7 +237,7 @@ public sealed class OrganizationModuleTests(DatabaseFixture fixture)
     private static string Unique(int length) => Guid.CreateVersion7().ToString("N")[^length..].ToUpperInvariant();
 
     private static SessionPrincipalQuery PrincipalQuery(IServiceScope scope) =>
-        new(scope.ServiceProvider.GetRequiredService<AppDbContext>(), scope.ServiceProvider.GetRequiredService<TenantContextAccessor>(), new MemoryCache(new MemoryCacheOptions()), scope.ServiceProvider.GetRequiredService<ITenantStatusLookup>());
+        new(scope.ServiceProvider.GetRequiredService<AppDbContext>(), scope.ServiceProvider.GetRequiredService<TenantContextAccessor>(), new MemoryCache(new MemoryCacheOptions()), scope.ServiceProvider.GetRequiredService<ITenantStatusLookup>(), scope.ServiceProvider.GetRequiredService<Platform.SharedKernel.Abstractions.IClock>());
 
     private async Task<Guid> RegisterUserAsync(string displayName = "Organization Tester")
     {

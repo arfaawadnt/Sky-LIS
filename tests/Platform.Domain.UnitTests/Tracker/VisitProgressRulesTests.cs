@@ -202,4 +202,17 @@ public sealed class VisitProgressRulesTests
         Assert.Equal((TrackerStage.InLab, TrackerNextStep.EnterResults), (received.Stage, received.NextStep));
         Assert.Null(received.DelayState);
     }
+
+    [Fact]
+    public void TRK_C02_the_samples_cell_shows_ext_when_a_live_sample_was_collected_outside()
+    {
+        Assert.False(VisitSampleCounts.None.AnyCollectedOutside);
+        Assert.False(Received.AnyCollectedOutside);
+
+        var outside = new VisitSampleCounts(2, 0, 1, 1, 0, CollectedOutside: 1);
+        Assert.True(outside.AnyCollectedOutside);
+
+        var progress = Of(Facts(samples: outside, visible: Results(ordered: 1)));
+        Assert.Equal(TrackerStage.InLab, progress.Stage);   // an outside sample is followed like any other
+    }
 }

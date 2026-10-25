@@ -55,6 +55,8 @@
   "samples.toCollect": "{done}/{total} collected",
   "samples.allReceived": "All received",
   "samples.received": "{done}/{total} received",
+  "samples.ext": "ext",
+  "samples.extTitle": "A sample was collected outside the laboratory",
   "results.none": "No results",
   "results.allHidden": "Not in your rights",
   "results.printed": "Printed",

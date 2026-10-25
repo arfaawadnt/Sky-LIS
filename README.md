@@ -235,7 +235,44 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+Change requests LIS-CR-008, CR-010, CR-011, CR-012 and CR-013 (2026-10-24/25, `docs/build/CR-2026-10-24_Review-Features.md`): the
+features of the reviewer's response LIS-RC-001 except CR-009 (catalogue simplification, parked), built as six packages and integrated with one
+migration `ReviewFeatures`. The decisions D-2…D-4 are built on the recommendations of LIS-RC-001 §5 (see the intakes' open questions).
+
+- **Addresses down to the village (CR-008, C-04).** Laboratories, subscription requests and branches record a city / markaz, district and
+  area / village under their governorate; the pick lists cascade on the subscription wizard, the SA-04 client drawer and the CP-36 branch
+  editor, and the server checks the chain (GEO-020…022). The clients register and the public laboratory card print "Area, District,
+  City, Governorate". SA-11 › Locations imports a governorate's localities from a UTF-8 CSV (dry run, all-or-nothing, repeat-safe;
+  `POST /api/v1/platform/governorates/{id}/localities/import`, GEO-023…025).
+- **"Collected outside the laboratory" per sample (CR-008, C-02).** Set per tube on CP-06 (switch, optional collection time, "All
+  outside"); such a sample is Collected at its time whatever auto-collect says, still waits for its receipt, prints EXT on its label and
+  shows an "Outside" tag in the samples dialog, the accession page, samples by visit and the Lab Tracker ("ext"). API:
+  `POST /api/v1/registration/visits` takes `samples[]` (`tubeKey`, `sampleTypeId`, `collectedOutside`, `collectedAtUtc`); the visit-level
+  field still marks every tube for one release (REG-040 / REG-041).
+- **Five report designs (CR-010, C-14).** Classic, Modern, Compact, Letterhead (pre-printed paper) and Cumulative (last three verified
+  values of earlier visits) in Setup › Parameters › Printing; a report template (CP-54) or a payer contract tier (CP-34,
+  `PUT /api/v1/pricing/contract-pricing/{tierId}/report-design`) may impose its own — contract wins, then template, then laboratory
+  (BR-32). The template preview shows every design with "Use this design".
+- **Cash ledger (CR-011, C-15).** New Finance page CP-70 `/billing/cash-ledger`: the day book of a drawer (own, or one cashier or the
+  whole branch with the "view branch collections" right) with opening balance, receipts by method, refunds, voids, cash in / cash out
+  entries (`POST /api/v1/billing/cash-entries`, void with `billing.approve`), running balance, Excel export and a printable A4 Daily cash
+  sheet; *Close the day* closes the drawer through Cash closing (CP-30, now in Release 1); closed periods are read-only (BIL-061, BR-30);
+  expected cash now adds the opening balance and the cash entries.
+- **Subscription reminders and grace (CR-012, C-16).** A daily pass (`Lis:Jobs:SubscriptionReminders`, hourly check) sends — once per
+  threshold — SMS and e-mail to the manager when the trial ends in 7 / 3 / 1 days, today or ended, when the wallet covers fewer than
+  7 / 3 / 1 days or is at zero, and when the grace ends in 3 / 1 days (templates `subscription-expiry`, `wallet-low`,
+  `subscription-grace` on SA-20). Grace = platform parameter `subscriptionGraceDays` (default 7); after it, only the laboratory's
+  administrators sign in, to the wallet (SUB-020 / SUB-021, BR-31; a trial past its end is no longer CLI-020). The client portal shows a
+  banner and a sign-in modal linking to Account › Wallet (now Release 1); SA-03 gains an "Expiring soon" tile and SA-04 a Subscription filter
+  (`GET /api/v1/platform/clients/subscriptions?state=`).
+- **Announcements (CR-013, C-17).** New Super Admin page SA-22 `/admin/announcements`: title and body in both languages, image, https
+  link, placement (sign-in hero or welcome card), schedule, audience (country, plan, status, chosen clients), activate / deactivate,
+  impressions and clicks (`/api/v1/platform/announcements`, public `/api/v1/public/announcements?placement=SignIn&laboratory=`,
+  `/api/v1/account/announcements`). The laboratory sign-in page shows the live announcement in place of the slogan; the client dashboard
+  shows the welcome announcements as one card closable for the session; SA-04 "Hide announcements for this client" (a laboratory cannot
+  change it, SET-004).
+- Documents: SRS 1.7 (CP-70, SA-22, BR-29…32), UAT 1.1 (UAT-CSH-11, UAT-SUP-09, UAT-SUP-10), intakes PLT 1.5–1.7, ORG, ACC, REG, SMP, TRK,
+  RES, CTB, PRC, BIL, FND.
 
 ### v0.21.1 — 2026-10-24
 

@@ -51,6 +51,7 @@
                 }
               </select>
             </app-form-field>
+            <app-locality-fields [governorateId]="governorateValue()" [controls]="localityControls" [labels]="localityLabels()" />
             <app-form-field class="full" [label]="i18n.t('public.field.address')">
               <input type="text" formControlName="address" maxlength="300" autocomplete="street-address" />
             </app-form-field>

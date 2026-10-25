@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 
 import { AuthStore } from './core/auth/auth.store';
 import { IdleWarningComponent } from './core/auth/idle-warning.component';
+import { SubscriptionModalComponent } from './features/account/ui/subscription-notice';
 import { I18nService } from './core/i18n/i18n.service';
 import { DialogHostComponent } from './shared/ui/dialog/dialog-host.component';
 import { ToastHostComponent } from './shared/ui/toast/toast-host.component';
@@ -15,7 +16,7 @@ import { ToastHostComponent } from './shared/ui/toast/toast-host.component';
  */
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, ToastHostComponent, DialogHostComponent, IdleWarningComponent],
+  imports: [RouterOutlet, ToastHostComponent, DialogHostComponent, IdleWarningComponent, SubscriptionModalComponent],
   templateUrl: './app.html',
   styleUrl: './app.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

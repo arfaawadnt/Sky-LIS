@@ -46,6 +46,9 @@ export interface ClientListItem {
   readonly source: ClientSource;
   readonly status: ClientStatus;
   readonly trialEndsAtUtc: string | null;
+  /** LIS-CR-008 C-04: "Area, District, City, Governorate" when the client has a city (null otherwise). */
+  readonly addressLineEn?: string | null;
+  readonly addressLineAr?: string | null;
 }
 
 export interface ClientDetail {
@@ -77,6 +80,12 @@ export interface ClientDetail {
   readonly walletCurrency: string;
   readonly branches: number;
   readonly users: number;
+  /** LIS-CR-008 C-04: the optional city (markaz) / district / area under the governorate. */
+  readonly cityId?: string | null;
+  readonly districtId?: string | null;
+  readonly areaId?: string | null;
+  readonly addressLineEn?: string | null;
+  readonly addressLineAr?: string | null;
 }
 
 /** `sort`: `nameEn`, `nameAr`, `planCode`, `walletBalance` or `createdAtUtc` (B-03, server allow-list); absent = newest first. */
@@ -103,6 +112,10 @@ export interface ClientDetailsRequest {
   readonly email: string | null;
   readonly planId: string;
   readonly language: string | null;
+  /** LIS-CR-008 C-04: optional; null clears (GEO-020 city of another governorate, GEO-021 / GEO-022 a broken chain). */
+  readonly cityId?: string | null;
+  readonly districtId?: string | null;
+  readonly areaId?: string | null;
 }
 
 /** SA-04 "Add": `adminPassword` is a `[CredentialField]`, sealed by the envelope interceptor. */
@@ -489,6 +502,47 @@ export interface PlatformDashboard {
   readonly silentClients: number;
   readonly silentTrialClients: number;
   readonly silentDays: number;
+  /** LIS-CR-012 (C-16): clients whose trial, wallet cover or grace ends within 7 days, the ones in grace and the expired ones (optional until the generator lands). */
+  readonly expiringSoonClients?: number;
+  readonly graceClients?: number;
+  readonly expiredClients?: number;
+}
+
+// ── Subscription state (LIS-CR-012, C-16) ──────────────────────────────────────────────────────
+
+/** The SA-04 "Subscription" filter; `expiring` = trial, wallet cover or grace ending within `days` (default 7). */
+export type SubscriptionFilter = 'expiring' | 'grace' | 'expired';
+
+export const SUBSCRIPTION_FILTERS: readonly SubscriptionFilter[] = ['expiring', 'grace', 'expired'];
+
+/** One client of a subscription filter: level, reason, whole days to `endsAtUtc`, the amount that brings the wallet to one month of the fee, the manager to call and the last reminder sent. */
+export interface SubscriptionClientItem {
+  readonly id: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly portalUrl: string;
+  readonly status: ClientStatus;
+  readonly level: 'Ok' | 'Warning' | 'Grace' | 'Expired';
+  readonly reason: 'None' | 'Trial' | 'Wallet' | 'WalletAtZero';
+  readonly daysLeft: number | null;
+  readonly endsAtUtc: string | null;
+  readonly trialEndsAtUtc: string | null;
+  readonly walletBalance: number | null;
+  readonly monthlyFee: number;
+  readonly currencyCode: string | null;
+  readonly amountToTopUp: number | null;
+  readonly administratorName: string;
+  readonly administratorMobile: string;
+  readonly lastReminderKey: string | null;
+  readonly lastReminderAtUtc: string | null;
+}
+
+export interface SubscriptionClientList {
+  readonly state: SubscriptionFilter;
+  readonly days: number;
+  readonly graceDays: number;
+  readonly asOfUtc: string;
+  readonly items: readonly SubscriptionClientItem[];
 }
 
 // ── Silent clients (LIS-CR-007 A-01) ───────────────────────────────────────────────────────────
@@ -563,6 +617,8 @@ export const PLATFORM_API = {
   dashboard: '/api/v1/platform/dashboard',
   /** LIS-CR-007 A-01: the silent clients of a window (`?days=`) and their CSV (`…/export`). */
   silentClients: '/api/v1/platform/clients/silent',
+  /** LIS-CR-012 (C-16): the clients of a subscription filter (`?state=expiring|grace|expired&days=`). */
+  subscriptionClients: '/api/v1/platform/clients/subscriptions',
   /** The laboratory's own wallet (CP-66). */
   myWallet: '/api/v1/wallet',
 } as const;
@@ -667,3 +723,36 @@ export const PLATFORM_LOCATIONS_API: Readonly<Record<LocationLevel, { readonly p
   districts: { parents: '/api/v1/platform/cities', items: '/api/v1/platform/districts' },
   areas: { parents: '/api/v1/platform/districts', items: '/api/v1/platform/areas' },
 };
+
+// ── Locality import (SA-11 "Import CSV", LIS-CR-008 C-04, decision D-2) ─────────────────────────────
+
+/** `POST …/governorates/{id}/localities/import?dryRun=` (multipart field `file`): UTF-8 CSV, at most 4 MB. */
+export const localityImportUrl = (governorateId: string): string => `/api/v1/platform/governorates/${encodeURIComponent(governorateId)}/localities/import`;
+
+export const LOCALITY_IMPORT_MAX_BYTES = 4 * 1024 * 1024;
+
+/** One level of an import: rows created, distinct existing rows matched, lines refused at this level. */
+export interface LocalityImportLevel {
+  readonly created: number;
+  readonly existing: number;
+  readonly refused: number;
+}
+
+/** A refused line (1 = the header): `level` City | District | Area, `code` GEO-025 / GEO-015 / GEO-006. */
+export interface LocalityImportError {
+  readonly line: number;
+  readonly level: string;
+  readonly code: string;
+  readonly message: string;
+}
+
+/** `applied` only when nothing was refused and the call was not a dry run (all-or-nothing). */
+export interface LocalityImportResult {
+  readonly rows: number;
+  readonly cities: LocalityImportLevel;
+  readonly districts: LocalityImportLevel;
+  readonly areas: LocalityImportLevel;
+  readonly dryRun: boolean;
+  readonly applied: boolean;
+  readonly errors: readonly LocalityImportError[];
+}

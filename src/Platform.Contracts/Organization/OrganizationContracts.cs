@@ -7,9 +7,10 @@ namespace Platform.Contracts.Organization;
 
 // ---- Branches (CP-36) -------------------------------------------------------------------------------------------
 
-public sealed record CreateBranchRequest(string Code, string NameEn, string NameAr, Guid? CountryId, Guid? GovernorateId, string? Phone, string? Email, string Currency);
+/// <summary>LIS-CR-008 C-04: <c>CityId</c> / <c>DistrictId</c> / <c>AreaId</c> place the branch under its governorate (optional, chain-checked GEO-020…022).</summary>
+public sealed record CreateBranchRequest(string Code, string NameEn, string NameAr, Guid? CountryId, Guid? GovernorateId, string? Phone, string? Email, string Currency, Guid? CityId = null, Guid? DistrictId = null, Guid? AreaId = null);
 
-public sealed record UpdateBranchRequest(string NameEn, string NameAr, Guid? CountryId, Guid? GovernorateId, string? Phone, string? Email, string Currency);
+public sealed record UpdateBranchRequest(string NameEn, string NameAr, Guid? CountryId, Guid? GovernorateId, string? Phone, string? Email, string Currency, Guid? CityId = null, Guid? DistrictId = null, Guid? AreaId = null);
 
 public sealed record BranchListItem(
     Guid Id,
@@ -21,7 +22,10 @@ public sealed record BranchListItem(
     string? Phone,
     string? Email,
     string Currency,
-    bool IsActive);
+    bool IsActive,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null);
 
 /// <summary>A branch the current user may bind the session to (CP-04).</summary>
 public sealed record SelectableBranch(Guid Id, string Code, string NameEn, string NameAr);

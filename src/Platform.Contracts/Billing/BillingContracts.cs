@@ -42,6 +42,16 @@ public sealed record PaymentMethodDefaultsResult(int Created);
 /// <summary>T5 (CP-30): the session branch; <paramref name="CashierUserId"/> null = every cashier of the branch; the period is half-open.</summary>
 public sealed record CloseCashDrawerRequest(Guid? CashierUserId, DateTimeOffset PeriodFromUtc, DateTimeOffset PeriodToUtc, decimal? CountedCash, string? Note);
 
+/// <summary>
+/// T6 (CP-70 cash ledger, change request LIS-CR-011): money out of the drawer (<paramref name="Kind"/> CashOut: categories
+/// Supplier | PettyCash | BankDeposit | Other) or into it (CashIn: OpeningFloat | OtherIncome | Other). Cashier and branch from the
+/// session; <paramref name="Method"/> defaults to Cash; <paramref name="MethodCode"/> names a payment method definition (its kind
+/// and reference rule win).
+/// </summary>
+public sealed record PostCashEntryRequest(string Kind, string Category, decimal Amount, string Reason, string? Method = null, string? MethodCode = null, string? Reference = null, string? Note = null);
+
+public sealed record VoidCashEntryRequest(string Reason);
+
 // ---- responses of commands ------------------------------------------------------------------------------------
 
 public sealed record PaymentCreated(Guid Id, string ReceiptNumber);
@@ -49,6 +59,8 @@ public sealed record PaymentCreated(Guid Id, string ReceiptNumber);
 public sealed record RefundCreated(Guid Id, string Number);
 
 public sealed record CashClosingCreated(Guid Id, string Number);
+
+public sealed record CashEntryCreated(Guid Id, string Number);
 
 public sealed record BatchMemberPayment(Guid VisitId, string Accession, Guid PaymentId, string ReceiptNumber, decimal Amount);
 
@@ -114,7 +126,11 @@ public sealed record CashClosingTotalsView(
     decimal ExpectedCash,
     decimal OutstandingBalance,
     decimal DiscountTotal,
-    int VisitCount);
+    int VisitCount,
+    decimal OpeningBalance = 0m,
+    decimal CashIn = 0m,
+    decimal CashOut = 0m,
+    int EntryCount = 0);
 
 /// <summary>A closing of the register: <paramref name="BranchId"/> is its scope (the closer's session branch), <paramref name="CashierUserId"/> null = every cashier.</summary>
 public sealed record CashClosingListItem(
@@ -134,8 +150,11 @@ public sealed record CashClosingListItem(
     string ClosedByName,
     DateTimeOffset ClosedAtUtc);
 
-/// <summary>One movement of a drawer: <paramref name="Kind"/> is Payment or Refund; <paramref name="Status"/> Posted/Voided (refunds: Posted).</summary>
-public sealed record DrawerMovement(string Kind, Guid Id, string Number, Guid VisitId, string? Accession, string Method, decimal Amount, DateTimeOffset AtUtc, Guid CashierUserId, string CashierName, string Status);
+/// <summary>
+/// One movement of a drawer: <paramref name="Kind"/> is Payment, Refund, CashIn or CashOut (a cash entry: <paramref name="VisitId"/>
+/// empty, <paramref name="Text"/> its reason); <paramref name="Status"/> Posted/Voided (refunds: Posted).
+/// </summary>
+public sealed record DrawerMovement(string Kind, Guid Id, string Number, Guid VisitId, string? Accession, string Method, decimal Amount, DateTimeOffset AtUtc, Guid CashierUserId, string CashierName, string Status, string? Text = null);
 
 /// <summary>A cashier who moved money in the session branch in a period (the closing page's cashier filter).</summary>
 public sealed record DrawerCashier(Guid UserId, string Name);
@@ -365,6 +384,92 @@ public sealed record CollectionsReportDocument(
     string? CashierName,
     IReadOnlyList<CollectionsReportRow> Rows,
     CollectionsReportRow Totals,
+    string Currency,
+    string PrintedBy,
+    DateTimeOffset PrintedAtUtc);
+
+// ---- cash ledger (CP-70, change request LIS-CR-011 point C-15) ------------------------------------------------------
+
+/// <summary>Amounts per method kind and their total.</summary>
+public sealed record CashLedgerMethodAmounts(decimal Cash, decimal Card, decimal Pos, decimal Transfer, decimal Total);
+
+/// <summary>
+/// The figures of a ledger: the opening balance (the previous closing of the scope: its number and end, or none), posted receipts
+/// and refunds per method, voided receipts and entries, cash entries in and out (cash method), count differences found by the
+/// closings of the period, the closing balance (cash in the drawer after the last line) and the net cash of the period.
+/// </summary>
+public sealed record CashLedgerSummaryView(
+    decimal OpeningBalance,
+    string? OpeningClosingNumber,
+    DateTimeOffset? OpeningClosedThroughUtc,
+    CashLedgerMethodAmounts Receipts,
+    int ReceiptCount,
+    CashLedgerMethodAmounts Refunds,
+    int RefundCount,
+    int VoidedCount,
+    decimal VoidedAmount,
+    decimal CashIn,
+    decimal CashOut,
+    int EntryCount,
+    decimal CountDifferences,
+    int ClosingCount,
+    decimal ClosingBalance,
+    decimal NetCash);
+
+/// <summary>
+/// One line of the ledger in time order. <paramref name="Kind"/> Receipt | Refund | CashIn | CashOut | Closing; <paramref name="Status"/>
+/// Posted | Voided; <paramref name="MoneyIn"/> / <paramref name="MoneyOut"/> what the line did to the drawer (cash only; a closing's
+/// count difference) and <paramref name="Balance"/> the cash after it. <paramref name="Text"/> is a void reason, a refund note,
+/// an entry's reason or a closing's note; <paramref name="Category"/> the entry's category. A closing carries its stored expected,
+/// counted and difference; its cashier is the closer.
+/// </summary>
+public sealed record CashLedgerRowView(
+    string Kind,
+    Guid Id,
+    string Number,
+    DateTimeOffset AtUtc,
+    Guid? VisitId,
+    string? Accession,
+    string? Method,
+    string? MethodCode,
+    string? Category,
+    string? Text,
+    decimal Amount,
+    string Status,
+    decimal MoneyIn,
+    decimal MoneyOut,
+    decimal Balance,
+    Guid CashierUserId,
+    string? CashierName,
+    decimal? Expected,
+    decimal? Counted,
+    decimal? Difference);
+
+/// <summary>The period a day close from the ledger covers: from the end of the scope's last closing (or the ledger's start) to the moment of the read.</summary>
+public sealed record CashLedgerCloseWindow(DateTimeOffset FromUtc, DateTimeOffset ToUtc);
+
+/// <summary>
+/// The cash ledger of the session branch (CP-70; also the A4 "Daily cash sheet"): <paramref name="Scope"/> User = the current
+/// user's drawer, Branch = one cashier (<paramref name="CashierUserId"/>) or every cashier of the branch (null); whole laboratory
+/// days <paramref name="FromDay"/>…<paramref name="ToDay"/> and their UTC bounds (half-open). <paramref name="CloseWindow"/> is
+/// present when the period includes the present and something is left to close; <paramref name="Cashiers"/> lists the cashiers who
+/// moved money in the branch over the period (Branch scope only).
+/// </summary>
+public sealed record CashLedgerView(
+    DocumentLetterhead Letterhead,
+    Guid BranchId,
+    string Scope,
+    Guid? CashierUserId,
+    string? CashierName,
+    DateOnly FromDay,
+    DateOnly ToDay,
+    DateTimeOffset FromUtc,
+    DateTimeOffset ToUtc,
+    string TimeZone,
+    CashLedgerSummaryView Summary,
+    IReadOnlyList<CashLedgerRowView> Rows,
+    CashLedgerCloseWindow? CloseWindow,
+    IReadOnlyList<DrawerCashier> Cashiers,
     string Currency,
     string PrintedBy,
     DateTimeOffset PrintedAtUtc);

@@ -48,7 +48,8 @@ public sealed record SampleListItem(
     string? RejectionNote,
     DateTimeOffset? RejectedAtUtc,
     Guid? ReplacedBySampleId,
-    Guid? ReplacesSampleId);
+    Guid? ReplacesSampleId,
+    bool CollectedOutside = false);
 
 public sealed record SampleServiceView(Guid Id, string? Code, string? NameEn, string? NameAr);
 
@@ -125,7 +126,8 @@ public sealed record SampleLabelDocument(
     string? BranchNameAr,
     DateTimeOffset LabelAtUtc,
     IReadOnlyList<SampleServiceView> Services,
-    int Copies);
+    int Copies,
+    bool CollectedOutside = false);
 
 public sealed record VisitLabelsDocument(Guid VisitId, string Accession, IReadOnlyList<SampleLabelDocument> Labels);
 

@@ -67,7 +67,7 @@ internal sealed class VisitLookup(AppDbContext context) : IVisitLookup
             visit.Status.ToString(),
             visit.Urgent,
             visit.Biohazard,
-            visit.CollectedOutside,
+            visit.AnyCollectedOutside,
             visit.RegisteredAtUtc,
             visit.RegisteredByUserId,
             visit.CompletedAtUtc,

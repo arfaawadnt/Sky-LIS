@@ -291,3 +291,23 @@ contain the username. The composition rules of CP-02 are superseded.
 | A14 | Change request 2026-10-13 item 1: the right "edit demographics according to test status" is a per-role (overridable per user) **status limit**: identity demographics of a patient may be changed from a visit while the highest status of that visit's results is at most the limit; every role that existed before 1.1 received `Complete` from the migration so that nothing changes for a reviewed or verified visit (an administrator raises it in the role editor); the administrator role of a laboratory provisioned after 1.1 holds `Printed` (`SpecialRights.All`). | Is `Complete` the right default for existing roles, and should the limit also apply from the patient file (there: the highest status over every visit of the patient)? |
 | A15 | Item 2: "treasury report for the current user or the branch as per the rights" is the boolean right `CanViewBranchCollections` (off for every role that existed before 1.1, on for the administrator role of a laboratory provisioned after 1.1); without it the collections report covers the user's own collections only. | Confirm. |
 | A16 | Item 3: "user right for time limits in days" is `ReportDaysLimit` per role / user: the earliest day a report may start is today minus the limit (0 = today only; empty = no limit, which existing roles received). The same limit bounds the collections report of item 2. | Should existing roles start with a limit (e.g. 30 days) instead of none? |
+
+## 17. Change request 2026-10-24 — branch address (LIS-CR-008 C-04, package P-ADR)
+
+`Branch` gains `CityId?`, `DistrictId?`, `AreaId?` (`app.branches.city_id / district_id / area_id`, uuid null, referenced by id: no FK
+across the schema boundary; migration `ReviewFeatures` of the integrator, no extra SQL). B1 Create and B2 Update take the optional ids
+(`CreateBranchRequest`, `UpdateBranchRequest` and the commands, trailing and defaulted: older bodies keep working and clear the
+locality on update); `BranchListItem` returns them. The handler reads the rows through `IBranchGeography.LocalityRowsAsync` and
+resolves them with `OrganizationGuards.ResolveLocalityAsync` → `Locality.Resolve` (platform domain); `Branch.Locate` refuses a locality
+on a branch without a governorate or of another governorate. Codes: GEO-020 (city not in the branch's governorate, or no governorate),
+GEO-021, GEO-022: field refusals (422) that the SPA puts under City, District and Area.
+
+CP-36 editor: three optional cascading selects after Governorate (City / markaz → District → Area / village), loaded from the public
+lookups for the chosen parent (master-data page `FieldSchema.dependsOn` + `dependentOptions`, added by LIS-CR-008); changing a level
+clears the levels below. Keys `organization.branches.field.cityId|districtId|areaId`, `organization.branches.hint.locality`,
+`organization.branches.error.GEO-020…022`.
+
+Acceptance: `AddressesFlowTests.A_branch_takes_a_locality_of_its_governorate_only` (create with city and district, GEO-020 without a
+governorate, GEO-022 for an area without its district, update to an area, update without the fields clears); unit tests
+`BranchGeographyRulesTests` (Application) and `LocalityTests.S_LCY_20` (Domain); SPA `branches.page.spec` and the master-data
+cascading spec.

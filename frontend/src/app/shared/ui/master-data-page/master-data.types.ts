@@ -55,6 +55,15 @@ export interface FieldSchema {
   readonly patternMessage?: string;
   /** `select` and `multiSelect`: static options or an async provider (resolved once when the page opens). */
   readonly options?: SelectOptionsSource;
+  /**
+   * `select` only — cascading selects (LIS-CR-008 C-04: governorate → city → district → area): the name of the field whose
+   * value this field's options depend on. With `dependentOptions` (instead of `options`), the options are loaded for the
+   * parent's current value when the drawer opens and again whenever the parent changes; a change of the parent also clears
+   * this field (and so, in turn, the fields that depend on it). No parent value means no options.
+   */
+  readonly dependsOn?: string;
+  /** The options of a `dependsOn` field for one value of its parent. */
+  readonly dependentOptions?: (parentValue: string) => Promise<readonly SelectOption[]>;
   /** Cannot change once created (a code); disabled in the edit drawer. */
   readonly immutable?: boolean;
   /** Takes the full row of the two-column form grid (default for textarea and localizedText). */

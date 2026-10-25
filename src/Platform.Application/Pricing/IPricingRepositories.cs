@@ -1,6 +1,7 @@
 using Platform.Application.Abstractions.Persistence;
 using Platform.Contracts.Common;
 using Platform.Contracts.Pricing;
+using Platform.Domain.Catalogue;
 using Platform.Domain.Pricing;
 
 namespace Platform.Application.Pricing;
@@ -18,7 +19,8 @@ public sealed record ContractPricingView(
     DateOnly? EffectiveTo,
     DateTimeOffset? AppliedAtUtc,
     IReadOnlyList<PricingFormulaTermView> Terms,
-    IReadOnlyList<ContractPriceItem> Prices);
+    IReadOnlyList<ContractPriceItem> Prices,
+    ReportDesign? ReportDesign = null);
 
 /// <summary>Write side of payers plus the projections of the payer register. <see cref="IRepository{T}.GetForUpdateAsync"/> loads the tiers.</summary>
 public interface IPayerRepository : IRepository<Payer>

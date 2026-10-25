@@ -69,6 +69,8 @@ internal static class BillingNotFound
     public static DomainException Closing() => new(BillingCodes.ClosingNotFound, "Cash closing not found.", DomainFault.NotFound);
 
     public static DomainException Method() => new(BillingCodes.MethodNotFound, "Payment method not found.", DomainFault.NotFound);
+
+    public static DomainException CashEntry() => new(BillingCodes.CashEntryNotFound, "Cash entry not found.", DomainFault.NotFound);
 }
 
 /// <summary>
@@ -167,7 +169,11 @@ internal static class BillingViews
         totals.ExpectedCash,
         totals.OutstandingBalance,
         totals.DiscountTotal,
-        totals.VisitCount);
+        totals.VisitCount,
+        totals.OpeningBalance,
+        totals.CashIn,
+        totals.CashOut,
+        totals.EntryCount);
 }
 
 /// <summary>

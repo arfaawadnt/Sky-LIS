@@ -8,6 +8,7 @@ import type {
   DiscountKind,
   OrderCheckResult,
   OrderLinePreview,
+  OrderSampleRequest,
   OrderWarning,
   PreparationAnswerRequest,
   RegisterVisitRequest,
@@ -37,7 +38,26 @@ export interface VisitHeaderState {
   readonly insuranceId: string;
   readonly urgent: boolean;
   readonly biohazard: boolean;
-  readonly collectedOutside: boolean;
+}
+
+/** A tube the clerk marked "collected outside the laboratory" (LIS-CR-008 C-02); `collectedAt` is a `datetime-local` value, '' = now. */
+export interface OutsideMark {
+  readonly outside: boolean;
+  readonly collectedAt: string;
+}
+
+/** One row of the CP-06 sample list (LIS-CR-008 C-02): a tube of the order with its "collected outside" state. */
+export interface SampleFlagRow {
+  readonly key: string;
+  readonly unitCode: string;
+  readonly sampleTypeNameEn: string;
+  readonly sampleTypeNameAr: string;
+  readonly sampleConditionNameEn: string | null;
+  readonly sampleConditionNameAr: string | null;
+  readonly sampleNumber: string | null;
+  readonly outside: boolean;
+  /** New visit: the `datetime-local` value typed ('' = now). Saved visit: the UTC instant recorded, '' when none. */
+  readonly collectedAt: string;
 }
 
 export interface DiscountState {
@@ -57,7 +77,7 @@ export interface PaymentState {
 /** Why the page cannot save yet (each maps to `registration.validation.<key>`). */
 export type SaveBlocker = 'patient' | 'contract' | 'lines' | 'issues' | 'checking' | 'doctor' | 'discountReason' | 'discountCap' | 'paymentReference' | 'paymentAmount';
 
-const EMPTY_HEADER: VisitHeaderState = { tierId: '', doctorId: '', diagnosisId: '', treatmentNo: '', insuranceId: '', urgent: false, biohazard: false, collectedOutside: false };
+const EMPTY_HEADER: VisitHeaderState = { tierId: '', doctorId: '', diagnosisId: '', treatmentNo: '', insuranceId: '', urgent: false, biohazard: false };
 const EMPTY_DISCOUNT: DiscountState = { kind: 'Percent', value: null, reasonId: '' };
 const EMPTY_PAYMENT: PaymentState = { method: 'Cash', amount: null, reference: '' };
 
@@ -80,6 +100,8 @@ export class RegistrationFacade {
   readonly answers = signal<Readonly<Record<string, string>>>({});
   readonly discount = signal<DiscountState>(EMPTY_DISCOUNT);
   readonly payment = signal<PaymentState>(EMPTY_PAYMENT);
+  /** The tubes marked "collected outside", by tube key of the dry run (LIS-CR-008 C-02); keys no longer planned are ignored. */
+  readonly outside = signal<Readonly<Record<string, OutsideMark>>>({});
 
   readonly settings = resource({ loader: ({ abortSignal }) => this.api.settings(abortSignal) });
   readonly tiers = resource({ loader: ({ abortSignal }) => this.api.tiers(abortSignal) });
@@ -146,6 +168,44 @@ export class RegistrationFacade {
   readonly plannedLines = computed<readonly OrderLinePreview[]>(() => this.result()?.lines ?? []);
 
   readonly warnings = computed<readonly OrderWarning[]>(() => this.result()?.warnings ?? []);
+
+  /**
+   * CP-06 sample list (LIS-CR-008 C-02). New visit: one row per new tube of the dry run with its switch; saved visit: the
+   * saved tubes as recorded (read-only: the flag is set at registration only).
+   */
+  readonly sampleRows = computed<readonly SampleFlagRow[]>(() => {
+    const saved = this.saved();
+    if (saved !== null) {
+      return saved.tubes
+        .filter((tube) => tube.isLive)
+        .map((tube) => ({
+          key: tube.id,
+          unitCode: tube.unitCode,
+          sampleTypeNameEn: tube.sampleTypeNameEn,
+          sampleTypeNameAr: tube.sampleTypeNameAr,
+          sampleConditionNameEn: tube.sampleConditionNameEn,
+          sampleConditionNameAr: tube.sampleConditionNameAr,
+          sampleNumber: tube.sampleNumber,
+          outside: tube.collectedOutside,
+          collectedAt: tube.collectedOutsideAtUtc ?? '',
+        }));
+    }
+
+    const marks = this.outside();
+    return (this.result()?.tubes ?? [])
+      .filter((tube) => tube.existingTubeId === null)
+      .map((tube) => ({
+        key: tube.key,
+        unitCode: tube.unitCode,
+        sampleTypeNameEn: tube.sampleTypeNameEn,
+        sampleTypeNameAr: tube.sampleTypeNameAr,
+        sampleConditionNameEn: tube.sampleConditionNameEn,
+        sampleConditionNameAr: tube.sampleConditionNameAr,
+        sampleNumber: null,
+        outside: marks[tube.key]?.outside ?? false,
+        collectedAt: marks[tube.key]?.collectedAt ?? '',
+      }));
+  });
 
   readonly frequencyAlerts = computed(() => this.warnings().filter((warning) => warning.code === 'REG-201'));
 
@@ -281,7 +341,6 @@ export class RegistrationFacade {
       insuranceId: blank(header.insuranceId),
       urgent: header.urgent,
       biohazard: header.biohazard,
-      collectedOutside: header.collectedOutside,
     });
   });
 
@@ -315,7 +374,6 @@ export class RegistrationFacade {
       insuranceId: detail.insuranceId ?? '',
       urgent: detail.urgent,
       biohazard: detail.biohazard,
-      collectedOutside: detail.collectedOutside,
     });
     this.discount.set(detail.discountKind === null ? EMPTY_DISCOUNT : { kind: detail.discountKind, value: detail.discountValue, reasonId: detail.discountReasonId ?? '' });
     this.answers.set(Object.fromEntries(detail.preparationAnswers.map((answer) => [answer.preparationId, answer.answer])));
@@ -377,6 +435,21 @@ export class RegistrationFacade {
     this.lines.update((lines) => lines.map((line) => (line.serviceId === serviceId ? { ...line, reserved } : line)));
   }
 
+  /** Marks one tube of the order as collected outside the laboratory, or back (LIS-CR-008 C-02). */
+  setOutside(key: string, outside: boolean): void {
+    this.outside.update((marks) => ({ ...marks, [key]: { outside, collectedAt: outside ? (marks[key]?.collectedAt ?? '') : '' } }));
+  }
+
+  /** "All outside" / "None outside": every tube of the order at once (the typed times are kept). */
+  setAllOutside(outside: boolean): void {
+    this.outside.update((marks) => Object.fromEntries(this.sampleRows().map((row) => [row.key, { outside, collectedAt: outside ? (marks[row.key]?.collectedAt ?? '') : '' }])));
+  }
+
+  /** The collection time the clerk typed for an outside tube (`datetime-local`; '' = now). */
+  setCollectedAt(key: string, collectedAt: string): void {
+    this.outside.update((marks) => ({ ...marks, [key]: { outside: true, collectedAt } }));
+  }
+
   setAnswer(preparationId: string, answer: string): void {
     this.answers.update((answers) => ({ ...answers, [preparationId]: answer }));
   }
@@ -403,6 +476,7 @@ export class RegistrationFacade {
     this.header.set({ ...EMPTY_HEADER, tierId });
     this.lines.set([]);
     this.answers.set({});
+    this.outside.set({});
     this.discount.set(EMPTY_DISCOUNT);
     this.payment.set(EMPTY_PAYMENT);
     this.methodCode.set('');
@@ -425,12 +499,13 @@ export class RegistrationFacade {
       bookingId: null,
       urgent: header.urgent,
       biohazard: header.biohazard,
-      collectedOutside: header.collectedOutside,
+      collectedOutside: false,
       lines: this.lines().map((line) => ({ serviceId: line.serviceId, reserved: line.reserved })),
       preparationAnswers: this.answerRequests(),
       discount: this.discountRequest(),
       confirmFrequencyWarnings: confirm,
       utcOffsetMinutes: utcOffsetMinutes(),
+      samples: this.sampleRequests(),
     };
   }
 
@@ -444,8 +519,7 @@ export class RegistrationFacade {
         (saved.treatmentNo ?? '') !== header.treatmentNo.trim() ||
         (saved.insuranceId ?? '') !== header.insuranceId.trim() ||
         saved.urgent !== header.urgent ||
-        saved.biohazard !== header.biohazard ||
-        saved.collectedOutside !== header.collectedOutside)
+        saved.biohazard !== header.biohazard)
     );
   }
 
@@ -467,6 +541,14 @@ export class RegistrationFacade {
     return discount.value !== null && discount.value > 0 && discount.reasonId !== '' ? { kind: discount.kind, value: discount.value, reasonId: discount.reasonId } : null;
   }
 
+  /** The tubes of the planned order marked outside (LIS-CR-008 C-02), each by its tube key; null when none. */
+  private sampleRequests(): readonly OrderSampleRequest[] | null {
+    const marked = this.sampleRows()
+      .filter((row) => row.outside)
+      .map((row) => ({ tubeKey: row.key, sampleTypeId: null, collectedOutside: true, collectedAtUtc: localToUtc(row.collectedAt) }));
+    return marked.length === 0 ? null : marked;
+  }
+
   private answerRequests(): readonly PreparationAnswerRequest[] | null {
     const applicable = new Set((this.result()?.preparations ?? []).map((question) => question.preparationId));
     const answers = Object.entries(this.answers())
@@ -474,6 +556,16 @@ export class RegistrationFacade {
       .map(([preparationId, answer]) => ({ preparationId, answer: answer.trim() }));
     return answers.length === 0 ? null : answers;
   }
+}
+
+/** A `datetime-local` value (browser time) as a UTC instant; null when empty or not a time. */
+function localToUtc(local: string): string | null {
+  if (local.trim() === '') {
+    return null;
+  }
+
+  const date = new Date(local);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function blank(value: string): string | null {

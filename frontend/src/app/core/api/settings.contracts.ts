@@ -60,6 +60,7 @@ export const SETTING_KEYS = {
   printUnverified: 'printUnverified',
   labelCopies: 'labelCopies',
   resultLanguage: 'resultLanguage',
+  reportDesign: 'reportDesign',
   autoCollect: 'autoCollect',
   autoReceive: 'autoReceive',
   newBarcodeOnReject: 'newBarcodeOnReject',
@@ -74,6 +75,8 @@ export const SETTING_KEYS = {
   defaultLanguage: 'defaultLanguage',
   masterDataUpdatePolicy: 'masterDataUpdatePolicy',
   timeZone: 'timeZone',
+  /** LIS-CR-012 (C-16, D-3): days of grace after a trial ended or a wallet stayed at or below zero for a plan period (platform only, 0–60). */
+  subscriptionGraceDays: 'subscriptionGraceDays',
 } as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];

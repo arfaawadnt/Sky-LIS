@@ -35,6 +35,7 @@ import { RegistrationFacade, type SaveBlocker } from '../state/registration.faca
 import { RegistrationPrinter } from '../state/registration-printer';
 import { type BarProblem, RegistrationActionBarComponent } from '../ui/registration-action-bar.component';
 import { type ChecklistItem, RegistrationReadinessComponent } from '../ui/registration-readiness.component';
+import { SampleFlagsComponent } from '../ui/sample-flags.component';
 import { type PickedService, ServiceEntryComponent } from '../ui/service-entry.component';
 import { type VisitFlag, VisitFlagsComponent } from '../ui/visit-flags.component';
 
@@ -87,6 +88,7 @@ interface SuccessState {
     ServiceEntryComponent,
     RegistrationReadinessComponent,
     RegistrationActionBarComponent,
+    SampleFlagsComponent,
     VisitFlagsComponent,
   ],
   templateUrl: './registration.page.html',

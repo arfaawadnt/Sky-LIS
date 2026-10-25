@@ -460,3 +460,24 @@ Row errors of the import reuse `PRC-015` (unknown code), `PRC-006` (price missin
 | Q25 | Should a bulk adjustment that would exceed the maximum price cap the price? | No: it is refused (`PRC-046`) so a wrong percentage is noticed; the user narrows the scope or the value. |
 | Q26 | Should the service prices page let the user edit a contract price (negotiate) inline? | No: contract pricing is Release 2; the page shows the derived prices read-only and links to the tier when CP-34 is in scope. |
 | Q27 | Which laboratory name goes on the printed price list? | The same texts as the contract review document (`pricing.review.labName*`) until the print kit takes the laboratory brand. |
+
+## 20. Change request 2026-10-24 — Report design of a contract tier (LIS-CR-010, package P-RPT, reviewer point C-14, CP-34)
+
+**Model.** `ContractPricing.ReportDesign` (`ReportDesign?`, column `app.contract_pricings.report_design`, nullable string with
+the enum convention's CHECK; wave migration `ReviewFeatures`, no seed). **C7 Report design** (`pricing.edit`):
+`PUT /api/v1/pricing/contract-pricing/{tierId}/report-design` with `{ "design": "Modern" | null }` → 204; null clears the
+override; an unknown name is a shape error (400); a tier without pricing is `PRC-407`; `PRC-047` (domain) guards an undefined
+value. Raises `ContractReportDesignSet` once per change (none when the value does not change). The design is not part of the
+formula: setting the formula, Apply and a copy onto the tier keep it; a pricing created by a copy starts without one.
+`ContractPricingDetail.reportDesign` reads it back. It is the first level of the selection order (Results intake §18): every
+result report of a visit registered under the tier prints in it.
+
+**SPA.** CP-34 shows a *Report design* card under the formula once the tier has pricing (`ui/contract-report-design.component`):
+a select (*Not set: template, then laboratory* + the five designs) and *Save design* for `pricing.edit`. Tests:
+`ReportDesignTests` RD-08…RD-10, `PricingReportDesignFlowTests`, `PricingModuleTests.A_tier_report_design_…`,
+`contract-report-design.component.spec.ts`, `pricing.api.spec.ts`.
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| Q28 | Should a tier without a formula take a design? | No: the design lives on the tier's pricing (`PRC-407` until the formula exists). |
+| Q29 | Should "Copy from another tier" copy the design? | No: the copy carries prices; the target keeps its own design. |

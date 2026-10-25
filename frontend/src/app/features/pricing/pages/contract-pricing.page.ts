@@ -13,6 +13,7 @@ import {
   type ServiceLabel,
   type TierOption,
 } from '../../../core/api/pricing.contracts';
+import type { ReportDesign } from '../../../core/api/report-designs';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
 import { markAllTouched } from '../../../shared/forms/mark-all-touched';
@@ -38,6 +39,7 @@ import { csvFileName, downloadCsv, toCsv } from '../data/csv';
 import { formatAmount, formatFactor, hasScale, round2 } from '../data/money';
 import { ServiceCatalogApi } from '../data/service-catalog.api';
 import { ContractPricingFacade } from '../state/contract-pricing.facade';
+import { ContractReportDesignComponent } from '../ui/contract-report-design.component';
 import { ContractReviewDocumentComponent, type ReviewLabels, type ReviewLine } from '../ui/contract-review.document';
 import { CopyTierDialogComponent, type CopyTierRequest } from '../ui/copy-tier-dialog.component';
 import { NegotiatePriceDialogComponent, type NegotiationTarget } from '../ui/negotiate-price-dialog.component';
@@ -110,6 +112,7 @@ export function formulaValidator(control: AbstractControl): ValidationErrors | n
     NegotiatePriceDialogComponent,
     PriceAlertDialogComponent,
     CopyTierDialogComponent,
+    ContractReportDesignComponent,
   ],
   templateUrl: './contract-pricing.page.html',
   styleUrl: './contract-pricing.page.css',
@@ -399,6 +402,14 @@ export class ContractPricingPage {
     });
     if (confirmed && (await this.facade.clearExclusion.execute({ tierId, serviceId: row.serviceId })) !== null) {
       this.toast.success(this.i18n.t('pricing.contract.restored'));
+    }
+  }
+
+  /** C7 (LIS-CR-010): saves or clears the tier's report design. */
+  protected async saveReportDesign(design: ReportDesign | null): Promise<void> {
+    const tierId = this.facade.tierId();
+    if (tierId !== null && (await this.facade.setReportDesign.execute({ tierId, design })) !== null) {
+      this.toast.success(this.i18n.t(design === null ? 'pricing.contract.design.cleared' : 'pricing.contract.design.saved'));
     }
   }
 

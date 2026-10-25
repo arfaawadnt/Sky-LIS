@@ -163,7 +163,9 @@ public sealed record ReportUnitView(
     IReadOnlyList<ServiceBannerView> Services,
     IReadOnlyList<ResultRowView> Results,
     int HiddenResults,
-    IReadOnlyList<LookupOption> HiddenGroups);
+    IReadOnlyList<LookupOption> HiddenGroups,
+    string? Design = null,
+    string? DesignSource = null);
 
 public sealed record ResultSettingsView(bool ReviewBeforeVerify, bool PrintUnverified, string ResultLanguage);
 
@@ -295,13 +297,19 @@ public sealed record ReportLine(
     string? Comment,
     IReadOnlyList<FormattedParagraphDto>? Paragraphs,
     CultureView? Culture,
-    string? Methodology);
+    string? Methodology,
+    IReadOnlyList<ReportPreviousValue>? Previous = null);
+
+/// <summary>A previous value of the line's test for the Cumulative design (LIS-CR-010): an earlier visit's signed result, newest first.</summary>
+public sealed record ReportPreviousValue(string Accession, DateTimeOffset RegisteredAtUtc, string? Value, string? Unit, string? Flag);
 
 public sealed record ReportSection(Guid ServiceId, string? HeadingEn, string? HeadingAr, bool IsProfile, IReadOnlyList<ReportLine> Lines);
 
 public sealed record ReportSignature(string? VerifiedByName, DateTimeOffset? VerifiedAtUtc, string? ReviewedByName, DateTimeOffset? ReviewedAtUtc);
 
-/// <summary>The laboratory report of one report unit (SRS documents; LDM §5.7, §12): hidden helpers excluded (BR-20).</summary>
+/// <summary>The laboratory report of one report unit (SRS documents; LDM §5.7, §12): hidden helpers excluded (BR-20).
+/// <paramref name="Design"/> is the resolved layout (LIS-CR-010: contract → template → laboratory, <paramref name="DesignSource"/> names the level);
+/// under <c>Cumulative</c> each numeric line carries its <see cref="ReportLine.Previous"/> values.</summary>
 public sealed record LaboratoryReportDocument(
     ReportLetterhead Letterhead,
     ReportTemplateInfo? Template,
@@ -321,7 +329,9 @@ public sealed record LaboratoryReportDocument(
     string? PrintListNumber,
     string QrValue,
     DateTimeOffset GeneratedAtUtc,
-    string? GeneratedBy);
+    string? GeneratedBy,
+    string Design = "Classic",
+    string DesignSource = "Laboratory");
 
 /// <summary>The bench list of the worklist filter (at most 2 000 rows; <paramref name="Truncated"/> says when more matched).</summary>
 public sealed record WorklistDocument(ReportLetterhead Letterhead, DateTimeOffset GeneratedAtUtc, string? GeneratedBy, DateTimeOffset? FromUtc, DateTimeOffset? ToUtc, string? GroupNameEn, string? GroupNameAr, IReadOnlyList<WorklistItem> Rows, bool Truncated);

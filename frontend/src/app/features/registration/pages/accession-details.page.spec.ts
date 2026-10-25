@@ -68,6 +68,7 @@ const sample: SampleListItem = {
   rejectedAtUtc: null,
   replacedBySampleId: null,
   replacesSampleId: null,
+  collectedOutside: true,
 };
 
 const account = {
@@ -189,6 +190,7 @@ describe('AccessionDetailsPage (CP-10b)', () => {
     expect(host.querySelector('app-reg-accession-lines tr[data-line="l-1"] .btn.danger')).toBeNull();   // a verified result locks the line (REG-106)
     expect(host.querySelector('app-reg-accession-lines tr[data-line="l-1"] [data-locked]')?.textContent).toContain('registration.accession.lines.locked');
     expect(host.querySelector('app-reg-accession-samples tr[data-sample="SMP-2026-00001"] .btn.primary')).not.toBeNull();   // collect
+    expect(host.querySelector('app-reg-accession-samples tr[data-sample="SMP-2026-00001"]')?.textContent).toContain('registration.sampleFlags.outside');   // LIS-CR-008 C-02
     expect(text).toContain('Haematology');
     expect(text).toContain('registration.accession.results.hidden');
     expect(host.querySelector('app-reg-accession-payments tr[data-receipt="RCP-2026-00001"]')?.textContent).toContain('Cashier One');

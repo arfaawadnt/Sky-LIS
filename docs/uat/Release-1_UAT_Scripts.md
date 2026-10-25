@@ -117,6 +117,7 @@ viewConfidential; Organization intake A4). `approve` on results covers review, v
 ### 5.1 Laboratory administrator (UAT-ADM)
 
 #### UAT-ADM-01 — Branches · critical
+LIS-CR-008 (C-04): the branch editor offers City / markaz → District → Area / village under the governorate (optional, cascading); a city of another governorate is refused with GEO-020.
 Refs: CP-36 · WF-01 step 3 · ORG AS-B1, AS-B2, AS-B3.
 Sign in as `lab.admin` at `<base>/lab/demo-lab`. Setup › Branches (`/organization/branches`).
 1. `Add branch`: code `north`, name EN "North Branch" / AR "الفرع الشمالي", country Egypt, governorate, phone, e-mail, currency `EGP`. Save.
@@ -386,6 +387,21 @@ Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 #### UAT-CSH-10 — Cancel own request · withdrawn
 **Withdrawn on 2026-10-20** (change request LIS-CR-004: the treasury was removed from the system — there is no access request). The id stays reserved; nothing to run.
 
+#### UAT-CSH-11 — Cash ledger, cash entries and the day close · critical
+Refs: CP-70, CP-30, CP-23 · BR-16, BR-30 · LIS-CR-011 (reviewer point C-15).
+As `uat.cashier` (own drawer), then a supervisor with `billing.approve`, `billing.manage` and the "view branch collections" right.
+1. Finance › Cash ledger. Today's own drawer shows: opening 0 (or the last count); *Close the day* is offered only to the supervisor.
+2. Take a cash payment of 100 (UAT-CSH-03); *Add cash in* 200 (Opening float); *Add cash out* 50 (Supplier, reason "Courier").
+3. *Add cash out* with the category Opening float; then a cash out with an empty reason.
+4. As the cashier without the branch right, look for the *Whole branch* scope; as the supervisor choose *Whole branch*, then one cashier.
+5. As the supervisor, void the cash out with a reason; void it again.
+6. *Close the day* with counted 295 and the note "5 short"; print the closing sheet.
+7. Void the cash in posted before the close.
+8. *Export Excel*; print the *Daily cash sheet*; choose a past day.
+9. Arabic check.
+Expected: (1) the page opens on today, own drawer. (2) the balance reads 100, then 300, then 250; the figures (receipts by method, cash in, cash out, closing) match. (3) BIL-062; the dialog does not send an empty reason (BIL-060 on the server). (4) the scope is not offered without the right; with it the other cashier's lines show. (5) the line reads voided and the balance returns to 300; the second void is refused with BIL-063. (6) a day-close line resets the balance to 295, the sheet shows opening, cash in, cash out, expected and counted cash, difference; the next window starts at that close. (7) refused with BIL-061 (closed period). (8) the workbook has a Ledger and a Summary sheet; the A4 sheet prints, in Arabic as well; a past day offers no entry buttons and shows the read-only note. (9) right-to-left, Arabic labels and counted forms.
+Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
+
 ### 5.4 Reception clerk (UAT-REG)
 
 Sign in as `uat.reception`; branch MAIN.
@@ -414,6 +430,7 @@ Expected: (1) "If an account matches, a 6-digit code was sent …" (the same mes
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-03 — Walk-in registration with full cash payment · critical
+LIS-CR-008 (C-02): once services are entered the sample list shows one row per tube with a "Collected outside" switch and an optional time; switch the serum tube to outside with a time one hour ago and save → the serum label prints EXT, the blood label does not; with auto-collect off the serum sample is Collected at the typed time and the blood sample is Ordered; "All outside" / "None outside" switch every tube; a time in the future or 31 days back is refused with REG-041; the edit page shows the list read-only with "Outside" and the time; the CP-10 samples dialog, the accession page and the Lab Tracker ("ext") show it.
 LIS-CR-007: the mobile is typed after the `+20` dial code (preselected on the laboratory's country); `0100 123 4567` reads `1001234567` after leaving the field and is still stored as `01001234567`. Paste `+966 50 123 4567`: the dial code switches to SA and the number is stored as `+966501234567`.
 Refs: CP-06, CP-10 · WF-02 · BR-01, BR-02, BR-06, BR-26, BR-27 · REG S-V1-ok · BIL S-T1-ok · PAT S-T1-ok.
 Reception › Registration (`/registration/new`).
@@ -743,6 +760,7 @@ Expected: (1) "The result was amended and returned to Complete; it needs a new v
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-VER-06 — Report preview and print · critical
+LIS-CR-010 (C-14): Setup › Parameters › Printing › *Report design* — preview a verified unit in Classic, Modern, Compact, Letterhead (45 mm clear top band) and Cumulative (last three verified values of earlier visits of the patient, newest first); a contract tier design (CP-34) wins over the template's, which wins over the laboratory's; Arabic RTL in every design.
 Refs: CP-19 · WF-06 step 6 · BR-09, BR-20 · document "Laboratory report" · RES R-T8-ok.
 Visit of UAT-REG-03 (CHEM verified in UAT-VER-01; HEMA cancelled in UAT-REG-11 or verified).
 1. `Preview` the CHEM unit.
@@ -774,6 +792,7 @@ Expected: (1) `AUTH-002` "The username or password is incorrect.", then the Supe
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-OPS-02 — Add a client manually · critical
+LIS-CR-008 (C-04): the client drawer offers City / District / Area; changing the city resets district and area; the register and the public laboratory card print "Area, District, City, Governorate"; clearing the locality saves. LIS-CR-012: the toolbar *Subscription* filter (Expiring / In grace / Expired) lists the clients with their days left and CSV export. LIS-CR-013: "Hide announcements for this client".
 Refs: SA-04 · WF-01 step 2, WF-12 step 1 · BR-25 · PLT S-P1-manual, CLI-100.
 SA › Administration › Clients (`/admin/clients`).
 1. `Add client`: name EN "UAT Lab B" / AR, country Egypt, governorate, address, laboratory mobile, licence, manager name and mobile, e-mail, language, plan, portal address `uatlabb`, administrator username `labb.admin`, password + confirm. `Create client`.
@@ -824,6 +843,7 @@ Expected: (1) saved; the malformed dial code is refused ("'+' and the country co
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-OPS-07 — Self-service subscription wizard · critical · *gateway*
+LIS-CR-008 (C-04): step 1 offers City / markaz, District and Area / village after the governorate (optional); the finished client shows the full address on SA-04.
 LIS-CR-007: once Egypt is chosen the `+20` dial code appears beside both mobiles; typing `01012345678` (leading 0) is accepted; the 9-digit refusal is unchanged.
 Refs: CP-01, CP-02 · WF-01 step 1 · BR-25 · PLT S-P1-sub, S-P1-mobile, S-S2-code.
 Public site (`/welcome`), no sign-in.
@@ -851,6 +871,7 @@ Expected: (1) saved in the platform catalogue; the editors are the same as the c
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-MDR-02 — Global lists · standard
+LIS-CR-008 (C-04): SA-11 › Locations drawer › *Import CSV* (header `city_en,city_ar,district_en,district_ar,area_en,area_ar`): the dry run shows created / existing / refused per level and writes nothing; a bad line (area without district) keeps *Import* disabled (GEO-025); fix it and import; import the same file again → nothing new. LIS-CR-010 (C-14): a Results report template takes a design and the preview offers every design with "Use this design"; a Receipt template with a design is refused (CAT-273).
 Refs: SA-13 · CTB S-CTB-T1-ok, S-CTB-T1-set, S-CTB-T1-rule, S-CTB-T5, S-CTB-T1-code.
 SA › Master data › Preparations, Comment library, Reasons, Diagnoses, Report templates, Test rules, Shortcut sets, Patient conditions, Additional services.
 1. Reasons › `Add reason`: kind Cancellation, "Doctor's request" / AR. Save.
@@ -954,6 +975,33 @@ Refs: cross-cutting "Tenancy & branches" · PLT S-PLT-403 · wave-4 fix (return 
 4. As `uat.ops`: Clients › UAT Lab B › "Open wallet"; try any client-portal page URL (`/registration/new`).
 5. Arabic check.
 Expected: (1) the URL redirects to the client dashboard — the client portal has no admin routes; a forced API call answers `PLT-403`. (2) the platform administrator lands on the **Super Admin** home, never on the client dashboard (each portal returns only to its own routes). (3) nothing found: no visit, patient or request of the UAT laboratory is visible from Lab B. (4) the wallet opens (Subscriptions & wallets with the client selected); a client-page URL redirects to the Super Admin home — client pages are not available in the Super Admin portal (the server scopes every call to the platform tenant regardless).
+Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
+
+#### UAT-SUP-09 — Announcements · standard
+Refs: SA-22, CP-03, CP-05, SA-04 · LIS-CR-013 (reviewer point C-17, decision D-4).
+As `platform.admin`, then `lab.admin` of the demo laboratory.
+1. Super Admin › Announcements › *Add*: title and body in both languages, https link, placement *Sign-in*, schedule from today. Save.
+2. Upload a PNG; then try an SVG; then a file over 512 KB. Check the preview in both languages.
+3. *Activate*. Open `<base>/lab/demo-lab`; click the link.
+4. Restrict the audience to another client; reload the sign-in page.
+5. Create and activate a *Welcome* announcement. Sign in as `lab.admin`: close the dashboard card, revisit the dashboard, sign in again.
+6. SA-04 › demo laboratory › "Hide announcements for this client" on; reload both placements. As `lab.admin`, try `PUT /api/v1/settings` with `hideAnnouncements`.
+7. Set an end date in the past and try to activate.
+8. Sign in as a `platform.view`-only user and open the page.
+9. Arabic check.
+Expected: (1) the announcement is a draft (inactive). (2) PNG accepted; SVG refused with ANN-008; the large file with ANN-007. (3) the hero of the sign-in page shows the announcement in place of the slogan; the click count rises by one. (4) the slogan is back. (5) the card shows once per sign-in and stays closed within the session. (6) both placements disappear for that client; the laboratory's own change is refused with SET-004. (7) refused with ANN-010. (8) register and editor read-only. (9) right-to-left, Arabic texts.
+Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
+
+#### UAT-SUP-10 — Subscription reminders, grace and expiry · critical · *gateway*
+Refs: SA-03, SA-04, SA-19, SA-20, CP-03, CP-05, CP-66 · BR-31 · LIS-CR-012 (reviewer point C-16, decision D-3).
+Set-up: a client whose trial ends in two days (SA-04 or the subscription wizard with trial days = 2 on SA-19), and one whose trial ended more than the grace period ago.
+1. As an administrator of the first client, sign in; as a plain member, sign in.
+2. SA-05 › *Run charges now* is not involved; run the reminder pass (restart the service or wait for the hourly job) and read the pickup folder / gateway; run it again.
+3. As a member of the expired client, sign in; as its administrator, sign in, open Account › Wallet, then open Registration.
+4. SA-03: the "Expiring soon" tile; SA-04: *Subscription* = Expiring, In grace, Expired; *Export CSV*.
+5. SA-19: set the grace days to 61; then to 7. SA-20: open the templates `subscription-expiry`, `wallet-low`, `subscription-grace`.
+6. Repeat 1 and 3 in Arabic.
+Expected: (1) the administrator sees the banner under the top bar and the modal; the member sees the modal only; both link to the wallet. (2) one SMS and one e-mail to the manager with the days and amount; the second run sends nothing. (3) the member is refused with SUB-020 on the sign-in page; the administrator signs in, the wallet opens, every other page answers SUB-021. (4) the tile counts the two clients; the filters list them with days left and the administrator's mobile; the CSV downloads. (5) 61 refused with SET-002, 7 saved; the three templates exist with their placeholders. (6) right-to-left, Arabic texts.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 ---
@@ -1095,4 +1143,5 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 0.7 | 2026-10-20 | Claude Code | Sign-in by address (change request LIS-CR-005, BR-28): set-up note (laboratory users at `<base>/lab/<slug>`, Super Admin personas at `<base>/admin/login`), UAT-REG-01 step 1a and expectations (another laboratory, admin address, unknown address, bare address; idle return), UAT-OPS intro (admin address, laboratory user refused), UAT-ADM-01 and the provisioning / subscription expectations print the new address. |
 | 0.8 | 2026-10-22 | Claude Code | New script UAT-REG-16 Lab Tracker (CP-69, change request LIS-CR-006): strip and chips, table and board, next-step links, search, live refresh, desk views, rights, Arabic. Reception persona and coverage updated. |
 | 0.9 | 2026-10-22 | Claude Code | UAT-REG-16 gains step 8 (period picker: yesterday, last 7 days, from / to); rights and Arabic checks become steps 9 and 10. Ids unchanged. |
+| 1.1 | 2026-10-25 | Claude Code | Reviewer features (change requests LIS-CR-008, CR-010, CR-011, CR-012, CR-013): new scripts UAT-CSH-11 (cash ledger, cash entries, day close), UAT-SUP-09 (announcements), UAT-SUP-10 (subscription reminders, grace and expiry); notes under UAT-REG-03 (collected outside per sample), UAT-ADM-01 / UAT-OPS-02 / UAT-OPS-07 (localities), UAT-MDR-02 (locality import, template design), UAT-VER-06 (report designs). Ids unchanged. |
 | 1.0 | 2026-10-24 | Claude Code | Reviewer quick wins (change request LIS-CR-007, response LIS-RC-001): UAT-REG-10 / UAT-REG-11 row actions on one line with a *More* menu; UAT-CSH-03 / 04 payment card first, focus on the amount, "Show all"; UAT-REG-01 keep-this-address strip; UAT-REG-03 and UAT-OPS-07 mobiles typed after the dial code; UAT-ADM-10 doctor code left blank → DR-nnn; UAT-RES-03 range shown before entry; UAT-ADM-08 "Used for cultures"; UAT-MDR-02 Microbiology tab names and order (Antibiotic classes, Culture specimens); UAT-OPS-01 silent-clients tile; UAT-ADM-08 / UAT-MDR-02 shortcut sets and test rules in the client menu. Open point 10 closed. Ids unchanged; the per-script notes are the "LIS-CR-007" lines under each script's Refs. |

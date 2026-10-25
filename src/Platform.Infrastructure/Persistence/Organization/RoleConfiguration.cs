@@ -94,6 +94,9 @@ internal sealed class BranchConfiguration : IEntityTypeConfiguration<Branch>
 
         builder.Property(branch => branch.CountryId);       // saas.countries (platform module): referenced by id
         builder.Property(branch => branch.GovernorateId);   // saas.governorates (platform module): referenced by id
+        builder.Property(branch => branch.CityId);          // LIS-CR-008 C-04: saas.cities / districts / areas, referenced by id (no FK across the schema boundary)
+        builder.Property(branch => branch.DistrictId);
+        builder.Property(branch => branch.AreaId);
         builder.Property(branch => branch.Phone).HasMaxLength(Branch.MaxPhoneLength);
         builder.Property(branch => branch.Email).HasMaxLength(Branch.MaxEmailLength);
         builder.Property(branch => branch.Currency).HasMaxLength(Branch.CurrencyLength).IsRequired();

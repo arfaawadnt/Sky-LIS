@@ -316,7 +316,8 @@ public sealed record CreateReportTemplateCommand(
     string? HeaderTextEn,
     string? HeaderTextAr,
     string? FooterTextEn,
-    string? FooterTextAr) : ICommand<CreatedResource>;
+    string? FooterTextAr,
+    string? Design = null) : ICommand<CreatedResource>;
 
 public sealed class CreateReportTemplateValidator : AbstractValidator<CreateReportTemplateCommand>
 {
@@ -326,6 +327,7 @@ public sealed class CreateReportTemplateValidator : AbstractValidator<CreateRepo
         RuleFor(command => command.NameAr).RequiredText(CatalogueBGuard.MaxNameLength);
         RuleFor(command => command.Type).EnumName<CreateReportTemplateCommand, ReportTemplateType>();
         RuleFor(command => command.Language).EnumName<CreateReportTemplateCommand, ReportTemplateLanguage>();
+        RuleFor(command => command.Design).OptionalEnumName<CreateReportTemplateCommand, ReportDesign>();
         RuleFor(command => command.HeaderTextEn).MaximumLength(CatalogueBGuard.MaxLongTextLength).NotEmpty().When(command => !string.IsNullOrWhiteSpace(command.HeaderTextAr));
         RuleFor(command => command.HeaderTextAr).MaximumLength(CatalogueBGuard.MaxLongTextLength).NotEmpty().When(command => !string.IsNullOrWhiteSpace(command.HeaderTextEn));
         RuleFor(command => command.FooterTextEn).MaximumLength(CatalogueBGuard.MaxLongTextLength).NotEmpty().When(command => !string.IsNullOrWhiteSpace(command.FooterTextAr));
@@ -350,7 +352,8 @@ public sealed class CreateReportTemplateHandler(IReportTemplateRepository templa
             CatalogueBRules.Parse<ReportTemplateLanguage>(command.Language),
             CatalogueBRules.OptionalText(command.HeaderTextEn, command.HeaderTextAr),
             CatalogueBRules.OptionalText(command.FooterTextEn, command.FooterTextAr),
-            clock.UtcNow);
+            clock.UtcNow,
+            CatalogueBRules.ParseOptional<ReportDesign>(command.Design));
         templates.Add(template);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new CreatedResource(template.Id);
@@ -368,7 +371,8 @@ public sealed record UpdateReportTemplateCommand(
     string? HeaderTextEn,
     string? HeaderTextAr,
     string? FooterTextEn,
-    string? FooterTextAr) : ICommand;
+    string? FooterTextAr,
+    string? Design = null) : ICommand;
 
 public sealed class UpdateReportTemplateValidator : AbstractValidator<UpdateReportTemplateCommand>
 {
@@ -379,6 +383,7 @@ public sealed class UpdateReportTemplateValidator : AbstractValidator<UpdateRepo
         RuleFor(command => command.NameAr).RequiredText(CatalogueBGuard.MaxNameLength);
         RuleFor(command => command.Type).EnumName<UpdateReportTemplateCommand, ReportTemplateType>();
         RuleFor(command => command.Language).EnumName<UpdateReportTemplateCommand, ReportTemplateLanguage>();
+        RuleFor(command => command.Design).OptionalEnumName<UpdateReportTemplateCommand, ReportDesign>();
         RuleFor(command => command.HeaderTextEn).MaximumLength(CatalogueBGuard.MaxLongTextLength).NotEmpty().When(command => !string.IsNullOrWhiteSpace(command.HeaderTextAr));
         RuleFor(command => command.HeaderTextAr).MaximumLength(CatalogueBGuard.MaxLongTextLength).NotEmpty().When(command => !string.IsNullOrWhiteSpace(command.HeaderTextEn));
         RuleFor(command => command.FooterTextEn).MaximumLength(CatalogueBGuard.MaxLongTextLength).NotEmpty().When(command => !string.IsNullOrWhiteSpace(command.FooterTextAr));
@@ -405,7 +410,8 @@ public sealed class UpdateReportTemplateHandler(IReportTemplateRepository templa
             command.ShowQr,
             CatalogueBRules.Parse<ReportTemplateLanguage>(command.Language),
             CatalogueBRules.OptionalText(command.HeaderTextEn, command.HeaderTextAr),
-            CatalogueBRules.OptionalText(command.FooterTextEn, command.FooterTextAr));
+            CatalogueBRules.OptionalText(command.FooterTextEn, command.FooterTextAr),
+            CatalogueBRules.ParseOptional<ReportDesign>(command.Design));
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

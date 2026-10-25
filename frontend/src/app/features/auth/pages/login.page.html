@@ -3,8 +3,13 @@
   [heroTitle]="isAdmin() ? i18n.t('auth.admin.title') : i18n.t('auth.hero.title')"
   [lead]="isAdmin() ? i18n.t('auth.admin.lead') : i18n.t('auth.hero.lead')"
   [showSubscribe]="!isAdmin()"
+  [customHero]="heroAnnouncement() !== null"
   labelledBy="sign-in-title"
 >
+  @if (heroAnnouncement(); as announcement) {
+    <app-sign-in-announcement authHero [announcement]="announcement" />
+  }
+
   @switch (state()) {
     @case ('loading') {
       <p class="loading" role="status" aria-busy="true">{{ i18n.t('auth.lab.loading') }}</p>
@@ -25,6 +30,9 @@
           <img class="lab-logo" [src]="logo" [alt]="laboratoryName() ?? ''" (error)="onLogoError()" />
         }
         <h2 id="sign-in-title">{{ cardTitle() }}</h2>
+        @if (laboratoryAddress(); as address) {
+          <p class="lab-address">{{ address }}</p>
+        }
       </div>
 
       @if (endedIdle()) {

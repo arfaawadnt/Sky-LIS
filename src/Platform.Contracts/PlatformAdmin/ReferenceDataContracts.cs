@@ -126,3 +126,24 @@ public sealed record PublicDistrict(Guid Id, Guid CityId, string NameEn, string 
 
 /// <summary>Active areas of a district (<c>GET /api/v1/public/areas?districtId=</c>).</summary>
 public sealed record PublicArea(Guid Id, Guid DistrictId, string NameEn, string NameAr);
+
+// LIS-CR-008 C-04 (decision D-2): the locality import of one governorate (SA-11 "Import CSV"), all-or-nothing, idempotent.
+
+/// <summary>One level of an import: rows created, distinct existing rows matched, lines refused at this level.</summary>
+public sealed record LocalityImportLevel(int Created, int Existing, int Refused);
+
+/// <summary>A refused line of the file (1 = the header): the level (City, District, Area), the code (GEO-025, GEO-015, GEO-006) and the reason.</summary>
+public sealed record LocalityImportError(int Line, string Level, string Code, string Message);
+
+/// <summary>
+/// The answer of an import: <paramref name="Rows"/> data lines read; counts per level; <paramref name="Applied"/> is true only
+/// when no line was refused and the call was not a dry run (otherwise nothing was written).
+/// </summary>
+public sealed record LocalityImportResult(
+    int Rows,
+    LocalityImportLevel Cities,
+    LocalityImportLevel Districts,
+    LocalityImportLevel Areas,
+    bool DryRun,
+    bool Applied,
+    IReadOnlyList<LocalityImportError> Errors);

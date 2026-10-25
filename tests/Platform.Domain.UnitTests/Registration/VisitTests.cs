@@ -255,11 +255,11 @@ public sealed class VisitTests
         var visit = Register(Test("GLU", ChemistrySerum()));
         var doctor = Guid.CreateVersion7();
 
-        visit.UpdateDetails(new VisitDetails(" T-1 ", doctor, "INS-9", true, true, false));
+        visit.UpdateDetails(new VisitDetails(" T-1 ", doctor, "INS-9", true, true));
         Assert.Equal(("T-1", doctor, "INS-9", true), (visit.TreatmentNo, visit.ReferringDoctorId!.Value, visit.InsuranceId, visit.Urgent));
 
         visit.Complete(Now);
-        var refusal = Assert.Throws<InvalidStateTransitionException>(() => visit.UpdateDetails(new VisitDetails(null, null, null, false, false, false)));
+        var refusal = Assert.Throws<InvalidStateTransitionException>(() => visit.UpdateDetails(new VisitDetails(null, null, null, false, false)));
         Assert.Equal(RegistrationCodes.VisitNotOpen, refusal.Code);
         Assert.Equal(RegistrationCodes.VisitNotOpen, Assert.Throws<InvalidStateTransitionException>(() => visit.AddLines([Additional("X")], [], Numbers(1), Actor, Now)).Code);
     }

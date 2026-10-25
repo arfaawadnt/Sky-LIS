@@ -4,6 +4,7 @@ namespace Platform.Contracts.PlatformAdmin;
 
 // The public subscription wizard (CP-02): anonymous, rate-limited, one hour from start to completion.
 // Step 1 start → code to the manager's mobile; step 2 verify; step 3 complete (credentials) → portal address.
+// LIS-CR-008 C-04: step 1 may name a city / district / area under the governorate (optional, chain-checked GEO-020…022).
 
 public sealed record StartSubscriptionRequest(
     string LabNameEn,
@@ -16,7 +17,10 @@ public sealed record StartSubscriptionRequest(
     string ManagerName,
     string ManagerMobile,
     string? Email,
-    string? Language);
+    string? Language,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null);
 
 /// <summary>The request to continue with; the code went to <paramref name="MaskedMobile"/> and lives <paramref name="CodeLifetimeSeconds"/>.</summary>
 /// <summary><see cref="VerificationCode"/> is present only on a host that reveals codes (<c>Lis:Notifications:RevealCodes</c>, no SMS gateway yet): the wizard shows it.</summary>

@@ -14,6 +14,7 @@ import { type VisibleNavGroup, filterNav, firstEntry } from './nav.filter';
 import { NAV_GROUPS, NAV_REGISTRY } from './nav.registry';
 import { ShellSidebarComponent } from './shell-sidebar.component';
 import { ShellTopbarComponent } from './shell-topbar.component';
+import { SubscriptionBannerComponent } from '../features/account/ui/subscription-notice';
 
 /** The sidebar becomes a drawer below this width (px); keep in step with the 959px media queries of the shell CSS. */
 const NARROW_BELOW = 960;
@@ -28,7 +29,7 @@ const NARROW_BELOW = 960;
  */
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, ShellSidebarComponent, ShellTopbarComponent],
+  imports: [RouterOutlet, ShellSidebarComponent, ShellTopbarComponent, SubscriptionBannerComponent],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -71,6 +72,8 @@ export class ShellComponent {
       this.navSearch(),
     ),
   );
+
+  protected readonly portalName = computed(() => this.portal.portal());
 
   protected readonly portalLabel = computed(() => this.i18n.t(this.portal.portal() === 'admin' ? 'shell.portal.admin' : 'shell.portal.client'));
 

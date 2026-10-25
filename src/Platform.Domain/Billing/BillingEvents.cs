@@ -58,3 +58,21 @@ public sealed record PaymentMethodUpdated(Guid MethodId, string Code, DateTimeOf
 public sealed record PaymentMethodDeactivated(Guid MethodId, string Code, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
 public sealed record PaymentMethodReactivated(Guid MethodId, string Code, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+// Cash ledger (change request LIS-CR-011, C-15): money in or out of the drawer without a visit.
+
+/// <summary>A cash entry recorded (T6): <paramref name="Kind"/> CashOut | CashIn; <paramref name="Reason"/> is the cashier's reason.</summary>
+public sealed record CashEntryPosted(
+    Guid EntryId,
+    string Number,
+    string Kind,
+    string Category,
+    decimal Amount,
+    string Method,
+    Guid CashierUserId,
+    Guid BranchId,
+    string Reason,
+    DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+/// <summary>A posted cash entry cancelled with a reason (T7); it no longer counts in the ledger or the drawer.</summary>
+public sealed record CashEntryVoided(Guid EntryId, string Number, string Kind, decimal Amount, Guid ActorUserId, string Reason, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);

@@ -62,6 +62,10 @@
     <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.samples.isLoading()" [interactive]="false" [caption]="i18n.t('samples.visit.title')" [emptyTitle]="i18n.t('samples.visit.empty')">
       <ng-template appCell="status" [appCellOf]="facade.rows()" let-row>
         <app-badge [status]="row.status" />
+        @if (row.collectedOutside) {
+          <!-- LIS-CR-008 C-02 -->
+          <app-badge tone="info">{{ i18n.t('samples.outside') }}</app-badge>
+        }
       </ng-template>
       <ng-template appCell="sampleNumber" [appCellOf]="facade.rows()" let-row>
         <a class="mono link" [routerLink]="links.track(row.sampleNumber)">{{ row.sampleNumber }}</a>

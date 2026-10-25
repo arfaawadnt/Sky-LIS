@@ -4,6 +4,7 @@ namespace Platform.Contracts.PlatformAdmin;
 
 // Clients (SA-04) of the Super Admin portal. Validation here is shape only; the rules live in the aggregates.
 // Statuses: Trial, Active, Inactive. Sources: Subscription, Manual. Mobiles are returned in E.164.
+// LIS-CR-008 C-04: city / district / area are optional (null = none); the address lines read "Area, District, City, Governorate".
 
 public sealed record ClientListItem(
     Guid Id,
@@ -30,7 +31,9 @@ public sealed record ClientListItem(
     DateTimeOffset CreatedAtUtc,
     string Source,
     string Status,
-    DateTimeOffset? TrialEndsAtUtc);
+    DateTimeOffset? TrialEndsAtUtc,
+    string? AddressLineEn = null,
+    string? AddressLineAr = null);
 
 public sealed record ClientDetail(
     Guid Id,
@@ -60,7 +63,12 @@ public sealed record ClientDetail(
     decimal WalletBalance,
     string WalletCurrency,
     int Branches,
-    int Users);
+    int Users,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null,
+    string? AddressLineEn = null,
+    string? AddressLineAr = null);
 
 /// <summary>
 /// SA-04 "Add": the client's details, the plan, an optional portal slug (derived from the English name when empty)
@@ -77,6 +85,13 @@ public sealed record ProvisionClientRequest
     public Guid GovernorateId { get; init; }
 
     public string Address { get; init; } = string.Empty;
+
+    /// <summary>LIS-CR-008 C-04: optional city (markaz) / district / area under the governorate (GEO-020…022).</summary>
+    public Guid? CityId { get; init; }
+
+    public Guid? DistrictId { get; init; }
+
+    public Guid? AreaId { get; init; }
 
     public string Mobile { get; init; } = string.Empty;
 
@@ -113,7 +128,10 @@ public sealed record UpdateClientRequest(
     string ManagerMobile,
     string? Email,
     Guid PlanId,
-    string? Language);
+    string? Language,
+    Guid? CityId = null,
+    Guid? DistrictId = null,
+    Guid? AreaId = null);
 
 public sealed record DeactivateClientRequest(string Reason);
 

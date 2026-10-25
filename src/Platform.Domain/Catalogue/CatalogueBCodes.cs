@@ -50,6 +50,9 @@ public static class CatalogueBCodes
     /// <summary>A report-template image is not a PNG, JPEG or WebP image (decided by its bytes).</summary>
     public const string TemplateImageTypeNotAllowed = "CAT-272";
 
+    /// <summary>A report design was given to a template that does not lay out a result report (claim, receipt, label, job order; LIS-CR-010).</summary>
+    public const string TemplateDesignNotApplicable = "CAT-273";
+
     public const string CodeExists = "CAT-300";
     public const string NameExists = "CAT-301";
     public const string ReferenceInactive = "CAT-310";

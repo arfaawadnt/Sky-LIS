@@ -191,6 +191,58 @@ class PairHostComponent {
   };
 }
 
+/** LIS-CR-008 C-04: cascading selects — governorate → city → district, each loaded for its parent's value. */
+@Component({
+  selector: 'app-cascade-host',
+  imports: [MasterDataPageComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<app-master-data-page [config]="config" />`,
+})
+class CascadeHostComponent {
+  readonly adapter = new FakeAdapter();
+  readonly asked: string[] = [];
+  readonly created: unknown[] = [];
+
+  private readonly cities: Readonly<Record<string, readonly { value: string; label: string }[]>> = {
+    cairo: [{ value: 'nasr', label: 'Nasr City' }],
+    giza: [{ value: 'dokki', label: 'Dokki' }],
+  };
+
+  readonly config: MasterDataConfig<Item, unknown> = {
+    i18nPrefix: 'test.cascade',
+    columns: [{ key: 'code', header: 'test.cascade.column.code' }],
+    fields: [
+      { name: 'code', kind: 'code', required: true },
+      { name: 'governorateId', kind: 'select', options: [{ value: 'cairo', label: 'Cairo' }, { value: 'giza', label: 'Giza' }] },
+      {
+        name: 'cityId',
+        kind: 'select',
+        dependsOn: 'governorateId',
+        dependentOptions: async (governorateId) => {
+          this.asked.push(`cities:${governorateId}`);
+          return this.cities[governorateId] ?? [];
+        },
+      },
+      {
+        name: 'districtId',
+        kind: 'select',
+        dependsOn: 'cityId',
+        dependentOptions: async (cityId) => {
+          this.asked.push(`districts:${cityId}`);
+          return cityId === 'nasr' ? [{ value: 'zone1', label: 'First Zone' }] : [];
+        },
+      },
+    ],
+    adapter: {
+      list: (filter) => this.adapter.list(filter),
+      create: async (dto) => {
+        this.created.push(dto);
+      },
+      update: async () => undefined,
+    },
+  };
+}
+
 /** A country-like page (validation v0.5.0 C-09 live check): the dial code carries a pattern with its own message key. */
 @Component({
   selector: 'app-pattern-host',
@@ -234,7 +286,7 @@ function setValue(input: HTMLInputElement | null, value: string): void {
 
 describe('MasterDataPageComponent (shared/ui)', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [HostComponent, DefaultsHostComponent, PairHostComponent, GatedHostComponent, PatternHostComponent], providers: [provideZonelessChangeDetection(), { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> }] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [HostComponent, DefaultsHostComponent, PairHostComponent, GatedHostComponent, PatternHostComponent, CascadeHostComponent], providers: [provideZonelessChangeDetection(), { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> }] }).compileComponents();
   });
 
   async function render(): Promise<{ fixture: ReturnType<typeof TestBed.createComponent<HostComponent>>; host: HTMLElement; adapter: FakeAdapter }> {
@@ -508,6 +560,44 @@ describe('MasterDataPageComponent (shared/ui)', () => {
       expect(dialog?.querySelector<HTMLInputElement>('input[lang="en"]')?.disabled).toBe(true);
       expect(dialog?.querySelector('.foot .btn.primary')).toBeNull();
     });
+  });
+
+  it('LIS-CR-008 C-04: a dependsOn select lists the options of its parent value and is cleared when the parent changes', async () => {
+    const fixture = TestBed.createComponent(CascadeHostComponent);
+    await flush(fixture);
+    const host = fixture.nativeElement as HTMLElement;
+    const page = fixture.componentInstance;
+    host.querySelector<HTMLButtonElement>('app-page-header .btn.primary')?.click();
+    await flush(fixture);
+    const dialog = host.querySelector<HTMLElement>('[role="dialog"]')!;
+    const selects = (): HTMLSelectElement[] => [...dialog.querySelectorAll<HTMLSelectElement>('select')];
+    const labels = (select: HTMLSelectElement): string[] => [...select.options].slice(1).map((option) => option.text.trim());
+    expect(labels(selects()[1]!)).toEqual([]);   // no governorate: no city
+
+    setValue(dialog.querySelector<HTMLInputElement>('input.code'), 'east');
+    choose(selects()[0], 'Cairo');
+    await flush(fixture);
+    expect(labels(selects()[1]!)).toEqual(['Nasr City']);
+    choose(selects()[1], 'Nasr City');
+    await flush(fixture);
+    expect(labels(selects()[2]!)).toEqual(['First Zone']);
+    choose(selects()[2], 'First Zone');
+    await flush(fixture);
+
+    // another governorate clears the city and, through it, the district
+    choose(selects()[0], 'Giza');
+    await flush(fixture);
+    expect(labels(selects()[1]!)).toEqual(['Dokki']);
+    expect(selects()[1]!.selectedIndex).toBe(0);
+    expect(labels(selects()[2]!)).toEqual([]);
+
+    choose(selects()[1], 'Dokki');
+    await flush(fixture);
+    dialog.querySelector<HTMLButtonElement>('.foot .btn.primary')?.click();
+    await flush(fixture);
+    expect(page.created).toEqual([{ code: 'EAST', governorateId: 'giza', cityId: 'dokki', districtId: null }]);
+    expect(page.asked).toContain('cities:cairo');
+    expect(page.asked).toContain('districts:nasr');
   });
 
   describe('validation v0.5.0', () => {

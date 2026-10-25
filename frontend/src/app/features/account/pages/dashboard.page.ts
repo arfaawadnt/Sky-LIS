@@ -17,6 +17,7 @@ import { StatCardComponent, type StatTone } from '../../../shared/ui/stat-card/s
 import { formatDateTime, formatDay, formatMoney, formatNumber, formatTime, humanize, localDay, pick, weekday } from '../data/account-format';
 import { DashboardFacade } from '../state/dashboard.facade';
 import { type BarDatum, BarChartComponent } from '../ui/bar-chart.component';
+import { WelcomeAnnouncementComponent } from '../ui/welcome-announcement.component';
 
 interface Kpi {
   readonly key: string;
@@ -56,7 +57,7 @@ const QUICK_ACTIONS: readonly QuickAction[] = [
  */
 @Component({
   selector: 'app-dashboard-page',
-  imports: [RouterLink, CanDirective, PageHeaderComponent, SectionCardComponent, StatCardComponent, DataTableComponent, CellTemplateDirective, IconComponent, BarChartComponent],
+  imports: [RouterLink, CanDirective, PageHeaderComponent, SectionCardComponent, StatCardComponent, DataTableComponent, CellTemplateDirective, IconComponent, BarChartComponent, WelcomeAnnouncementComponent],
   templateUrl: './dashboard.page.html',
   styleUrl: './dashboard.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

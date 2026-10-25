@@ -43,11 +43,23 @@
         }
       </select>
     </label>
+    <!-- LIS-CR-012 (C-16): the Subscription filter swaps the register for the clients expiring within a week, in grace or expired -->
+    <label toolbarFilters class="inline-filter" *appCan="permissions.platformView">
+      <span>{{ i18n.t('platform.subscription.filter') }}</span>
+      <select class="inp" (change)="onSubscription($event)" data-testid="subscription-filter">
+        <option value="">{{ i18n.t('platform.subscription.any') }}</option>
+        @for (state of subscriptionOptions; track state) {
+          <option [value]="state" [selected]="subscriptionFilter() === state">{{ i18n.t('platform.subscription.option.' + state) }}</option>
+        }
+      </select>
+    </label>
     <button toolbarActions type="button" class="btn ghost" (click)="reloadList()"><app-icon name="refresh" [size]="15" />{{ i18n.t('platform.refresh') }}</button>
   </app-toolbar>
 
   @if (silentDays(); as days) {
     <app-silent-clients [days]="days" [search]="facade.filter().search" [status]="facade.filter().status" (openClient)="openEdit({ id: $event })" />
+  } @else if (subscriptionFilter(); as state) {
+    <app-subscription-clients [state]="state" [search]="facade.filter().search" [status]="facade.filter().status" (openClient)="openEdit({ id: $event })" />
   } @else {
   @if (facade.clients.error()) {
     <p class="problem list-problem" role="alert">{{ i18n.t('platform.clients.loadError') }}</p>
@@ -111,13 +123,16 @@
           </select>
         </app-form-field>
         <app-form-field [label]="i18n.t('platform.clients.field.governorate')" [problem]="saveProblem()">
-          <select formControlName="governorateId">
+          <select formControlName="governorateId" (change)="onGovernorateChange(form)">
             <option value="">{{ i18n.t('platform.choose') }}</option>
             @for (governorate of governorateOptions(); track governorate.id) {
               <option [value]="governorate.id">{{ name(governorate) }}</option>
             }
           </select>
         </app-form-field>
+        @if (localityControls(); as locality) {
+          <app-locality-fields [governorateId]="drawerGovernorateId()" [controls]="locality" [labels]="localityLabels()" />
+        }
         <app-form-field class="full" [label]="i18n.t('platform.clients.field.address')" [problem]="saveProblem()">
           <input type="text" formControlName="address" maxlength="300" autocomplete="off" />
         </app-form-field>
@@ -158,6 +173,10 @@
           <input type="text" formControlName="portalSlug" dir="ltr" maxlength="40" autocomplete="off" spellcheck="false" />
         </app-form-field>
       </div>
+      @if (editing(); as client) {
+        <!-- LIS-CR-013 (decision D-4): the client's opt-out of the platform's announcements, saved at once -->
+        <app-client-announcements-switch class="full" [clientId]="client.id" />
+      }
 
       @if (editing() === null) {
         <h3 class="section-title">{{ i18n.t('platform.clients.section.administrator') }}</h3>

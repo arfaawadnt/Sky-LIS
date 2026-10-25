@@ -4,7 +4,8 @@ import { type Release, RELEASE_SCOPE, inReleaseScope } from '../../../core/relea
 /**
  * The release of each permission module of the server catalogue (`PermissionCatalog`) whose screens are all of a later
  * release, in both portals (the navigation registry lists every one of their pages as Release 2): payer claims, analysers
- * and the integration library, auto-verification, quality control, support tickets and the wallet. Every other module is
+ * and the integration library, auto-verification, quality control and support tickets. Every other module (the wallet since
+ * LIS-CR-012 brought CP-66 to Release 1) is
  * Release 1. Validation v0.5.0 O-7: the role editor offers only the modules of the delivered release; the server stays
  * permissive and a role keeps the keys of hidden modules it already holds.
  */
@@ -14,7 +15,6 @@ export const PERMISSION_MODULE_RELEASE: Readonly<Record<string, Release>> = {
   automation: 'R2',
   quality: 'R2',
   support: 'R2',
-  wallet: 'R2',
 };
 
 /** The release of a permission key (`module.action`) or of a module key. */

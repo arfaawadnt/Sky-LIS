@@ -51,6 +51,15 @@ public static class BillingCodes
     public const string MethodSequenceInvalid = "BIL-054";
     public const string MethodKindInvalid = "BIL-055";
 
+    /// <summary>Cash ledger (change request LIS-CR-011, C-15): an entry without a reason, a movement inside a closed period, a category of another kind, an entry already voided.</summary>
+    public const string CashEntryReasonRequired = "BIL-060";
+    public const string PeriodClosed = "BIL-061";
+    public const string CashEntryCategoryInvalid = "BIL-062";
+    public const string CashEntryNotPosted = "BIL-063";
+
+    /// <summary>The cash ledger reads at most this many lines (<c>CashLedger.MaxLines</c>); a longer period is refused (narrow it).</summary>
+    public const string LedgerTooLarge = "BIL-064";
+
     public const string ClosingOverlaps = "BIL-120";
     public const string MethodCodeExists = "BIL-121";
 
@@ -60,4 +69,5 @@ public static class BillingCodes
     public const string RefundNotFound = "BIL-407";
     public const string ClosingNotFound = "BIL-408";
     public const string MethodNotFound = "BIL-410";
+    public const string CashEntryNotFound = "BIL-411";
 }

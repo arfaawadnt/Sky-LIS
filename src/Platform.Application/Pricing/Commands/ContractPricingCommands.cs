@@ -4,6 +4,7 @@ using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Contracts.Pricing;
 using Platform.Domain.Authorization;
+using Platform.Domain.Catalogue;
 using Platform.Domain.Pricing;
 using Platform.SharedKernel.Abstractions;
 using Platform.SharedKernel.Primitives;
@@ -159,6 +160,33 @@ public sealed class SetPriceAlertHandler(IContractPricingRepository contracts, I
         var pricing = await ContractPricingLoader.RequireAsync(contracts, command.TierId, cancellationToken);
 
         pricing.SetAlert(command.ServiceId, command.AlertCondition);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+}
+
+/// <summary>C7 Report design (LIS-CR-010, C-14): the tier's report design override; null clears it. The tier needs its pricing (PRC-407).</summary>
+[RequirePermissionPolicy(PermissionCatalog.Pricing, PermissionAction.Edit)]
+public sealed record SetContractReportDesignCommand(Guid TierId, string? Design) : ICommand;
+
+public sealed class SetContractReportDesignValidator : AbstractValidator<SetContractReportDesignCommand>
+{
+    public SetContractReportDesignValidator()
+    {
+        RuleFor(command => command.TierId).NotEmpty();
+        RuleFor(command => command.Design)
+            .Must(design => string.IsNullOrWhiteSpace(design) || Enum.GetNames<ReportDesign>().Contains(design, StringComparer.OrdinalIgnoreCase))
+            .WithMessage($"Unknown report design; expected one of {string.Join(", ", Enum.GetNames<ReportDesign>())}.");
+    }
+}
+
+public sealed class SetContractReportDesignHandler(IContractPricingRepository contracts, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<SetContractReportDesignCommand>
+{
+    public async Task Handle(SetContractReportDesignCommand command, CancellationToken cancellationToken)
+    {
+        var pricing = await ContractPricingLoader.RequireAsync(contracts, command.TierId, cancellationToken);
+        var design = string.IsNullOrWhiteSpace(command.Design) ? (ReportDesign?)null : Enum.Parse<ReportDesign>(command.Design, ignoreCase: true);
+
+        pricing.SetReportDesign(design, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

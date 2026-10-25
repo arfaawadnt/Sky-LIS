@@ -14,7 +14,9 @@ internal sealed record ReportHeader(
     DoctorView? Doctor,
     ReportLetterhead Letterhead,
     ReportTemplateView? Template,
-    string Language);
+    string Language,
+    ReportDesignChoice Design = default,
+    IReadOnlyDictionary<Guid, IReadOnlyList<ReportPreviousValue>>? History = null);
 
 /// <summary>The data of the module's documents (MODULES.md §1 "Documents"); rendering is the SPA's print kit.</summary>
 internal static class ResultDocuments
@@ -39,7 +41,7 @@ internal static class ResultDocuments
             {
                 var service = context.Services.GetValueOrDefault(section.Key);
                 var isProfile = service is not null && service.Type != ServiceType.Test && section.Count() > 1;
-                return new ReportSection(section.Key, isProfile ? service!.ReportName ?? service.NameEn : null, isProfile ? service!.NameAr : null, isProfile, [.. section.Select(result => Line(result, context))]);
+                return new ReportSection(section.Key, isProfile ? service!.ReportName ?? service.NameEn : null, isProfile ? service!.NameAr : null, isProfile, [.. section.Select(result => Line(result, context, header.History))]);
             })
             .ToList();
 
@@ -69,10 +71,12 @@ internal static class ResultDocuments
             live.Where(result => result.LastPrintedAtUtc is not null).OrderByDescending(result => result.LastPrintedAtUtc).Select(result => result.LastPrintListNumber).FirstOrDefault(),
             first.Accession,
             nowUtc,
-            generatedBy);
+            generatedBy,
+            header.Design.Design.ToString(),
+            header.Design.Source.ToString());
     }
 
-    private static ReportLine Line(Result result, ResultReadContext context)
+    private static ReportLine Line(Result result, ResultReadContext context, IReadOnlyDictionary<Guid, IReadOnlyList<ReportPreviousValue>>? history)
     {
         var test = context.Tests.GetValueOrDefault(result.TestId);
         var decimals = result.HasValue ? result.Decimals : test?.Decimals ?? 0;
@@ -91,7 +95,8 @@ internal static class ResultDocuments
             result.ReportComment,
             result.Formatted?.Paragraphs.Select(paragraph => new FormattedParagraphDto(paragraph.Title, paragraph.Text)).ToList(),
             ResultViews.Culture(result.Culture),
-            test?.Methodology);
+            test?.Methodology,
+            history?.GetValueOrDefault(result.Id));
     }
 
     private static List<ReportSampleLine> Samples(IEnumerable<Result> results, ResultReadContext context) =>

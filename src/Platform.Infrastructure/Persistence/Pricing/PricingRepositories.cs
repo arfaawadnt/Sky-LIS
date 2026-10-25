@@ -262,7 +262,7 @@ internal sealed class ContractPricingRepository(AppDbContext context) : Reposito
     {
         var head = await Set.AsNoTracking()
             .Where(pricing => pricing.ContractTierId == contractTierId)
-            .Select(pricing => new { pricing.Id, pricing.EffectiveFrom, pricing.EffectiveTo, pricing.AppliedAtUtc })
+            .Select(pricing => new { pricing.Id, pricing.EffectiveFrom, pricing.EffectiveTo, pricing.AppliedAtUtc, pricing.ReportDesign })
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
         if (head is null)
@@ -292,7 +292,7 @@ internal sealed class ContractPricingRepository(AppDbContext context) : Reposito
             return new ContractPriceItem(row.ServiceId, row.ListPrice, row.PatientShare, row.PayerShare, row.IsExcluded, row.AlertCondition, row.SourceListId, row.SourceListCode, label?.Code, label?.NameEn, label?.NameAr);
         }).ToList();
 
-        return new ContractPricingView(head.Id, head.EffectiveFrom, head.EffectiveTo, head.AppliedAtUtc, terms, prices);
+        return new ContractPricingView(head.Id, head.EffectiveFrom, head.EffectiveTo, head.AppliedAtUtc, terms, prices, head.ReportDesign);
     }
 
     public async Task<IReadOnlyList<ContractPricingListItem>> ListAsync(Guid? payerId, CancellationToken cancellationToken) =>

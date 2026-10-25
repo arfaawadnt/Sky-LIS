@@ -47,10 +47,16 @@ public enum TrackerView
     FrontDesk = 2,
 }
 
-/// <summary>The live samples of a visit (Cancelled and Replaced excluded) by status.</summary>
-public sealed record VisitSampleCounts(int Total, int Ordered, int Collected, int Received, int Rejected)
+/// <summary>
+/// The live samples of a visit (Cancelled and Replaced excluded) by status; <paramref name="CollectedOutside"/> counts the
+/// live samples collected outside the laboratory (LIS-CR-008 C-02), whatever their status.
+/// </summary>
+public sealed record VisitSampleCounts(int Total, int Ordered, int Collected, int Received, int Rejected, int CollectedOutside = 0)
 {
     public static VisitSampleCounts None { get; } = new(0, 0, 0, 0, 0);
+
+    /// <summary>The samples cell shows the "ext" tag: at least one live sample was collected outside (LIS-CR-008 C-02).</summary>
+    public bool AnyCollectedOutside => CollectedOutside > 0;
 }
 
 /// <summary>Live results (Cancelled excluded) by status on the track.</summary>

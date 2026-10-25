@@ -6674,5 +6674,511 @@ BEGIN
     VALUES ('20261023231824_ReviewQuickWins', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE saas.wallets ADD at_or_below_zero_since_utc timestamp with time zone;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.visit_tubes ADD collected_outside boolean NOT NULL DEFAULT FALSE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.visit_tubes ADD collected_outside_at_utc timestamp with time zone;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE saas.tenants ADD area_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE saas.tenants ADD city_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE saas.tenants ADD district_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE saas.subscription_requests ADD area_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE saas.subscription_requests ADD city_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE saas.subscription_requests ADD district_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.samples ADD collected_outside boolean NOT NULL DEFAULT FALSE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.report_templates ADD design character varying(40);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.contract_pricings ADD report_design character varying(40);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.cash_closings ADD cash_in numeric(14,2) NOT NULL DEFAULT 0.0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.cash_closings ADD cash_out numeric(14,2) NOT NULL DEFAULT 0.0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.cash_closings ADD entry_count integer NOT NULL DEFAULT 0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.cash_closings ADD opening_balance numeric(14,2) NOT NULL DEFAULT 0.0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.branches ADD area_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.branches ADD city_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.branches ADD district_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE TABLE saas.announcements (
+        id uuid NOT NULL,
+        title_en character varying(120) NOT NULL,
+        title_ar character varying(120) NOT NULL,
+        body_en character varying(600),
+        body_ar character varying(600),
+        link_url character varying(500),
+        placement character varying(40) NOT NULL,
+        from_utc timestamp with time zone NOT NULL,
+        to_utc timestamp with time zone,
+        audience_country_id uuid,
+        audience_plan_id uuid,
+        audience_status character varying(40) NOT NULL,
+        client_ids uuid[] NOT NULL,
+        is_active boolean NOT NULL,
+        image_content_type character varying(50),
+        image_size_bytes bigint,
+        image_storage_key character varying(400),
+        image_version integer NOT NULL,
+        impressions bigint NOT NULL,
+        clicks bigint NOT NULL,
+        created_at_utc timestamp with time zone NOT NULL,
+        created_by_user_id uuid,
+        created_by_display_name character varying(200),
+        modified_at_utc timestamp with time zone,
+        modified_by_user_id uuid,
+        modified_by_display_name character varying(200),
+        CONSTRAINT pk_announcements PRIMARY KEY (id),
+        CONSTRAINT ck_announcements_audience_status_domain CHECK ("audience_status" IN ('Any', 'Trial', 'Active')),
+        CONSTRAINT ck_announcements_placement_domain CHECK ("placement" IN ('SignIn', 'Welcome'))
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE TABLE app.cash_entries (
+        id uuid NOT NULL,
+        tenant_id uuid NOT NULL,
+        number character varying(20) NOT NULL,
+        kind character varying(40) NOT NULL,
+        category character varying(40) NOT NULL,
+        amount numeric(14,2) NOT NULL,
+        method character varying(40) NOT NULL,
+        method_code character varying(20),
+        reference character varying(64),
+        reason character varying(200) NOT NULL,
+        note character varying(500),
+        cashier_user_id uuid NOT NULL,
+        branch_id uuid NOT NULL,
+        posted_at_utc timestamp with time zone NOT NULL,
+        status character varying(40) NOT NULL,
+        void_reason character varying(500),
+        voided_by_user_id uuid,
+        voided_at_utc timestamp with time zone,
+        created_at_utc timestamp with time zone NOT NULL,
+        created_by_user_id uuid,
+        created_by_display_name character varying(200),
+        modified_at_utc timestamp with time zone,
+        modified_by_user_id uuid,
+        modified_by_display_name character varying(200),
+        CONSTRAINT pk_cash_entries PRIMARY KEY (tenant_id, id),
+        CONSTRAINT ck_cash_entries_amount_positive CHECK (amount > 0),
+        CONSTRAINT ck_cash_entries_category_domain CHECK ("category" IN ('Supplier', 'PettyCash', 'BankDeposit', 'OpeningFloat', 'OtherIncome', 'Other')),
+        CONSTRAINT ck_cash_entries_category_of_kind CHECK ((kind = 'CashOut' AND category IN ('Supplier', 'PettyCash', 'BankDeposit', 'Other')) OR (kind = 'CashIn' AND category IN ('OpeningFloat', 'OtherIncome', 'Other'))),
+        CONSTRAINT ck_cash_entries_kind_domain CHECK ("kind" IN ('CashOut', 'CashIn')),
+        CONSTRAINT ck_cash_entries_method_domain CHECK ("method" IN ('Cash', 'Card', 'Pos', 'Transfer')),
+        CONSTRAINT ck_cash_entries_reference_for_non_cash CHECK (method = 'Cash' OR method_code IS NOT NULL OR reference IS NOT NULL),
+        CONSTRAINT ck_cash_entries_status_domain CHECK ("status" IN ('Posted', 'Voided')),
+        CONSTRAINT ck_cash_entries_void_consistency CHECK ((status = 'Voided') = (void_reason IS NOT NULL AND voided_at_utc IS NOT NULL AND voided_by_user_id IS NOT NULL)),
+        CONSTRAINT fk_cash_entries_platform_users_cashier_user_id FOREIGN KEY (cashier_user_id) REFERENCES identity.platform_users (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_cash_entries_platform_users_voided_by_user_id FOREIGN KEY (voided_by_user_id) REFERENCES identity.platform_users (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE TABLE saas.subscription_reminders (
+        id uuid NOT NULL,
+        tenant_id uuid NOT NULL,
+        kind character varying(40) NOT NULL,
+        due_key character varying(80) NOT NULL,
+        template_code character varying(40) NOT NULL,
+        channels character varying(40) NOT NULL,
+        sent_at_utc timestamp with time zone NOT NULL,
+        created_at_utc timestamp with time zone NOT NULL,
+        created_by_user_id uuid,
+        created_by_display_name character varying(200),
+        modified_at_utc timestamp with time zone,
+        modified_by_user_id uuid,
+        modified_by_display_name character varying(200),
+        CONSTRAINT pk_subscription_reminders PRIMARY KEY (id),
+        CONSTRAINT ck_subscription_reminders_kind_domain CHECK ("kind" IN ('TrialEnding', 'TrialEnded', 'WalletLow', 'WalletAtZero', 'GraceEnding')),
+        CONSTRAINT fk_subscription_reminders_tenant_tenant_id FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE INDEX ix_tenants_area_id ON saas.tenants (area_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE INDEX ix_tenants_city_id ON saas.tenants (city_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE INDEX ix_tenants_district_id ON saas.tenants (district_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.report_templates ADD CONSTRAINT ck_report_templates_design_domain CHECK ("design" IN ('Classic', 'Modern', 'Compact', 'Letterhead', 'Cumulative'));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.contract_pricings ADD CONSTRAINT ck_contract_pricings_report_design_domain CHECK ("report_design" IN ('Classic', 'Modern', 'Compact', 'Letterhead', 'Cumulative'));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE INDEX ix_announcements_placement_is_active_from_utc ON saas.announcements (placement, is_active, from_utc);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE INDEX ix_cash_entries_cashier_user_id ON app.cash_entries (cashier_user_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE INDEX ix_cash_entries_tenant_id_branch_id_posted_at_utc ON app.cash_entries (tenant_id, branch_id, posted_at_utc);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE INDEX ix_cash_entries_tenant_id_cashier_user_id_posted_at_utc ON app.cash_entries (tenant_id, cashier_user_id, posted_at_utc);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE UNIQUE INDEX ix_cash_entries_tenant_id_number ON app.cash_entries (tenant_id, number);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE INDEX ix_cash_entries_voided_by_user_id ON app.cash_entries (voided_by_user_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE UNIQUE INDEX ix_subscription_reminders_tenant_id_due_key ON saas.subscription_reminders (tenant_id, due_key);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    CREATE INDEX ix_subscription_reminders_tenant_id_sent_at_utc ON saas.subscription_reminders (tenant_id, sent_at_utc);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE saas.tenants ADD CONSTRAINT fk_tenants_areas_area_id FOREIGN KEY (area_id) REFERENCES saas.areas (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE saas.tenants ADD CONSTRAINT fk_tenants_cities_city_id FOREIGN KEY (city_id) REFERENCES saas.cities (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE saas.tenants ADD CONSTRAINT fk_tenants_districts_district_id FOREIGN KEY (district_id) REFERENCES saas.districts (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    ALTER TABLE app.cash_entries ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE app.cash_entries FORCE ROW LEVEL SECURITY;
+    CREATE POLICY tenant_isolation ON app.cash_entries
+        USING (
+            tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid
+            OR current_setting('app.bypass_rls', true) = 'on'
+        )
+        WITH CHECK (
+            tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid
+            OR current_setting('app.bypass_rls', true) = 'on'
+        );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    -- ---------------------------------------------------------------------------------------------------------------------
+    -- 2026-10-24 Collected outside per sample (change request LIS-CR-008, P-SMP, reviewer point C-02). Appended to the
+    -- ReviewFeatures migration after EF added app.visit_tubes.collected_outside (boolean, default false),
+    -- app.visit_tubes.collected_outside_at_utc (timestamptz, null) and app.samples.collected_outside (boolean, default false).
+    -- Idempotent: each UPDATE touches only rows still false.
+    -- ---------------------------------------------------------------------------------------------------------------------
+
+    -- (1) The visit-level flag of the old contract meant "every tube collected outside": copy it to every tube of the visits
+    --     that carry it. app.visits.collected_outside stays as history (since this change it is true only for a visit
+    --     registered with the old visit-level field, which marks every tube, so a rerun changes nothing). The tube guard
+    --     (app.visit_tubes_guard) protects the number and key only, so this UPDATE passes it.
+    UPDATE app.visit_tubes t
+    SET collected_outside = true
+    FROM app.visits v
+    WHERE v.tenant_id = t.tenant_id
+      AND v.id = t.visit_id
+      AND v.collected_outside
+      AND NOT t.collected_outside;
+
+    -- (2) The first sample of such a tube (generation 0) shows the "Outside" tag and prints "EXT"; a replacement sample was
+    --     collected again in the laboratory and stays false. Its status and times are left as they were recorded.
+    UPDATE app.samples s
+    SET collected_outside = true
+    FROM app.visit_tubes t
+    WHERE t.tenant_id = s.tenant_id
+      AND t.id = s.tube_id
+      AND t.collected_outside
+      AND s.generation = 0
+      AND NOT s.collected_outside;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    -- ---------------------------------------------------------------------------------------------------------------------
+    -- 2026-10-24 Cash ledger (change request LIS-CR-011, package P-CSH, point C-15). Appended to the ReviewFeatures migration
+    -- after EF created app.cash_entries (with RLS declared in the migration) and added opening_balance, cash_in, cash_out and
+    -- entry_count (NOT NULL DEFAULT 0) to app.cash_closings. Idempotent.
+    -- ---------------------------------------------------------------------------------------------------------------------
+
+    -- INV-BIL-004 for cash entries: never deleted, never edited; the only change is the void (Posted -> Voided with reason,
+    -- voider and time), once.
+    CREATE OR REPLACE FUNCTION app.billing_guard_cash_entry() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    BEGIN
+        IF TG_OP = 'DELETE' THEN
+            RAISE EXCEPTION 'cash entries are never deleted (entry %)', OLD.number;
+        END IF;
+
+        IF OLD.status = 'Voided' THEN
+            RAISE EXCEPTION 'a voided cash entry is frozen (entry %)', OLD.number;
+        END IF;
+
+        IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
+           OR NEW.id IS DISTINCT FROM OLD.id
+           OR NEW.number IS DISTINCT FROM OLD.number
+           OR NEW.kind IS DISTINCT FROM OLD.kind
+           OR NEW.category IS DISTINCT FROM OLD.category
+           OR NEW.amount IS DISTINCT FROM OLD.amount
+           OR NEW.method IS DISTINCT FROM OLD.method
+           OR NEW.method_code IS DISTINCT FROM OLD.method_code
+           OR NEW.reference IS DISTINCT FROM OLD.reference
+           OR NEW.reason IS DISTINCT FROM OLD.reason
+           OR NEW.note IS DISTINCT FROM OLD.note
+           OR NEW.cashier_user_id IS DISTINCT FROM OLD.cashier_user_id
+           OR NEW.branch_id IS DISTINCT FROM OLD.branch_id
+           OR NEW.posted_at_utc IS DISTINCT FROM OLD.posted_at_utc THEN
+            RAISE EXCEPTION 'a cash entry changes only by its void (entry %)', OLD.number;
+        END IF;
+
+        RETURN NEW;
+    END
+    $fn$;
+
+    DROP TRIGGER IF EXISTS cash_entries_guard ON app.cash_entries;
+    CREATE TRIGGER cash_entries_guard BEFORE UPDATE OR DELETE ON app.cash_entries FOR EACH ROW EXECUTE FUNCTION app.billing_guard_cash_entry();
+    -- A row trigger never fires on TRUNCATE (validation 2026-10-11 D-01): refuse it with a statement trigger, as app.payments.
+    DROP TRIGGER IF EXISTS cash_entries_no_truncate ON app.cash_entries;
+    CREATE TRIGGER cash_entries_no_truncate BEFORE TRUNCATE ON app.cash_entries FOR EACH STATEMENT EXECUTE FUNCTION audit.refuse_truncate();
+
+    -- Reviewed: app.cash_closings keeps its trigger cash_closings_immutable; ALTER TABLE ... ADD COLUMN ... DEFAULT 0 fires no row
+    -- trigger, so existing closings read opening_balance = cash_in = cash_out = entry_count = 0 and their expected_cash (stored) is
+    -- unchanged. Nothing to backfill.
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    -- Change request 2026-10-24 (LIS-CR-013 C-17, P-ANN, migration ReviewFeatures): announcements of National Technology and its
+    --    partners (SA-22). Grant for the runtime role on the new saas table (no deletes: an announcement is deactivated; the public
+    --    counters are UPDATEs). Idempotent.
+    GRANT SELECT, INSERT, UPDATE ON saas.announcements TO lis_app;
+
+    -- Change request 2026-10-24 (LIS-CR-012 C-16, P-REM, migration ReviewFeatures): subscription reminders and grace.
+    --    (a) Grants on the reminder log: SELECT, INSERT only (append-only: a reminder row is never changed or deleted).
+    --    (b) Backfill of saas.wallets.at_or_below_zero_since_utc for wallets already at or below zero: the time of the first debit
+    --        that left the balance at or below zero after the last positive balance (null when never debited). Idempotent: only
+    --        rows still null are touched.
+    --    (c) The three editable reminder templates of SA-20 (channel Email so both subjects exist; the SMS uses the same text).
+    GRANT SELECT, INSERT ON saas.subscription_reminders TO lis_app;
+
+    UPDATE saas.wallets AS w
+    SET at_or_below_zero_since_utc = (
+        SELECT min(t.at_utc)
+        FROM saas.wallet_transactions AS t
+        WHERE t.wallet_id = w.id
+          AND t.amount < 0
+          AND t.balance_after <= 0
+          AND t.at_utc > COALESCE(
+              (SELECT max(p.at_utc) FROM saas.wallet_transactions AS p WHERE p.wallet_id = w.id AND p.balance_after > 0),
+              '-infinity'::timestamptz))
+    WHERE w.balance <= 0 AND w.at_or_below_zero_since_utc IS NULL;
+
+    INSERT INTO saas.notification_templates (id, code, channel, subject_en, subject_ar, text_en, text_ar, is_active, created_at_utc, created_by_display_name)
+    VALUES
+        (md5('lis:template:subscription-expiry')::uuid, 'subscription-expiry', 'Email', 'Your Sky LIS trial is ending', 'الفترة التجريبية لـ Sky LIS على وشك الانتهاء',
+         '{laboratory}: your Sky LIS trial ends in {days} day(s). Top up {amount} to keep working without interruption: {link}',
+         '{laboratory}: تنتهي الفترة التجريبية في Sky LIS خلال {days} يوم. اشحن المحفظة بمبلغ {amount} لمواصلة العمل دون انقطاع: {link}', true, now(), 'seed'),
+        (md5('lis:template:wallet-low')::uuid, 'wallet-low', 'Email', 'Your Sky LIS wallet is running low', 'رصيد محفظة Sky LIS منخفض',
+         '{laboratory}: your Sky LIS wallet balance is low. Top up {amount} within {days} day(s) to avoid an interruption: {link}',
+         '{laboratory}: رصيد محفظة Sky LIS منخفض. اشحن {amount} خلال {days} يوم لتجنب انقطاع الخدمة: {link}', true, now(), 'seed'),
+        (md5('lis:template:subscription-grace')::uuid, 'subscription-grace', 'Email', 'Your Sky LIS subscription is about to stop', 'اشتراك Sky LIS على وشك التوقف',
+         '{laboratory}: the grace period of your Sky LIS subscription ends in {days} day(s). After that only your administrators can sign in, to the wallet. Top up {amount}: {link}',
+         '{laboratory}: تنتهي فترة السماح لاشتراك Sky LIS خلال {days} يوم. بعدها يستطيع المسؤولون فقط الدخول إلى المحفظة. اشحن {amount}: {link}', true, now(), 'seed')
+    ON CONFLICT (code) DO NOTHING;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261024014426_ReviewFeatures') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261024014426_ReviewFeatures', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

@@ -174,6 +174,12 @@ export function samplesLook(item: LabTrackerItem, i18n: I18nService): StatusLook
   return { tone: 'violet', icon: 'flask', text: i18n.tf('tracker.samples.received', { done: num(samples.received, lang), total: num(samples.total, lang) }) };
 }
 
+/** The "ext" tag (LIS-CR-008 C-02): a live sample of the visit was collected outside the laboratory; null otherwise or without `samples.view`. */
+export function outsideLook(item: LabTrackerItem, i18n: I18nService): StatusLook | null {
+  const outside = item.samples?.collectedOutside ?? 0;
+  return outside > 0 ? { tone: 'info', icon: 'info', text: i18n.t('tracker.samples.ext'), title: i18n.t('tracker.samples.extTitle') } : null;
+}
+
 export function resultsLook(item: LabTrackerItem, i18n: I18nService): StatusLook | null {
   const results = item.results;
   if (results === null) {

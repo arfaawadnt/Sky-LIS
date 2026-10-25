@@ -175,6 +175,55 @@ describe('Public pages (CP-01, CP-02)', () => {
       expect(root.querySelector<HTMLInputElement>('input[formcontrolname=code]')?.value).toBe('');
     });
 
+    it('offers city, district and area after the governorate and sends the picked locality (LIS-CR-008 C-04)', async () => {
+      setValue(root, 'select[formcontrolname=countryId]', 'eg');
+      await render();
+      backend.expectOne((request) => request.url === PUBLIC_SUBSCRIPTION_API.governorates).flush([
+        { id: 'cairo', countryId: 'eg', nameEn: 'Cairo', nameAr: 'القاهرة' },
+        { id: 'giza', countryId: 'eg', nameEn: 'Giza', nameAr: 'الجيزة' },
+      ]);
+      await render();
+      expect(root.querySelector('select[data-level=city]')).toBeNull();   // nothing before a governorate
+
+      setValue(root, 'select[formcontrolname=governorateId]', 'cairo');
+      await render();
+      backend.expectOne((request) => request.url === '/api/v1/public/cities' && request.params.get('governorateId') === 'cairo').flush([{ id: 'nasr', governorateId: 'cairo', nameEn: 'Nasr City', nameAr: 'مدينة نصر' }]);
+      await render();
+      setValue(root, 'select[data-level=city]', 'nasr');
+      await render();
+      backend.expectOne((request) => request.url === '/api/v1/public/districts' && request.params.get('cityId') === 'nasr').flush([{ id: 'zone1', cityId: 'nasr', nameEn: 'First Zone', nameAr: 'المنطقة الأولى' }]);
+      await render();
+      setValue(root, 'select[data-level=district]', 'zone1');
+      await render();
+      backend.expectOne((request) => request.url === '/api/v1/public/areas' && request.params.get('districtId') === 'zone1').flush([{ id: 'block7', districtId: 'zone1', nameEn: 'Block 7', nameAr: 'بلوك 7' }]);
+      await render();
+      setValue(root, 'select[data-level=area]', 'block7');
+
+      setValue(root, 'input[formcontrolname=labNameEn]', 'Al Noor Laboratories');
+      setValue(root, 'input[formcontrolname=labNameAr]', 'مختبرات النور');
+      setValue(root, 'input[formcontrolname=address]', 'Nasr City');
+      setValue(root, 'app-mobile-input[formcontrolname=mobile] input.number', '01012345678');
+      setValue(root, 'input[formcontrolname=managerName]', 'Ahmed Hassan');
+      setValue(root, 'app-mobile-input[formcontrolname=managerMobile] input.number', '01012345679');
+      (root.querySelector('form button[type=submit]') as HTMLButtonElement).click();
+      await render();
+      const start = backend.expectOne(PUBLIC_SUBSCRIPTION_API.start);
+      expect(start.request.body).toMatchObject({ governorateId: 'cairo', cityId: 'nasr', districtId: 'zone1', areaId: 'block7' });
+      start.flush({ type: 'about:blank', title: 'refused', status: 422, code: 'GEO-022' }, { status: 422, statusText: 'Unprocessable Entity' });
+      await render();
+      expect(root.querySelector('select[data-level=area]')?.classList.contains('ng-invalid')).toBe(true);   // GEO-022 marks the area
+
+      // another governorate forgets the locality
+      setValue(root, 'select[formcontrolname=governorateId]', 'giza');
+      await render();
+      backend.expectOne((request) => request.url === '/api/v1/public/cities' && request.params.get('governorateId') === 'giza').flush([]);
+      await render();
+      expect(root.querySelector('select[data-level=city]')).toBeNull();
+      (root.querySelector('form button[type=submit]') as HTMLButtonElement).click();
+      await render();
+      expect(backend.expectOne(PUBLIC_SUBSCRIPTION_API.start).request.body).toMatchObject({ governorateId: 'giza', cityId: null, districtId: null, areaId: null });
+    });
+
     it('opens the sign-in address of the new laboratory from the last step, the username prefilled (LIS-CR-005)', async () => {
       const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       const facade = TestBed.inject(SubscriptionFacade);

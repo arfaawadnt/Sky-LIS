@@ -1,5 +1,7 @@
 /** Catalogue B contracts mirrored from `Platform.Contracts.Catalogue.CatalogueBContracts` (bootstrap until the OpenAPI generator lands, 01 §6.2). */
 
+import type { ReportDesign } from './report-designs';
+
 export type { Paged } from './paging';
 
 export interface CatalogueBCreated {
@@ -267,6 +269,8 @@ export interface ReportTemplateListItem {
   readonly footerTextEn: string | null;
   readonly footerTextAr: string | null;
   readonly isActive: boolean;
+  /** LIS-CR-010: the report design this template imposes, or null to follow the laboratory (a contract still wins). */
+  readonly design?: ReportDesign | null;
 }
 
 /** Logo and signature are not part of the request: they are uploaded and removed on their own (`reportTemplateImageUrl`, intake A10). */
@@ -280,6 +284,8 @@ export interface ReportTemplateRequest {
   readonly headerTextAr: string | null;
   readonly footerTextEn: string | null;
   readonly footerTextAr: string | null;
+  /** Result templates only (CAT-273); null or absent clears the override. */
+  readonly design?: ReportDesign | null;
 }
 
 /** The two images of a report template; the URL segment of `…/report-templates/{id}/images/{image}`. */

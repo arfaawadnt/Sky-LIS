@@ -45,7 +45,7 @@ function jobOrder(): JobOrderDocument {
     collectedOutside: false,
     batchNumber: null,
     lines: detail.lines.map((line) => ({ lineId: line.id, code: line.code, nameEn: line.nameEn, nameAr: line.nameAr, kind: line.kind, status: line.status, unitCode: 'H', sampleNumber: line.sampleNumber, sampleTypeNameEn: 'Whole blood', sampleTypeNameAr: 'دم كامل', expectedResultAtUtc: line.expectedResultAtUtc })),
-    tubes: [{ id: 'tube-1', sampleNumber: 'SMP-2026-00001', unitCode: 'H', clinicalGroupId: 'g-haem', clinicalGroupNameEn: 'Haematology', clinicalGroupNameAr: 'أمراض الدم', sampleTypeId: 'st-blood', sampleTypeNameEn: 'Whole blood', sampleTypeNameAr: 'دم كامل', sampleConditionNameEn: null, sampleConditionNameAr: null, isLive: true, serviceCodes: ['CBC'] }],
+    tubes: [{ id: 'tube-1', sampleNumber: 'SMP-2026-00001', unitCode: 'H', clinicalGroupId: 'g-haem', clinicalGroupNameEn: 'Haematology', clinicalGroupNameAr: 'أمراض الدم', sampleTypeId: 'st-blood', sampleTypeNameEn: 'Whole blood', sampleTypeNameAr: 'دم كامل', sampleConditionNameEn: null, sampleConditionNameAr: null, isLive: true, serviceCodes: ['CBC'], collectedOutside: false, collectedOutsideAtUtc: null }],
     preparationAnswers: [{ preparationId: 'prep-fast', questionEn: 'Fasting?', questionAr: 'صائم؟', answer: 'Yes', answeredAtUtc: detail.registeredAtUtc }],
     balance: detail.balance,
     currency: 'EGP',

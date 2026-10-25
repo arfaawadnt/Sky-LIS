@@ -30,6 +30,10 @@
       (signOutRequested)="signOut()"
     />
 
+    @if (portalName() === 'client') {
+      <app-subscription-banner />
+    }
+
     <main class="main" id="app-main" tabindex="-1">
       <router-outlet />
     </main>

@@ -23,6 +23,12 @@ public sealed class Visit : AggregateRoot, ITenantScoped
     public const string SampleKind = "sample";
     public const string SamplePrefix = "SMP";
 
+    /// <summary>LIS-CR-008 C-02: how far back a typed "collected outside" time may lie.</summary>
+    public const int MaxOutsideCollectionAgeDays = 30;
+
+    /// <summary>The clock difference tolerated between the desk and the server for a typed collection time.</summary>
+    public static readonly TimeSpan OutsideCollectionClockSkew = TimeSpan.FromMinutes(5);
+
     /// <summary>Service types that need a sample (CAT-028/029: Package and Additional carry none).</summary>
     public static readonly IReadOnlySet<string> SampleCarryingTypes = new HashSet<string>(StringComparer.Ordinal) { "Test", "Profile", "Culture", "TextReport" };
 
@@ -53,7 +59,7 @@ public sealed class Visit : AggregateRoot, ITenantScoped
         BatchId = registration.BatchId;
         Urgent = registration.Urgent;
         Biohazard = registration.Biohazard;
-        CollectedOutside = registration.CollectedOutside;
+        CollectedOutside = registration.CollectedOutside && registration.OutsideSamples is not { Count: > 0 };
         UtcOffsetMinutes = registration.UtcOffsetMinutes;
         Status = VisitStatus.Open;
         RegisteredAtUtc = nowUtc;
@@ -95,8 +101,15 @@ public sealed class Visit : AggregateRoot, ITenantScoped
 
     public bool Biohazard { get; private set; }
 
-    /// <summary>Lab-to-lab "sample collected inside the lab" unticked: printed on the job order (LDM §4.9).</summary>
+    /// <summary>
+    /// History since LIS-CR-008 C-02 (read-only): true when the visit was registered with the visit-level "collected
+    /// outside" flag of the old order contract, which marks every tube. The flag now lives on each tube
+    /// (<see cref="VisitTube.CollectedOutside"/>); readers use <see cref="AnyCollectedOutside"/>.
+    /// </summary>
     public bool CollectedOutside { get; private set; }
+
+    /// <summary>Derived (not stored): at least one tube of the visit was collected outside the laboratory (lists, job order, reports).</summary>
+    public bool AnyCollectedOutside => _tubes.Any(tube => tube.CollectedOutside);
 
     /// <summary>The registering desk's offset from UTC in minutes: test days (BR-13) are counted on its local days.</summary>
     public int UtcOffsetMinutes { get; private set; }
@@ -188,6 +201,7 @@ public sealed class Visit : AggregateRoot, ITenantScoped
         var visit = new Visit(registration, actorUserId, nowUtc);
         var added = visit.AddItems(items, registration.CollectorUserId, actorUserId, nowUtc);
         var tubes = visit.AssignTubes(added, sampleNumbers, nowUtc);
+        visit.MarkCollectedOutside(registration, nowUtc);
         visit.Answer(answers, actorUserId, nowUtc);
         if (discount is not null)
         {
@@ -349,7 +363,6 @@ public sealed class Visit : AggregateRoot, ITenantScoped
         InsuranceId = Blank(details.InsuranceId);
         Urgent = details.Urgent;
         Biohazard = details.Biohazard;
-        CollectedOutside = details.CollectedOutside;
         Revision++;
     }
 
@@ -579,6 +592,51 @@ public sealed class Visit : AggregateRoot, ITenantScoped
         return touched;
     }
 
+    /// <summary>
+    /// LIS-CR-008 C-02 at registration: the per-sample entries mark the tubes they match (REG-040 when one matches none,
+    /// REG-041 for a collection time in the future or older than <see cref="MaxOutsideCollectionAgeDays"/> days); without
+    /// entries, the old visit-level flag marks every tube (kept for one release).
+    /// </summary>
+    private void MarkCollectedOutside(VisitRegistration registration, DateTimeOffset nowUtc)
+    {
+        var entries = registration.OutsideSamples ?? [];
+        if (entries.Count == 0)
+        {
+            if (registration.CollectedOutside)
+            {
+                foreach (var tube in _tubes)
+                {
+                    tube.MarkCollectedOutside(null);
+                }
+            }
+
+            return;
+        }
+
+        foreach (var entry in entries)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+            Require(entry.Key is not null || entry.SampleTypeId is { } type && type != Guid.Empty, RegistrationCodes.OutsideSampleUnknown, "A sample collected outside names its tube or its sample type.", DomainFault.Validation);
+            DateTimeOffset? collectedAt = null;
+            if (entry.CollectedAtUtc is { } at)
+            {
+                Require(
+                    at <= nowUtc + OutsideCollectionClockSkew && at >= nowUtc.AddDays(-MaxOutsideCollectionAgeDays),
+                    RegistrationCodes.OutsideCollectedAtInvalid,
+                    $"The collection time of a sample collected outside must lie within the last {MaxOutsideCollectionAgeDays} days.",
+                    DomainFault.Validation);
+                collectedAt = at > nowUtc ? nowUtc : at;
+            }
+
+            var matched = _tubes.Where(tube => entry.Matches(tube.Key)).ToList();
+            Require(matched.Count > 0, RegistrationCodes.OutsideSampleUnknown, "A sample marked as collected outside is not part of this order.", DomainFault.Validation);
+            foreach (var tube in matched.Where(tube => !tube.CollectedOutside))
+            {
+                tube.MarkCollectedOutside(collectedAt);
+            }
+        }
+    }
+
     private static bool NeedsTube(VisitLine line) =>
         line.Status == VisitLineStatus.Ordered && line.Kind != VisitLineKind.Package && SampleCarryingTypes.Contains(line.ServiceType);
 
@@ -665,7 +723,9 @@ public sealed class Visit : AggregateRoot, ITenantScoped
 
     private RegisteredTube ToRegisteredTube(VisitTube tube) =>
         new(tube.Id, tube.SampleNumber, tube.ClinicalGroupId, tube.SampleTypeId, tube.SampleConditionId,
-            [.. _lines.Where(line => line.TubeId == tube.Id && line.Status == VisitLineStatus.Ordered).Select(line => line.ServiceId).Distinct()]);
+            [.. _lines.Where(line => line.TubeId == tube.Id && line.Status == VisitLineStatus.Ordered).Select(line => line.ServiceId).Distinct()],
+            tube.CollectedOutside,
+            tube.CollectedOutsideAtUtc);
 
     private static RegisteredLine ToRegisteredLine(VisitLine line) =>
         new(line.Id, line.ServiceId, line.TubeId, line.Status.ToString(), [.. line.TestIds]);

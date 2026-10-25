@@ -33,6 +33,9 @@ public interface IBranchGeography
 {
     /// <summary>The country of a governorate, or null when the governorate does not exist.</summary>
     Task<Guid?> CountryOfGovernorateAsync(Guid governorateId, CancellationToken cancellationToken);
+
+    /// <summary>LIS-CR-008 C-04: the city / district / area rows the ids name, with their parents (absent ids are null nodes).</summary>
+    Task<Platform.Domain.PlatformAdmin.LocalityRows> LocalityRowsAsync(Guid? cityId, Guid? districtId, Guid? areaId, CancellationToken cancellationToken);
 }
 
 /// <summary>Display names of users for registers ("requested by", "verified by"): the membership's bilingual name in the current tenant, else the platform display name.</summary>

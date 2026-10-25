@@ -13,7 +13,7 @@ using Platform.SharedKernel.Primitives;
 
 namespace Platform.Application.PlatformAdmin;
 
-/// <summary>What provisioning needs, whichever door it came through (SA-04 manual, CP-02 wizard).</summary>
+/// <summary>What provisioning needs, whichever door it came through (SA-04 manual, CP-02 wizard). <see cref="Locality"/>: the city / district / area the handler resolved (LIS-CR-008 C-04), none when null.</summary>
 public sealed record ProvisionTenantSpec(
     string NameEn,
     string NameAr,
@@ -30,7 +30,8 @@ public sealed record ProvisionTenantSpec(
     TenantSource Source,
     string? Language,
     string AdminUsername,
-    string AdminPassword);
+    string AdminPassword,
+    Locality? Locality = null);
 
 /// <summary>A provisioning prepared in memory: the aggregates and the administrator's data, nothing staged yet.</summary>
 public sealed record PreparedTenant(Tenant Tenant, Wallet Wallet, string AdminUsername, string AdminDisplayName, string AdminMobile, string PasswordHash);
@@ -92,6 +93,7 @@ public sealed class TenantProvisioner(
         }
 
         var tenant = Tenant.Provision(profile, country, governorate, plan, slug, spec.Source, spec.Language ?? country.Language, trialDays, now);
+        tenant.Locate(spec.Locality ?? Locality.None);   // LIS-CR-008 C-04
         var wallet = Wallet.Open(tenant.Id, country.CurrencyCode, tenant.TrialEndsAtUtc ?? now.AddMonths(1));
         return new PreparedTenant(tenant, wallet, username, profile.ManagerName, profile.ManagerMobile, hasher.Hash(spec.AdminPassword));
     }

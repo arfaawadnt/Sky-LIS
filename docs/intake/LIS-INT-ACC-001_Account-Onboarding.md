@@ -258,3 +258,36 @@ slot `pat`; front end only (no server change, no new code, no new endpoint).
 | --- | --- | --- |
 | Q-K1 | Should the strip come back after *Hide* on the next visit? | Yes: nothing is stored, so every visit of the sign-in page shows it again until the user hides it. |
 | Q-K2 | May the sign-in pages remember the last laboratory to skip the find page? | No (no device storage); the bookmark is the way back. To be revisited only with a security decision on device storage. |
+
+## 19. Change request 2026-10-24 — announcements on the sign-in page and the dashboard (LIS-CR-013 C-17, package P-ANN)
+
+Source: `docs/build/CR-2026-10-24_Review-Features.md` §7 and the review response LIS-RC-001 point C-17, decision D-4 (built on its
+recommendation). The announcement itself (aggregate, audience, image, counters, SA-22 page, opt-out) is LIS-INT-PLT-001 §20; this
+section records where a laboratory sees it.
+
+| Item | Decision |
+| --- | --- |
+| CP-03 sign-in hero | On a found laboratory address (`/lab/<slug>`) the page reads `GET /api/v1/public/announcements?placement=SignIn&laboratory=<slug>` (anonymous, cached five minutes by the browser). When one is live for the laboratory's audience, the first replaces the hero's slogan: image (`/api/v1/public/announcements/{id}/image?v=n`), title as the page's `h1`, text, *Learn more* link (new tab, `rel="noopener noreferrer"`). One impression is reported per announcement shown and one click per link opened (`POST …/impression|click`, fire and forget). No announcement, an opted-out client or a failed read keeps the slogan. The Super Admin sign-in and "address not found" never ask. Components `features/auth/ui/sign-in-announcement.component.ts`, `data/public-announcements.api.ts`; the frame's hero takes `[authHero]` content when `customHero` is set. Key `auth.announcement.more`. |
+| CP-05 welcome card | The dashboard reads `GET /api/v1/account/announcements` (any signed-in member; the audience is resolved from the session's laboratory on the server; an opted-out client, the platform tenant or a tenant without a client record gets none) and shows the Welcome announcements as **one** card above the figures: image, title, text, *Learn more*, "n of m ›" when there are several, ✕ to close it. Closing lasts for the session only — kept in memory (`state/announcement-dismissals.service.ts`, root), so returning to the dashboard keeps it closed and a sign-out or reload shows it again; nothing is written on the device. Same impression / click reporting. Component `features/account/ui/welcome-announcement.component.ts`, keys `account.announcement.*`. |
+| Session profile | Carries nothing new (`AuthContracts` unchanged): the dashboard reads its own endpoint. |
+| Opt-out | `hideAnnouncements` is a client flag set by the Super Admin on SA-04; the laboratory cannot change it (`PUT /api/v1/settings` answers SET-004) and does not see it on its Parameters page. |
+
+| # | Question | Assumption built on |
+| --- | --- | --- |
+| Q-N1 | Should a closed welcome card stay closed after the next sign-in? | No: closing lasts for the session (no device storage, LIS-CR-004 rule); the Super Admin ends an announcement by its schedule or by deactivating it. |
+| Q-N2 | Does the sign-in hero keep the eyebrow ("Staff sign in")? | Yes: only the title and the lead are replaced, so the page still says what it is. |
+
+## 20. Change request 2026-10-24 — city, district and area in the subscription wizard (LIS-CR-008 C-04, package P-ADR)
+
+Step 1 of CP-02 offers, after Governorate, three optional cascading selects — City / markaz → District → Area / village — shown only
+when the governorate lists cities, loaded from the anonymous lookups `/api/v1/public/cities|districts|areas` (shared component
+`shared/forms/locality-fields`, one key signal per level, the shared/patient pattern). Changing the governorate clears them; changing a
+level clears the levels below. `StartSubscriptionRequest` takes `cityId`, `districtId`, `areaId` (optional); the server checks the
+chain (GEO-020, GEO-021, GEO-022, 422, marked under the refused select) before any code is sent, keeps the ids on the request and places
+the new laboratory there at completion. The laboratory's public card (`GET /api/v1/public/laboratories/{slug}`) now returns
+`addressEn` / `addressAr` ("Area, District, City, Governorate", null without a city) for the sign-in page; rendering it on
+`features/auth` belongs to that feature's owner. Keys `public.field.city|district|area`, `public.wizard.localityNone`,
+`public.error.GEO-020…022`.
+
+Acceptance: `AddressesFlowTests.The_wizard_keeps_the_picked_locality_and_the_register_and_card_print_the_address`; SPA
+`subscribe.page.spec` ("offers city, district and area after the governorate…").

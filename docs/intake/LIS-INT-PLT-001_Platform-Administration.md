@@ -460,3 +460,189 @@ them"); brief `docs/build/CR-2026-10-24_Review-Quick-Wins.md` §6.
 | Q23 | Does a token renewal count as a sign-in? | Yes: an open session renews every 15 minutes while someone works, so the latest issue is the best "last seen" the platform tables hold without reading the laboratory's data. |
 | Q24 | Who is "the administrator" to call? | The manager on the client record (name and mobile), which provisioning used for the laboratory administrator and the Super Admin maintains on SA-04; the administrator user's own profile may differ later. |
 | Q25 | Are trial clients included? | Yes, counted separately in the tile's subtitle (a silent trial is the most important call). |
+
+## 20. Change request 2026-10-24 — announcements (LIS-CR-013 C-17, package P-ANN, SA-22)
+
+Source: the reviewer's comments response LIS-RC-001, point C-17, decision D-4 built on its recommendation (National Technology's
+own and partner announcements; sign-in hero and dashboard welcome card only, no in-app strip; a client may be opted out); brief
+`docs/build/CR-2026-10-24_Review-Features.md` §7.
+
+- **Aggregate** `Platform.Domain.PlatformAdmin.Announcement` (platform reference data, `saas.announcements`, no tenant, no RLS):
+  title en / ar (both required, ≤ 120), body en / ar (optional, ≤ 600), link (optional, absolute `https://` without credentials,
+  ≤ 500), placement `SignIn | Welcome`, schedule `FromUtc` (inclusive) / `ToUtc?` (exclusive, after the start), audience — country?,
+  plan?, status `Any | Trial | Active`, client list (`uuid[]`, ≤ 200, de-duplicated; empty = every client the other criteria admit)
+  — `IsActive`, image (content type, size, storage key, `ImageVersion` raised on every upload / removal) and the counters
+  `Impressions` / `Clicks`. A new announcement is a **draft** (inactive) until the Super Admin activates it; an ended schedule cannot
+  be activated (ANN-010); activation and deactivation are idempotent. Raises no event (reference data, like the templates).
+- **Audience rule** (`Announcement.AdmitsViewer`): every given criterion matches the client record — country, plan, status (Any =
+  Trial or Active; an Inactive client matches nothing) and the client list. Without a laboratory (the anonymous sign-in page of no
+  address) only an **open** audience matches. **Live** = active and `FromUtc ≤ now < ToUtc`.
+- **Image**: PNG, JPEG or WebP decided by the signature (`AnnouncementImages.Inspect` over `LaboratoryLogoFiles.DetectContentType`),
+  1 byte … 512 KB, SVG refused; stored in the **platform tenant's** file store, area `announcements`, below the announcement id; the
+  stored file is kept on removal or replacement (BR-15).
+- **Opt-out**: `SettingKeys.HideAnnouncements` (`hideAnnouncements`, bool, default false) is a **client flag**
+  (`SettingKeys.IsClientFlag`): set by the Super Admin only, on SA-04, through `PUT /api/v1/platform/clients/{id}/announcements`
+  (stored as the client's own `app.tenant_settings` row, written in the client's tenant scope); `PUT /api/v1/settings` refuses it for
+  every tenant (`SET-004`, 403); only the client's **own** row is read, so a platform row never hides announcements for every
+  laboratory.
+- **Codes** (`AnnouncementCodes`): ANN-001 texts, ANN-002 link, ANN-003 schedule, ANN-004 audience shape, ANN-005 placement,
+  ANN-006 empty image, ANN-007 image over 512 KB, ANN-008 image type, ANN-010 schedule ended (409), ANN-011 no image (404),
+  ANN-012 / 013 / 014 audience country / plan / client unknown (400), ANN-404 not found; `SET-004` client flag (403).
+- **Endpoints**:
+  - SA-22 (platform tenant only, PLT-403): `GET /api/v1/platform/announcements?search&placement&isActive&page&pageSize&sort&direction`
+    and `GET …/{id}` [platform.view] (`AnnouncementView` with `isLive`, `imageVersion`, counters; sort keys `title`, `titleAr`,
+    `placement`, `fromUtc`, `toUtc`, `impressions`, `clicks`); `POST` (201) / `PUT …/{id}` / `POST …/{id}/activate|deactivate`
+    [platform.manage]; `GET …/{id}/image` [platform.view] (editor preview, any announcement); `POST …/{id}/image` (multipart `file`) /
+    `DELETE …/{id}/image` [platform.manage].
+  - SA-04: `GET` [tenancy.view] / `PUT` [tenancy.edit] `/api/v1/platform/clients/{clientId}/announcements` `{ hidden }` (CLI-404 for
+    no client record).
+  - Public (anonymous, global rate-limit chain): `GET /api/v1/public/announcements?placement=SignIn&laboratory=<slug>` — the live
+    SignIn announcements the laboratory's audience admits, newest start first, at most five; none when the client opted out or the
+    address names no usable laboratory; open audiences only without an address; any other placement is `VALIDATION-400`;
+    `Cache-Control: public, max-age=300` (`SecurityHeadersMiddleware.PublicCacheItem`). `GET …/{id}/image` — the image of a **live**
+    announcement only (a draft's image stays private), same cache header, ETag `announcement-v{version}`. `POST …/{id}/impression` and
+    `POST …/{id}/click` — always 204; one atomic `UPDATE … SET n = n + 1` on a live row (anything else counts nothing; no aggregate
+    load, no row-version race, no audit row per view).
+- **Tests**: domain `AnnouncementTests` (S-ANN create, text, link, schedule, activate, audience, update, image, opt-out), application
+  `AnnouncementFeedTests` (feed, opt-out scope, five at most, dashboard handler, validators, SET-004), integration
+  `AnnouncementsModuleTests` (round trip with `uuid[]`, search in both titles with escaped wildcards, every sort key, live read,
+  ten concurrent impressions, audience directory, own-row opt-out not inherited from the platform), functional
+  `AnnouncementsFlowTests` (CRUD and codes, viewer / laboratory fence, public list by schedule / audience / opt-out / cache header,
+  SET-004, dashboard list, image sniffing and privacy of drafts, counters).
+- **SPA** (`features/platform`): page `pages/announcements.page.*` (`/admin/announcements`, facade `state/announcements.facade.ts`):
+  register (search, placement, active filter, server sort, paging, state badge Live / Scheduled / Ended / Inactive, audience in words,
+  views and clicks), editor drawer (texts in both languages, https link, placement, schedule in local time, audience: country, plan,
+  status, searchable client list; image upload / replace / remove once saved — a new announcement stays open after its first save;
+  a live preview in both languages, `ui/announcement-preview.component.ts`), activate / deactivate with confirmation; read-only for
+  `platform.view`. SA-04 drawer: `ui/client-announcements-switch.component.ts` "Hide announcements for this client", saved at once.
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| Q26 | Is a new announcement shown at once? | No: it is a draft until activated from the register, so the Super Admin can add the image and check the preview first. |
+| Q27 | Who may change the opt-out? | Only the Super Admin (`tenancy.edit`, SA-04). A laboratory cannot, not even its administrator (SET-004); decision D-4 says "a laboratory cannot change it in Release 1". |
+| Q28 | Which announcement does the sign-in hero show when several are live? | The newest start first; the hero shows the first, the dashboard card pages through up to five. |
+| Q29 | Are impressions per view or per visitor? | Per view: one impression each time the page shows the announcement (no device storage, LIS-CR-004), one click per link opened. Rate-limited by the global chain. |
+| Q30 | May the link be plain http? | No: https only (ANN-002), opened in a new tab with `rel="noopener noreferrer"`. |
+
+## 21. Change request 2026-10-24 — subscription reminders and grace (LIS-CR-012 C-16, package P-REM)
+
+Source: the reviewer's comments response LIS-RC-001, point C-16, decision D-3 built on its recommendation ("7 days of grace with
+reminders, then sign-in blocked except the administrator's billing page"); brief `docs/build/CR-2026-10-24_Review-Features.md` §6.
+
+- **State** (`Platform.Domain.PlatformAdmin.SubscriptionTerms.Evaluate`, pure; `Tenant.SubscriptionState(now, graceDays, wallet)`):
+  `Ok | Warning | Grace | Expired` with a reason `Trial | Wallet | WalletAtZero`, whole days left (floor) to `endsAtUtc` and the amount
+  that brings the wallet to one month of the plan fee (`max(0, fee − balance)`).
+  - **Trial**: more than 7 days left → Ok; 0–7 days → Warning (days to the trial end); ended (not activated) → Grace for the grace days,
+    then Expired. A trial without an end date is Ok.
+  - **Active**: no wallet or a free plan → Ok. Positive balance covering fewer than 7 days of the fee (`balance ÷ (fee ÷ 30)`) →
+    Warning (reason `Wallet`, whole days covered). Balance at or below zero → Warning (reason `WalletAtZero`) until it has been so for one
+    plan period (a calendar month from the moment it reached zero), then Grace for the grace days, then Expired.
+  - **Inactive** → nothing (deactivation keeps its own refusal `CLI-020`).
+- **Zero mark**: `Wallet.AtOrBelowZeroSinceUtc` (new nullable column `saas.wallets.at_or_below_zero_since_utc`) is set by the debit (a
+  monthly charge or metered usage) that leaves the balance at or below zero, kept by later debits, cleared by a top-up that brings the
+  balance above zero. A new empty wallet is never marked (it owes nothing until charged). Backfill for existing wallets in
+  `PlatformAdmin.migration.sql` (the first debit at or below zero after the last positive balance).
+- **Grace days**: `SettingKeys.SubscriptionGraceDays` (`subscriptionGraceDays`, int, default 7, 0…60), shown on SA-19 in the Subscription
+  group. A **platform** parameter: only the platform tenant's row is read (the session principal reads it as a scalar subquery, the job
+  and the SA queries under `ForTenant(platform)`); a laboratory's own row is ignored, so a laboratory cannot extend its own grace (the
+  client Parameters page does not list the key).
+- **INV-PLT-003 amended**: a laboratory is "usable" (reaches sign-in, its address and public card resolve) unless it is **deactivated**;
+  a trial past its end no longer answers `CLI-020` — it runs its grace and then expires. `Tenant.IsUsableAt` and `TenantStatusLookup`
+  follow.
+- **Expired** (D-3): a member who is **not an administrator** is refused at sign-in `403 SUB-020` (reason `subscription_expired` in
+  `SIGN_IN_FAILED`) and an open session of such a member ends (the principal is no longer live: the next request is 401, the refresh
+  fails). An **administrator** (primary administrator, or effective `organization.manage`) still signs in and reaches only the auth
+  surface, the own profile / password / preferences, the laboratory logo, privileges, selectable branches, the wallet
+  (`/api/v1/wallet/**`, `/api/v1/account/wallet`, `/api/v1/account/subscription`) and support tickets; anything else is `403 SUB-021`
+  (`SubscriptionExpiredGateMiddleware`, see LIS-INT-FND-001 §10). Codes `SUB-001…SUB-010` already belong to the subscription wizard, so
+  the expiry codes are `SUB-020` / `SUB-021` (`SubscriptionCodes`).
+- **Reminders** (`SubscriptionReminderJob`, Infrastructure `Jobs/`, hosted by `SubscriptionReminderHostedService`,
+  `Lis:Jobs:SubscriptionReminders:{Enabled,PollInterval}` default on / 1 h; the production template carries both keys): every poll lists
+  the Trial and Active clients once, reads the grace days once, and hands each client to `SubscriptionReminderRun` in its own platform
+  scope. At most one reminder per client and run, the most urgent of its state (`SubscriptionReminders.Due`), with a once-only key:
+
+  | State | Reminder | Template | Key |
+  | --- | --- | --- | --- |
+  | Trial Warning, 7 / 3 / 1 days, today | trial ending | `subscription-expiry` | `trial-{7,3,1,0}:{trial end}` |
+  | Grace (trial) with more than 3 days left | trial ended | `subscription-expiry` | `trial-ended:{trial end}` |
+  | Wallet covering < 7 / 3 / 1 days | wallet low | `wallet-low` | `wallet-{7,3,1}:{next charge day}` |
+  | Wallet at or below zero (Warning, or Grace with more than 3 days left) | wallet at zero | `wallet-low` | `wallet-zero:{zero mark}` |
+  | Grace with 3 / 1 days left | grace ending | `subscription-grace` | `grace-{3,1}:{grace end}` |
+  | Ok, Expired | none | — | — |
+
+  The row is recorded in `saas.subscription_reminders` (client, kind, key, template, channels, sent at; unique on client + key,
+  INV-PLT-050) and committed **before** sending: a concurrent run loses on the unique index (`UNIQUE-409` → "already sent"); a crash
+  between commit and send loses that reminder rather than repeating it (at most once). Channels: SMS to the manager's mobile and e-mail to
+  the client's e-mail when it has one, through `INotificationSender` (the delivering sender absorbs a gateway failure). Placeholders
+  `labName` (alias `laboratory`), `days`, `amount` (e.g. `3,000.00 EGP`), `url` (alias `link`: the laboratory's sign-in address); the
+  three templates are seeded editable on SA-20 (channel Email so both subjects exist; the SMS uses the same text) and built in. A
+  failure is logged (event 7324) and written to the ledger as `SUBSCRIPTION_REMINDER_FAILED`; nothing is recorded, so the next poll retries.
+- **SA-03 / SA-04**: `PlatformDashboard.expiringSoonClients` (Warning or Grace ending within 7 days), `graceClients`, `expiredClients`; tile
+  "Expiring soon" linking to `/admin/clients?subscription=expiring`. `GET /api/v1/platform/clients/subscriptions?state=expiring|grace|expired&days=7`
+  [platform.view, platform tenant only] → `SubscriptionClientList { state, days, graceDays, asOfUtc, items[] }` (soonest end first; `days`
+  1…60 and `state` checked by shape → `VALIDATION-400`). SA-04 toolbar select *Subscription* (Any / Expiring within 7 days / In grace /
+  Expired) swaps the register for the list (`ui/subscription-clients.component.ts`) with level, cause, days left, amount to top up, wallet,
+  manager with a `tel:` link and the last reminder; CSV of the shown rows.
+- **Tests**: domain `SubscriptionStateTests` (SUB-S1…S8 state, SUB-R1…R4 reminder keys, SUB-W1/W2 zero mark, SUB-P1 parameter, SUB-A1
+  administrators, SUB-C1 codes); application `SubscriptionReminderTests` (run: due, once, channels, placeholders, race, scope; filters;
+  profile notice); integration `SubscriptionReminderModuleTests` (unique key, reader, lookup) and the amended `PlatformAdminModuleTests`
+  status lookup; functional `SubscriptionRemindersFlowTests` (notice, SUB-020, administrator + SUB-021, SA-03/SA-04, job once),
+  `SubscriptionExpiredGateTests` (the gate as a unit) and the amended `PortalAddressesFlowTests` (an ended trial past its grace: SUB-020;
+  its card resolves); SPA `clients-subscription.page.spec.ts`, `dashboard-expiring.spec.ts`, `subscription-notice.spec.ts`.
+
+| # | Question | Assumed answer |
+| --- | --- | --- |
+| Q31 | Is the grace period read-only for reports only (LIS-RC-001 C-16 text) or full access? | Full access during grace (simpler, no per-module gate); the restriction starts when the grace is over (D-3 recommendation). |
+| Q32 | Who is an "administrator" of an expired laboratory? | The primary administrator and every member with effective `organization.manage` (who could grant itself anything anyway). |
+| Q33 | When does a wallet's "plan period at or below zero" start? | At the debit that left the balance at or below zero (`AtOrBelowZeroSinceUtc`), not at the wallet's opening: an empty new wallet owes nothing. |
+| Q34 | One reminder per threshold, or every day? | Once per threshold and anchor (trial end, charge period, zero episode, grace end); the most urgent only when several are due (no backlog after downtime). |
+| Q35 | May a laboratory set its own grace days? | No: the key is read from the platform tenant's row only. |
+| Q36 | Do the reminders need the SMS gateway? | The SMS channel does (remaining point B-01); until then the pickup directory / log receives it, and the e-mail goes out when SMTP is configured. |
+
+## 22. Change request 2026-10-24 — laboratory and branch addresses, locality import (LIS-CR-008 C-04, package P-ADR)
+
+Source: `docs/review/Sky-LIS_Reviewer-Comments_Response_V1.html` point C-04 and decision D-2; wave brief
+`docs/build/CR-2026-10-24_Review-Features.md` §2.
+
+**Model.** `Tenant` and `SubscriptionRequest` gain `CityId?`, `DistrictId?`, `AreaId?` (nullable). A locality is the value
+`Locality` (`Domain/PlatformAdmin/Locality.cs`), obtained only from `Locality.Resolve(governorateId, cityId, districtId, areaId,
+LocalityRows)`, which checks the chain on the rows the handler read: the city belongs to the governorate (GEO-020), the district to
+the city (GEO-021), the area to the district (GEO-022); a lower level without its parent and an id no row has are refused the same
+way; `Guid.Empty` means none; inactive rows are accepted (a record keeps its place after a deactivation, like the patient file).
+`Tenant.Locate(locality)` and `SubscriptionRequest.Locate(locality)` (Pending only) refuse a locality checked against another
+governorate (GEO-020). `ILocalityLookup` (adapter `Persistence/PlatformAdmin/LocalityReads.cs`) reads the rows.
+
+**Flows.** SA-04 provision and update, and the wizard start (CP-02), take optional `cityId`, `districtId`, `areaId`; the wizard keeps
+them on the request and resolves them again at completion (the tenant is placed by `TenantProvisioner.PrepareAsync` through
+`ProvisionTenantSpec.Locality`). An update body without the fields (the 0.21 shape) clears the locality. `ClientDetail` returns the
+ids and `AddressLineEn/Ar`; `ClientListItem` returns `AddressLineEn/Ar`; the public card `GET /api/v1/public/laboratories/{slug}`
+returns `AddressEn/Ar`. The line reads "Area, District, City, Governorate" (`AddressLine`, Arabic comma in Arabic), null without a city.
+
+**Locality import (SA-11 "Import CSV", D-2).** `POST /api/v1/platform/governorates/{id}/localities/import?dryRun=` [tenancy.manage, like
+every write of the Locations drawer; the wave brief named platform.manage], multipart field `file`, UTF-8 CSV of at most 4 MB and 20,000
+lines (`LocalityCsv`), header in any order: `city_en, city_ar, district_en, district_ar, area_en, area_ar` (aliases `city`, `district`,
+`area`, `village`, `village_en/ar`, `markaz`); a city column is required. Planning (`LocalityImport.Plan`): names are matched
+case-insensitively on the English name within the parent, among stored rows (active or not) and rows earlier in the file, so the import
+is idempotent; stored rows are never renamed or reactivated; a blank English name takes the Arabic one and the reverse. Refusals per
+line: no city, an area without its district, a name over 100 characters (GEO-025); a new row under an inactive parent (GEO-015).
+All-or-nothing: with any refusal, or on a dry run, nothing is written; otherwise one save. Answer `LocalityImportResult` (rows,
+created / existing / refused per level, `dryRun`, `applied`, refused lines with level, code and message). GEO-023 unreadable file,
+GEO-024 too large, GEO-405 unknown governorate. SPA: *Import CSV* in the Locations drawer runs the dry run on file choice, shows the
+counts and the refused lines, and *Import* (enabled only without refusals) sends the file for real; the columns reload.
+
+**Codes.** GEO-020 city not in the governorate, GEO-021 district not in the city, GEO-022 area not in the district (all 422),
+GEO-023 import file unreadable, GEO-024 import too large, GEO-025 import line refused. No CLI code was needed (CLI-030 is already
+`AdministratorMissing`, so the CLI-030…039 region starts at 031 for later use).
+
+**Persistence (migration `ReviewFeatures`, integrator).** `saas.tenants.city_id / district_id / area_id` (uuid null, FK Restrict to
+`saas.cities / districts / areas`, indexes by convention); `saas.subscription_requests.city_id / district_id / area_id` (uuid null, no
+FK). No extra SQL: the grants and the per-parent unique indexes of the three location tables exist since LIS-CR-003.
+
+**Acceptance (functional `AddressesFlowTests`).** S-ADR-01 the wizard keeps the locality and the register and the card print the line;
+S-ADR-02 a district of another city is GEO-021 before any code is sent; S-ADR-03 SA-04 sets, refuses (GEO-022, GEO-020) and clears the
+locality; S-ADR-04 the import dry run writes nothing, a refused line blocks everything, the real run creates, a second run creates
+nothing; GEO-023, GEO-405, 403 for a viewer. Domain: `LocalityTests`, `LocalityImportTests`; Application: `LocalityCsvTests`.
+
+**Assumptions for the business owner.** (a) The official Egyptian list (governorate → markaz / city → district → village) is a content
+deliverable of National Technology; the importer takes it per governorate when it arrives (D-2). (b) Every level is optional; an address
+line is printed only when a city is chosen. (c) The import never renames, deactivates or reactivates a stored row.

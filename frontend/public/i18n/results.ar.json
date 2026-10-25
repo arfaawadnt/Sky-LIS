@@ -333,6 +333,8 @@
   "report.reprintTwo": "إعادة طباعة (طُبعت نسختان)",
   "report.reprintMany": "إعادة طباعة (طُبعت {count} نسخة)",
   "report.printList": "قائمة الطباعة",
+  "report.current": "النتيجة",
+  "report.previousResults": "النتائج السابقة",
 
   "error.RES-001": "مرجع النتيجة مفقود.",
   "error.RES-002": "القيمة مطلوبة.",

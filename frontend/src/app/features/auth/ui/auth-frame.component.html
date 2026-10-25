@@ -13,8 +13,13 @@
   <main class="main">
     <div class="hero">
       <p class="eyebrow">{{ eyebrow() }}</p>
-      <h1>{{ heroTitle() }}</h1>
-      <p class="lead">{{ lead() }}</p>
+      @if (customHero()) {
+        <!-- LIS-CR-013: the page's [authHero] content (the laboratory's SignIn announcement) replaces the slogan -->
+        <ng-content select="[authHero]" />
+      } @else {
+        <h1>{{ heroTitle() }}</h1>
+        <p class="lead">{{ lead() }}</p>
+      }
     </div>
 
     <div class="card-col">

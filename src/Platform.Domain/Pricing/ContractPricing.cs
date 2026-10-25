@@ -49,6 +49,13 @@ public sealed class ContractPricing : AggregateRoot, ITenantScoped
     /// <summary>When the derived prices were last computed (Apply or copy); <see langword="null"/> until then.</summary>
     public DateTimeOffset? AppliedAtUtc { get; private set; }
 
+    /// <summary>
+    /// The report design every report of a visit under this tier prints in (LIS-CR-010, C-14), or <see langword="null"/> to
+    /// follow the report template, then the laboratory parameter (<see cref="Catalogue.ReportDesigns.Resolve"/>). Not part of
+    /// the formula: set by C7 only, kept by Apply and by a copy onto this tier.
+    /// </summary>
+    public Catalogue.ReportDesign? ReportDesign { get; private set; }
+
     public uint RowVersion { get; private set; }
 
     public IReadOnlyCollection<PricingSource> Sources => _sources.AsReadOnly();
@@ -246,6 +253,19 @@ public sealed class ContractPricing : AggregateRoot, ITenantScoped
         EffectiveTo = source.EffectiveTo;
         AppliedAtUtc = nowUtc;
         Raise(new ContractPricingCopied(Id, ContractTierId, source.Id, source.ContractTierId, factor, nowUtc));
+    }
+
+    /// <summary>C7 Report design (<c>pricing.edit</c>, LIS-CR-010): sets or clears (null) the tier's report design override (PRC-047 for an unknown design).</summary>
+    public void SetReportDesign(Catalogue.ReportDesign? design, DateTimeOffset nowUtc)
+    {
+        Require(design is null || Enum.IsDefined(design.Value), PricingCodes.ReportDesignInvalid, "The report design is unknown.", DomainFault.Validation);
+        if (ReportDesign == design)
+        {
+            return;
+        }
+
+        ReportDesign = design;
+        Raise(new ContractReportDesignSet(Id, ContractTierId, design, nowUtc));
     }
 
     /// <summary>The tier quotes its prices only between the effective dates, inclusive (intake Q5).</summary>

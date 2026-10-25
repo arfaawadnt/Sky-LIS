@@ -18,10 +18,10 @@ namespace Platform.Application.UnitTests.Billing;
 public sealed class PaymentMethodUseCaseTests
 {
     private static RecordPaymentHandler PaymentHandler(BillingWorld world) =>
-        new(world.Visits, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        new(world.Visits, world.Methods, world.Accounts, world.Closings, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
     private static RecordRefundHandler RefundHandler(BillingWorld world) =>
-        new(world.Visits, world.Reasons, world.Methods, world.Accounts, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
+        new(world.Visits, world.Reasons, world.Methods, world.Accounts, world.Closings, world.Numbers, world.UnitOfWork, world.User, world.Privileges, world.Clock);
 
     [Fact]
     public async Task T10_Define_upper_cases_the_code_orders_after_the_last_option_and_refuses_a_duplicate_BIL_121()

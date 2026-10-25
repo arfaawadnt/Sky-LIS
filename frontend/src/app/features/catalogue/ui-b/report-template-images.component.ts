@@ -16,7 +16,8 @@ import { type LoadedTemplateImages, REPORT_DOCUMENT_RENDERER, ReportTemplateImag
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { CatalogueBApi } from '../data-b/catalogue-b.api';
-import { type PreviewLanguage, previewLanguageOf, sampleReportDocument } from '../data-b/report-template-preview';
+import { REPORT_DESIGNS, type ReportDesign } from '../../../core/api/report-designs';
+import { type PreviewLanguage, previewLanguageOf, sampleReportDocument, templateRequestWithDesign, templateTakesDesign } from '../data-b/report-template-preview';
 
 /**
  * `<app-report-template-images [template]="item" (changed)="…" />`: the logo and the signature of a report template
@@ -64,6 +65,19 @@ import { type PreviewLanguage, previewLanguageOf, sampleReportDocument } from '.
         }
       </div>
       <p class="muted small">{{ i18n.t('catalogue-b.reportTemplates.preview.hint') }}</p>
+      @if (takesDesign()) {
+        <div class="designs" role="group" [attr.aria-label]="i18n.t('catalogue-b.reportTemplates.preview.design')">
+          @for (design of designs; track design) {
+            <button type="button" class="btn sm" [class.primary]="previewDesign() === design" [attr.aria-pressed]="previewDesign() === design" (click)="previewDesign.set(design)">
+              {{ i18n.t('catalogue-b.reportTemplates.design.' + design) }}
+            </button>
+          }
+          @if (previewDesign() !== current().design) {
+            <button type="button" class="btn sm ghost use-design" *appCan="permissions.edit" [disabled]="busy()" (click)="useDesign()">{{ i18n.t('catalogue-b.reportTemplates.preview.useDesign') }}</button>
+          }
+        </div>
+        <p class="muted small">{{ i18n.t('catalogue-b.reportTemplates.preview.designHint') }}</p>
+      }
       @if (renderer.hasValue() && renderer.value(); as type) {
         @if (previewInputs().texts !== null) {
           <div class="paper"><ng-container *ngComponentOutlet="type; inputs: previewInputs()" /></div>
@@ -85,7 +99,7 @@ import { type PreviewLanguage, previewLanguageOf, sampleReportDocument } from '.
     .thumb { display: grid; place-items: center; height: 96px; border: 1px dashed var(--line); border-radius: var(--r); background: var(--surface-2); }
     .thumb img { max-width: 90%; max-height: 84px; object-fit: contain; }
     .thumb.signature { background: #fff; }
-    .actions, .langs, .preview-head { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+    .actions, .langs, .designs, .preview-head { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
     .preview-head { justify-content: space-between; }
     .actions label:has(input:focus-visible) { box-shadow: var(--focus-ring); }
     .actions label.disabled { opacity: 0.6; pointer-events: none; }
@@ -118,6 +132,13 @@ export class ReportTemplateImagesComponent {
 
   protected readonly previewLang = linkedSignal<PreviewLanguage>(() => previewLanguageOf(this.current(), untracked(() => this.i18n.lang())));
 
+  protected readonly designs = REPORT_DESIGNS;
+
+  /** LIS-CR-010: the design the sample is drawn in — the template's own, else Classic; the buttons try the others without saving. */
+  protected readonly previewDesign = linkedSignal<ReportDesign>(() => this.current().design ?? 'Classic');
+
+  protected readonly takesDesign = computed(() => templateTakesDesign(this.current()));
+
   private readonly images = signal<LoadedTemplateImages | null>(null);
   private loadSequence = 0;
 
@@ -139,7 +160,13 @@ export class ReportTemplateImagesComponent {
     const texts = this.texts.hasValue() ? this.texts.value() : null;
     return {
       texts: texts !== null && texts.lang === this.previewLang() ? texts : null,
-      doc: sampleReportDocument(this.current(), this.previewLang(), { labNameEn: this.i18n.t('catalogue-b.reportTemplates.preview.labEn'), labNameAr: this.i18n.t('catalogue-b.reportTemplates.preview.labAr') }, this.nowUtc),
+      doc: sampleReportDocument(
+        this.current(),
+        this.previewLang(),
+        { labNameEn: this.i18n.t('catalogue-b.reportTemplates.preview.labEn'), labNameAr: this.i18n.t('catalogue-b.reportTemplates.preview.labAr') },
+        this.nowUtc,
+        this.previewDesign(),
+      ),
       images: images === null ? null : { logoUrl: images.logoUrl, signatureUrl: images.signatureUrl },
     };
   });
@@ -175,6 +202,14 @@ export class ReportTemplateImagesComponent {
     input.value = '';   // the same file can be chosen again after a refusal
     if (file !== undefined && !this.busy()) {
       await this.run(() => this.api.uploadReportTemplateImage(this.current().id, kind, file), 'catalogue-b.reportTemplates.images.saved');
+    }
+  }
+
+  /** Saves the previewed design on the template (an edit of the template as it is, with this design). */
+  protected async useDesign(): Promise<void> {
+    if (!this.busy()) {
+      const design = this.previewDesign();
+      await this.run(() => this.api.reportTemplates.update(this.current().id, templateRequestWithDesign(this.current(), design)), 'catalogue-b.reportTemplates.preview.designSaved');
     }
   }
 

@@ -280,6 +280,12 @@ internal sealed class VisitRepository(AppDbContext context) : Repository<Visit>(
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         var byVisit = lines.GroupBy(line => line.VisitId).ToDictionary(group => group.Key, group => group.Select(line => line.Chip).ToList());
+        var outside = (await Context.Set<VisitTube>().AsNoTracking()
+            .Where(tube => ids.Contains(tube.VisitId) && tube.CollectedOutside)
+            .Select(tube => tube.VisitId)
+            .Distinct()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false)).ToHashSet();   // LIS-CR-008 C-02: derived from the tubes
 
         return [.. visits.Select(visit => new VisitRow(
             visit.Id,
@@ -293,7 +299,7 @@ internal sealed class VisitRepository(AppDbContext context) : Repository<Visit>(
             visit.LocationType,
             visit.Urgent,
             visit.BatchId,
-            visit.CollectedOutside,
+            outside.Contains(visit.Id),
             visit.TotalListPrice,
             visit.DiscountTotal,
             visit.PatientShareTotal,

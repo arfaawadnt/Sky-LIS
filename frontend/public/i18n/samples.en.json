@@ -49,6 +49,7 @@
   "column.reason": "Reason",
   "column.note": "Note",
   "column.rejectedAt": "Rejected at",
+  "outside": "Outside",
   "allStatuses": "All",
   "searchPlaceholder": "Sample or accession number…",
   "exportCsv": "Export CSV",

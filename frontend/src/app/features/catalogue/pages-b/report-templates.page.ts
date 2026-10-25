@@ -9,6 +9,7 @@ import {
   type ReportTemplateRequest,
   type ReportTemplateType,
 } from '../../../core/api/catalogue-b.contracts';
+import { REPORT_DESIGNS, type ReportDesign, reportDesignOverride } from '../../../core/api/report-designs';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { type LocalizedText, localizedPick } from '../../../shared/forms/localized-text';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
@@ -42,6 +43,15 @@ export const TEMPLATE_LANGUAGE_LABELS: Readonly<Record<ReportTemplateLanguage, r
   En: ['English', 'الإنجليزية'],
   Ar: ['Arabic', 'العربية'],
   Both: ['English and Arabic', 'الإنجليزية والعربية'],
+};
+
+/** The Report design select (LIS-CR-010), both languages like the selects above (the words of `catalogue-b.reportTemplates.design.*`). */
+export const REPORT_DESIGN_LABELS: Readonly<Record<ReportDesign, readonly [en: string, ar: string]>> = {
+  Classic: ['Classic', 'كلاسيكي'],
+  Modern: ['Modern', 'حديث'],
+  Compact: ['Compact', 'مختصر'],
+  Letterhead: ['Pre-printed letterhead', 'ورق مطبوع مسبقًا'],
+  Cumulative: ['Cumulative (previous results)', 'تراكمي (النتائج السابقة)'],
 };
 
 /**
@@ -116,6 +126,12 @@ export class ReportTemplatesPage {
         options: () =>
           Promise.resolve(REPORT_TEMPLATE_LANGUAGES.map((language) => ({ value: language, label: TEMPLATE_LANGUAGE_LABELS[language][0], labelAr: TEMPLATE_LANGUAGE_LABELS[language][1] }))),
       },
+      {
+        name: 'design',
+        kind: 'select',
+        hint: 'catalogue-b.reportTemplates.hint.design',
+        options: () => Promise.resolve(REPORT_DESIGNS.map((design) => ({ value: design, label: REPORT_DESIGN_LABELS[design][0], labelAr: REPORT_DESIGN_LABELS[design][1] }))),
+      },
       { name: 'showQr', kind: 'boolean' },
       { name: 'headerText', kind: 'localizedText', required: false, maxLength: 400, hint: 'catalogue-b.reportTemplates.hint.texts' },
       { name: 'footerText', kind: 'localizedText', required: false, maxLength: 400 },
@@ -168,5 +184,6 @@ export function toRequest(value: FormValue): ReportTemplateRequest {
     headerTextAr: optional(header?.ar),
     footerTextEn: optional(footer?.en),
     footerTextAr: optional(footer?.ar),
+    design: reportDesignOverride(typeof value['design'] === 'string' ? value['design'] : null),
   };
 }

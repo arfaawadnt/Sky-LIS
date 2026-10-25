@@ -29,7 +29,7 @@ public sealed class OrganizationBranchesController(ISender sender) : ControllerB
     public async Task<ActionResult<CreatedResource>> Create([FromBody] CreateBranchRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var created = await sender.Send(new CreateBranchCommand(request.Code, request.NameEn, request.NameAr, request.CountryId, request.GovernorateId, request.Phone, request.Email, request.Currency), cancellationToken);
+        var created = await sender.Send(new CreateBranchCommand(request.Code, request.NameEn, request.NameAr, request.CountryId, request.GovernorateId, request.Phone, request.Email, request.Currency, request.CityId, request.DistrictId, request.AreaId), cancellationToken);
         return Created($"/api/v1/organization/branches/{created.Id}", created);
     }
 
@@ -37,7 +37,7 @@ public sealed class OrganizationBranchesController(ISender sender) : ControllerB
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBranchRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        await sender.Send(new UpdateBranchCommand(id, request.NameEn, request.NameAr, request.CountryId, request.GovernorateId, request.Phone, request.Email, request.Currency), cancellationToken);
+        await sender.Send(new UpdateBranchCommand(id, request.NameEn, request.NameAr, request.CountryId, request.GovernorateId, request.Phone, request.Email, request.Currency, request.CityId, request.DistrictId, request.AreaId), cancellationToken);
         return NoContent();
     }
 

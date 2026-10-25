@@ -211,7 +211,12 @@ export class CancelServicesDialogComponent {
               <tr>
                 <td class="mono">{{ sample.sampleNumber }}</td>
                 <td>{{ sample.unitCode ?? '' }}</td>
-                <td>{{ name(sample.sampleTypeNameEn, sample.sampleTypeNameAr) }}</td>
+                <td>
+                  {{ name(sample.sampleTypeNameEn, sample.sampleTypeNameAr) }}
+                  @if (sample.collectedOutside) {
+                    <app-badge tone="info">{{ i18n.t('registration.sampleFlags.outside') }}</app-badge>
+                  }
+                </td>
                 <td><app-badge [status]="sample.status" /></td>
                 <td class="small">{{ when(sample.collectedAtUtc) }}</td>
                 <td class="small">{{ when(sample.receivedAtUtc) }}</td>

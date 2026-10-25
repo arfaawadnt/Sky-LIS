@@ -9,6 +9,9 @@ export interface PublicLaboratory {
   readonly nameAr: string;
   /** Bumped on every logo change; `null` when the laboratory has no logo. */
   readonly logoVersion: number | null;
+  /** LIS-CR-008 C-04: "Area, District, City, Governorate" when the laboratory has a city (absent or null otherwise). */
+  readonly addressEn?: string | null;
+  readonly addressAr?: string | null;
 }
 
 /** A laboratory address: 3–40 of `a-z 0-9 -` (INV-PLT-001, the tenant's `PortalSlug`). */
