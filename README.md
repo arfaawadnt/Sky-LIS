@@ -235,7 +235,7 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Installation record.** WIN-9S2KO4FA64L upgraded to 0.22.0 on 2026-10-25 (`docs/deploy/Installations.md`): clean-tag build, verified backup, migration `ReviewFeatures` already applied (19 of 19), configuration unchanged (the reminder job runs with its defaults), smoke tests 20 / 20 by name and 20 / 20 by IP, the new endpoints and dictionary keys checked through IIS. Documentation only; the installed 0.22.0 build is the same code as this release.
 
 ### v0.22.0 — 2026-10-25
 
