@@ -95,6 +95,19 @@ public sealed class SampleTypesController(ISender sender) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Compatible sample conditions (LIS-CR-015 M4): every sample type with its conditions and their target.</summary>
+    [HttpGet("compatible-conditions")]
+    public async Task<ActionResult<IReadOnlyList<CompatibleSampleTypeView>>> CompatibleConditions(CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ListCompatibleConditionsQuery(), cancellationToken));
+
+    [HttpPut("{id:guid}/compatible-conditions")]
+    public async Task<IActionResult> SaveCompatibleConditions(Guid id, [FromBody] SaveCompatibleConditionsRequest body, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        await sender.Send(new SaveCompatibleConditionsCommand(id, body.Pairs), cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("{id:guid}/deactivate")]
     public async Task<IActionResult> Deactivate(Guid id, CancellationToken cancellationToken)
     {

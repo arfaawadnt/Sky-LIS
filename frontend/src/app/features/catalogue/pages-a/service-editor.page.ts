@@ -32,10 +32,12 @@ import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import type { Breadcrumb } from '../../../shared/ui/page-header/page-header.component';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
+import { DialogComponent } from '../../../shared/ui/dialog/dialog.component';
 import { FormFieldComponent } from '../../../shared/ui/form-field/form-field.component';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { LocalizedTextInputComponent } from '../../../shared/ui/localized-text-input/localized-text-input.component';
 import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
+import { RETURN_TO_PARAM, safeReturnTo } from '../../../shared/ui/return-link/return-link.component';
 import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.component';
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { type TabItem, TabsComponent } from '../../../shared/ui/tabs/tabs.component';
@@ -66,7 +68,9 @@ export interface MemberRow {
 /**
  * The service editor (SRS CP-40): general data and members, one save (Ctrl+S). A new service is created with its
  * members in one call (a test service needs its test from the start); an existing one saves the general data and the
- * members separately, only what changed. The type is fixed once created (CAT-035).
+ * members separately, only what changed. The type is fixed once created (CAT-035). Every member row opens the member's own
+ * setup with `returnTo` = this page, asking first when the service has unsaved changes (LIS-CR-015 M2); `back()` honours
+ * the `returnTo` this page was opened with.
  */
 @Component({
   selector: 'app-service-editor-page',
@@ -80,6 +84,7 @@ export interface MemberRow {
     SearchBoxComponent,
     BadgeComponent,
     IconComponent,
+    DialogComponent,
     CanDirective,
     SaveShortcutDirective,
     UppercaseDirective,
@@ -107,6 +112,11 @@ export class ServiceEditorPage {
   /** The id in the address bar, followed reactively: the router reuses this page when only `:id` changes (UAT B-05). */
   protected readonly serviceId = toSignal(this.route.paramMap.pipe(map((params) => params.get('id'))), { initialValue: this.route.snapshot.paramMap.get('id') });
   protected readonly isNew = computed(() => this.serviceId() === null);
+
+  /** The safe `?returnTo=` this page was opened with (a package opened from another package's members, LIS-CR-015 M2). */
+  private readonly returnTo = toSignal(this.route.queryParamMap.pipe(map((params) => safeReturnTo(params.get(RETURN_TO_PARAM)))), {
+    initialValue: safeReturnTo(this.route.snapshot.queryParamMap.get(RETURN_TO_PARAM)),
+  });
 
   /** Viewers (no create / edit right) see the service read-only (UAT B-12); the server decides regardless. */
   protected readonly canEdit = computed(() => this.access.can(this.isNew() ? CATALOGUE_A_PERMISSIONS.create : CATALOGUE_A_PERMISSIONS.edit));
@@ -151,6 +161,9 @@ export class ServiceEditorPage {
   protected readonly blocked = signal(false);
   protected readonly generalProblem = signal<ProblemDetails | null>(null);
   protected readonly membersProblem = signal<ProblemDetails | null>(null);
+  /** The member whose setup waits for the answer of the unsaved-changes dialog (LIS-CR-015 M2). */
+  protected readonly pendingSetup = signal<MemberRow | null>(null);
+  protected readonly leaveDialogOpen = signal(false);
 
   protected readonly tabs = computed<readonly TabItem[]>(() => [
     { id: 'general', label: this.i18n.t('catalogue-a.services.tab.general') },
@@ -379,7 +392,64 @@ export class ServiceEditorPage {
   }
 
   protected back(): void {
-    void this.router.navigate(['..'], { relativeTo: this.route });
+    const returnTo = this.returnTo();
+    void (returnTo !== null ? this.router.navigateByUrl(returnTo) : this.router.navigate(['..'], { relativeTo: this.route }));
+  }
+
+  /**
+   * LIS-CR-015 M2: opens the setup of a member — a test at `tests/<id>`, a package's member service at `services/<id>` — with
+   * `returnTo` = this page. Unsaved changes of the service ask first (save and open, open without saving, cancel).
+   */
+  protected openSetup(member: MemberRow): void {
+    if (this.hasUnsavedChanges()) {
+      this.pendingSetup.set(member);
+      this.leaveDialogOpen.set(true);
+      return;
+    }
+
+    void this.goToSetup(member);
+  }
+
+  /** Saves the service, then opens the member when the save went through; a refused save stays here with its problem. */
+  protected async saveAndOpenSetup(): Promise<void> {
+    const member = this.pendingSetup();
+    this.closeLeaveDialog();
+    if (member === null) {
+      return;
+    }
+
+    await this.save();
+    if (!this.hasUnsavedChanges()) {
+      await this.goToSetup(member);
+    }
+  }
+
+  /** Leaves the unsaved changes behind: the service is read again from the server on return. */
+  protected openSetupWithoutSaving(): void {
+    const member = this.pendingSetup();
+    this.closeLeaveDialog();
+    if (member !== null) {
+      void this.goToSetup(member);
+    }
+  }
+
+  protected closeLeaveDialog(): void {
+    this.leaveDialogOpen.set(false);
+    this.pendingSetup.set(null);
+  }
+
+  /** The address of a member's setup, relative to this page (mounted under `/catalogue` and `/admin/catalogue`). */
+  protected setupUrl(member: MemberRow): string {
+    const path = member.kind === 'Test' ? ['../..', 'tests', member.memberId] : ['..', member.memberId];
+    return this.router.createUrlTree(path, { relativeTo: this.route, queryParams: { [RETURN_TO_PARAM]: this.router.url } }).toString();
+  }
+
+  private hasUnsavedChanges(): boolean {
+    return this.canEdit() && (this.form.dirty || this.membersDirty());
+  }
+
+  private async goToSetup(member: MemberRow): Promise<void> {
+    await this.router.navigateByUrl(this.setupUrl(member));
   }
 
   private async create(): Promise<void> {

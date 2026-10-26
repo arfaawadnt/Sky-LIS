@@ -79,10 +79,11 @@ internal sealed class BillableVisitLookup(AppDbContext context) : IBillableVisit
     private const string ByBatch = VisitColumns + " WHERE v.tenant_id = {0} AND v.batch_id = {1} ORDER BY v.accession";
 
     private const string Lines = """
-        SELECT l.id, l.visit_id, l.service_id, l.status, l.list_price, l.discount, l.patient_share, l.payer_share
+        SELECT l.id, l.visit_id, l.service_id, l.status, l.list_price, l.discount, l.patient_share, l.payer_share,
+               l.kind, l.parent_line_id, l.visible_on_receipt
         FROM app.visit_lines l
         WHERE l.tenant_id = {0} AND l.visit_id = {1} AND l.status <> 'Cancelled'
-        ORDER BY l.id
+        ORDER BY l.sequence, l.id
         """;
 
     private const string BatchColumns = "SELECT b.id, b.number, b.kind, b.payer_id, b.contract_tier_id, b.sending_lab_id FROM app.batches b";
@@ -126,7 +127,7 @@ internal sealed class BillableVisitLookup(AppDbContext context) : IBillableVisit
     public async Task<IReadOnlyList<BillableLine>> LinesAsync(Guid visitId, CancellationToken cancellationToken)
     {
         var rows = await context.Database.SqlQueryRaw<LineRow>(Lines, context.CurrentTenantIdOrNil, visitId).ToListAsync(cancellationToken).ConfigureAwait(false);
-        return rows.Select(row => new BillableLine(row.Id, row.VisitId, row.ServiceId, row.Status, row.ListPrice, row.Discount, row.PatientShare, row.PayerShare)).ToList();
+        return rows.Select(row => new BillableLine(row.Id, row.VisitId, row.ServiceId, row.Status, row.ListPrice, row.Discount, row.PatientShare, row.PayerShare, row.Kind, row.ParentLineId, row.VisibleOnReceipt)).ToList();
     }
 
     public async Task<BillableBatch?> GetBatchAsync(Guid batchId, CancellationToken cancellationToken)
@@ -207,6 +208,12 @@ internal sealed class BillableVisitLookup(AppDbContext context) : IBillableVisit
         public decimal PatientShare { get; set; }
 
         public decimal PayerShare { get; set; }
+
+        public string Kind { get; set; } = string.Empty;
+
+        public Guid? ParentLineId { get; set; }
+
+        public bool VisibleOnReceipt { get; set; }
     }
 
     private sealed class BatchRow

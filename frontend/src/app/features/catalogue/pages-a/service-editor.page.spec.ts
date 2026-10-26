@@ -1,6 +1,6 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { Component, provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import type { FormControl, FormGroup } from '@angular/forms';
 import { Router, provideRouter } from '@angular/router';
@@ -34,7 +34,12 @@ interface ServiceEditorInternals {
   addMember(candidate: MemberCandidate): void;
   moveMember(index: number, offset: -1 | 1): void;
   save(): Promise<void>;
+  back(): void;
 }
+
+/** The test editor's place in the routes (LIS-CR-015 M2 opens it from a member row). */
+@Component({ selector: 'app-test-setup-stub', template: '' })
+class TestSetupStub {}
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -69,6 +74,7 @@ describe('ServiceEditorPage (CP-40)', () => {
               { path: ':id', providers: [ServiceEditorFacade, CatalogueAOptions], component: ServiceEditorPage },
             ],
           },
+          { path: 'catalogue/tests/:id', component: TestSetupStub },
         ]),
       ],
     });
@@ -316,5 +322,115 @@ describe('ServiceEditorPage (CP-40)', () => {
     TestBed.tick();
     expect(picker().querySelectorAll('optgroup').length).toBe(0);
     expect(Array.from(picker().querySelectorAll('option')).slice(1).map((option) => option.textContent?.trim())).toEqual(['SERUM · Serum', 'URINE · Urine', 'WSWAB · Wound swab']);
+  });
+
+  describe('LIS-CR-015 M2: the setup of a member from the members grid', () => {
+    const root = (): HTMLElement => harness.routeNativeElement as HTMLElement;
+    const openSetupButtons = (): HTMLButtonElement[] => Array.from(root().querySelectorAll<HTMLButtonElement>('table.grid button.open-setup'));
+    const dialog = (): HTMLElement | null => root().querySelector<HTMLElement>('.modal[role="dialog"]');
+    const dialogButton = (index: number): HTMLButtonElement | undefined => Array.from(dialog()?.querySelectorAll<HTMLButtonElement>('.foot .btn') ?? [])[index];
+
+    /** Never `whenStable()`: a page left with its reads pending (flushed or not) keeps the application busy. */
+    async function render(): Promise<void> {
+      TestBed.tick();
+      await settle();
+      await settle();
+      TestBed.tick();
+    }
+
+    async function openGlucose(): Promise<ServiceEditorInternals> {
+      const editor = await open('/catalogue/services/svc-1', service('svc-1', 'GLU'));
+      backend.match(`${CATALOGUE_A_API.sampleTypes}/s1`).forEach((request) => request.flush({ ...serum, conditions: [] }));
+      await render();
+      return editor;
+    }
+
+    it('opens a test member at tests/<id> with returnTo = this service, and back() honours a returnTo', async () => {
+      await openGlucose();
+      expect(openSetupButtons().length).toBe(1);
+      expect(openSetupButtons()[0]?.getAttribute('aria-label')).toContain('catalogue-a.services.member.openSetup');
+
+      openSetupButtons()[0]?.click();
+      await render();
+      expect(dialog()).toBeNull();
+      const router = TestBed.inject(Router);
+      expect(router.url).toBe('/catalogue/tests/t1?returnTo=%2Fcatalogue%2Fservices%2Fsvc-1');
+
+      // a package opened from another package's members goes back there
+      const editor = (await harness.navigateByUrl('/catalogue/services/svc-2?returnTo=%2Fcatalogue%2Fservices%2Fsvc-1', ServiceEditorPage)) as unknown as ServiceEditorInternals;
+      await render();
+      editor.back();
+      await render();
+      expect(router.url).toBe('/catalogue/services/svc-1');
+    });
+
+    it('opens a package member service at services/<id> and re-reads the service shown', async () => {
+      const pkg: ServiceDetail = {
+        ...service('pkg-1', 'CHECKUP'),
+        type: 'Package',
+        sampleTypeId: null,
+        members: [{ kind: 'Service', memberId: 'svc-2', code: 'LIPID', nameEn: 'Lipids', nameAr: 'دهون', memberType: 'Profile', isActive: true, order: 1, inSum: false, visible: true }],
+      };
+      await open('/catalogue/services/pkg-1', pkg);
+      backend.match((request) => request.url === CATALOGUE_A_API.lookupServices).forEach((request) => request.flush(page([])));
+      await render();
+
+      openSetupButtons()[0]?.click();
+      await render();
+      expect(TestBed.inject(Router).url).toBe('/catalogue/services/svc-2?returnTo=%2Fcatalogue%2Fservices%2Fpkg-1');
+      backend.expectOne(`${CATALOGUE_A_API.services}/svc-2`).flush(service('svc-2', 'LIPID'));
+    });
+
+    it('asks first when the service has unsaved changes: cancel stays, open without saving leaves without a save', async () => {
+      const editor = await openGlucose();
+      editor.form.controls.shortName.setValue('Glucose fasting');
+      editor.form.markAsDirty();
+
+      openSetupButtons()[0]?.click();
+      await render();
+      expect(dialog()?.textContent).toContain('catalogue-a.services.openSetup.message');
+      expect(dialogButton(0)?.textContent).toContain('catalogue-a.services.openSetup.cancel');
+      expect(dialogButton(1)?.textContent).toContain('catalogue-a.services.openSetup.discard');
+      expect(dialogButton(2)?.textContent).toContain('catalogue-a.services.openSetup.save');
+
+      dialogButton(0)?.click();
+      await render();
+      expect(dialog()).toBeNull();
+      const router = TestBed.inject(Router);
+      expect(router.url).toBe('/catalogue/services/svc-1');
+
+      openSetupButtons()[0]?.click();
+      await render();
+      dialogButton(1)?.click();
+      await render();
+      backend.expectNone((request) => request.method === 'PUT');
+      expect(router.url).toBe('/catalogue/tests/t1?returnTo=%2Fcatalogue%2Fservices%2Fsvc-1');
+    });
+
+    it('save and open saves the service first, and stays when the save is refused', async () => {
+      const editor = await openGlucose();
+      editor.form.controls.shortName.setValue('Glucose fasting');
+      editor.form.markAsDirty();
+      const router = TestBed.inject(Router);
+
+      openSetupButtons()[0]?.click();
+      await render();
+      dialogButton(2)?.click();
+      await settle();
+      const refused: ProblemDetails = { type: 'about:blank', title: 'Refused', status: 422, code: 'CAT-035', traceId: null, correlationId: null, errors: null };
+      backend.expectOne((request) => request.method === 'PUT' && request.url === `${CATALOGUE_A_API.services}/svc-1`).flush(refused, { status: 422, statusText: 'Unprocessable Entity' });
+      await render();
+      expect(router.url).toBe('/catalogue/services/svc-1');
+
+      openSetupButtons()[0]?.click();
+      await render();
+      dialogButton(2)?.click();
+      await settle();
+      const put = backend.expectOne((request) => request.method === 'PUT' && request.url === `${CATALOGUE_A_API.services}/svc-1`);
+      expect(put.request.body).toEqual(expect.objectContaining({ shortName: 'Glucose fasting' }));
+      put.flush(null, { status: 204, statusText: 'No Content' });
+      await render();
+      expect(router.url).toBe('/catalogue/tests/t1?returnTo=%2Fcatalogue%2Fservices%2Fsvc-1');
+    });
   });
 });

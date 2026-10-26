@@ -40,6 +40,9 @@ internal sealed class LabTestRepository(AppDbContext context) : Repository<LabTe
         return rows.Select(row => new LabTestFormulaNode(row.Id, row.Code, row.IsActive, row.FormulaReferences)).ToList();
     }
 
+    public Task<IReadOnlyList<FormulaOperandTestRead>> FormulaOperandTestsAsync(IReadOnlyCollection<string> codes, CancellationToken cancellationToken) =>
+        FormulaOperandQueries.TestsAsync(Context, codes, cancellationToken);
+
     public async Task<Paged<LabTestListItem>> ListAsync(LabTestListFilter filter, PageRequest page, CancellationToken cancellationToken)
     {
         var query = Filtered(filter);
@@ -95,6 +98,7 @@ internal sealed class LabTestRepository(AppDbContext context) : Repository<LabTe
             timing,
             test.FormulaExpression,
             test.FormulaReferences,
+            test.FormulaOperands.Select(operand => new FormulaOperandItem(operand.TestCode, operand.ServiceId, operand.VisibleOnReceipt)).ToList(),
             test.RangeBands.OrderBy(band => band.DisplayOrder).Select(band => new RangeBandItem(
                 band.Sex.ToString(),
                 band.AgeFrom,

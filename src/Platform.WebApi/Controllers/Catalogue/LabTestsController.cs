@@ -83,7 +83,7 @@ public sealed class LabTestsController(ISender sender) : ControllerBase
     public async Task<IActionResult> SetFormula(Guid id, [FromBody] SetFormulaRequest body, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
-        await sender.Send(new SetLabTestFormulaCommand(id, body.Expression), cancellationToken);
+        await sender.Send(new SetLabTestFormulaCommand(id, body.Expression, body.Operands), cancellationToken);
         return NoContent();
     }
 

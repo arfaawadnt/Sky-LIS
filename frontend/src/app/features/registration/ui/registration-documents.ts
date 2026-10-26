@@ -164,8 +164,8 @@ export class RegistrationLabelsDocument {
         <tbody>
           @for (line of doc.lines; track line.lineId) {
             <tr>
-              <td>{{ line.kind === 'PackageMember' ? '↳ ' : '' }}{{ line.code }}</td>
-              <td>{{ name(line.nameEn, line.nameAr) }}</td>
+              <td>{{ line.kind === 'PackageMember' || line.kind === 'FormulaOperand' ? '↳ ' : '' }}{{ line.code }}</td>
+              <td>{{ name(line.nameEn, line.nameAr) }}@if (line.formulaServiceCode) { · {{ i18n.tf('registration.forFormula', { code: line.formulaServiceCode }) }}}</td>
               <td>{{ line.unitCode ?? '' }}</td>
               <td>{{ line.sampleNumber ?? '' }}</td>
               <td>{{ expected(line.expectedResultAtUtc) }}</td>
@@ -286,9 +286,12 @@ export class JobOrderDocumentComponent {
         <tbody>
           @for (line of doc.lines; track line.serviceId) {
             <tr>
-              <td>{{ line.code }}</td>
+              <td>{{ line.formulaServiceCode ? '↳ ' : '' }}{{ line.code }}</td>
               <td>
                 {{ name(line.nameEn, line.nameAr) }}
+                @if (line.formulaServiceCode) {
+                  <div style="font-size:0.9em;">{{ i18n.tf('registration.forFormula', { code: line.formulaServiceCode }) }}</div>
+                }
                 @if (line.precaution) {
                   <div style="font-size:0.9em;">{{ line.precaution }}</div>
                 }

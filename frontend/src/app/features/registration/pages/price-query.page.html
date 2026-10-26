@@ -59,9 +59,12 @@
       <tbody>
         @for (line of lines(); track line.serviceId) {
           <tr>
-            <td class="mono">{{ line.code }}</td>
+            <td class="mono">{{ line.formulaServiceCode ? '↳ ' : '' }}{{ line.code }}</td>
             <td>
               {{ name(line.nameEn, line.nameAr) }}
+              @if (line.formulaServiceCode) {
+                <app-badge tone="info" [attr.data-formula]="line.serviceId">{{ i18n.tf('registration.forFormula', { code: line.formulaServiceCode }) }}</app-badge>
+              }
               @if (line.alertCondition) {
                 <span class="hint warn">{{ line.alertCondition }}</span>
               }
@@ -82,7 +85,9 @@
               }
             </td>
             <td>
-              <button type="button" class="icon-btn" [attr.aria-label]="i18n.tf('registration.removeLine', { code: line.code })" (click)="facade.removeLine(line.serviceId)"><app-icon name="x" [size]="15" /></button>
+              @if (!line.formulaServiceCode) {
+                <button type="button" class="icon-btn" [attr.aria-label]="i18n.tf('registration.removeLine', { code: line.code })" (click)="facade.removeLine(line.serviceId)"><app-icon name="x" [size]="15" /></button>
+              }
             </td>
           </tr>
         }

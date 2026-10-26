@@ -4,7 +4,8 @@ export type { Paged } from './paging';
 
 export type VisitStatus = 'Open' | 'Completed';
 export type VisitLineStatus = 'Ordered' | 'Reserved' | 'Cancelled';
-export type VisitLineKind = 'Service' | 'Package' | 'PackageMember';
+/** `FormulaOperand` (LIS-CR-015): a service ordered for a test a formula reads; price 0, listed under its formula line. */
+export type VisitLineKind = 'Service' | 'Package' | 'PackageMember' | 'FormulaOperand';
 export type DiscountKind = 'Amount' | 'Percent';
 
 export const VISIT_STATUSES: readonly VisitStatus[] = ['Open', 'Completed'];
@@ -114,12 +115,16 @@ export interface OrderLinePreview {
   readonly expectedResultAtUtc: string | null;
   readonly precaution: string | null;
   readonly alertCondition: string | null;
-  readonly origin: 'Manual' | 'Rule' | 'Diagnosis';
+  readonly origin: 'Manual' | 'Rule' | 'Diagnosis' | 'Formula';
   readonly addedByRuleId: string | null;
   readonly ruleNameEn: string | null;
   readonly ruleNameAr: string | null;
   readonly tubeKey: string | null;
   readonly members: readonly OrderLinePreview[];
+  /** The code of the formula's service a `FormulaOperand` line is ordered for. */
+  readonly formulaServiceCode?: string | null;
+  /** False when the line will not print on the receipt (formula operand setup, LIS-CR-015 M3c). */
+  readonly visibleOnReceipt?: boolean;
 }
 
 export interface TubePreview {
@@ -313,6 +318,8 @@ export interface VisitLineItem {
   readonly cancellationReason: string | null;
   readonly cancelledByName: string | null;
   readonly cancelledAtUtc: string | null;
+  /** False for a formula operand line kept off the receipt (LIS-CR-015 M3c). */
+  readonly visibleOnReceipt?: boolean;
 }
 
 export interface VisitTubeItem {
@@ -484,6 +491,8 @@ export interface JobOrderLine {
   readonly sampleTypeNameEn: string | null;
   readonly sampleTypeNameAr: string | null;
   readonly expectedResultAtUtc: string | null;
+  /** The code of the formula's service a `FormulaOperand` line is ordered for. */
+  readonly formulaServiceCode?: string | null;
 }
 
 export interface JobOrderDocument {
@@ -532,6 +541,9 @@ export interface PriceQuoteDocumentLine {
   readonly expectedResultAtUtc: string | null;
   readonly precaution: string | null;
   readonly alertCondition: string | null;
+  readonly kind?: VisitLineKind;
+  /** The code of the formula's service a `FormulaOperand` line is ordered for (price 0). */
+  readonly formulaServiceCode?: string | null;
 }
 
 export interface PriceQuoteDocument {

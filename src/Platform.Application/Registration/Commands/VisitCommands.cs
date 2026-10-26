@@ -125,7 +125,8 @@ public sealed class RegisterVisitHandler(
     IReferenceNumbers numbers,
     IUnitOfWork unitOfWork,
     ICurrentUser user,
-    IClock clock) : ICommandHandler<RegisterVisitCommand, VisitRegisteredResponse>
+    IClock clock,
+    IFormulaOperandLookup formulas) : ICommandHandler<RegisterVisitCommand, VisitRegisteredResponse>
 {
     public async Task<VisitRegisteredResponse> Handle(RegisterVisitCommand command, CancellationToken cancellationToken)
     {
@@ -141,7 +142,7 @@ public sealed class RegisterVisitHandler(
             booking.EnsureConvertibleFor(command.PatientId);
         }
 
-        var registrar = new VisitRegistrar(new RegistrarPorts(visits, patients, payers, doctors, catalogue, rules, prices, settings, privileges, numbers));
+        var registrar = new VisitRegistrar(new RegistrarPorts(visits, patients, payers, doctors, catalogue, rules, prices, settings, privileges, numbers, formulas));
         var (visit, plan) = await registrar.RegisterAsync(
             new VisitRegistrationInput(
                 command.PatientId,
@@ -199,7 +200,8 @@ public sealed class AddVisitLinesHandler(
     IReferenceNumbers numbers,
     IUnitOfWork unitOfWork,
     ICurrentUser user,
-    IClock clock) : ICommandHandler<AddVisitLinesCommand, VisitLinesAddedResponse>
+    IClock clock,
+    IFormulaOperandLookup formulas) : ICommandHandler<AddVisitLinesCommand, VisitLinesAddedResponse>
 {
     public async Task<VisitLinesAddedResponse> Handle(AddVisitLinesCommand command, CancellationToken cancellationToken)
     {
@@ -213,7 +215,7 @@ public sealed class AddVisitLinesHandler(
         }
 
         var patient = await patients.GetAsync(visit.PatientId, cancellationToken);
-        var planner = new OrderPlanner(catalogue, rules, prices, visits);
+        var planner = new OrderPlanner(catalogue, rules, prices, visits, formulas);
         var plan = await planner.PlanAsync(
             new OrderContext(
                 patient is null ? null : new OrderPatient(patient.Id, patient.Gender),
@@ -240,7 +242,7 @@ public sealed class AddVisitLinesHandler(
 
         visit.AddLines(items, answers, samples, actor, now);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new VisitLinesAddedResponse(items.Count, visit.Tubes.Count - tubesBefore, plan.Warnings);
+        return new VisitLinesAddedResponse(items.Count(item => item.Kind != VisitLineKind.FormulaOperand), visit.Tubes.Count - tubesBefore, plan.Warnings);   // operand lines follow their formula (LIS-CR-015)
     }
 }
 

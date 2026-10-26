@@ -16,22 +16,25 @@ public enum VisitLineStatus
 }
 
 /// <summary>
-/// What a line stands for: an ordered service, a package (one price, several services) or one member service of a
-/// package (price 0; carries the tube and the tests of that member, intake Q2).
+/// What a line stands for: an ordered service, a package (one price, several services), one member service of a
+/// package (price 0; carries the tube and the tests of that member, intake Q2) or a service ordered for an operand of a
+/// formula test (LIS-CR-015; price 0, follows its formula line).
 /// </summary>
 public enum VisitLineKind
 {
     Service = 0,
     Package = 1,
     PackageMember = 2,
+    FormulaOperand = 3,
 }
 
-/// <summary>Why a line is on the visit: typed by the clerk, added by a test rule, or added by the visit's diagnosis.</summary>
+/// <summary>Why a line is on the visit: typed by the clerk, added by a test rule, added by the visit's diagnosis, or added for a formula (LIS-CR-015).</summary>
 public enum VisitLineOrigin
 {
     Manual = 0,
     Rule = 1,
     Diagnosis = 2,
+    Formula = 3,
 }
 
 /// <summary>Where the patient was registered (CP-06 location type; R1 has no hospital locations).</summary>

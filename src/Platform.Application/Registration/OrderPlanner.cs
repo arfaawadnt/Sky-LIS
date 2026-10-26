@@ -31,14 +31,15 @@ public sealed record OrderContext(
     bool ForQuote = false,
     IReadOnlyDictionary<Guid, string>? ExistingTests = null);
 
-/// <summary>A planned line: the domain item plus what the screen shows about it.</summary>
+/// <summary>A planned line: the domain item plus what the screen shows about it (for a formula operand, the code of its formula's service, LIS-CR-015).</summary>
 public sealed record PlannedLine(
     VisitOrderItem Item,
     bool Priced,
     string? Precaution,
     string? AlertCondition,
     string? RuleNameEn,
-    string? RuleNameAr);
+    string? RuleNameAr,
+    string? FormulaServiceCode = null);
 
 /// <summary>The outcome of planning: lines to order, refusals, warnings and the preparation questions that apply.</summary>
 public sealed record OrderPlan(
@@ -81,9 +82,9 @@ public sealed record OrderPlan(
 /// The order planner shared by every entry path (walk-in, saved visit, booking conversion, batch members) and by the dry
 /// run and the price quote: catalogue resolution, diagnosis sets, test rules, contract prices (BR-06), gender restriction,
 /// duplicates (INV-REG-002), frequency check (BR-12), contract alerts, precautions, expected result dates (BR-13), tube
-/// specs (BR-02) and preparation questions. Reads only (ports); constructed by the handlers.
+/// specs (BR-02), formula operands (LIS-CR-015) and preparation questions. Reads only (ports); constructed by the handlers.
 /// </summary>
-public sealed class OrderPlanner(ICatalogueLookup catalogue, IOrderRulesLookup rules, IPriceLookup prices, IVisitRepository visits)
+public sealed class OrderPlanner(ICatalogueLookup catalogue, IOrderRulesLookup rules, IPriceLookup prices, IVisitRepository visits, IFormulaOperandLookup formulas)
 {
     private enum Origin
     {
@@ -238,13 +239,171 @@ public sealed class OrderPlanner(ICatalogueLookup catalogue, IOrderRulesLookup r
             }
         }
 
-        // 8. preparation questions for every planned service (members included)
-        var preparationIds = kept.SelectMany(entry => entry.Line.Item.AllServiceIds).Distinct().ToList();
+        // 8. formula operands (LIS-CR-015): each listed under the line whose formula reads it, price 0
+        var lines = await WithFormulaOperandsAsync([.. kept.Select(entry => entry.Line)], services, tests, groups, sampleTypes, context, warnings, cancellationToken);
+
+        // 9. preparation questions for every planned service (members and formula operands included)
+        var preparationIds = lines.SelectMany(line => line.Item.AllServiceIds).Distinct().ToList();
         var preparations = preparationIds.Count == 0
             ? []
             : await rules.PreparationsForAsync(preparationIds, PreparationGenderOf(context.Patient?.Gender), cancellationToken);
 
-        return new OrderPlan([.. kept.Select(entry => entry.Line)], issues, warnings, preparations);
+        return new OrderPlan(lines, issues, warnings, preparations);
+    }
+
+    /// <summary>
+    /// LIS-CR-015 M3b: for every formula test of a planned line (a test service, a profile, or a package's member service), the
+    /// service the laboratory chose for each test the formula reads (<see cref="IFormulaOperandLookup"/>) is ordered as a
+    /// <see cref="VisitLineKind.FormulaOperand"/> line at price 0 under that line, unless a live line of the visit or of this
+    /// order already carries the test (package members included). One operand service is ordered once, for the first formula
+    /// that needs it. These lines never meet the duplicate, unpriced, repeated-test or frequency checks: they are not the
+    /// clerk's order. A chosen service that is unknown, inactive, not orderable or restricted for the patient's gender is
+    /// skipped with REG-207. The operand lines follow their top-level line in the returned list.
+    /// </summary>
+    private async Task<List<PlannedLine>> WithFormulaOperandsAsync(
+        List<PlannedLine> kept,
+        Dictionary<Guid, CatalogueServiceInfo> services,
+        Dictionary<Guid, CatalogueTestInfo> tests,
+        Dictionary<Guid, CatalogueClinicalGroupInfo> groups,
+        Dictionary<Guid, CatalogueSampleTypeInfo> sampleTypes,
+        OrderContext context,
+        List<OrderWarning> warnings,
+        CancellationToken cancellationToken)
+    {
+        // the lines that may carry a formula: each top-level service and each member service of a package
+        var carriers = new Dictionary<Guid, (VisitOrderItem Top, VisitOrderItem Carrier)>();
+        foreach (var top in kept.Select(line => line.Item))
+        {
+            foreach (var carrier in top.Kind == VisitLineKind.Package ? top.Members : [top])
+            {
+                carriers.TryAdd(carrier.ServiceId, (top, carrier));
+            }
+        }
+
+        var operands = carriers.Count == 0
+            ? []
+            : (await formulas.ForServicesAsync([.. carriers.Keys], cancellationToken))
+                .Where(operand => operand.OperandServiceId is { } id && id != Guid.Empty && carriers.ContainsKey(operand.ServiceId))
+                .Where(operand => !tests.TryGetValue(operand.FormulaTestId, out var formulaTest) || formulaTest.IsActive)
+                .ToList();
+        if (operands.Count == 0)
+        {
+            return kept;
+        }
+
+        await LoadOperandCatalogueAsync(operands, services, tests, groups, sampleTypes, cancellationToken);
+
+        var carried = new HashSet<Guid>(context.ExistingTests?.Keys ?? []);
+        var ordered = new HashSet<Guid>(context.ExistingServiceIds);
+        foreach (var item in kept.Select(line => line.Item))
+        {
+            ordered.UnionWith(item.AllServiceIds);
+            carried.UnionWith(item.Members.Prepend(item).SelectMany(part => part.TestIds));
+        }
+
+        var added = new Dictionary<Guid, List<PlannedLine>>();
+        foreach (var operand in operands)
+        {
+            var serviceId = operand.OperandServiceId!.Value;
+            if (carried.Contains(operand.OperandTestId) || ordered.Contains(serviceId))
+            {
+                continue;   // the test is already on the visit or in this order
+            }
+
+            var (top, carrier) = carriers[operand.ServiceId];
+            if (!services.TryGetValue(serviceId, out var service))
+            {
+                continue;
+            }
+
+            var refusal = OperandRefusal(service, tests, context);
+            if (refusal is not null)
+            {
+                warnings.Add(Warning(RegistrationCodes.WarningSkippedCompanion, service, $"'{service.Code}' cannot be ordered for the formula of '{carrier.ServiceCode}' ({operand.OperandTestCode}): {refusal}", null));
+                continue;
+            }
+
+            var item = Single(service, tests, groups, sampleTypes, null, top.Reserved, VisitLineOrigin.Formula, null, context, VisitLineKind.FormulaOperand)
+                with { FormulaServiceId = carrier.ServiceId, VisibleOnReceipt = operand.VisibleOnReceipt };
+            ordered.Add(serviceId);
+            carried.UnionWith(item.TestIds);
+            carried.Add(operand.OperandTestId);
+            if (!added.TryGetValue(top.ServiceId, out var under))
+            {
+                added[top.ServiceId] = under = [];
+            }
+
+            under.Add(new PlannedLine(item, true, Blank(service.Precaution), null, null, null, carrier.ServiceCode));
+        }
+
+        return [.. kept.SelectMany(line => added.TryGetValue(line.Item.ServiceId, out var under) ? under.Prepend(line) : [line])];
+    }
+
+    /// <summary>Why a service chosen for a formula operand cannot be ordered (null when it can).</summary>
+    private static string? OperandRefusal(CatalogueServiceInfo service, Dictionary<Guid, CatalogueTestInfo> tests, OrderContext context)
+    {
+        if (!service.IsActive || !service.IsOrderable || service.Type is ServiceType.Package or ServiceType.Additional)
+        {
+            return "it is inactive or not orderable.";
+        }
+
+        if (context.Patient is { } patient)
+        {
+            var gender = GenderOf(patient.Gender);
+            if (!Allows(service.Gender, gender) || service.TestIds.Any(testId => tests.TryGetValue(testId, out var test) && !Allows(test.Gender, gender)))
+            {
+                return $"it cannot be ordered for a {patient.Gender.ToLowerInvariant()} patient.";
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The catalogue rows the operand services need (service, tests, clinical group, sample type) that the plan has not read yet.</summary>
+    private async Task LoadOperandCatalogueAsync(
+        IReadOnlyList<CatalogueFormulaOperandInfo> operands,
+        Dictionary<Guid, CatalogueServiceInfo> services,
+        Dictionary<Guid, CatalogueTestInfo> tests,
+        Dictionary<Guid, CatalogueClinicalGroupInfo> groups,
+        Dictionary<Guid, CatalogueSampleTypeInfo> sampleTypes,
+        CancellationToken cancellationToken)
+    {
+        var serviceIds = operands.Select(operand => operand.OperandServiceId!.Value).Where(id => !services.ContainsKey(id)).Distinct().ToList();
+        if (serviceIds.Count > 0)
+        {
+            foreach (var service in await catalogue.GetServicesAsync(serviceIds, cancellationToken))
+            {
+                services[service.Id] = service;
+            }
+        }
+
+        var chosen = operands.Select(operand => operand.OperandServiceId!.Value).Distinct().Where(services.ContainsKey).Select(id => services[id]).ToList();
+        var testIds = chosen.SelectMany(service => service.TestIds).Where(id => !tests.ContainsKey(id)).Distinct().ToList();
+        if (testIds.Count > 0)
+        {
+            foreach (var test in await catalogue.GetTestsAsync(testIds, cancellationToken))
+            {
+                tests[test.Id] = test;
+            }
+        }
+
+        var groupIds = chosen.Where(service => service.ClinicalGroupId is { } id && !groups.ContainsKey(id)).Select(service => service.ClinicalGroupId!.Value).Distinct().ToList();
+        if (groupIds.Count > 0)
+        {
+            foreach (var group in await catalogue.GetClinicalGroupsAsync(groupIds, cancellationToken))
+            {
+                groups[group.Id] = group;
+            }
+        }
+
+        var typeIds = chosen.Where(service => service.SampleTypeId is { } id && !sampleTypes.ContainsKey(id)).Select(service => service.SampleTypeId!.Value).Distinct().ToList();
+        if (typeIds.Count > 0)
+        {
+            foreach (var type in await catalogue.GetSampleTypesAsync(typeIds, cancellationToken))
+            {
+                sampleTypes[type.Id] = type;
+            }
+        }
     }
 
     private static OrderIssue? Check(
@@ -489,6 +648,11 @@ public sealed class OrderPlanner(ICatalogueLookup catalogue, IOrderRulesLookup r
         }
 
         var condition = service.SampleConditionId is { } conditionId ? sampleType.Conditions.FirstOrDefault(candidate => candidate.Id == conditionId) : null;
+
+        // LIS-CR-015 M4: a compatible condition may join the tube of its active target (same type; the planner decides when)
+        var mergesInto = condition?.MergesIntoConditionId is { } targetId && sampleType.Conditions.Any(candidate => candidate.Id == targetId && candidate.IsActive && candidate.MergesIntoConditionId is null)
+            ? targetId
+            : (Guid?)null;
         return new TubeSpec(
             groupId,
             typeId,
@@ -499,7 +663,8 @@ public sealed class OrderPlanner(ICatalogueLookup catalogue, IOrderRulesLookup r
             sampleType.NameEn,
             sampleType.NameAr,
             condition?.NameEn,
-            condition?.NameAr);
+            condition?.NameAr,
+            mergesInto);
     }
 
     private async Task CheckFrequencyAsync(

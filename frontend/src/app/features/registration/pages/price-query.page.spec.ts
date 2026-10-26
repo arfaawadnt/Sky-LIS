@@ -136,4 +136,38 @@ describe('PriceQueryPage (CP-12, WF-10)', () => {
     expect(pending?.textContent).toContain('HCG: ');
     expect(pending?.textContent).not.toContain('registration.services.notPlanned');
   });
+
+  it('lists the service ordered for a formula operand at 0 under its formula, tagged and not removable (LIS-CR-015)', async () => {
+    harness = await RouterTestingHarness.create();
+    const page = (await harness.navigateByUrl('/registration/price-query', PriceQueryPage)) as unknown as PriceQueryPageInternals;
+    await tick();
+    backend.expectOne((request) => request.url === PRICING_API.tierOptions).flush([cashTier]);
+    await tick();
+
+    page.onAdded([{ serviceId: 's-gfr', code: 'GFR', nameEn: 'eGFR', nameAr: '' }]);
+    await tick();
+    const base = { type: 'Test', priced: true, expectedResultAtUtc: null, precaution: null, alertCondition: null, nameAr: '' };
+    backend.expectOne(REGISTRATION_API.quote).flush({
+      ...quote,
+      lines: [
+        { ...base, serviceId: 's-gfr', code: 'GFR', nameEn: 'eGFR', listPrice: 100, patientShare: 100, payerShare: 0, kind: 'Service', formulaServiceCode: null },
+        { ...base, serviceId: 's-crea', code: 'CREA', nameEn: 'Creatinine', listPrice: 0, patientShare: 0, payerShare: 0, kind: 'FormulaOperand', formulaServiceCode: 'GFR' },
+      ],
+      totalListPrice: 100,
+      totalPatientShare: 100,
+      totalPayerShare: 0,
+      preparations: [],
+      issues: [],
+    } satisfies PriceQuoteDocument);
+    await tick();
+    harness.detectChanges();
+
+    const rows = harness.routeNativeElement!.querySelectorAll('table.lines tbody tr');
+    expect(rows.length).toBe(2);
+    expect(rows[1]?.textContent).toContain('↳ CREA');
+    expect(rows[1]?.textContent).toContain('registration.forFormula');
+    expect(rows[1]?.textContent).toContain('0.00');
+    expect(rows[1]?.querySelector('button.icon-btn')).toBeNull();
+    expect(rows[0]?.querySelector('button.icon-btn')).not.toBeNull();
+  });
 });

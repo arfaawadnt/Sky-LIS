@@ -277,16 +277,28 @@ public sealed class ReplaceListValuesHandler(ILabTestRepository tests, IUnitOfWo
     }
 }
 
-/// <summary>T17: an empty expression clears the formula.</summary>
+/// <summary>
+/// T17: an empty expression clears the formula. <paramref name="Operands"/> (LIS-CR-015): the service ordered for each referenced
+/// test and its receipt flag; null keeps the stored choices, a missing reference takes its default service (CAT-067 for a service
+/// that does not carry the test).
+/// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Edit)]
-public sealed record SetLabTestFormulaCommand(Guid TestId, string? Expression) : ICommand;
+public sealed record SetLabTestFormulaCommand(Guid TestId, string? Expression, IReadOnlyList<FormulaOperandItem>? Operands = null) : ICommand;
 
 public sealed class SetLabTestFormulaValidator : AbstractValidator<SetLabTestFormulaCommand>
 {
+    /// <summary>More operands than a formula of the maximum length could reference are refused before any read.</summary>
+    public const int MaxOperands = 200;
+
     public SetLabTestFormulaValidator()
     {
         RuleFor(command => command.TestId).NotEmpty();
         RuleFor(command => command.Expression).MaximumLength(LabTest.MaxFormulaLength);
+        RuleFor(command => command.Operands!.Count).LessThanOrEqualTo(MaxOperands).When(command => command.Operands is not null).OverridePropertyName("operands");
+        RuleForEach(command => command.Operands).ChildRules(operand =>
+        {
+            operand.RuleFor(item => item.TestCode).NotEmpty().MaximumLength(LabTest.MaxCodeLength);
+        }).When(command => command.Operands is not null);
     }
 }
 
@@ -314,7 +326,10 @@ public sealed class SetLabTestFormulaHandler(ILabTestRepository tests, IFormulaE
                 throw new DomainException(verdict.Code!, verdict.Message!, DomainFault.Validation);
             }
 
-            test.SetFormula(verdict.Normalized, verdict.References, clock.UtcNow);
+            var operandTests = await tests.FormulaOperandTestsAsync(verdict.References.ToList(), cancellationToken);
+            var given = command.Operands?.Select(item => new FormulaOperand(item.TestCode, item.ServiceId, item.VisibleOnReceipt)).ToList()
+                ?? [.. test.FormulaOperands];
+            test.SetFormula(verdict.Normalized, verdict.References, given, operandTests.Select(read => read.Choices).ToList(), clock.UtcNow);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);

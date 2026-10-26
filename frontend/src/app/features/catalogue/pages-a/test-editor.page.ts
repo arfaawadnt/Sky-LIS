@@ -1,5 +1,5 @@
 import { Location } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { type AbstractControl, FormArray, FormControl, FormGroup, ReactiveFormsModule, type ValidationErrors, type ValidatorFn, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -12,6 +12,8 @@ import {
   LAB_TEST_TYPES,
   RANGE_AGE_UNITS,
   TEST_CONFIGURATION,
+  type FormulaOperandChoice,
+  type FormulaOperandItem,
   type FrequencyCheckAction,
   type GenderRestriction,
   type LabTestDetail,
@@ -46,6 +48,7 @@ import { FormFieldComponent } from '../../../shared/ui/form-field/form-field.com
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { LocalizedTextInputComponent } from '../../../shared/ui/localized-text-input/localized-text-input.component';
 import { type Breadcrumb, PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
+import { RETURN_TO_PARAM, returnToPath, safeReturnTo } from '../../../shared/ui/return-link/return-link.component';
 import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.component';
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { type TabItem, TabsComponent } from '../../../shared/ui/tabs/tabs.component';
@@ -53,6 +56,8 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { daysToMask, maskToDays, numberOrNull, testGeneralOf, textOrNull } from '../data-a/catalogue-a.mapping';
 import { CatalogueAOptions, type CatalogueOption, optionLabel } from '../state-a/catalogue-a-options';
 import { TestEditorFacade } from '../state-a/test-editor.facade';
+import { type FormulaOperandRow, FormulaOperandsComponent, formulaOperandItems, formulaOperandRows } from '../ui-a/formula-operands.component';
+import { type FormulaTool, FormulaToolsComponent, applyFormulaTool } from '../ui-a/formula-tools.component';
 
 type Section = 'general' | 'ranges' | 'values' | 'formula' | 'paragraphs' | 'timing';
 
@@ -110,6 +115,8 @@ const COLOUR = /^#[0-9A-Fa-f]{6}$/;
     CanDirective,
     SaveShortcutDirective,
     UppercaseDirective,
+    FormulaToolsComponent,
+    FormulaOperandsComponent,
   ],
   templateUrl: './test-editor.page.html',
   styleUrl: './catalogue-editor.css',
@@ -137,6 +144,11 @@ export class TestEditorPage {
 
   /** The id in the address bar, followed reactively: the router reuses this page when only `:id` changes (UAT B-05). */
   private readonly routeId = toSignal(this.route.paramMap.pipe(map((params) => params.get('id'))), { initialValue: this.route.snapshot.paramMap.get('id') });
+
+  /** The safe `?returnTo=` this page was opened with (a test opened from a service's members, LIS-CR-015 M2): back() and the breadcrumb go there. */
+  private readonly returnTo = toSignal(this.route.queryParamMap.pipe(map((params) => safeReturnTo(params.get(RETURN_TO_PARAM)))), {
+    initialValue: safeReturnTo(this.route.snapshot.queryParamMap.get(RETURN_TO_PARAM)),
+  });
 
   /** A test created here whose configuration was partly refused: the page continues as its editor and keeps the input (UAT B-04). */
   private readonly createdId = signal<string | null>(null);
@@ -184,6 +196,11 @@ export class TestEditorPage {
   protected readonly values = new FormArray<ValueForm>([]);
   protected readonly paragraphs = new FormArray<ParagraphForm>([]);
   protected readonly formula = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(1000)] });
+  private readonly formulaInput = viewChild<ElementRef<HTMLTextAreaElement>>('formulaInput');
+
+  /** LIS-CR-015: one row per referenced test — the service ordered for it at registration and its receipt flag; saved with the formula. */
+  protected readonly operandRows = signal<readonly FormulaOperandRow[]>([]);
+  protected readonly operandsDirty = signal(false);
 
   /** The forms as a new test starts: restored when the page goes back to "new" without being rebuilt (UAT R1-07). */
   private readonly blankGeneral = this.general.getRawValue();
@@ -247,10 +264,18 @@ export class TestEditorPage {
     return detail === null ? this.i18n.t('catalogue-a.tests.new') : `${detail.code} · ${localizedPick({ en: detail.nameEn, ar: detail.nameAr }, this.i18n.lang())}`;
   });
 
-  protected readonly crumbs = computed<readonly Breadcrumb[]>(() => [
-    { label: this.i18n.t('catalogue-a.tests.title'), path: this.router.createUrlTree(['..'], { relativeTo: this.route }).toString() },
-    { label: this.detail()?.code ?? this.i18n.t('catalogue-a.tests.new'), path: null },
-  ]);
+  protected readonly crumbs = computed<readonly Breadcrumb[]>(() => {
+    const list: Breadcrumb = { label: this.i18n.t('catalogue-a.tests.title'), path: this.router.createUrlTree(['..'], { relativeTo: this.route }).toString() };
+    const current: Breadcrumb = { label: this.detail()?.code ?? this.i18n.t('catalogue-a.tests.new'), path: null };
+    // LIS-CR-015 M2: opened from a service's members, the first crumb leads back there (its path; back() keeps the whole address)
+    const origin = returnToPath(this.returnTo());
+    if (origin === null) {
+      return [list, current];
+    }
+
+    const label = this.i18n.t(/\/services\/[^/]+$/.test(origin) ?'catalogue-a.tests.return.service' : 'catalogue-a.back');
+    return [{ label, path: origin }, list, current];
+  });
 
   protected readonly groupOptions = computed(() => selectable(this.options.groups.hasValue() ? this.options.groups.value() : [], this.detail()?.clinicalGroupId ?? null));
   protected readonly sampleTypeOptions = computed(() => selectable(this.options.sampleTypes.hasValue() ? this.options.sampleTypes.value() : [], this.detail()?.sampleTypeId ?? null));
@@ -446,6 +471,7 @@ export class TestEditorPage {
 
     if (result.valid) {
       this.verdict.set({ valid: true, text: this.i18n.tf('catalogue-a.tests.formula.valid', { normalized: result.normalized ?? '', references: result.references.join(', ') || '—' }) });
+      this.setOperandRows(result.operands);
       if (result.normalized !== null && result.normalized !== expression) {
         this.formula.setValue(result.normalized);
         this.formula.markAsDirty();
@@ -469,6 +495,69 @@ export class TestEditorPage {
     this.formula.setValue(current === '' ? `[${item.code}]` : `${current} [${item.code}]`);
     this.formula.markAsDirty();
     this.verdict.set(null);
+  }
+
+  /** LIS-CR-015 M3a: a formula tool inserts its text at the caret (a function wraps the selection) and the caret lands inside it. */
+  protected applyTool(tool: Pick<FormulaTool, 'before' | 'after'>): void {
+    if (!this.canEdit()) {
+      return;
+    }
+
+    const element = this.formulaInput()?.nativeElement ?? null;
+    const value = this.formula.value;
+    const start = element?.selectionStart ?? value.length;
+    const end = element?.selectionEnd ?? start;
+    const next = applyFormulaTool(value, start, end, tool);
+    if (next.value === value) {
+      return;
+    }
+
+    this.formula.setValue(next.value);
+    this.formula.markAsDirty();
+    this.verdict.set(null);
+    if (element !== null) {
+      element.focus();
+      element.setSelectionRange(next.caret, next.caret);
+    }
+  }
+
+  /** The *Clear* tool: empties the expression (saved as 'no formula' by the next save). */
+  protected clearFormula(): void {
+    if (!this.canEdit() || this.formula.value === '') {
+      return;
+    }
+
+    this.formula.setValue('');
+    this.formula.markAsDirty();
+    this.verdict.set(null);
+    this.operandRows.set([]);
+    this.formulaInput()?.nativeElement.focus();
+  }
+
+  protected operandsEdited(rows: readonly FormulaOperandRow[]): void {
+    this.operandRows.set(rows);
+    this.operandsDirty.set(true);
+  }
+
+  /** The operand table for the choices of a check: what the user chose here, else the stored operand, else the default. */
+  private setOperandRows(choices: readonly FormulaOperandChoice[]): void {
+    const rows = formulaOperandRows(choices, this.operandRows(), this.detail()?.formulaOperands ?? []);
+    this.operandRows.set(rows);
+  }
+
+  /** On opening a formula test: the choices of its stored formula, so the table shows without a click (ignored once another record is open). */
+  private async loadOperands(id: string, expression: string): Promise<void> {
+    const choices = await this.facade.operandChoices(expression, id);
+    if (this.testId() === id && this.formula.value.trim() === expression && !this.operandsDirty()) {
+      this.operandRows.set([]);
+      this.setOperandRows(choices);
+    }
+  }
+
+  /** The operands sent with the formula: the table when it has rows, else null (the server keeps or derives the choices). */
+  private operandItems(): readonly FormulaOperandItem[] | null {
+    const rows = this.operandRows();
+    return rows.length === 0 ? null : formulaOperandItems(rows);
   }
 
   // ---- parent services (CP-41)
@@ -596,8 +685,10 @@ export class TestEditorPage {
     }
   }
 
+  /** Back to the page this test was opened from (`returnTo`, LIS-CR-015 M2), else to the list. */
   protected back(): void {
-    void this.router.navigate(['..'], { relativeTo: this.route });
+    const returnTo = this.returnTo();
+    void (returnTo !== null ? this.router.navigateByUrl(returnTo) : this.router.navigate(['..'], { relativeTo: this.route }));
   }
 
   private async createAll(): Promise<void> {
@@ -623,7 +714,7 @@ export class TestEditorPage {
     }
 
     if (allows.formula && this.formula.value.trim() !== '') {
-      steps.push(['formula', () => this.run('formula', this.facade.formula, { id: created.id, expression: this.formula.value.trim() }, this.formula)]);
+      steps.push(['formula', () => this.runFormula(created.id, this.formula.value.trim())]);
     }
 
     if (allows.paragraphs && this.paragraphs.length > 0) {
@@ -638,7 +729,7 @@ export class TestEditorPage {
     const refused = await this.runEach(steps);
     if (refused.length === 0) {
       this.toast.success(this.i18n.t('catalogue-a.tests.created'));
-      await this.router.navigate(['..', created.id], { relativeTo: this.route, replaceUrl: true });
+      await this.router.navigate(['..', created.id], { relativeTo: this.route, replaceUrl: true, queryParamsHandling: 'preserve' });
       return;
     }
 
@@ -646,7 +737,7 @@ export class TestEditorPage {
     // user typed; the refused sections stay dirty and are sent again by the next save (UAT B-04 / C-05).
     this.filledId = created.id;
     this.createdId.set(created.id);
-    this.location.replaceState(this.router.serializeUrl(this.router.createUrlTree(['..', created.id], { relativeTo: this.route })));
+    this.location.replaceState(this.router.serializeUrl(this.router.createUrlTree(['..', created.id], { relativeTo: this.route, queryParamsHandling: 'preserve' })));
     this.facade.load(created.id);
     this.applyAccess();
     this.activeTab.set(refused[0] ?? 'general');
@@ -694,8 +785,8 @@ export class TestEditorPage {
       independent.push(['values', () => this.run('values', this.facade.values, { id, values: this.valueItems() }, this.values)]);
     }
 
-    if (allows.formula && this.formula.dirty && this.formula.value.trim() !== '') {
-      independent.push(['formula', () => this.run('formula', this.facade.formula, { id, expression: this.formula.value.trim() }, this.formula)]);
+    if (allows.formula && (this.formula.dirty || this.operandsDirty()) && this.formula.value.trim() !== '') {
+      independent.push(['formula', () => this.runFormula(id, this.formula.value.trim())]);
     }
 
     if (allows.paragraphs && this.paragraphs.dirty && this.paragraphs.length > 0) {
@@ -758,6 +849,16 @@ export class TestEditorPage {
     }
 
     control.markAsPristine();
+    return true;
+  }
+
+  /** Writes the formula with its operands (LIS-CR-015); on success both are clean. */
+  private async runFormula(id: string, expression: string): Promise<boolean> {
+    if (!(await this.run('formula', this.facade.formula, { id, expression, operands: this.operandItems() }, this.formula))) {
+      return false;
+    }
+
+    this.operandsDirty.set(false);
     return true;
   }
 
@@ -824,6 +925,8 @@ export class TestEditorPage {
     this.filledId = null;
     this.problems.set({});
     this.verdict.set(null);
+    this.operandRows.set([]);
+    this.operandsDirty.set(false);
     this.parents.set([]);
     this.parentsDirty.set(false);
     this.activeTab.set('general');
@@ -957,9 +1060,14 @@ export class TestEditorPage {
       this.paragraphs.markAsPristine();
     }
 
-    if (refill(this.formula)) {
+    if (refill(this.formula) && (!keep || !this.operandsDirty())) {
       this.formula.reset(detail.formulaExpression ?? '');
       this.verdict.set(null);
+      this.operandRows.set([]);
+      this.operandsDirty.set(false);
+      if (detail.formulaExpression !== null && TEST_CONFIGURATION.formula(detail.type)) {
+        void this.loadOperands(detail.id, detail.formulaExpression);
+      }
     }
 
     if (!keep || !this.parentsDirty()) {

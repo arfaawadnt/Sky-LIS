@@ -16,7 +16,7 @@ import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { RegistrationFacade } from '../state/registration.facade';
 import { RegistrationPrinter } from '../state/registration-printer';
-import { checkResult, flushReferenceLists, patient, settle, visitDetail } from '../testing/registration.fixtures';
+import { checkResult, flushReferenceLists, line, patient, settle, visitDetail } from '../testing/registration.fixtures';
 import type { PickedService } from '../ui/service-entry.component';
 import { RegistrationPage } from './registration.page';
 
@@ -413,5 +413,32 @@ describe('RegistrationPage (CP-06, WF-02)', () => {
     expect(internals.tubesText(1)).toBe('1 tube was issued.');
     expect(internals.tubesText(3)).toBe('3 tubes were issued.');
     vi.restoreAllMocks();
+  });
+
+  it('lists the service the dry run orders for a formula operand under its formula line, free, tagged and not removable (LIS-CR-015)', async () => {
+    const page = await open('/registration/new');
+    facade().setPatient(patient);
+    page.onAdded([cbc]);
+    await tick();
+    backend.expectOne(REGISTRATION_API.check).flush(
+      checkResult({
+        lines: [
+          line(),
+          line({ serviceId: 's-crea', code: 'CREA', nameEn: 'Creatinine', kind: 'FormulaOperand', origin: 'Formula', listPrice: 0, patientShare: 0, formulaServiceCode: 'CBC', visibleOnReceipt: false }),
+        ],
+      }),
+    );
+    await tick();
+    harness.detectChanges();
+
+    const rows = harness.routeNativeElement!.querySelectorAll('tr.planned');
+    expect(rows.length).toBe(2);
+    expect(rows[1]?.classList.contains('member')).toBe(true);
+    expect(rows[1]?.textContent).toContain('↳ CREA');
+    expect(rows[1]?.textContent).toContain('registration.forFormula');
+    expect(rows[1]?.textContent).toContain('registration.offReceipt');
+    expect(rows[1]?.querySelector('button.icon-btn')).toBeNull();
+    expect(rows[0]?.querySelector('button.icon-btn')).not.toBeNull();
+    expect(facade().blockers()).toEqual([]);
   });
 });

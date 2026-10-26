@@ -133,7 +133,7 @@ public sealed class GetLabTestHandler(ILabTestRepository tests) : IQueryHandler<
         ?? throw new DomainException(LabTestCodes.NotFound, "Test not found.", DomainFault.NotFound);
 }
 
-/// <summary>T20 "Check formula": the verdict the save would give, never a refusal.</summary>
+/// <summary>T20 "Check formula": the verdict the save would give, never a refusal; when valid, the operand choices per reference (LIS-CR-015).</summary>
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
 public sealed record CheckFormulaQuery(string Expression, Guid? TestId) : IQuery<FormulaCheckResult>;
 
@@ -147,7 +147,10 @@ public sealed class CheckFormulaHandler(ILabTestRepository tests, IFormulaEvalua
     public async Task<FormulaCheckResult> Handle(CheckFormulaQuery query, CancellationToken cancellationToken)
     {
         var verdict = await LabTestFormulaRules.CheckAsync(evaluator, tests, query.Expression, query.TestId, cancellationToken);
-        return new FormulaCheckResult(verdict.Valid, verdict.Normalized, verdict.References, verdict.Code, verdict.Message, verdict.Position);
+        var operands = verdict.Valid
+            ? FormulaOperandChoiceViews.For(verdict.References, await tests.FormulaOperandTestsAsync(verdict.References.ToList(), cancellationToken))
+            : [];
+        return new FormulaCheckResult(verdict.Valid, verdict.Normalized, verdict.References, verdict.Code, verdict.Message, verdict.Position, operands);
     }
 }
 

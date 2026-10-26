@@ -127,6 +127,9 @@ export const NAV_REGISTRY: readonly NavEntry[] = [
   { portal: 'admin', group: 'shell.group.masterData', path: '/admin/catalogue/service-sequence', permission: 'catalogue.view', i18nKey: 'shell.nav.serviceSequence', release: 'R1', icon: 'sort' },
   { portal: 'client', group: 'shell.group.setup', path: '/catalogue/sample-types', permission: 'catalogue.view', i18nKey: 'shell.nav.sampleTypes', release: 'R1', icon: 'flask' },
   { portal: 'admin', group: 'shell.group.masterData', path: '/admin/catalogue/sample-types', permission: 'catalogue.view', i18nKey: 'shell.nav.sampleTypes', release: 'R1', icon: 'flask' },
+  // LIS-CR-015 M4: which condition's tests may join another condition's sample in the same visit
+  { portal: 'client', group: 'shell.group.setup', path: '/catalogue/compatible-conditions', permission: 'catalogue.view', i18nKey: 'shell.nav.compatibleConditions', release: 'R1', icon: 'flask' },
+  { portal: 'admin', group: 'shell.group.masterData', path: '/admin/catalogue/compatible-conditions', permission: 'catalogue.view', i18nKey: 'shell.nav.compatibleConditions', release: 'R1', icon: 'flask' },
   { portal: 'client', group: 'shell.group.setup', path: '/catalogue/units', permission: 'catalogue.view', i18nKey: 'shell.nav.units', release: 'R1', icon: 'layers' },
   { portal: 'admin', group: 'shell.group.masterData', path: '/admin/catalogue/units', permission: 'catalogue.view', i18nKey: 'shell.nav.units', release: 'R1', icon: 'layers' },
   { portal: 'client', group: 'shell.group.setup', path: '/catalogue/patient-conditions', permission: 'catalogue.view', i18nKey: 'shell.nav.patientConditions', release: 'R2', icon: 'user' },

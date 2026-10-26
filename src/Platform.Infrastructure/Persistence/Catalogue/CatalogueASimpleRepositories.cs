@@ -124,6 +124,22 @@ internal sealed class SampleTypeRepository(AppDbContext context) : Repository<Sa
                 sampleType.ForCulture))
             .FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<CompatibleSampleTypeView>> ListCompatibilityAsync(CancellationToken cancellationToken) =>
+        await Set.AsNoTracking()
+            .OrderBy(sampleType => sampleType.Code)
+            .Take(CatalogueALimits.MaxExportRows)
+            .Select(sampleType => new CompatibleSampleTypeView(
+                sampleType.Id,
+                sampleType.Code,
+                sampleType.ShortName,
+                sampleType.Name.En,
+                sampleType.Name.Ar,
+                sampleType.IsActive,
+                sampleType.Conditions.OrderBy(condition => condition.Code)
+                    .Select(condition => new CompatibleConditionView(condition.Id, condition.Code, condition.Name.En, condition.Name.Ar, condition.IsActive, condition.MergesIntoConditionId))
+                    .ToList()))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
     private IQueryable<SampleType> Filtered(SampleTypeListFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);

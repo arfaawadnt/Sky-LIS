@@ -570,6 +570,19 @@ QMS source is never read or copied (section 1); everything here is written from 
   `app-column-chooser`, `TablePrintComponent` (A4 landscape through `PrintService`), `shared/export/table-export.ts` (`buildTableWorkbook`,
   typed cells). **Tracker** — `rows=services` (`LabTrackerServiceItem`, sort key `service`), the filter in the URL query, actions column
   navigating with `returnTo`, `shared/ui/return-link` (`app-return-link`, in-app paths only) mounted in the shell top bar.
+- Change request LIS-CR-015 (2026-10-26, `docs/build/CR-2026-10-26_Reviewer-Round-3.md`; migration `ReviewerRound3`): **preparation
+  options** edited as rows (`pages-b/preparations.page.*`, `FormArray`, stored shape unchanged); **member setup** from the service grid
+  (`service-editor.page.*`: *Open setup* with `returnTo`, save-first dialog; both editors' `back()` honour `returnTo`); **formula tools**
+  (`ui-a/formula-tools.component.ts`) and **formula operands** (`Domain/Catalogue/FormulaOperand.cs`, `LabTest.FormulaOperands` →
+  `app.tests.formula_operands` jsonb via a value converter, CAT-067; `POST tests/formula/check` answers the service choices per
+  reference; `ui-a/formula-operands.component.ts`); port `IFormulaOperandLookup` (adapter `FormulaOperandLookup`, defaults for formulas
+  saved before the change) consumed by `OrderPlanner.WithFormulaOperandsAsync`: operand lines `VisitLineKind.FormulaOperand` / origin
+  `Formula`, price 0, not top-level, follow their formula on cancel / release, REG-026 alone, REG-207 warning for an unusable operand
+  service, `VisitOrderItem.FormulaServiceId/VisibleOnReceipt`, `visit_lines.visible_on_receipt` (CHECKs `ck_visit_lines_member`,
+  `ck_visit_lines_formula_operand`, `ck_visit_lines_receipt`); the invoice leaves out invisible lines; **compatible sample conditions**
+  (`SampleCondition.MergesIntoConditionId`, `SampleType.SetCompatibleConditions`, CAT-280…285, `GET/PUT …/sample-types/…/compatible-conditions`,
+  page `pages-a/compatible-conditions.page.*`): `TubeSpec.MergesIntoConditionId` / `Need`, `TubePlanner` joins the target's tube only
+  when it is live on the visit or needed in the same request (never reversed, never re-keyed). Open points: UAT open points 14–16.
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

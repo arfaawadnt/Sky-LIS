@@ -12,6 +12,7 @@ import {
   type CreateServiceRequest,
   type CreatedResource,
   type FormulaCheckResult,
+  type FormulaOperandItem,
   type LabTestDetail,
   type LabTestGeneral,
   type LabTestListFilter,
@@ -39,6 +40,7 @@ import {
   type ServiceSequenceChange,
   type ServiceSequenceRow,
   type ServiceType,
+  type SetFormulaRequest,
   type TestLookupItem,
   type UpdateServiceRequest,
 } from '../../../core/api/catalogue-a.contracts';
@@ -234,8 +236,10 @@ export class CatalogueAApi {
     return this.put(`${CATALOGUE_A_API.tests}/${encodeURIComponent(id)}/list-values`, { values });
   }
 
-  setFormula(id: string, expression: string | null): Promise<void> {
-    return this.put(`${CATALOGUE_A_API.tests}/${encodeURIComponent(id)}/formula`, { expression });
+  /** LIS-CR-015: the operands travel with the expression; null keeps the stored choices. */
+  setFormula(id: string, expression: string | null, operands: readonly FormulaOperandItem[] | null = null): Promise<void> {
+    const body: SetFormulaRequest = { expression, operands };
+    return this.put(`${CATALOGUE_A_API.tests}/${encodeURIComponent(id)}/formula`, body);
   }
 
   replaceParagraphs(id: string, paragraphs: readonly ParagraphItem[]): Promise<void> {

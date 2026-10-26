@@ -65,8 +65,24 @@ public sealed record ListValueItem(string Value, bool IsNormal, bool IsCritical,
 
 public sealed record ReplaceListValuesRequest(IReadOnlyList<ListValueItem> Values);
 
-/// <summary>An empty or null expression clears the formula.</summary>
-public sealed record SetFormulaRequest(string? Expression);
+/// <summary>
+/// An empty or null expression clears the formula. <paramref name="Operands"/> (LIS-CR-015): what registration orders for each
+/// referenced test; a reference without an entry takes its default service off the receipt, entries of codes the formula does not
+/// read are dropped; null keeps the stored choices.
+/// </summary>
+public sealed record SetFormulaRequest(string? Expression, IReadOnlyList<FormulaOperandItem>? Operands = null);
+
+/// <summary>
+/// One operand of a formula (LIS-CR-015 M3b / M3c): the referenced test, the service ordered for it when the formula is registered
+/// without it (null = none) and whether that added line shows on the receipt.
+/// </summary>
+public sealed record FormulaOperandItem(string TestCode, Guid? ServiceId, bool VisibleOnReceipt);
+
+/// <summary>A service that may be ordered for a formula operand: an active, orderable service carrying the test (Type = service type name).</summary>
+public sealed record FormulaOperandServiceOption(Guid Id, string Code, string NameEn, string NameAr, string Type);
+
+/// <summary>Per reference of a checked formula: the test, the services that carry it and the default one (null when none fits).</summary>
+public sealed record FormulaOperandChoice(string TestCode, Guid? TestId, string? TestNameEn, string? TestNameAr, IReadOnlyList<FormulaOperandServiceOption> Services, Guid? DefaultServiceId);
 
 public sealed record ParagraphItem(string Title, string? Text);
 
@@ -75,8 +91,11 @@ public sealed record ReplaceParagraphsRequest(IReadOnlyList<ParagraphItem> Parag
 /// <summary><paramref name="TestId"/> is the test being edited (for the self-reference and cycle checks), or null for a new one.</summary>
 public sealed record CheckFormulaRequest(string Expression, Guid? TestId);
 
-/// <summary>The verdict of the formula check: the normalised expression and its references, or the refusal code, message and 1-based position.</summary>
-public sealed record FormulaCheckResult(bool Valid, string? Normalized, IReadOnlyList<string> References, string? Code, string? Message, int? Position);
+/// <summary>
+/// The verdict of the formula check: the normalised expression and its references, or the refusal code, message and 1-based position;
+/// <paramref name="Operands"/> lists, per reference in reference order, the services that may be ordered for it (empty when invalid).
+/// </summary>
+public sealed record FormulaCheckResult(bool Valid, string? Normalized, IReadOnlyList<string> References, string? Code, string? Message, int? Position, IReadOnlyList<FormulaOperandChoice> Operands);
 
 public sealed record LabTestListItem(
     Guid Id,
@@ -117,6 +136,7 @@ public sealed record LabTestDetail(
     LabTestTimingItem Timing,
     string? FormulaExpression,
     IReadOnlyList<string> FormulaReferences,
+    IReadOnlyList<FormulaOperandItem> FormulaOperands,
     IReadOnlyList<RangeBandItem> RangeBands,
     IReadOnlyList<ListValueItem> ListValues,
     IReadOnlyList<ParagraphItem> Paragraphs,

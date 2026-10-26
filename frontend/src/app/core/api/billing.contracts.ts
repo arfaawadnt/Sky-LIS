@@ -329,6 +329,9 @@ export interface InvoiceLine {
   readonly discount: number;
   readonly patientShare: number;
   readonly payerShare: number;
+  /** The stored line kind; `FormulaOperand` lines (LIS-CR-015) print at 0.00 with their formula. */
+  readonly kind?: string;
+  readonly formulaServiceCode?: string | null;
 }
 
 export interface InvoiceMovement {

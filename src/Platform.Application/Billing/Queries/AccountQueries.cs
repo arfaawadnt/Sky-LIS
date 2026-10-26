@@ -115,6 +115,8 @@ public sealed class GetInvoiceHandler(
     IUserPrivileges privileges,
     IClock clock) : IQueryHandler<GetInvoiceQuery, InvoiceDocument>
 {
+    private const string FormulaOperandKind = "FormulaOperand";
+
     public async Task<InvoiceDocument> Handle(GetInvoiceQuery query, CancellationToken cancellationToken)
     {
         BillingRights.RequirePrintInvoice(privileges);
@@ -135,10 +137,15 @@ public sealed class GetInvoiceHandler(
         var letterhead = await directory.LetterheadAsync(visit.BranchId, cancellationToken);
         var currency = await settings.GetAsync(SettingKeys.DefaultCurrency, cancellationToken);
 
-        var invoiceLines = lines.Select(line =>
+        // LIS-CR-015 M3c: a formula operand line prints only when its formula setup says "Visible in receipt"; it names its formula
+        var byId = lines.ToDictionary(line => line.LineId);
+        var invoiceLines = lines.Where(line => line.VisibleOnReceipt).Select(line =>
         {
             services.TryGetValue(line.ServiceId, out var service);
-            return new InvoiceLine(line.LineId, line.ServiceId, service?.Code, service?.NameEn, service?.NameAr, line.Status, line.ListPrice, line.Discount, line.PatientShare, line.PayerShare);
+            var formula = line.Kind == FormulaOperandKind && line.ParentLineId is { } parentId && byId.TryGetValue(parentId, out var parent) && services.TryGetValue(parent.ServiceId, out var parentService)
+                ? parentService.Code
+                : null;
+            return new InvoiceLine(line.LineId, line.ServiceId, service?.Code, service?.NameEn, service?.NameAr, line.Status, line.ListPrice, line.Discount, line.PatientShare, line.PayerShare, line.Kind, formula);
         }).ToList();
 
         return new InvoiceDocument(

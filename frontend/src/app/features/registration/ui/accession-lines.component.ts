@@ -1,12 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 
-import { REGISTRATION_PERMISSIONS, type VisitLineItem, type VisitTubeItem } from '../../../core/api/registration.contracts';
+import { REGISTRATION_PERMISSIONS, type VisitLineItem, type VisitLineKind, type VisitTubeItem } from '../../../core/api/registration.contracts';
 import type { ResultStatus } from '../../../core/api/results.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
+import { followsLine, formulaCodeOf } from '../data/line-kinds';
 import { dateTime, money, pick } from '../data/registration-format';
 
 /**
@@ -42,10 +43,13 @@ import { dateTime, money, pick } from '../data/registration-format';
             </thead>
             <tbody>
               @for (line of ordered(); track line.id) {
-                <tr [class.cancelled]="line.status === 'Cancelled'" [class.member]="line.kind === 'PackageMember'" [attr.data-line]="line.id">
+                <tr [class.cancelled]="line.status === 'Cancelled'" [class.member]="follows(line.kind)" [attr.data-line]="line.id">
                   <td class="mono">{{ line.code }}</td>
                   <td>
                     {{ name(line.nameEn, line.nameAr) }}
+                    @if (formulaOf(line); as formula) {
+                      <span class="small muted block" [attr.data-formula]="line.id">{{ i18n.tf('registration.forFormula', { code: formula }) }}@if (line.visibleOnReceipt === false) { · {{ i18n.t('registration.offReceipt') }}}</span>
+                    }
                     @if (line.status === 'Cancelled') {
                       <span class="small muted block">{{ line.cancellationReason ?? '' }} · {{ line.cancelledByName ?? '' }} · {{ when(line.cancelledAtUtc) }}</span>
                     }
@@ -72,9 +76,9 @@ import { dateTime, money, pick } from '../data/registration-format';
                     }
                   </td>
                   <td class="actions">
-                    @if (line.kind !== 'PackageMember' && line.status !== 'Cancelled' && lockedLines().has(line.id)) {
+                    @if (!follows(line.kind) && line.status !== 'Cancelled' && lockedLines().has(line.id)) {
                       <span class="small muted" [attr.data-locked]="line.id">{{ i18n.t('registration.accession.lines.locked') }}</span>
-                    } @else if (line.kind !== 'PackageMember' && line.status !== 'Cancelled') {
+                    } @else if (!follows(line.kind) && line.status !== 'Cancelled') {
                       <button type="button" class="btn sm danger" *appCan="permissions.cancel" (click)="cancelLine.emit(line)" [attr.aria-label]="i18n.t('registration.cancel.action') + ' ' + line.code"><app-icon name="x" [size]="14" />{{ i18n.t('registration.cancel.action') }}</button>
                     }
                   </td>
@@ -115,19 +119,31 @@ export class AccessionLinesComponent {
 
   protected readonly permissions = REGISTRATION_PERMISSIONS;
 
-  /** Top-level lines in order, each package followed by its members. */
+  /** Top-level lines in order, each package followed by its members, each line by the formula operand lines ordered for it (LIS-CR-015). */
   protected readonly ordered = computed<readonly VisitLineItem[]>(() => {
     const all = this.lines();
+    const under = (id: string, kind: VisitLineKind): VisitLineItem[] => all.filter((child) => child.kind === kind && child.parentLineId === id);
     const out: VisitLineItem[] = [];
     for (const line of all) {
-      if (line.kind !== 'PackageMember') {
-        out.push(line, ...all.filter((member) => member.kind === 'PackageMember' && member.parentLineId === line.id));
+      if (!followsLine(line.kind)) {
+        out.push(line, ...under(line.id, 'FormulaOperand'));
+        for (const member of under(line.id, 'PackageMember')) {
+          out.push(member, ...under(member.id, 'FormulaOperand'));
+        }
       }
     }
 
     // members whose package is not in the list (never expected) are still shown rather than lost
     return out.length === all.length ? out : [...out, ...all.filter((line) => !out.includes(line))];
   });
+
+  protected follows(kind: VisitLineKind): boolean {
+    return followsLine(kind);
+  }
+
+  protected formulaOf(line: VisitLineItem): string | null {
+    return formulaCodeOf(line, this.lines());
+  }
 
   private readonly tubeTypes = computed(() => new Map(this.tubes().map((tube) => [tube.id, pick(tube.sampleTypeNameEn, tube.sampleTypeNameAr, this.i18n.lang())])));
 

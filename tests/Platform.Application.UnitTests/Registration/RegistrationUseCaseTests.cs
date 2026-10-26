@@ -130,7 +130,7 @@ public sealed class RegistrationUseCaseTests
         Assert.Equal("Every test of 'CREA' is already on this visit: CREA (WELL › RENAL).", inPackage.Message);
         Assert.Empty(_world.Visits.Items);
 
-        var planner = new OrderPlanner(Catalogue, _world.Rules, _world.Prices, _world.Visits);
+        var planner = new OrderPlanner(Catalogue, _world.Rules, _world.Prices, _world.Visits, new FakeFormulaOperands());
         var plan = await planner.PlanAsync(
             new OrderContext(null, _world.PayerId, _world.TierId, null, [new OrderLineRequest(Catalogue.Wellness.Id, false), new OrderLineRequest(Catalogue.Creatinine.Id, false)], new HashSet<Guid>(), null, RegistrationWorld.Now, 0),
             CancellationToken.None);
@@ -356,7 +356,7 @@ public sealed class RegistrationUseCaseTests
     [Fact]
     public async Task Planner_quote_keeps_unpriced_lines_and_ignores_frequency()
     {
-        var planner = new OrderPlanner(Catalogue, _world.Rules, _world.Prices, _world.Visits);
+        var planner = new OrderPlanner(Catalogue, _world.Rules, _world.Prices, _world.Visits, new FakeFormulaOperands());
 
         var plan = await planner.PlanAsync(
             new OrderContext(null, null, null, null, [new OrderLineRequest(Catalogue.Unpriced.Id, false), new OrderLineRequest(Catalogue.Package.Id, false)], new HashSet<Guid>(), null, RegistrationWorld.Now, 0, ForQuote: true),
@@ -406,10 +406,10 @@ public sealed class RegistrationUseCaseTests
             120);
 
     private RegisterVisitHandler Handler() =>
-        new(_world.Visits, _world.Bookings, _world.Patients, _world.Payers, _world.Doctors, Catalogue, _world.Rules, _world.Prices, _world.Settings, _world.Privileges, _world.Numbers, _world.UnitOfWork, _world.User, _world.Clock);
+        new(_world.Visits, _world.Bookings, _world.Patients, _world.Payers, _world.Doctors, Catalogue, _world.Rules, _world.Prices, _world.Settings, _world.Privileges, _world.Numbers, _world.UnitOfWork, _world.User, _world.Clock, new FakeFormulaOperands());
 
     private AddVisitLinesHandler AddLinesHandler() =>
-        new(_world.Visits, _world.Patients, Catalogue, _world.Rules, _world.Prices, _world.Numbers, _world.UnitOfWork, _world.User, _world.Clock);
+        new(_world.Visits, _world.Patients, Catalogue, _world.Rules, _world.Prices, _world.Numbers, _world.UnitOfWork, _world.User, _world.Clock, new FakeFormulaOperands());
 
     private static async Task<DomainException> Refused(Func<Task> action) => await Assert.ThrowsAnyAsync<DomainException>(action);
 }

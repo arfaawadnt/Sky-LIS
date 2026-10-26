@@ -15,4 +15,7 @@ public interface ISampleTypeRepository : IRepository<SampleType>
     Task<IReadOnlyList<SampleTypeListItem>> ExportAsync(SampleTypeListFilter filter, CancellationToken cancellationToken);
 
     Task<SampleTypeDetail?> GetDetailAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Every sample type with its conditions and their compatible target (LIS-CR-015 M4), by code.</summary>
+    Task<IReadOnlyList<CompatibleSampleTypeView>> ListCompatibilityAsync(CancellationToken cancellationToken);
 }

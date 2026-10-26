@@ -13,6 +13,7 @@ import {
   REGISTRATION_PERMISSIONS,
   type TubePreview,
   type VisitLineItem,
+  type VisitLineKind,
   type VisitRegisteredResponse,
 } from '../../../core/api/registration.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
@@ -27,6 +28,7 @@ import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
+import { followsLine, formulaCodeOf } from '../data/line-kinds';
 import { count, dateTime, money, pick } from '../data/registration-format';
 import { PatientLookupApi } from '../../../shared/patient/patient-lookup.api';
 import { toSummary } from '../../../shared/patient/patient-demographics';
@@ -205,7 +207,7 @@ export class RegistrationPage {
     }
 
     add('contract', this.i18n.t('registration.ready.contract'), ['contract']);
-    add('services', edit ? this.i18n.t('registration.ready.servicesEdit') : this.i18n.tf('registration.ready.services', { count: this.num(this.facade.plannedLines().length) }), ['lines', 'issues', 'checking']);
+    add('services', edit ? this.i18n.t('registration.ready.servicesEdit') : this.i18n.tf('registration.ready.services', { count: this.num(this.facade.plannedLines().filter((line) => line.kind !== 'FormulaOperand').length) }), ['lines', 'issues', 'checking']);
     if (this.doctorRequired()) {
       add('doctor', this.i18n.t('registration.ready.doctor'), ['doctor']);
     }
@@ -378,6 +380,16 @@ export class RegistrationPage {
 
   protected isManual(serviceId: string): boolean {
     return this.manualIds().has(serviceId);
+  }
+
+  /** A package member or a formula operand line (LIS-CR-015): listed under its line, no own price or action. */
+  protected follows(kind: VisitLineKind): boolean {
+    return followsLine(kind);
+  }
+
+  /** The code of the formula a saved operand line was ordered for. */
+  protected savedFormulaOf(line: VisitLineItem): string | null {
+    return formulaCodeOf(line, this.savedLines());
   }
 
   protected isReserved(serviceId: string): boolean {

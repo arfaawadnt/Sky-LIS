@@ -160,7 +160,7 @@ describe('TestEditorPage (CP-41)', () => {
     await settle();
 
     const formula = backend.expectOne(`${CATALOGUE_A_API.tests}/t9/formula`);
-    expect(formula.request.body).toEqual({ expression: '[CHOL] - [HDL] - [TG] / 5' });
+    expect(formula.request.body).toEqual({ expression: '[CHOL] - [HDL] - [TG] / 5', operands: null });   // not checked: the server takes the defaults
     backend.expectNone(`${CATALOGUE_A_API.tests}/t9/range-bands`);
     formula.flush(null, { status: 204, statusText: 'No Content' });
     await saving;
@@ -580,6 +580,148 @@ describe('TestEditorPage (CP-41)', () => {
       await saving;
 
       expect(TestBed.inject(Router).url).toBe('/catalogue/tests/t9');
+    });
+  });
+  describe('LIS-CR-015 formula tools, operands and return', () => {
+    interface FormulaInternals extends TestEditorInternals {
+      readonly operandRows: () => readonly { readonly testCode: string; readonly serviceId: string | null; readonly visibleOnReceipt: boolean }[];
+      readonly crumbs: () => readonly { readonly label: string; readonly path: string | null }[];
+      back(): void;
+    }
+
+    const ldl: LabTestDetail = {
+      ...glucose,
+      id: 'f1',
+      code: 'LDL',
+      type: 'Formula',
+      rangeBands: [],
+      formulaExpression: '[CHOL] - [HDL]',
+      formulaReferences: ['CHOL', 'HDL'],
+      formulaOperands: [{ testCode: 'HDL', serviceId: 's-lipid', visibleOnReceipt: true }],
+    };
+
+    const option = (id: string, type: 'Test' | 'Profile'): { id: string; code: string; nameEn: string; nameAr: string; type: 'Test' | 'Profile' } => ({ id, code: id.toUpperCase(), nameEn: id, nameAr: id, type });
+
+    const checked = {
+      valid: true,
+      normalized: '[CHOL] - [HDL]',
+      references: ['CHOL', 'HDL'],
+      code: null,
+      message: null,
+      position: null,
+      operands: [
+        { testCode: 'CHOL', testId: 't-chol', testNameEn: 'Cholesterol', testNameAr: 'كوليسترول', services: [option('s-chol', 'Test'), option('s-lipid', 'Profile')], defaultServiceId: 's-chol' },
+        { testCode: 'HDL', testId: 't-hdl', testNameEn: 'HDL', testNameAr: 'HDL', services: [option('s-hdl', 'Test'), option('s-lipid', 'Profile')], defaultServiceId: 's-hdl' },
+      ],
+    };
+
+    function root(): HTMLElement {
+      return harness.routeNativeElement as HTMLElement;
+    }
+
+    async function render(): Promise<void> {
+      await settle();
+      TestBed.tick();
+      await settle();
+    }
+
+    it('inserts the tools at the caret, wraps a selection in a function and clears', async () => {
+      const editor = await open('/catalogue/tests/new', null);
+      editor.general.controls.type.setValue('Formula');
+      TestBed.tick();
+      await render();
+
+      const area = root().querySelector<HTMLTextAreaElement>('textarea.formula')!;
+      const tool = (id: string): HTMLButtonElement => root().querySelector<HTMLButtonElement>(`button[data-tool="${id}"]`)!;
+      editor.formula.setValue('[A][B]');
+      area.setSelectionRange(3, 3);
+      tool('plus').click();
+      expect(editor.formula.value).toBe('[A] + [B]');
+      expect([area.selectionStart, area.selectionEnd]).toEqual([6, 6]);
+
+      area.setSelectionRange(0, 9);
+      tool('round').click();
+      expect(editor.formula.value).toBe('ROUND([A] + [B])');
+      expect(area.selectionStart).toBe(15);
+      expect(editor.formula.dirty).toBe(true);
+
+      area.setSelectionRange(16, 16);
+      tool('female').click();
+      expect(editor.formula.value).toBe('ROUND([A] + [B])@FEMALE');
+
+      root().querySelector<HTMLButtonElement>('app-formula-tools button.clear')!.click();
+      expect(editor.formula.value).toBe('');
+    });
+
+    it('fills the operand table on opening a formula test and saves a changed choice with the formula', async () => {
+      const editor = (await open('/catalogue/tests/f1', ldl)) as FormulaInternals;
+      const read = backend.expectOne((request) => request.method === 'POST' && request.url === CATALOGUE_A_API.formulaCheck);
+      expect(read.request.body).toEqual({ expression: '[CHOL] - [HDL]', testId: 'f1' });
+      read.flush(checked);
+      await render();
+
+      // the stored HDL choice wins, CHOL takes its default off the receipt
+      expect(editor.operandRows().map((row) => [row.testCode, row.serviceId, row.visibleOnReceipt])).toEqual([
+        ['CHOL', 's-chol', false],
+        ['HDL', 's-lipid', true],
+      ]);
+
+      const select = root().querySelector<HTMLSelectElement>('app-formula-operands tr[data-operand="CHOL"] select')!;
+      select.value = '';
+      select.dispatchEvent(new Event('change'));
+      await render();
+      expect(root().querySelector('app-formula-operands tr[data-operand="CHOL"] .warn-strip')).not.toBeNull();
+
+      const saving = editor.save();
+      await settle();
+      const put = backend.expectOne(`${CATALOGUE_A_API.tests}/f1/formula`);
+      expect(put.request.body).toEqual({
+        expression: '[CHOL] - [HDL]',
+        operands: [
+          { testCode: 'CHOL', serviceId: null, visibleOnReceipt: false },
+          { testCode: 'HDL', serviceId: 's-lipid', visibleOnReceipt: true },
+        ],
+      });
+      backend.expectNone((request) => request.method === 'PUT' && request.url === `${CATALOGUE_A_API.tests}/f1`);
+      put.flush(null, { status: 204, statusText: 'No Content' });
+      await saving;
+    });
+
+    it('fills the table from a check, keeping what the user chose', async () => {
+      const editor = (await open('/catalogue/tests/f1', { ...ldl, formulaExpression: null, formulaReferences: [], formulaOperands: [] })) as FormulaInternals;
+      backend.expectNone((request) => request.url === CATALOGUE_A_API.formulaCheck);
+      editor.formula.setValue('[chol] - [hdl]');
+      root().querySelector<HTMLButtonElement>('.members > div > button.btn.soft')!.click();
+      await settle();
+      backend.expectOne((request) => request.url === CATALOGUE_A_API.formulaCheck).flush(checked);
+      await render();
+
+      expect(editor.operandRows().map((row) => [row.testCode, row.serviceId])).toEqual([
+        ['CHOL', 's-chol'],
+        ['HDL', 's-hdl'],
+      ]);
+      expect(editor.formula.value).toBe('[CHOL] - [HDL]');
+    });
+
+    it('goes back to the service it was opened from and keeps the parameter after a create', async () => {
+      const router = TestBed.inject(Router);
+      const navigated = vi.spyOn(router, 'navigateByUrl');
+      const editor = (await open('/catalogue/tests/t1?returnTo=%2Fcatalogue%2Fservices%2Fs9', glucose)) as FormulaInternals;
+      expect(editor.crumbs().map((crumb) => crumb.path)).toEqual(['/catalogue/services/s9', '/catalogue/tests', null]);
+
+      navigated.mockResolvedValueOnce(true);
+      editor.back();
+      expect(navigated).toHaveBeenCalledWith('/catalogue/services/s9');
+
+      const created = await open('/catalogue/tests/new?returnTo=%2Fcatalogue%2Fservices%2Fs9', null);
+      created.general.controls.code.setValue('UREA');
+      created.general.controls.name.setValue({ en: 'Urea', ar: 'يوريا' });
+      created.general.controls.clinicalGroupId.setValue('g1');
+      const saving = created.save();
+      await settle();
+      backend.expectOne((request) => request.method === 'POST' && request.url === CATALOGUE_A_API.tests).flush({ id: 't9' }, { status: 201, statusText: 'Created' });
+      await saving;
+      expect(router.url).toBe('/catalogue/tests/t9?returnTo=%2Fcatalogue%2Fservices%2Fs9');
     });
   });
 });

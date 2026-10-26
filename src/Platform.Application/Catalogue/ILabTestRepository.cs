@@ -15,6 +15,9 @@ public interface ILabTestRepository : IRepository<LabTest>
     /// <summary>Every test of the tenant with the codes its formula reads (INV-CAT-009).</summary>
     Task<IReadOnlyList<LabTestFormulaNode>> FormulaGraphAsync(CancellationToken cancellationToken);
 
+    /// <summary>The tests of the tenant with the given codes (active or not) and the services carrying each as a direct member (LIS-CR-015).</summary>
+    Task<IReadOnlyList<FormulaOperandTestRead>> FormulaOperandTestsAsync(IReadOnlyCollection<string> codes, CancellationToken cancellationToken);
+
     Task<Paged<LabTestListItem>> ListAsync(LabTestListFilter filter, PageRequest page, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<LabTestListItem>> ExportAsync(LabTestListFilter filter, CancellationToken cancellationToken);

@@ -122,8 +122,8 @@ export class CancelServicesDialogComponent {
     loader: ({ abortSignal }) => this.api.reasons('Cancellation', abortSignal),
   });
 
-  /** Top-level lines only: a package cancels with its members (INV-REG-007). */
-  protected readonly lines = computed<readonly VisitLineItem[]>(() => (this.detail.hasValue() ? this.detail.value().lines.filter((line) => line.kind !== 'PackageMember') : []));
+  /** Top-level lines only: a package cancels with its members (INV-REG-007), a formula line with its operand lines (LIS-CR-015). */
+  protected readonly lines = computed<readonly VisitLineItem[]>(() => (this.detail.hasValue() ? this.detail.value().lines.filter((line) => line.kind !== 'PackageMember' && line.kind !== 'FormulaOperand') : []));
 
   protected readonly canSubmit = computed(() => this.selected().size > 0 && (this.reasonId() !== '' || this.note().trim() !== ''));
 

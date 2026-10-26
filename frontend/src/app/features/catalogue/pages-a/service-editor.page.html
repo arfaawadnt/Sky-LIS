@@ -175,6 +175,7 @@
                 }
                 <td class="center"><input type="checkbox" [disabled]="!canEdit()" [checked]="member.visible" (change)="toggleMember(i, 'visible', $event)" [attr.aria-label]="i18n.t('catalogue-a.services.member.visible')" /></td>
                 <td class="actions">
+                  <button type="button" class="row-btn open-setup" *appCan="permissions.view" (click)="openSetup(member)" [attr.aria-label]="i18n.tf('catalogue-a.services.member.openSetup', { code: member.code })" [title]="i18n.tf('catalogue-a.services.member.openSetup', { code: member.code })"><app-icon name="settings" [size]="14" /></button>
                   <button type="button" class="row-btn" [disabled]="first || !canEdit()" (click)="moveMember(i, -1)" [attr.aria-label]="i18n.t('catalogue-a.moveUp')" [title]="i18n.t('catalogue-a.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
                   <button type="button" class="row-btn" [disabled]="last || !canEdit()" (click)="moveMember(i, 1)" [attr.aria-label]="i18n.t('catalogue-a.moveDown')" [title]="i18n.t('catalogue-a.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
                   <button type="button" class="row-btn danger" [disabled]="!canEdit()" (click)="removeMember(i)" [attr.aria-label]="i18n.t('catalogue-a.remove')" [title]="i18n.t('catalogue-a.remove')"><app-icon name="x" [size]="14" /></button>
@@ -208,3 +209,12 @@
     </div>
   </form>
 </app-section-card>
+
+<app-dialog [(open)]="leaveDialogOpen" [title]="i18n.t('catalogue-a.services.openSetup.title')" size="sm" (closed)="closeLeaveDialog()">
+  <p class="leave-message">{{ i18n.tf('catalogue-a.services.openSetup.message', { code: pendingSetup()?.code ?? '' }) }}</p>
+  <ng-container dialogFooter>
+    <button type="button" class="btn" (click)="closeLeaveDialog()">{{ i18n.t('catalogue-a.services.openSetup.cancel') }}</button>
+    <button type="button" class="btn" (click)="openSetupWithoutSaving()">{{ i18n.t('catalogue-a.services.openSetup.discard') }}</button>
+    <button type="button" class="btn primary" [disabled]="saving()" (click)="saveAndOpenSetup()">{{ i18n.t('catalogue-a.services.openSetup.save') }}</button>
+  </ng-container>
+</app-dialog>

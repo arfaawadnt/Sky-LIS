@@ -229,7 +229,7 @@ internal sealed class VisitRepository(AppDbContext context) : Repository<Visit>(
 
     private IQueryable<CancelledLineRow> Cancelled(DateTimeOffset? fromUtc, DateTimeOffset? toUtc, Guid? branchId)
     {
-        var lines = Context.Set<VisitLine>().AsNoTracking().Where(line => line.Status == VisitLineStatus.Cancelled && line.Kind != VisitLineKind.PackageMember);
+        var lines = Context.Set<VisitLine>().AsNoTracking().Where(line => line.Status == VisitLineStatus.Cancelled && line.Kind != VisitLineKind.PackageMember && line.Kind != VisitLineKind.FormulaOperand);   // members and formula operands follow their line
         if (fromUtc is { } from)
         {
             lines = lines.Where(line => line.CancelledAtUtc >= from);
@@ -274,7 +274,7 @@ internal sealed class VisitRepository(AppDbContext context) : Repository<Visit>(
 
         var ids = visits.Select(visit => visit.Id).ToArray();
         var lines = await Context.Set<VisitLine>().AsNoTracking()
-            .Where(line => ids.Contains(line.VisitId) && line.Kind != VisitLineKind.PackageMember)
+            .Where(line => ids.Contains(line.VisitId) && line.Kind != VisitLineKind.PackageMember && line.Kind != VisitLineKind.FormulaOperand)
             .OrderBy(line => line.Sequence)
             .Select(line => new { line.VisitId, Chip = new VisitLineChip(line.Id, line.ServiceCode, line.ServiceNameEn, line.ServiceNameAr, line.Status.ToString(), line.Kind.ToString()) })
             .ToListAsync(cancellationToken)

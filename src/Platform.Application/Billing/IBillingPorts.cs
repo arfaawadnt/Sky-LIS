@@ -138,8 +138,22 @@ public sealed record BillableVisit(
     public VisitCharge Charge => new(PatientShareTotal, BilledThroughClaims);
 }
 
-/// <summary>A billed line of a visit (<c>app.visit_lines</c>, Ordered or Reserved; Cancelled lines are not billed).</summary>
-public sealed record BillableLine(Guid LineId, Guid VisitId, Guid ServiceId, string Status, decimal ListPrice, decimal Discount, decimal PatientShare, decimal PayerShare);
+/// <summary>
+/// A billed line of a visit (<c>app.visit_lines</c>, Ordered or Reserved; Cancelled lines are not billed), with its kind, the
+/// line it follows (package member, formula operand) and whether it prints on the Receipt / invoice (LIS-CR-015 M3c).
+/// </summary>
+public sealed record BillableLine(
+    Guid LineId,
+    Guid VisitId,
+    Guid ServiceId,
+    string Status,
+    decimal ListPrice,
+    decimal Discount,
+    decimal PatientShare,
+    decimal PayerShare,
+    string Kind = "Service",
+    Guid? ParentLineId = null,
+    bool VisibleOnReceipt = true);
 
 /// <summary>A batch of Registration (<c>app.batches</c>): kind Group or LabToLab.</summary>
 public sealed record BillableBatch(Guid BatchId, string Number, string Kind, Guid? PayerId, Guid? ContractTierId, Guid? SendingLabId)

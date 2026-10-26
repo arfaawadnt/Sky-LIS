@@ -141,3 +141,39 @@ public sealed class SetSampleTypeActiveHandler(ISampleTypeRepository sampleTypes
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }
+
+/// <summary>
+/// Compatible conditions (LIS-CR-015 M4): the full compatibility map of a sample type; listed conditions merge into the
+/// condition named (or keep their own sample), unlisted ones keep their own sample. Rules in <see cref="SampleType.SetCompatibleConditions"/>.
+/// </summary>
+[RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.Edit)]
+public sealed record SaveCompatibleConditionsCommand(Guid SampleTypeId, IReadOnlyList<SampleConditionPairItem> Pairs) : ICommand;
+
+public sealed class SaveCompatibleConditionsValidator : AbstractValidator<SaveCompatibleConditionsCommand>
+{
+    public SaveCompatibleConditionsValidator()
+    {
+        RuleFor(command => command.SampleTypeId).NotEmpty();
+        RuleFor(command => command.Pairs).NotNull();
+        RuleFor(command => command.Pairs.Count).LessThanOrEqualTo(SampleType.MaxConditions).When(command => command.Pairs is not null);
+        RuleForEach(command => command.Pairs).ChildRules(pair =>
+        {
+            pair.RuleFor(item => item.ConditionId).NotEmpty();
+            pair.RuleFor(item => item.MergesIntoConditionId).NotEqual(Guid.Empty).When(item => item.MergesIntoConditionId is not null);
+        });
+    }
+}
+
+public sealed class SaveCompatibleConditionsHandler(ISampleTypeRepository sampleTypes, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<SaveCompatibleConditionsCommand>
+{
+    public async Task Handle(SaveCompatibleConditionsCommand command, CancellationToken cancellationToken)
+    {
+        var sampleType = await sampleTypes.GetForUpdateAsync(command.SampleTypeId, cancellationToken)
+            ?? throw new DomainException(SampleTypeCodes.NotFound, "Sample type not found.", DomainFault.NotFound);
+
+        if (sampleType.SetCompatibleConditions([.. command.Pairs.Select(pair => new SampleConditionPair(pair.ConditionId, pair.MergesIntoConditionId))], clock.UtcNow))
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+    }
+}

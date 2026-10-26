@@ -60,6 +60,7 @@ import { branchOf } from './receipt-document.component';
               <td>
                 @if (line.serviceCode; as code) {<span class="mono">{{ code }}</span> · }{{ serviceName(line) }}
                 @if (line.status === 'Reserved') {<span class="muted"> ({{ i18n.t('billing.doc.reserved') }})</span>}
+                @if (line.formulaServiceCode; as formula) {<span class="muted" [attr.data-formula]="line.lineId"> ({{ i18n.tf('billing.doc.forFormula', { code: formula }) }})</span>}
               </td>
               <td class="num">{{ money(line.listPrice) }}</td>
               <td class="num">{{ money(line.discount) }}</td>

@@ -2,6 +2,8 @@ import { Injectable, inject, resource, signal } from '@angular/core';
 
 import {
   type CreateLabTestRequest,
+  type FormulaOperandChoice,
+  type FormulaOperandItem,
   type LabTestGeneral,
   type LabTestTiming,
   type ListValueItem,
@@ -58,7 +60,9 @@ export class TestEditorFacade {
 
   readonly values = mutation((input: { readonly id: string; readonly values: readonly ListValueItem[] }) => this.api.replaceListValues(input.id, input.values));
 
-  readonly formula = mutation((input: { readonly id: string; readonly expression: string | null }) => this.api.setFormula(input.id, input.expression));
+  readonly formula = mutation((input: { readonly id: string; readonly expression: string | null; readonly operands?: readonly FormulaOperandItem[] | null }) =>
+    this.api.setFormula(input.id, input.expression, input.operands ?? null),
+  );
 
   readonly paragraphs = mutation((input: { readonly id: string; readonly paragraphs: readonly ParagraphItem[] }) => this.api.replaceParagraphs(input.id, input.paragraphs));
 
@@ -76,6 +80,19 @@ export class TestEditorFacade {
     this.detail.reload();
     this.references.reload();
     this.parentCandidates.reload();
+  }
+
+  /**
+   * The operand choices of a stored formula (LIS-CR-015): the check answers, per reference, the services that may be ordered for it.
+   * Read on opening a formula test, so the operand table shows without a click; an unreadable answer is no choices (the table stays empty).
+   */
+  async operandChoices(expression: string, testId: string | null): Promise<readonly FormulaOperandChoice[]> {
+    try {
+      const result = await this.api.checkFormula(expression, testId);
+      return result.valid ? result.operands : [];
+    } catch {
+      return [];
+    }
   }
 
   searchReferences(search: string): void {

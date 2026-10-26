@@ -74,6 +74,11 @@ public sealed record OrderWarning(
     string? LastAccession,
     int? WindowDays);
 
+/// <summary>
+/// A planned line of the dry run. A formula operand (<c>Kind</c> <c>FormulaOperand</c>, LIS-CR-015) is priced 0 and names the
+/// service of its formula in <paramref name="FormulaServiceCode"/>; <paramref name="VisibleOnReceipt"/> is false when it will
+/// not print on the receipt.
+/// </summary>
 public sealed record OrderLinePreview(
     Guid ServiceId,
     string Code,
@@ -94,7 +99,9 @@ public sealed record OrderLinePreview(
     string? RuleNameEn,
     string? RuleNameAr,
     string? TubeKey,
-    IReadOnlyList<OrderLinePreview> Members);
+    IReadOnlyList<OrderLinePreview> Members,
+    string? FormulaServiceCode = null,
+    bool VisibleOnReceipt = true);
 
 /// <summary>A tube the order produces or joins (BR-02); <paramref name="Key"/> is <c>group:type:condition</c>.</summary>
 public sealed record TubePreview(
@@ -245,7 +252,8 @@ public sealed record VisitLineItem(
     DateTimeOffset? ReleasedAtUtc,
     string? CancellationReason,
     string? CancelledByName,
-    DateTimeOffset? CancelledAtUtc);
+    DateTimeOffset? CancelledAtUtc,
+    bool VisibleOnReceipt = true);
 
 public sealed record VisitTubeItem(
     Guid Id,
@@ -587,7 +595,8 @@ public sealed record JobOrderLine(
     string? SampleNumber,
     string? SampleTypeNameEn,
     string? SampleTypeNameAr,
-    DateTimeOffset? ExpectedResultAtUtc);
+    DateTimeOffset? ExpectedResultAtUtc,
+    string? FormulaServiceCode = null);
 
 public sealed record JobOrderDocument(
     RegistrationLetterhead Letterhead,
@@ -628,7 +637,9 @@ public sealed record PriceQuoteDocumentLine(
     decimal PayerShare,
     DateTimeOffset? ExpectedResultAtUtc,
     string? Precaution,
-    string? AlertCondition);
+    string? AlertCondition,
+    string Kind = "Service",
+    string? FormulaServiceCode = null);
 
 public sealed record PriceQuoteDocument(
     RegistrationLetterhead Letterhead,

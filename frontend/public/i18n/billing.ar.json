@@ -285,6 +285,7 @@
   "doc.services": "الخدمات",
   "doc.service": "الخدمة",
   "doc.reserved": "مؤجلة",
+  "doc.forFormula": "للمعادلة {code}",
   "doc.total": "الإجمالي",
   "doc.payments": "المدفوعات",
   "doc.refunds": "الاستردادات",

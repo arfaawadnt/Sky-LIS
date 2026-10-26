@@ -80,7 +80,7 @@
     <ng-template appCell="services" [appCellOf]="rows()" let-row>
       <span class="chips">
         @for (line of row.lines; track line.lineId) {
-          @if (line.kind !== 'PackageMember') {
+          @if (line.kind !== 'PackageMember' && line.kind !== 'FormulaOperand') {
             <span class="chip" [class.cancelled]="line.status === 'Cancelled'" [class.reserved]="line.status === 'Reserved'" [title]="name(line.nameEn, line.nameAr)">{{ line.code }}</span>
           }
         }

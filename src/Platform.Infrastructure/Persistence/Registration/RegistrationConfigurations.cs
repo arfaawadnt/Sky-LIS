@@ -77,7 +77,7 @@ internal sealed class VisitConfiguration : IEntityTypeConfiguration<Visit>
     }
 }
 
-/// <summary><c>app.visit_lines</c> (MODULES.md §5): a cancelled line keeps reason, actor and time (CHECK); a member points at its package; a line points at its tube.</summary>
+/// <summary><c>app.visit_lines</c> (MODULES.md §5): a cancelled line keeps reason, actor and time (CHECK); a member points at its package and a formula operand line at its formula line (LIS-CR-015, price 0); a line points at its tube.</summary>
 internal sealed class VisitLineConfiguration : IEntityTypeConfiguration<VisitLine>
 {
     public void Configure(EntityTypeBuilder<VisitLine> builder)
@@ -86,7 +86,9 @@ internal sealed class VisitLineConfiguration : IEntityTypeConfiguration<VisitLin
         {
             table.HasCheckConstraint("ck_visit_lines_amounts", "list_price >= 0 AND patient_share >= 0 AND payer_share >= 0 AND discount >= 0");
             table.HasCheckConstraint("ck_visit_lines_cancellation", "(status = 'Cancelled') = (cancelled_at_utc IS NOT NULL AND cancellation_reason IS NOT NULL AND cancelled_by_user_id IS NOT NULL)");
-            table.HasCheckConstraint("ck_visit_lines_member", "(kind = 'PackageMember') = (parent_line_id IS NOT NULL)");
+            table.HasCheckConstraint("ck_visit_lines_member", "(kind IN ('PackageMember', 'FormulaOperand')) = (parent_line_id IS NOT NULL)");
+            table.HasCheckConstraint("ck_visit_lines_formula_operand", "kind <> 'FormulaOperand' OR (list_price = 0 AND patient_share = 0 AND payer_share = 0 AND discount = 0)");
+            table.HasCheckConstraint("ck_visit_lines_receipt", "visible_on_receipt OR kind = 'FormulaOperand'");
         });
 
         builder.Property(line => line.VisitId).IsRequired();
@@ -98,6 +100,7 @@ internal sealed class VisitLineConfiguration : IEntityTypeConfiguration<VisitLin
         builder.Property(line => line.Kind).IsRequired();
         builder.Property(line => line.Status).IsRequired();
         builder.Property(line => line.Origin).IsRequired();
+        builder.Property(line => line.VisibleOnReceipt).IsRequired();   // LIS-CR-015 M3c; no model default (false would be EF's "unset" sentinel): the migration gives existing rows true
         builder.Property(line => line.ListPrice).Money();
         builder.Property(line => line.PatientShare).Money();
         builder.Property(line => line.PayerShare).Money();

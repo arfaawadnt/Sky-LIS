@@ -101,6 +101,7 @@ public sealed class LabTest : AggregateRoot, ITenantScoped
         Code = string.Empty;
         Name = null!;
         FormulaReferences = [];
+        FormulaOperands = [];
     }
 
     private LabTest(Guid id, string code)
@@ -109,6 +110,7 @@ public sealed class LabTest : AggregateRoot, ITenantScoped
         Code = code;
         Name = null!;
         FormulaReferences = [];
+        FormulaOperands = [];
         IsActive = true;
         ApplyTiming(LabTestTiming.Default);
     }
@@ -173,6 +175,12 @@ public sealed class LabTest : AggregateRoot, ITenantScoped
 
     /// <summary>The test codes the formula reads, upper-case, distinct (cycle checks and lookups).</summary>
     public string[] FormulaReferences { get; private set; }
+
+    /// <summary>
+    /// What registration orders for each referenced test (LIS-CR-015): one entry per reference in reference order, or empty for a
+    /// formula saved before the change (readers then derive the default service per reference, off the receipt).
+    /// </summary>
+    public IReadOnlyList<FormulaOperand> FormulaOperands { get; private set; }
 
     public bool IsActive { get; private set; }
 
@@ -295,7 +303,27 @@ public sealed class LabTest : AggregateRoot, ITenantScoped
     /// evaluator and checks the references against the tenant's active tests and for cycles (CAT-063/064/066);
     /// the aggregate keeps the type rule and refuses a self-reference (CAT-065).
     /// </summary>
-    public void SetFormula(string? normalizedExpression, IReadOnlyCollection<string> references, DateTimeOffset nowUtc)
+    public void SetFormula(string? normalizedExpression, IReadOnlyCollection<string> references, DateTimeOffset nowUtc) =>
+        Store(normalizedExpression, references, operands: null, choices: [], nowUtc);
+
+    /// <summary>
+    /// T17 with the operands (LIS-CR-015): every reference gets exactly one operand — the given one, else the default service of
+    /// <paramref name="choices"/> off the receipt; operands of codes no longer referenced are dropped; a chosen service must carry
+    /// the test (CAT-067).
+    /// </summary>
+    public void SetFormula(
+        string? normalizedExpression,
+        IReadOnlyCollection<string> references,
+        IReadOnlyCollection<FormulaOperand> operands,
+        IReadOnlyCollection<FormulaOperandChoices> choices,
+        DateTimeOffset nowUtc)
+    {
+        ArgumentNullException.ThrowIfNull(operands);
+        ArgumentNullException.ThrowIfNull(choices);
+        Store(normalizedExpression, references, operands, choices, nowUtc);
+    }
+
+    private void Store(string? normalizedExpression, IReadOnlyCollection<string> references, IReadOnlyCollection<FormulaOperand>? operands, IReadOnlyCollection<FormulaOperandChoices> choices, DateTimeOffset nowUtc)
     {
         ArgumentNullException.ThrowIfNull(references);
         var expression = string.IsNullOrWhiteSpace(normalizedExpression) ? null : normalizedExpression.Trim();
@@ -315,8 +343,11 @@ public sealed class LabTest : AggregateRoot, ITenantScoped
             CatalogueAGuard.Refuse(LabTestCodes.FormulaSelfReference, "A formula cannot read its own test.");
         }
 
+        var stored = expression is null || operands is null ? [] : FormulaOperandRules.Normalize(references, operands, choices);
+
         FormulaExpression = expression;
         FormulaReferences = codes;
+        FormulaOperands = stored;
         Revision++;
         Raise(new LabTestFormulaChanged(Id, Code, expression, nowUtc));
     }

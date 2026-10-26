@@ -36,15 +36,16 @@ public sealed class VisitLine : Entity, ITenantScoped
         Kind = kind;
         ParentLineId = parentLineId;
         Status = status;
-        var priced = kind != VisitLineKind.PackageMember;
+        var priced = kind is not (VisitLineKind.PackageMember or VisitLineKind.FormulaOperand);
         ListPrice = priced ? Money(item.ListPrice) : 0m;
         PatientShare = priced ? Money(item.PatientShare) : 0m;
         PayerShare = priced ? Money(item.PayerShare) : 0m;
         ExpectedResultAtUtc = item.ExpectedResultAtUtc;
         TestIds = [.. item.TestIds.Distinct()];
         CollectorUserId = collectorUserId;
-        Origin = item.Origin;
-        AddedByRuleId = item.AddedByRuleId;
+        Origin = kind == VisitLineKind.FormulaOperand ? VisitLineOrigin.Formula : item.Origin;
+        AddedByRuleId = kind == VisitLineKind.FormulaOperand ? null : item.AddedByRuleId;
+        VisibleOnReceipt = kind != VisitLineKind.FormulaOperand || item.VisibleOnReceipt;
         Sequence = sequence;
         OrderedAtUtc = nowUtc;
         OrderedByUserId = actorUserId;
@@ -67,7 +68,7 @@ public sealed class VisitLine : Entity, ITenantScoped
 
     public VisitLineKind Kind { get; private set; }
 
-    /// <summary>The package line a member belongs to (INV-REG-007).</summary>
+    /// <summary>The package line a member belongs to (INV-REG-007), or the formula line an operand line was ordered for (LIS-CR-015).</summary>
     public Guid? ParentLineId { get; private set; }
 
     /// <summary>The tube (BR-02) of an Ordered sample-carrying line; kept after cancellation for the record.</summary>
@@ -97,6 +98,12 @@ public sealed class VisitLine : Entity, ITenantScoped
 
     public Guid? AddedByRuleId { get; private set; }
 
+    /// <summary>
+    /// Whether the line prints on the Receipt / invoice (LIS-CR-015 M3c): the catalogue's "Visible in receipt" of the formula
+    /// operand for a <see cref="VisitLineKind.FormulaOperand"/> line; always true for every other line.
+    /// </summary>
+    public bool VisibleOnReceipt { get; private set; } = true;
+
     public int Sequence { get; private set; }
 
     public DateTimeOffset OrderedAtUtc { get; private set; }
@@ -121,8 +128,8 @@ public sealed class VisitLine : Entity, ITenantScoped
     /// <summary>The patient share before the discount.</summary>
     public decimal GrossPatientShare => PatientShare + Discount;
 
-    /// <summary>A top-level line carries the price; package members follow their package.</summary>
-    public bool IsTopLevel => Kind != VisitLineKind.PackageMember;
+    /// <summary>A top-level line carries the price; package members follow their package, formula operand lines their formula line (LIS-CR-015).</summary>
+    public bool IsTopLevel => Kind is not (VisitLineKind.PackageMember or VisitLineKind.FormulaOperand);
 
     internal static VisitLine Create(Guid visitId, VisitOrderItem item, VisitLineKind kind, Guid? parentLineId, VisitLineStatus status, int sequence, Guid? collectorUserId, Guid actorUserId, DateTimeOffset nowUtc) =>
         new(visitId, item, kind, parentLineId, status, sequence, collectorUserId, actorUserId, nowUtc);

@@ -64,6 +64,11 @@ internal sealed class SampleConditionConfiguration : IEntityTypeConfiguration<Sa
         builder.OwnsOne(condition => condition.Name, CatalogueAMapping.Bilingual<SampleCondition>("name"));
         builder.Navigation(condition => condition.Name).IsRequired();
         builder.Property(condition => condition.IsActive).IsRequired();
+
+        // LIS-CR-015 M4: the compatible condition this one merges into (same tenant; same type and one level are domain rules)
+        builder.Property(condition => condition.MergesIntoConditionId);
+        builder.HasOne<SampleCondition>().WithMany().HasForeignKey(condition => new { condition.TenantId, condition.MergesIntoConditionId }).IsRequired(false).OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_sample_conditions_merges_into");
     }
 }
 
@@ -178,6 +183,12 @@ internal sealed class LabTestConfiguration : IEntityTypeConfiguration<LabTest>
         builder.Property(test => test.DeltaPercent).HasPrecision(9, 3);
         builder.Property(test => test.FormulaExpression).HasMaxLength(LabTest.MaxFormulaLength);
         builder.Property(test => test.FormulaReferences).IsRequired();
+        builder.Property(test => test.FormulaOperands)
+            .HasColumnName("formula_operands")
+            .HasColumnType("jsonb")
+            .HasConversion(FormulaOperandJson.Converter, FormulaOperandJson.Comparer)
+            .HasDefaultValueSql("'[]'::jsonb")
+            .IsRequired();   // LIS-CR-015: [] by default (migration ReviewerRound3)
         builder.Property(test => test.IsActive).IsRequired();
         builder.Property(test => test.Revision).IsRequired();
         builder.HasIndex(test => new { test.TenantId, test.ClinicalGroupId, test.IsActive });

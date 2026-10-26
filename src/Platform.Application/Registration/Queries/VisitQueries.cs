@@ -228,7 +228,8 @@ public sealed class GetJobOrderHandler(
             .Select(line =>
             {
                 var tube = line.TubeId is { } tubeId ? tubes.GetValueOrDefault(tubeId) : null;
-                return new JobOrderLine(line.Id, line.ServiceCode, line.ServiceNameEn, line.ServiceNameAr, line.Kind.ToString(), line.Status.ToString(), tube?.UnitCode, tube?.SampleNumber, tube?.SampleTypeNameEn, tube?.SampleTypeNameAr, line.ExpectedResultAtUtc);
+                return new JobOrderLine(line.Id, line.ServiceCode, line.ServiceNameEn, line.ServiceNameAr, line.Kind.ToString(), line.Status.ToString(), tube?.UnitCode, tube?.SampleNumber, tube?.SampleTypeNameEn, tube?.SampleTypeNameAr, line.ExpectedResultAtUtc,
+                    line.Kind == VisitLineKind.FormulaOperand ? visit.Lines.FirstOrDefault(parent => parent.Id == line.ParentLineId)?.ServiceCode : null);
             })
             .ToList();
 
@@ -310,7 +311,8 @@ public sealed class CheckOrderHandler(
     IOrderRulesLookup rules,
     IPriceLookup prices,
     ITenantSettings settings,
-    IClock clock) : IQueryHandler<CheckOrderQuery, OrderCheckResult>
+    IClock clock,
+    IFormulaOperandLookup formulas) : IQueryHandler<CheckOrderQuery, OrderCheckResult>
 {
     public async Task<OrderCheckResult> Handle(CheckOrderQuery query, CancellationToken cancellationToken)
     {
@@ -334,7 +336,7 @@ public sealed class CheckOrderHandler(
         await RegistrationRules.RequireContractAsync(payers, payerId, tierId, cancellationToken);
         await RegistrationRules.CheckDiagnosisAsync(rules, visit is null ? query.DiagnosisId : null, cancellationToken);
 
-        var planner = new OrderPlanner(catalogue, rules, prices, visits);
+        var planner = new OrderPlanner(catalogue, rules, prices, visits, formulas);
         var plan = await planner.PlanAsync(
             new OrderContext(
                 patient is null ? null : new OrderPatient(patient.Id, patient.Gender),
@@ -445,7 +447,8 @@ public sealed class PriceQuoteHandler(
     IRegistrationDirectory directory,
     ITenantSettings settings,
     ICurrentUser user,
-    IClock clock) : IQueryHandler<PriceQuoteQuery, PriceQuoteDocument>
+    IClock clock,
+    IFormulaOperandLookup formulas) : IQueryHandler<PriceQuoteQuery, PriceQuoteDocument>
 {
     public async Task<PriceQuoteDocument> Handle(PriceQuoteQuery query, CancellationToken cancellationToken)
     {
@@ -460,7 +463,7 @@ public sealed class PriceQuoteHandler(
             await RegistrationRules.RequireContractAsync(payers, payer, tier, cancellationToken);
         }
 
-        var planner = new OrderPlanner(catalogue, rules, prices, visits);
+        var planner = new OrderPlanner(catalogue, rules, prices, visits, formulas);
         var offset = RegistrationRules.UtcOffset(query.UtcOffsetMinutes);
         var plan = await planner.PlanAsync(
             new OrderContext(
@@ -488,7 +491,9 @@ public sealed class PriceQuoteHandler(
             line.Item.PayerShare,
             line.Item.ExpectedResultAtUtc,
             line.Precaution,
-            line.AlertCondition)).ToList();
+            line.AlertCondition,
+            line.Item.Kind.ToString(),
+            line.FormulaServiceCode)).ToList();
         var contract = payerId is { } p && tierId is { } t ? await new ContractNames(payers).ContractAsync(p, t, cancellationToken) : null;
         var branch = user.BranchId ?? Guid.Empty;
 
@@ -821,7 +826,8 @@ internal sealed class VisitDetailComposer(
             line.ReleasedAtUtc,
             line.CancellationReason,
             NameOf(line.CancelledByUserId),
-            line.CancelledAtUtc)).ToList();
+            line.CancelledAtUtc,
+            line.VisibleOnReceipt)).ToList();
 
         var tubeItems = visit.Tubes.OrderBy(tube => tube.CreatedAtUtc).ThenBy(tube => tube.SampleNumber, StringComparer.Ordinal).Select(tube =>
         {

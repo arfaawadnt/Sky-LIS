@@ -94,6 +94,7 @@ public sealed class FollowPayerOnVisitTransferredPolicy(IResultRepository result
 internal sealed class ResultOrdering(IResultRepository results, ICatalogueLookup catalogue, ISampleStatusLookup samples, IUnitOfWork unitOfWork)
 {
     private const string OrderedLine = "Ordered";
+    private const string PackageMemberLine = "PackageMember";
     private const int MaxDepth = 4;
 
     internal sealed record VisitContext(Guid VisitId, string Accession, Guid BranchId, Guid PatientId, Guid? PayerId, bool Urgent, Guid ActorUserId, DateTimeOffset AtUtc, VisitView? Stored);
@@ -125,7 +126,9 @@ internal sealed class ResultOrdering(IResultRepository results, ICatalogueLookup
         {
             var lineService = services.GetValueOrDefault(line.ServiceId);
             var storedLine = stored.GetValueOrDefault(line.LineId);
-            var parentLine = storedLine?.ParentLineId is { } parentId ? stored.GetValueOrDefault(parentId) : null;
+            // a package member reports in its package's unit when that package prints alone; a formula operand line
+            // (LIS-CR-015) is a service of its own and reports like one
+            var parentLine = storedLine?.ParentLineId is { } parentId && string.Equals(storedLine.Kind, PackageMemberLine, StringComparison.Ordinal) ? stored.GetValueOrDefault(parentId) : null;
             var parentService = parentLine is null ? null : services.GetValueOrDefault(parentLine.ServiceId);
             foreach (var member in expansion[line.LineId])
             {

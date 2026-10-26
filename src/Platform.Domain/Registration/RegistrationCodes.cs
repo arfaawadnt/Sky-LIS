@@ -32,6 +32,9 @@ public static class RegistrationCodes
     public const string SharesInvalid = "REG-023";
     public const string LineNotOnVisit = "REG-024";
     public const string PackageMemberAction = "REG-025";
+
+    /// <summary>LIS-CR-015: a line ordered for a formula operand follows its formula line; it is not cancelled, released or adjusted alone.</summary>
+    public const string FormulaOperandAction = "REG-026";
     public const string BookingAddressRequired = "REG-027";
     public const string BookingPatientRequired = "REG-028";
     public const string BookingTimeInvalid = "REG-029";

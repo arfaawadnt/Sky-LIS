@@ -305,12 +305,16 @@
         }
         <div class="members">
           <div>
+            <app-formula-tools [disabled]="!canEdit()" (apply)="applyTool($event)" (clear)="clearFormula()" />
             <app-form-field [label]="i18n.t('catalogue-a.tests.formula.expression')" [hint]="i18n.t('catalogue-a.tests.formula.syntax')">
-              <textarea class="formula" [formControl]="formula" rows="4" maxlength="1000" dir="ltr" spellcheck="false"></textarea>
+              <textarea #formulaInput class="formula" [formControl]="formula" rows="4" maxlength="1000" dir="ltr" spellcheck="false"></textarea>
             </app-form-field>
             <button type="button" class="btn soft" [disabled]="facade.check.pending()" (click)="checkFormula()"><app-icon name="check" [size]="15" />{{ i18n.t('catalogue-a.tests.formula.check') }}</button>
             @if (verdict(); as current) {
               <p class="verdict" [class.info-strip]="current.valid" [class.problem]="!current.valid" role="status">{{ current.text }}</p>
+            }
+            @if (operandRows().length > 0) {
+              <app-formula-operands [rows]="operandRows()" [disabled]="!canEdit()" (rowsChange)="operandsEdited($event)" />
             }
           </div>
           <section class="picker" [attr.aria-label]="i18n.t('catalogue-a.tests.formula.insert')">

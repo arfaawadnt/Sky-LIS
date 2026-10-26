@@ -7195,5 +7195,104 @@ BEGIN
     VALUES ('20261025110631_ListPreferences', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.visit_lines DROP CONSTRAINT ck_visit_lines_kind_domain;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.visit_lines DROP CONSTRAINT ck_visit_lines_member;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.visit_lines DROP CONSTRAINT ck_visit_lines_origin_domain;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.visit_lines ADD visible_on_receipt boolean NOT NULL DEFAULT TRUE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.tests ADD formula_operands jsonb NOT NULL DEFAULT ('[]'::jsonb);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.sample_conditions ADD merges_into_condition_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.visit_lines ADD CONSTRAINT ck_visit_lines_formula_operand CHECK (kind <> 'FormulaOperand' OR (list_price = 0 AND patient_share = 0 AND payer_share = 0 AND discount = 0));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.visit_lines ADD CONSTRAINT ck_visit_lines_kind_domain CHECK ("kind" IN ('Service', 'Package', 'PackageMember', 'FormulaOperand'));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.visit_lines ADD CONSTRAINT ck_visit_lines_member CHECK ((kind IN ('PackageMember', 'FormulaOperand')) = (parent_line_id IS NOT NULL));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.visit_lines ADD CONSTRAINT ck_visit_lines_origin_domain CHECK ("origin" IN ('Manual', 'Rule', 'Diagnosis', 'Formula'));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.visit_lines ADD CONSTRAINT ck_visit_lines_receipt CHECK (visible_on_receipt OR kind = 'FormulaOperand');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    CREATE INDEX ix_sample_conditions_tenant_id_merges_into_condition_id ON app.sample_conditions (tenant_id, merges_into_condition_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    ALTER TABLE app.sample_conditions ADD CONSTRAINT fk_sample_conditions_merges_into FOREIGN KEY (tenant_id, merges_into_condition_id) REFERENCES app.sample_conditions (tenant_id, id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026105529_ReviewerRound3') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261026105529_ReviewerRound3', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

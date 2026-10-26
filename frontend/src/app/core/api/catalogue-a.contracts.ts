@@ -335,6 +335,43 @@ export interface FormulaCheckResult {
   readonly code: string | null;
   readonly message: string | null;
   readonly position: number | null;
+  /** LIS-CR-015: per reference, in reference order, the services that may be ordered for it and the default (empty when invalid). */
+  readonly operands: readonly FormulaOperandChoice[];
+}
+
+/**
+ * One operand of a formula (LIS-CR-015 M3b / M3c): the referenced test, the service ordered for it when the formula is registered
+ * without it (null = none) and whether that added line shows on the receipt.
+ */
+export interface FormulaOperandItem {
+  readonly testCode: string;
+  readonly serviceId: string | null;
+  readonly visibleOnReceipt: boolean;
+}
+
+/** An active, orderable service carrying a referenced test. */
+export interface FormulaOperandServiceOption {
+  readonly id: string;
+  readonly code: string;
+  readonly nameEn: string;
+  readonly nameAr: string;
+  readonly type: ServiceType;
+}
+
+/** What the formula check answers per reference: the test (null when unknown), the services carrying it and the default one. */
+export interface FormulaOperandChoice {
+  readonly testCode: string;
+  readonly testId: string | null;
+  readonly testNameEn: string | null;
+  readonly testNameAr: string | null;
+  readonly services: readonly FormulaOperandServiceOption[];
+  readonly defaultServiceId: string | null;
+}
+
+/** `PUT tests/{id}/formula`: null expression clears; operands null keeps the stored choices (LIS-CR-015). */
+export interface SetFormulaRequest {
+  readonly expression: string | null;
+  readonly operands: readonly FormulaOperandItem[] | null;
 }
 
 export interface LabTestListItem {
@@ -360,6 +397,8 @@ export interface LabTestDetail extends LabTestGeneral {
   readonly timing: LabTestTiming;
   readonly formulaExpression: string | null;
   readonly formulaReferences: readonly string[];
+  /** LIS-CR-015: empty for a formula saved before operands existed (the defaults then apply). */
+  readonly formulaOperands?: readonly FormulaOperandItem[];
   readonly rangeBands: readonly RangeBandItem[];
   readonly listValues: readonly ListValueItem[];
   readonly paragraphs: readonly ParagraphItem[];

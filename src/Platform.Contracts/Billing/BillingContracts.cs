@@ -273,7 +273,24 @@ public sealed record PaymentReceiptDocument(
     string? MethodNameEn = null,
     string? MethodNameAr = null);
 
-public sealed record InvoiceLine(Guid LineId, Guid ServiceId, string? ServiceCode, string? ServiceNameEn, string? ServiceNameAr, string Status, decimal ListPrice, decimal Discount, decimal PatientShare, decimal PayerShare);
+/// <summary>
+/// A line of the Receipt / invoice. <paramref name="Kind"/> is the stored line kind; a formula operand line (LIS-CR-015) prints at
+/// 0.00 with the code of its formula's service (<paramref name="FormulaServiceCode"/>); operand lines unchecked "Visible in
+/// receipt" are left out of the document.
+/// </summary>
+public sealed record InvoiceLine(
+    Guid LineId,
+    Guid ServiceId,
+    string? ServiceCode,
+    string? ServiceNameEn,
+    string? ServiceNameAr,
+    string Status,
+    decimal ListPrice,
+    decimal Discount,
+    decimal PatientShare,
+    decimal PayerShare,
+    string Kind = "Service",
+    string? FormulaServiceCode = null);
 
 public sealed record InvoiceMovement(string Number, DateTimeOffset AtUtc, string Method, decimal Amount, string? MethodCode = null, string? MethodNameEn = null, string? MethodNameAr = null);
 

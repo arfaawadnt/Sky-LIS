@@ -75,11 +75,35 @@
       </app-form-field>
       <app-localized-text-input class="full" [group]="form.controls.question" name="question" [label]="i18n.t('catalogue-b.preparations.field.question')" [maxLength]="400" [problem]="saveProblem()" />
       @if (isOptionList()) {
-        <div class="full">
-          <app-form-field [label]="i18n.t('catalogue-b.preparations.field.options')" [hint]="i18n.t('catalogue-b.preparations.hint.options')" [problem]="saveProblem()">
-            <textarea formControlName="options" rows="4"></textarea>
-          </app-form-field>
-        </div>
+        <fieldset class="full option-list" formArrayName="options" aria-describedby="prep-options-hint">
+          <legend>{{ i18n.t('catalogue-b.preparations.field.options') }}</legend>
+          <p class="option-hint" id="prep-options-hint">{{ i18n.t('catalogue-b.preparations.hint.options') }}</p>
+          <ol class="option-rows">
+            @for (row of optionRows.controls; track row; let i = $index; let first = $first; let last = $last) {
+              <li class="option-row">
+                <span class="option-no" aria-hidden="true">{{ i + 1 }}</span>
+                <input #optionInput class="inp" type="text" [formControlName]="i" [maxlength]="maxOptionLength" autocomplete="off" [class.invalid]="optionError(row) !== null" [attr.aria-label]="i18n.tf('catalogue-b.preparations.options.option', { n: i + 1 })" [attr.aria-invalid]="optionError(row) !== null ? 'true' : null" [attr.aria-describedby]="optionError(row) !== null ? 'prep-option-error-' + i : null" (input)="revalidateOptions()" (keydown.enter)="onOptionEnter($event, i)" (paste)="onOptionPaste($event, i)" />
+                <span class="option-actions">
+                  <button type="button" class="row-btn" [disabled]="first || readOnly()" (click)="moveOption(i, -1)" [attr.aria-label]="i18n.t('catalogue-b.preparations.options.moveUp')" [title]="i18n.t('catalogue-b.preparations.options.moveUp')"><app-icon name="arrow-up" [size]="14" /></button>
+                  <button type="button" class="row-btn" [disabled]="last || readOnly()" (click)="moveOption(i, 1)" [attr.aria-label]="i18n.t('catalogue-b.preparations.options.moveDown')" [title]="i18n.t('catalogue-b.preparations.options.moveDown')"><app-icon name="arrow-down" [size]="14" /></button>
+                  <button type="button" class="row-btn danger" [disabled]="readOnly()" (click)="removeOption(i)" [attr.aria-label]="i18n.t('catalogue-b.preparations.options.remove')" [title]="i18n.t('catalogue-b.preparations.options.remove')"><app-icon name="x" [size]="14" /></button>
+                </span>
+                @if (optionError(row); as error) {
+                  <p class="option-error" role="alert" [id]="'prep-option-error-' + i">{{ error }}</p>
+                }
+              </li>
+            } @empty {
+              <li class="option-empty">{{ i18n.t('catalogue-b.preparations.options.none') }}</li>
+            }
+          </ol>
+          <div class="option-foot">
+            <button type="button" class="btn sm soft" [disabled]="readOnly() || optionRows.length >= maxOptions" (click)="addOption()"><app-icon name="plus" [size]="14" />{{ i18n.t('catalogue-b.preparations.options.add') }}</button>
+            <span class="option-count">{{ i18n.tf('catalogue-b.preparations.options.count', { count: optionRows.length, max: maxOptions }) }}</span>
+          </div>
+          @if (optionsError(); as error) {
+            <p class="option-error" role="alert">{{ error }}</p>
+          }
+        </fieldset>
       }
       <app-form-field [label]="i18n.t('catalogue-b.preparations.field.gender')" [problem]="saveProblem()">
         <select formControlName="gender">

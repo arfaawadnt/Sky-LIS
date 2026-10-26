@@ -90,7 +90,7 @@ internal sealed class CatalogueLookup(AppDbContext context) : ICatalogueLookup
             sampleType.Name.Ar,
             sampleType.IsActive,
             sampleType.Conditions.OrderBy(condition => condition.Code, StringComparer.Ordinal)
-                .Select(condition => new CatalogueSampleConditionInfo(condition.Id, condition.Code, condition.Name.En, condition.Name.Ar, condition.IsActive)).ToList())).ToList();
+                .Select(condition => new CatalogueSampleConditionInfo(condition.Id, condition.Code, condition.Name.En, condition.Name.Ar, condition.IsActive, condition.MergesIntoConditionId)).ToList())).ToList();
     }
 
     public async Task<CatalogueRangeBandInfo?> ResolveRangeAsync(Guid testId, GenderRestriction sex, PatientAge age, Guid? patientConditionId, CancellationToken cancellationToken)

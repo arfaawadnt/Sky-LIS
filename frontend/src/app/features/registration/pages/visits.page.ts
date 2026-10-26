@@ -94,7 +94,7 @@ export class VisitsPage {
       secondary: true,
     },
     { key: 'payer', header: 'registration.column.payer', optional: true, exportValue: (row) => [this.name(row.payerNameEn, row.payerNameAr), this.name(row.tierNameEn, row.tierNameAr)].filter((part) => part !== '').join(' · ') },
-    { key: 'services', header: 'registration.column.services', exportValue: (row) => row.lines.filter((line) => line.kind !== 'PackageMember').map((line) => line.code).join(', ') },
+    { key: 'services', header: 'registration.column.services', exportValue: (row) => row.lines.filter((line) => line.kind !== 'PackageMember' && line.kind !== 'FormulaOperand').map((line) => line.code).join(', ') },
     {
       key: 'patientShareTotal',
       header: 'registration.column.patientShare',

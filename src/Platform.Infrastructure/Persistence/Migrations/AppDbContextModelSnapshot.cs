@@ -1487,6 +1487,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("formula_expression");
 
+                    b.Property<string>("FormulaOperands")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("formula_operands")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.PrimitiveCollection<string[]>("FormulaReferences")
                         .IsRequired()
                         .HasColumnType("text[]")
@@ -2238,12 +2245,19 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<Guid?>("MergesIntoConditionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("merges_into_condition_id");
+
                     b.Property<Guid>("SampleTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("sample_type_id");
 
                     b.HasKey("TenantId", "Id")
                         .HasName("pk_sample_conditions");
+
+                    b.HasIndex("TenantId", "MergesIntoConditionId")
+                        .HasDatabaseName("ix_sample_conditions_tenant_id_merges_into_condition_id");
 
                     b.HasIndex("TenantId", "SampleTypeId", "Code")
                         .IsUnique()
@@ -7058,6 +7072,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tube_id");
 
+                    b.Property<bool>("VisibleOnReceipt")
+                        .HasColumnType("boolean")
+                        .HasColumnName("visible_on_receipt");
+
                     b.Property<Guid>("VisitId")
                         .HasColumnType("uuid")
                         .HasColumnName("visit_id");
@@ -7088,11 +7106,15 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_visit_lines_cancellation", "(status = 'Cancelled') = (cancelled_at_utc IS NOT NULL AND cancellation_reason IS NOT NULL AND cancelled_by_user_id IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_visit_lines_kind_domain", "\"kind\" IN ('Service', 'Package', 'PackageMember')");
+                            t.HasCheckConstraint("ck_visit_lines_formula_operand", "kind <> 'FormulaOperand' OR (list_price = 0 AND patient_share = 0 AND payer_share = 0 AND discount = 0)");
 
-                            t.HasCheckConstraint("ck_visit_lines_member", "(kind = 'PackageMember') = (parent_line_id IS NOT NULL)");
+                            t.HasCheckConstraint("ck_visit_lines_kind_domain", "\"kind\" IN ('Service', 'Package', 'PackageMember', 'FormulaOperand')");
 
-                            t.HasCheckConstraint("ck_visit_lines_origin_domain", "\"origin\" IN ('Manual', 'Rule', 'Diagnosis')");
+                            t.HasCheckConstraint("ck_visit_lines_member", "(kind IN ('PackageMember', 'FormulaOperand')) = (parent_line_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_visit_lines_origin_domain", "\"origin\" IN ('Manual', 'Rule', 'Diagnosis', 'Formula')");
+
+                            t.HasCheckConstraint("ck_visit_lines_receipt", "visible_on_receipt OR kind = 'FormulaOperand'");
 
                             t.HasCheckConstraint("ck_visit_lines_status_domain", "\"status\" IN ('Ordered', 'Reserved', 'Cancelled')");
                         });
@@ -9752,6 +9774,12 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.SampleCondition", b =>
                 {
+                    b.HasOne("Platform.Domain.Catalogue.SampleCondition", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "MergesIntoConditionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_sample_conditions_merges_into");
+
                     b.HasOne("Platform.Domain.Catalogue.SampleType", null)
                         .WithMany("Conditions")
                         .HasForeignKey("TenantId", "SampleTypeId")

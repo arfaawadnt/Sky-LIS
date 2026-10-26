@@ -235,7 +235,27 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+Change request LIS-CR-015 (2026-10-26, `docs/build/CR-2026-10-26_Reviewer-Round-3.md`): the business owner's third round —
+master data and sample merging. One migration, `ReviewerRound3`.
+
+- **Preparation options as rows** (CP-46): an option-list question is edited as numbered rows (add up to 30, move up / down,
+  remove, Enter adds the next row, a multi-line paste splits into rows); duplicate and too-long options are marked on their row.
+  Stored shape unchanged.
+- **Member setup from the service grid** (CP-40): every member row has *Open setup* — a test opens the test editor, a package's
+  member service its own editor — with the *Back* chip to the service; unsaved service changes ask first (Save and open / Open
+  without saving / Cancel). Both editors' Back honour `returnTo`.
+- **Formula tools** (CP-41): buttons insert operators, comparisons, `ROUND IF MIN MAX ABS`, `@AGE` / `@FEMALE` at the caret.
+- **Formula operands** (CP-41, CP-06, CP-12, CP-23): per test a formula reads, the formula setup stores the *service to order*
+  (default: the test's own single-test service; "None" orders nothing) and **Visible in receipt** (default off) in
+  `app.tests.formula_operands` (CAT-067). Registering a formula service adds each operand service once, at price 0, under the
+  formula line (`VisitLineKind.FormulaOperand`, origin `Formula`), unless the visit already carries that test; it gets its tube and
+  results, follows its formula when that is cancelled or released and cannot be acted on alone (REG-026). The dry run, price query
+  and job order show "for formula …"; the Receipt / invoice leaves out operands not marked visible (`visit_lines.visible_on_receipt`).
+  Formulas saved before the change pull their operands with the defaults.
+- **Compatible sample conditions** (new page `/catalogue/compatible-conditions`, admin `/admin/catalogue/compatible-conditions`):
+  a condition may merge into another condition of the same sample type (`sample_conditions.merges_into_condition_id`, one level,
+  CAT-280…285). At registration (BR-02) its tests join the target condition's sample when that sample is in the same visit (one
+  sample and label named after the target, e.g. "Serum · Fasting"); alone it keeps its own sample; never the other way.
 
 ### v0.24.1 — 2026-10-26
 

@@ -81,6 +81,7 @@
   "nav.tests": "Tests",
   "nav.serviceSequence": "Service sequence",
   "nav.sampleTypes": "Sample types",
+  "nav.compatibleConditions": "Compatible sample conditions",
   "nav.units": "Units of measurement",
   "nav.patientConditions": "Patient conditions",
   "nav.additionalServices": "Additional services",

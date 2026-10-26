@@ -65,7 +65,8 @@ public sealed class RegisterBatchHandler(
     IReferenceNumbers numbers,
     IUnitOfWork unitOfWork,
     ICurrentUser user,
-    IClock clock) : ICommandHandler<RegisterBatchCommand, BatchRegisteredResponse>
+    IClock clock,
+    IFormulaOperandLookup formulas) : ICommandHandler<RegisterBatchCommand, BatchRegisteredResponse>
 {
     public async Task<BatchRegisteredResponse> Handle(RegisterBatchCommand command, CancellationToken cancellationToken)
     {
@@ -78,7 +79,7 @@ public sealed class RegisterBatchHandler(
         var number = await numbers.NextAsync(Batch.NumberKind, Batch.NumberPrefix, now, cancellationToken);
         var batch = Batch.Register(number, branch, header, command.Members.Count, actor, now);
 
-        var registrar = new VisitRegistrar(new RegistrarPorts(visits, patients, payers, doctors, catalogue, rules, prices, settings, privileges, numbers));
+        var registrar = new VisitRegistrar(new RegistrarPorts(visits, patients, payers, doctors, catalogue, rules, prices, settings, privileges, numbers, formulas));
         var registered = await BatchMembers.RegisterAsync(registrar, visits, batch, command.Members, command.ServiceIds, command.ConfirmFrequencyWarnings, RegistrationRules.UtcOffset(command.UtcOffsetMinutes), actor, branch, now, cancellationToken);
 
         batches.Add(batch);
@@ -117,7 +118,8 @@ public sealed class AddBatchMembersHandler(
     IReferenceNumbers numbers,
     IUnitOfWork unitOfWork,
     ICurrentUser user,
-    IClock clock) : ICommandHandler<AddBatchMembersCommand, BatchRegisteredResponse>
+    IClock clock,
+    IFormulaOperandLookup formulas) : ICommandHandler<AddBatchMembersCommand, BatchRegisteredResponse>
 {
     public async Task<BatchRegisteredResponse> Handle(AddBatchMembersCommand command, CancellationToken cancellationToken)
     {
@@ -135,7 +137,7 @@ public sealed class AddBatchMembersHandler(
         }
 
         await RegistrationRules.RequireContractAsync(payers, batch.PayerId, batch.ContractTierId, cancellationToken);
-        var registrar = new VisitRegistrar(new RegistrarPorts(visits, patients, payers, doctors, catalogue, rules, prices, settings, privileges, numbers));
+        var registrar = new VisitRegistrar(new RegistrarPorts(visits, patients, payers, doctors, catalogue, rules, prices, settings, privileges, numbers, formulas));
         var registered = await BatchMembers.RegisterAsync(registrar, visits, batch, command.Members, command.ServiceIds, command.ConfirmFrequencyWarnings, RegistrationRules.UtcOffset(command.UtcOffsetMinutes), actor, branch, now, cancellationToken);
 
         batch.AddMembers(command.Members.Count, actor, now);

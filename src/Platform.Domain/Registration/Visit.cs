@@ -168,7 +168,7 @@ public sealed class Visit : AggregateRoot, ITenantScoped
         var holders = new Dictionary<Guid, string>();
         foreach (var line in _lines.Where(line => line.IsLive).OrderBy(line => line.Sequence))
         {
-            var parent = line.ParentLineId is { } parentId ? _lines.FirstOrDefault(candidate => candidate.Id == parentId) : null;
+            var parent = line.Kind == VisitLineKind.PackageMember && line.ParentLineId is { } parentId ? _lines.FirstOrDefault(candidate => candidate.Id == parentId) : null;
             var holder = parent is null ? line.ServiceCode : $"{parent.ServiceCode} › {line.ServiceCode}";
             foreach (var testId in line.TestIds)
             {
@@ -196,7 +196,7 @@ public sealed class Visit : AggregateRoot, ITenantScoped
         CheckHeader(registration);
         Require(actorUserId != Guid.Empty, RegistrationCodes.HeaderInvalid, "A registration needs an actor.", DomainFault.Validation);
         Require(items.Count > 0, RegistrationCodes.LinesRequired, "Add at least one service.", DomainFault.Validation);
-        Require(items.Count <= MaxLines, RegistrationCodes.TooManyLines, $"A visit holds at most {MaxLines} services.", DomainFault.Validation);
+        Require(TopLevelCount(items) <= MaxLines, RegistrationCodes.TooManyLines, $"A visit holds at most {MaxLines} services.", DomainFault.Validation);
 
         var visit = new Visit(registration, actorUserId, nowUtc);
         var added = visit.AddItems(items, registration.CollectorUserId, actorUserId, nowUtc);
@@ -231,7 +231,7 @@ public sealed class Visit : AggregateRoot, ITenantScoped
 
     /// <summary>How many new tubes (and sample numbers) <paramref name="tubeNeeds"/> require on this visit (the handler issues the numbers first).</summary>
     public int CountNewTubes(IEnumerable<TubeSpec?> tubeNeeds) =>
-        TubePlanner.CountNewTubes(ExistingTubes(), [.. (tubeNeeds ?? []).Select(spec => spec?.Key)]);
+        TubePlanner.CountNewTubes(ExistingTubes(), [.. (tubeNeeds ?? []).Select(spec => spec?.Need)]);
 
     /// <summary>The tube needs of items about to be ordered: one per Ordered sample-carrying line (members of an Ordered package included).</summary>
     public static IReadOnlyList<TubeSpec?> TubeNeedsOf(IEnumerable<VisitOrderItem> items) =>
@@ -248,7 +248,7 @@ public sealed class Visit : AggregateRoot, ITenantScoped
         ArgumentNullException.ThrowIfNull(sampleNumbers);
         RequireOpen("add services");
         Require(items.Count > 0, RegistrationCodes.LinesRequired, "Add at least one service.", DomainFault.Validation);
-        Require(_lines.Count(line => line.IsLive && line.IsTopLevel) + items.Count <= MaxLines, RegistrationCodes.TooManyLines, $"A visit holds at most {MaxLines} services.", DomainFault.Validation);
+        Require(_lines.Count(line => line.IsLive && line.IsTopLevel) + TopLevelCount(items) <= MaxLines, RegistrationCodes.TooManyLines, $"A visit holds at most {MaxLines} services.", DomainFault.Validation);
 
         var added = AddItems(items, null, actorUserId, nowUtc);
         var touched = AssignTubes(added, sampleNumbers, nowUtc);
@@ -276,14 +276,16 @@ public sealed class Visit : AggregateRoot, ITenantScoped
         foreach (var lineId in releases.Select(release => release.LineId).Distinct())
         {
             var line = LineOf(lineId);
-            if (line.Kind == VisitLineKind.PackageMember)
+            if (!line.IsTopLevel)
             {
-                if (line.ParentLineId is { } parentId && byLine.ContainsKey(parentId))
+                if (byLine.ContainsKey(TopLevelOf(line).Id))
                 {
-                    continue;   // released with its package below
+                    continue;   // released with its package or its formula line below
                 }
 
-                throw new DomainException(RegistrationCodes.PackageMemberAction, "This service belongs to a package; release the package.", DomainFault.Validation);
+                throw line.Kind == VisitLineKind.FormulaOperand
+                    ? new DomainException(RegistrationCodes.FormulaOperandAction, "This service was added for a formula; release the formula's service.", DomainFault.Validation)
+                    : new DomainException(RegistrationCodes.PackageMemberAction, "This service belongs to a package; release the package.", DomainFault.Validation);
             }
 
             if (line.Status != VisitLineStatus.Reserved)
@@ -323,6 +325,7 @@ public sealed class Visit : AggregateRoot, ITenantScoped
         {
             var line = LineOf(lineId);
             Require(line.Kind != VisitLineKind.PackageMember, RegistrationCodes.PackageMemberAction, "This service belongs to a package; cancel the package.", DomainFault.Validation);
+            Require(line.Kind != VisitLineKind.FormulaOperand, RegistrationCodes.FormulaOperandAction, "This service was added for a formula; cancel the formula's service.", DomainFault.Validation);
             if (!line.IsLive)
             {
                 throw new DomainException(RegistrationCodes.LineNotLive, $"'{line.ServiceCode}' is already cancelled.", DomainFault.Conflict);
@@ -444,6 +447,7 @@ public sealed class Visit : AggregateRoot, ITenantScoped
     {
         var line = LineOf(lineId);
         Require(line.Kind != VisitLineKind.PackageMember, RegistrationCodes.PackageMemberAction, "This service belongs to a package; adjust the package.", DomainFault.Validation);
+        Require(line.Kind != VisitLineKind.FormulaOperand, RegistrationCodes.FormulaOperandAction, "This service was added for a formula and carries no price.", DomainFault.Validation);
         if (!line.IsLive)
         {
             throw new DomainException(RegistrationCodes.LineNotLive, $"'{line.ServiceCode}' is cancelled.", DomainFault.Conflict);
@@ -546,6 +550,16 @@ public sealed class Visit : AggregateRoot, ITenantScoped
                 }
             }
 
+            if (item.Kind == VisitLineKind.FormulaOperand)
+            {
+                // LIS-CR-015: the operand line hangs under its formula line (a line of this order or a live line) and shares its state.
+                var formula = FormulaLineOf(item);
+                var operandLine = VisitLine.Create(Id, item, VisitLineKind.FormulaOperand, formula.Id, formula.Status, ++sequence, collectorUserId, actorUserId, nowUtc);
+                _lines.Add(operandLine);
+                added.Add((operandLine, item.Tube));
+                continue;
+            }
+
             var status = item.Reserved ? VisitLineStatus.Reserved : VisitLineStatus.Ordered;
             var kind = item.Kind == VisitLineKind.Package ? VisitLineKind.Package : VisitLineKind.Service;
             var line = VisitLine.Create(Id, item, kind, null, status, ++sequence, collectorUserId, actorUserId, nowUtc);
@@ -569,7 +583,8 @@ public sealed class Visit : AggregateRoot, ITenantScoped
     private List<VisitTube> AssignTubes(IReadOnlyList<(VisitLine Line, TubeSpec? Spec)> lines, SampleNumberSource sampleNumbers, DateTimeOffset nowUtc)
     {
         var needs = lines.Select(pair => NeedsTube(pair.Line) ? pair.Spec : null).ToList();
-        var plan = TubePlanner.Assign(ExistingTubes(), [.. needs.Select(spec => spec?.Key)]);
+        var plan = TubePlanner.Assign(ExistingTubes(), [.. needs.Select(spec => spec?.Need)]);
+        // a new tube is named by a need of its own key: a compatible condition joins a new tube only when its target is needed too (LIS-CR-015 M4)
         var created = plan.NewTubes.Select(key => VisitTube.Create(Id, sampleNumbers.Next(), needs.First(spec => spec is not null && spec.Key == key)!, nowUtc)).ToList();
         _tubes.AddRange(created);
 
@@ -718,8 +733,39 @@ public sealed class Visit : AggregateRoot, ITenantScoped
         _lines.FirstOrDefault(line => line.Id == lineId)
         ?? throw new DomainException(RegistrationCodes.LineNotOnVisit, "The service line does not belong to this visit.", DomainFault.Validation);
 
-    private IEnumerable<VisitLine> MembersOf(VisitLine line) =>
-        line.Kind == VisitLineKind.Package ? _lines.Where(member => member.ParentLineId == line.Id) : [];
+    /// <summary>
+    /// The lines that follow <paramref name="line"/>: a package's members, then the formula operand lines ordered for the line
+    /// or for one of those members (LIS-CR-015).
+    /// </summary>
+    private IEnumerable<VisitLine> MembersOf(VisitLine line)
+    {
+        var members = line.Kind == VisitLineKind.Package ? _lines.Where(member => member.ParentLineId == line.Id && member.Kind == VisitLineKind.PackageMember).ToList() : [];
+        var owners = members.Prepend(line).Select(owner => owner.Id).ToHashSet();
+        return [.. members, .. _lines.Where(operand => operand.Kind == VisitLineKind.FormulaOperand && operand.ParentLineId is { } parentId && owners.Contains(parentId))];
+    }
+
+    /// <summary>The top-level line a package member or a formula operand line follows (itself for a top-level line).</summary>
+    private VisitLine TopLevelOf(VisitLine line)
+    {
+        var current = line;
+        for (var depth = 0; depth < 3 && !current.IsTopLevel && current.ParentLineId is { } parentId; depth++)
+        {
+            current = LineOf(parentId);
+        }
+
+        return current;
+    }
+
+    /// <summary>The live line of the formula an operand item was planned for (LIS-CR-015): the line of <see cref="VisitOrderItem.FormulaServiceId"/>.</summary>
+    private VisitLine FormulaLineOf(VisitOrderItem item)
+    {
+        Require(item.Members.Count == 0 && item.FormulaServiceId is { } id && id != Guid.Empty, RegistrationCodes.HeaderInvalid, "A formula operand names the service of its formula.", DomainFault.Validation);
+        return _lines.LastOrDefault(line => line.IsLive && line.ServiceId == item.FormulaServiceId && line.Kind != VisitLineKind.FormulaOperand)
+            ?? throw new DomainException(RegistrationCodes.HeaderInvalid, $"'{item.ServiceCode}' is ordered for a formula that is not on this visit.", DomainFault.Validation);
+    }
+
+    /// <summary>The items that count against <see cref="MaxLines"/>: formula operands follow their formula (LIS-CR-015).</summary>
+    private static int TopLevelCount(IReadOnlyList<VisitOrderItem> items) => items.Count(item => item?.Kind != VisitLineKind.FormulaOperand);
 
     private RegisteredTube ToRegisteredTube(VisitTube tube) =>
         new(tube.Id, tube.SampleNumber, tube.ClinicalGroupId, tube.SampleTypeId, tube.SampleConditionId,

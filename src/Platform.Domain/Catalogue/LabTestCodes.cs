@@ -25,6 +25,9 @@ public static class LabTestCodes
     public const string FormulaUnknownReference = "CAT-064";
     public const string FormulaSelfReference = "CAT-065";
     public const string FormulaCycle = "CAT-066";
+
+    /// <summary>The service chosen to order for a formula operand does not carry that test (LIS-CR-015).</summary>
+    public const string FormulaOperandServiceInvalid = "CAT-067";
     public const string ParagraphsNotAllowed = "CAT-068";
     public const string ParagraphInvalid = "CAT-069";
     public const string TimingInvalid = "CAT-070";

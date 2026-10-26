@@ -275,6 +275,7 @@
   "doc.services": "Services",
   "doc.service": "Service",
   "doc.reserved": "deferred",
+  "doc.forFormula": "for formula {code}",
   "doc.total": "Total",
   "doc.payments": "Payments",
   "doc.refunds": "Refunds",

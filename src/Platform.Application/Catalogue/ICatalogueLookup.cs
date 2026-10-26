@@ -113,6 +113,7 @@ public sealed record CatalogueTestInfo(
 
 public sealed record CatalogueClinicalGroupInfo(Guid Id, string Code, string UnitCode, string NameEn, string NameAr, string? ReportName, Guid? ReportTemplateId, int DisplayOrder, bool IsActive);
 
-public sealed record CatalogueSampleConditionInfo(Guid Id, string Code, string NameEn, string NameAr, bool IsActive);
+/// <summary><paramref name="MergesIntoConditionId"/> (LIS-CR-015 M4): the compatible condition of the same type whose tube this condition's tests may join.</summary>
+public sealed record CatalogueSampleConditionInfo(Guid Id, string Code, string NameEn, string NameAr, bool IsActive, Guid? MergesIntoConditionId = null);
 
 public sealed record CatalogueSampleTypeInfo(Guid Id, string Code, string ShortName, string NameEn, string NameAr, bool IsActive, IReadOnlyList<CatalogueSampleConditionInfo> Conditions);

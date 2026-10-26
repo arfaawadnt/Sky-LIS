@@ -13,3 +13,6 @@ public sealed record SampleConditionsChanged(Guid SampleTypeId, string Code, int
 public sealed record SampleTypeDeactivated(Guid SampleTypeId, string Code, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
 
 public sealed record SampleTypeReactivated(Guid SampleTypeId, string Code, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);
+
+/// <summary>The compatible conditions of the type changed (LIS-CR-015 M4); <paramref name="MergingConditionCount"/> = conditions that now merge into another.</summary>
+public sealed record SampleConditionCompatibilityChanged(Guid SampleTypeId, string Code, int MergingConditionCount, DateTimeOffset OccurredAtUtc) : DomainEvent(OccurredAtUtc);

@@ -118,16 +118,24 @@
           </thead>
           <tbody>
             @for (line of savedLines(); track line.id) {
-              <tr class="saved" [class.cancelled]="line.status === 'Cancelled'" [class.member]="line.kind === 'PackageMember'">
-                <td class="mono code">{{ line.kind === 'PackageMember' ? '↳ ' : '' }}{{ line.code }}</td>
-                <td>{{ name(line.nameEn, line.nameAr) }}</td>
+              <tr class="saved" [class.cancelled]="line.status === 'Cancelled'" [class.member]="follows(line.kind)">
+                <td class="mono code">{{ follows(line.kind) ? '↳ ' : '' }}{{ line.code }}</td>
+                <td>
+                  {{ name(line.nameEn, line.nameAr) }}
+                  @if (savedFormulaOf(line); as formula) {
+                    <app-badge tone="info">{{ i18n.tf('registration.forFormula', { code: formula }) }}</app-badge>
+                  }
+                  @if (line.visibleOnReceipt === false) {
+                    <span class="hint">{{ i18n.t('registration.offReceipt') }}</span>
+                  }
+                </td>
                 <td><app-badge [status]="line.status">{{ i18n.t('registration.lineStatus.' + line.status) }}</app-badge></td>
                 <td class="mono small">{{ line.sampleNumber ?? '' }}</td>
                 <td class="small nowrap">{{ when(line.expectedResultAtUtc) }}</td>
                 <td class="num">{{ line.kind === 'PackageMember' ? '' : amount(line.patientShare) }}</td>
                 <td class="num">{{ line.kind === 'PackageMember' ? '' : amount(line.payerShare) }}</td>
                 <td>
-                  @if (line.status === 'Reserved' && line.kind !== 'PackageMember' && canRelease()) {
+                  @if (line.status === 'Reserved' && !follows(line.kind) && canRelease()) {
                     <button type="button" class="btn sm" [disabled]="facade.release.pending()" (click)="release(line)">{{ i18n.t('registration.release') }}</button>
                   }
                 </td>
@@ -135,12 +143,17 @@
             }
 
             @for (line of facade.plannedLines(); track line.serviceId) {
-              <tr class="planned" [class.has-issue]="issuesOf(line.serviceId).length > 0" [class.has-warning]="warnedServices().has(line.serviceId)">
-                <td class="mono code">{{ line.code }}</td>
+              <tr class="planned" [class.member]="follows(line.kind)" [class.has-issue]="issuesOf(line.serviceId).length > 0" [class.has-warning]="warnedServices().has(line.serviceId)">
+                <td class="mono code">{{ follows(line.kind) ? '↳ ' : '' }}{{ line.code }}</td>
                 <td>
                   {{ name(line.nameEn, line.nameAr) }}
-                  @if (line.origin !== 'Manual') {
+                  @if (line.formulaServiceCode) {
+                    <app-badge tone="info">{{ i18n.tf('registration.forFormula', { code: line.formulaServiceCode }) }}</app-badge>
+                  } @else if (line.origin !== 'Manual') {
                     <app-badge tone="info">{{ i18n.t('registration.origin.' + line.origin) }}</app-badge>
+                  }
+                  @if (line.visibleOnReceipt === false) {
+                    <span class="hint">{{ i18n.t('registration.offReceipt') }}</span>
                   }
                   @if (line.alertCondition) {
                     <span class="hint warn" [title]="line.alertCondition"><app-icon name="alert" [size]="13" /> {{ line.alertCondition }}</span>

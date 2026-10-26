@@ -214,7 +214,8 @@ internal sealed record RegistrarPorts(
     IPriceLookup Prices,
     ITenantSettings Settings,
     IUserPrivileges Privileges,
-    IReferenceNumbers Numbers);
+    IReferenceNumbers Numbers,
+    IFormulaOperandLookup Formulas);
 
 /// <summary>One visit to register; <paramref name="HeaderChecked"/> skips the contract and doctor checks a batch already made.</summary>
 internal sealed record VisitRegistrationInput(
@@ -263,7 +264,7 @@ internal sealed class VisitRegistrar(RegistrarPorts ports)
             throw new DomainException(RegistrationCodes.LinesRequired, "Add at least one service.", DomainFault.Validation);
         }
 
-        var planner = new OrderPlanner(ports.Catalogue, ports.Rules, ports.Prices, ports.Visits);
+        var planner = new OrderPlanner(ports.Catalogue, ports.Rules, ports.Prices, ports.Visits, ports.Formulas);
         var plan = await planner.PlanAsync(
             new OrderContext(new OrderPatient(patient.Id, patient.Gender), input.PayerId, input.ContractTierId, input.DiagnosisId, input.Lines, new HashSet<Guid>(), null, nowUtc, input.UtcOffsetMinutes),
             cancellationToken);
@@ -273,7 +274,7 @@ internal sealed class VisitRegistrar(RegistrarPorts ports)
         var discount = await RegistrationRules.DiscountAsync(ports.Rules, ports.Settings, ports.Privileges, input.Discount, cancellationToken);
         var items = plan.Items;
         var accession = await ports.Numbers.NextAsync(Visit.AccessionKind, Visit.AccessionPrefix, nowUtc, cancellationToken);
-        var sampleCount = TubePlanner.CountNewTubes([], [.. Visit.TubeNeedsOf(items).Select(spec => spec?.Key)]);
+        var sampleCount = TubePlanner.CountNewTubes([], [.. Visit.TubeNeedsOf(items).Select(spec => spec?.Need)]);
         var samples = await RegistrationRules.SampleNumbersAsync(ports.Numbers, sampleCount, nowUtc, cancellationToken);
 
         var visit = Visit.Register(
@@ -312,9 +313,9 @@ internal static class OrderPlanViews
     public static OrderCheckResult ToCheckResult(OrderPlan plan, Visit? visit, string currency)
     {
         ArgumentNullException.ThrowIfNull(plan);
-        var tubes = Tubes(plan.Items, visit);
+        var tubes = Tubes(plan.Items, visit, out var merged);
         return new OrderCheckResult(
-            [.. plan.Lines.Select(line => Preview(line.Item, line))],
+            [.. plan.Lines.Select(line => Merged(Preview(line.Item, line), merged))],
             tubes,
             new OrderTotals(plan.Lines.Sum(line => line.Item.ListPrice), plan.Lines.Sum(line => line.Item.PatientShare), plan.Lines.Sum(line => line.Item.PayerShare)),
             plan.Issues,
@@ -371,29 +372,45 @@ internal static class OrderPlanViews
             line?.RuleNameEn,
             line?.RuleNameAr,
             KeyOf(item),
-            [.. item.Members.Select(member => Preview(member with { Reserved = item.Reserved }, null))]);
+            [.. item.Members.Select(member => Preview(member with { Reserved = item.Reserved }, null))],
+            line?.FormulaServiceCode,
+            item.VisibleOnReceipt);
 
-    private static List<TubePreview> Tubes(IReadOnlyList<VisitOrderItem> items, Visit? visit)
+    /// <summary>
+    /// The tubes of the dry run as <see cref="Visit"/> would assign them; <paramref name="merged"/> maps the own key of a need
+    /// whose compatible condition joined its target's tube to that tube's key (LIS-CR-015 M4), so line previews point at it.
+    /// </summary>
+    private static List<TubePreview> Tubes(IReadOnlyList<VisitOrderItem> items, Visit? visit, out Dictionary<string, string> merged)
     {
         var existing = visit?.Tubes.Select(tube => new TubePlanner.ExistingTube(tube.Id, tube.Key, visit.Lines.Any(line => line.TubeId == tube.Id && line.Status == VisitLineStatus.Ordered))).ToList() ?? [];
         var needs = items.Where(item => !item.Reserved)
             .SelectMany(item => item.Kind == VisitLineKind.Package ? item.Members : [item])
             .Where(item => item.Tube is not null && Visit.SampleCarryingTypes.Contains(item.ServiceType))
             .ToList();
-        var plan = TubePlanner.Assign(existing, [.. needs.Select(item => (TubeKey?)item.Tube!.Key)]);
+        var plan = TubePlanner.Assign(existing, [.. needs.Select(item => (TubePlanner.Need?)item.Tube!.Need)]);
 
+        merged = new Dictionary<string, string>(StringComparer.Ordinal);
         var previews = new List<TubePreview>();
         for (var index = 0; index < needs.Count; index++)
         {
             var item = needs[index];
-            var spec = item.Tube!;
-            var key = KeyText(spec.Key);
             var assignment = plan.Assignments[index]!;
+            var tubeKey = assignment.Key ?? item.Tube!.Key;
+            var key = KeyText(tubeKey);
+            if (tubeKey != item.Tube!.Key)
+            {
+                merged[KeyText(item.Tube.Key)] = key;
+            }
+
+            // the tube is named by a need of its own key (the target of a merge), else by the existing tube it joins
+            var spec = tubeKey == item.Tube.Key ? item.Tube : needs.Select(need => need.Tube!).FirstOrDefault(candidate => candidate.Key == tubeKey);
             var existingTube = assignment.ExistingTubeId is { } tubeId ? visit!.Tubes.First(tube => tube.Id == tubeId) : null;
             var preview = previews.FirstOrDefault(candidate => candidate.Key == key && candidate.ExistingTubeId == existingTube?.Id);
             if (preview is null)
             {
-                previews.Add(new TubePreview(key, existingTube?.Id, existingTube?.SampleNumber, spec.UnitCode, spec.ClinicalGroupNameEn, spec.ClinicalGroupNameAr, spec.SampleTypeNameEn, spec.SampleTypeNameAr, spec.SampleConditionNameEn, spec.SampleConditionNameAr, [item.ServiceId]));
+                previews.Add(spec is not null
+                    ? new TubePreview(key, existingTube?.Id, existingTube?.SampleNumber, spec.UnitCode, spec.ClinicalGroupNameEn, spec.ClinicalGroupNameAr, spec.SampleTypeNameEn, spec.SampleTypeNameAr, spec.SampleConditionNameEn, spec.SampleConditionNameAr, [item.ServiceId])
+                    : new TubePreview(key, existingTube!.Id, existingTube.SampleNumber, existingTube.UnitCode, existingTube.ClinicalGroupNameEn, existingTube.ClinicalGroupNameAr, existingTube.SampleTypeNameEn, existingTube.SampleTypeNameAr, existingTube.SampleConditionNameEn, existingTube.SampleConditionNameAr, [item.ServiceId]));
             }
             else
             {
@@ -403,6 +420,16 @@ internal static class OrderPlanViews
 
         return previews;
     }
+
+    /// <summary>A line preview (and its members) pointing at the tube its compatible condition merged into, when it did.</summary>
+    private static OrderLinePreview Merged(OrderLinePreview preview, Dictionary<string, string> merged) =>
+        merged.Count == 0
+            ? preview
+            : preview with
+            {
+                TubeKey = preview.TubeKey is { } own && merged.TryGetValue(own, out var target) ? target : preview.TubeKey,
+                Members = [.. preview.Members.Select(member => Merged(member, merged))],
+            };
 }
 
 /// <summary>Name lookups for registers and documents: one call per distinct id, cached for the request.</summary>
