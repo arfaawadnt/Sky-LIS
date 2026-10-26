@@ -9,6 +9,7 @@ using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Organization;
 using Platform.Application.Patients;
+using Platform.Application.Tracker;
 using Platform.Contracts.Billing;
 using Platform.Contracts.Common;
 using Platform.Contracts.Registration;
@@ -174,6 +175,76 @@ public sealed class TrackerFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         {
             var refused = await client.GetAsync(Tracker + query);
             Assert.True(refused.StatusCode == HttpStatusCode.BadRequest, $"{query}: {(int)refused.StatusCode}");
+        }
+    }
+
+    [DatabaseFact]
+    public async Task Service_rows_follow_each_line_on_its_own_while_the_counters_stay_the_visits()
+    {
+        // LIS-CR-014 T3: ?rows=services answers one row per live top-level line with the line's own stage, next step and
+        // samples / results; the visit's identity and balance travel along; the counters are the visits' as before.
+        var world = await SeedAsync();
+        var (desk, _, _) = await factory.SeedUserAsync(tenantId: world.Tenant, permissions: DeskPermissions, displayName: "Front Desk", branchIds: [world.Branch]);
+        await GrantAsync(world.Tenant, desk, SpecialRights.All, world.Chemistry);
+        var client = await SignedInClientAsync(desk);
+
+        var response = await client.PostAsJsonAsync(Visits, new RegisterVisitRequest(world.Patient, null, null, world.Payer, world.Tier, null, null, null, false, false, false, [new OrderLineRequest(world.Glucose, false), new OrderLineRequest(world.Cbc, false)], null, null, false, 120));
+        Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        var both = (await response.Content.ReadFromJsonAsync<VisitRegisteredResponse>())!;
+        var single = await RegisterAsync(client, world, world.Patient, world.Glucose);
+        await DispatchVisitEventsAsync(world.Tenant);
+        await EnterAsync(client, both.Accession, 4.2m);   // the glucose of the first visit waits for verification
+
+        var visits = (await client.GetFromJsonAsync<LabTrackerPage>(Tracker))!;
+        Assert.Equal((LabTrackerRows.Visits, (IReadOnlyList<LabTrackerServiceItem>?)null), (visits.Rows, visits.Services));
+
+        var page = (await client.GetFromJsonAsync<LabTrackerPage>($"{Tracker}?rows=services"))!;
+        Assert.Equal(LabTrackerRows.Services, page.Rows);
+        Assert.Empty(page.Items);
+        Assert.Equal(visits.Counters, page.Counters);   // counters stay visit-based
+        Assert.Equal(new LabTrackerCounters(2, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0), page.Counters);
+        Assert.Equal(3L, page.TotalCount);
+        var rows = page.Services!;
+        var glucose = rows.Single(row => row.VisitId == both.Id && row.ServiceCode == "GLU");
+        var cbc = rows.Single(row => row.VisitId == both.Id && row.ServiceCode == "CBC");
+        var alone = rows.Single(row => row.VisitId == single.Id);
+
+        Assert.Equal(("AwaitingVerification", "VerifyResults", "AwaitingVerification"), (glucose.Stage, glucose.NextStep, glucose.VisitStage));
+        Assert.Equal((1, 1, 0), (glucose.Results!.Total, glucose.Results.Complete, glucose.Results.Hidden));
+        Assert.Equal((1, 1), (glucose.Samples!.Total, glucose.Samples.Received));
+        Assert.Equal(("GLU service", "Service", both.Accession, "Mona Hassan"), (glucose.ServiceName, glucose.ServiceKind, glucose.Accession, glucose.PatientName));
+        Assert.Equal(("Unpaid", 150m), (glucose.Payment!.Status, glucose.Payment.Remaining));   // the visit's balance on every line
+        Assert.Equal(glucose.Payment, cbc.Payment);
+
+        // the CBC line holds results outside the desk's rights: followed on all its results, counted as hidden
+        Assert.Equal(("InLab", "EnterResults", 0, 1), (cbc.Stage, cbc.NextStep, cbc.Results!.Total, cbc.Results.Hidden));
+        Assert.InRange(cbc.MinutesLeft!.Value, 1439, 1440);
+        Assert.Equal(("InLab", "EnterResults"), (alone.Stage, alone.NextStep));
+
+        // the line's own stage filters the rows; sort by the service code, then accession and sequence
+        var inLab = (await client.GetFromJsonAsync<LabTrackerPage>($"{Tracker}?rows=services&stage=InLab"))!;
+        Assert.Equal(new[] { cbc.LineId, alone.LineId }.Order(), inLab.Services!.Select(row => row.LineId).Order());
+        Assert.Equal((2L, page.Counters), (inLab.TotalCount, inLab.Counters));
+        var byCode = (await client.GetFromJsonAsync<LabTrackerPage>($"{Tracker}?rows=services&sort=service"))!;
+        Assert.Equal([cbc.LineId, glucose.LineId, alone.LineId], byCode.Services!.Select(row => row.LineId).ToArray());
+        var byCodeDesc = (await client.GetFromJsonAsync<LabTrackerPage>($"{Tracker}?rows=Services&sort=service&direction=desc&pageSize=2"))!;
+        Assert.Equal([glucose.LineId, alone.LineId], byCodeDesc.Services!.Select(row => row.LineId).ToArray());
+        Assert.Equal(3L, byCodeDesc.TotalCount);
+        foreach (var key in TrackerSortKeys.Services.Names)
+        {
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"{Tracker}?rows=services&sort={key}&direction=desc")).StatusCode);
+        }
+
+        // the raw JSON: camelCase names, the rows mode and the service rows
+        var json = JsonDocument.Parse(await client.GetStringAsync($"{Tracker}?rows=services")).RootElement;
+        Assert.Equal("Services", json.GetProperty("rows").GetString());
+        Assert.True(json.GetProperty("services")[0].TryGetProperty("serviceCode", out _));
+        Assert.True(json.GetProperty("services")[0].TryGetProperty("lineId", out _));
+
+        // the shape: a rows mode of its own, the service key only with service rows
+        foreach (var query in new[] { "?rows=lines", "?sort=service", "?rows=services&sort=password" })
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync(Tracker + query)).StatusCode);
         }
     }
 

@@ -13,6 +13,12 @@ namespace Platform.Application.Tracker;
 public interface ILabTrackerReader
 {
     Task<IReadOnlyList<LabTrackerRow>> ReadAsync(LabTrackerFilter filter, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The live top-level service lines (services and packages; package members fold into their package) of the same visits
+    /// <paramref name="filter"/> selects, with the per-line aggregates of their samples and results (LIS-CR-014 T3).
+    /// </summary>
+    Task<IReadOnlyList<LabTrackerServiceRow>> ReadServicesAsync(LabTrackerFilter filter, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -72,6 +78,34 @@ public sealed record LabTrackerRow(
     decimal Refunded,
     bool BilledThroughClaims);
 
+/// <summary>
+/// One live top-level line of a visit for the tracker's <i>Services</i> rows (LIS-CR-014 T3): the service as ordered (code,
+/// names, sequence), the live samples of the tubes of the line and its package members, its live results (visible by the
+/// user's result rights and all) with the clocks of the unsigned ones, the visible panic / delta counts and the first visible
+/// panic test. A sample shared by two lines (one tube) counts for both.
+/// </summary>
+public sealed record LabTrackerServiceRow(
+    Guid VisitId,
+    Guid LineId,
+    Guid ServiceId,
+    string ServiceCode,
+    string ServiceNameEn,
+    string ServiceNameAr,
+    string Kind,
+    int Sequence,
+    VisitSampleCounts Samples,
+    string? FirstRejectionReasonEn,
+    string? FirstRejectionReasonAr,
+    VisitResultCounts VisibleResults,
+    VisitResultCounts AllResults,
+    int VisiblePanics,
+    int VisibleOpenPanics,
+    int VisibleDeltas,
+    string? FirstPanicTestEn,
+    string? FirstPanicTestAr,
+    IReadOnlyList<ResultClock> VisibleOpenClocks,
+    IReadOnlyList<ResultClock> AllOpenClocks);
+
 /// <summary>The sortable columns of the tracker (allow-list; the handler orders the whole filtered day before paging).</summary>
 public static class TrackerSortKeys
 {
@@ -81,5 +115,11 @@ public static class TrackerSortKeys
     public const string Patient = "patient";
     public const string Stage = "stage";
 
+    /// <summary>The service code (the <i>Services</i> rows only, LIS-CR-014 T3).</summary>
+    public const string Service = "service";
+
     public static readonly SortKeys Visits = new(TimeLeft, RegisteredAt, Accession, Patient, Stage);
+
+    /// <summary>The keys of the <i>Services</i> rows: the visit keys and the service code.</summary>
+    public static readonly SortKeys Services = new(TimeLeft, RegisteredAt, Accession, Patient, Stage, Service);
 }

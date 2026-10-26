@@ -124,6 +124,17 @@ public static class PlatformAdminCodes
     public const string SubscriptionNotVerified = "SUB-003";
     public const string TooManyCodes = "SUB-004";
     public const string CodeRejected = "SUB-010";
+
+    /// <summary>
+    /// LIS-CR-014 (S1): the manager's mobile already belongs to a platform user account (any spelling; it becomes the
+    /// administrator's mobile, unique among users). Raised by the early check, by start and again by complete, on the field <c>managerMobile</c>.
+    /// </summary>
+    public const string MobileInUse = "SUB-011";
+
+    // SUB-012 is reserved for a laboratory-name rule; no such rule exists (names are not unique), so nothing raises it.
+
+    /// <summary>LIS-CR-014 (S2): the administrator username is taken (the availability check of step 3 and complete, field <c>username</c>).</summary>
+    public const string UsernameInUse = "SUB-013";
     public const string SubscriptionNotFound = "SUB-404";
 
     // The Super Admin portal

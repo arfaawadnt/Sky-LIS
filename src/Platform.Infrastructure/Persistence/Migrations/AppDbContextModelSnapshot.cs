@@ -8087,6 +8087,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_primary_administrator");
 
+                    b.Property<string>("ListPreferences")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("list_preferences");
+
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_at_utc");

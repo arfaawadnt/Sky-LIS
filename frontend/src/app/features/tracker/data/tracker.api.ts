@@ -25,6 +25,7 @@ export class TrackerApi {
       pageSize: query.pageSize,
       sort: query.sort,
       direction: query.direction,
+      rows: query.rows ?? null,
     });
     return firstValueFrom(this.http.get<LabTrackerPage>(TRACKER_API.visits, { params })).then(abortable(signal));
   }

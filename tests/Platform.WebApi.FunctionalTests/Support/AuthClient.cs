@@ -82,7 +82,8 @@ internal sealed class AuthClient(HttpClient http)
         var response = await SignInAsync(username, password, target, cookie);
         Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
         var body = (await response.Content.ReadFromJsonAsync<AuthResponse>())!;
-        var setCookie = response.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("__Secure-rt=", StringComparison.Ordinal));
+        // LIS-CR-014 G1: a laboratory sign-in sets __Secure-rt, a Super Admin sign-in __Secure-rta (the cookie of its portal)
+        var setCookie = response.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("__Secure-rt=", StringComparison.Ordinal) || value.StartsWith("__Secure-rta=", StringComparison.Ordinal));
         return (body, CookieValue(setCookie), setCookie);
     }
 

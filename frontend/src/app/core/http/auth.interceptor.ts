@@ -21,6 +21,8 @@ function withBearer<T>(req: HttpRequest<T>, token: string | null): HttpRequest<T
  * tabs of the browser, and a request built for one user must never be sent as another. When the refresh fails or
  * returns another identity, the store clears the session and reloads the sign-in page itself (full page load, A-01);
  * the original error is surfaced and nothing is replayed. A 401 without a session (anonymous page) routes to sign-in.
+ * LIS-CR-014 G1: the refresh behind a replay is the tab's own portal's (`AuthStore.refresh` asks `?portal=admin` on a Super
+ * Admin page), so a 401 in one portal never rotates or adopts the other portal's session.
  *
  * Once the tab's session has ended and the sign-in page is loading (`AuthStore.hasEnded`, round 2 R2-05), no API request
  * leaves the browser: it fails locally (status 0) instead of reaching the server without a token and being refused with 401.

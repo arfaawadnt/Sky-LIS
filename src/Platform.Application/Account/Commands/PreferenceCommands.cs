@@ -64,3 +64,45 @@ public sealed class UpdateMyPreferencesHandler(
         }
     }
 }
+
+/// <summary>
+/// LIS-CR-014 T2: the columns the signed-in member hides in one table (the column chooser's view, saved per user on the
+/// membership of the session's tenant — <c>TenantMembership.SetListPreference</c>; an empty set returns the table to its
+/// defaults). Keys and size are the domain's rules (TEN-015). Every live session of the user is evicted, like the other
+/// preferences, so the next refresh profile carries the view on every device.
+/// </summary>
+[RequireAuthenticatedActor]
+public sealed record UpdateMyListPreferenceCommand(string ListKey, IReadOnlyList<string> Hidden) : ICommand;
+
+public sealed class UpdateMyListPreferenceValidator : AbstractValidator<UpdateMyListPreferenceCommand>
+{
+    public UpdateMyListPreferenceValidator()
+    {
+        RuleFor(command => command.ListKey).NotEmpty();
+        RuleFor(command => command.Hidden).NotNull();
+    }
+}
+
+public sealed class UpdateMyListPreferenceHandler(
+    ITenantMembershipRepository memberships,
+    IRefreshSessionRepository sessions,
+    ISessionPrincipalQuery principals,
+    IUnitOfWork unitOfWork,
+    ICurrentUser user) : ICommandHandler<UpdateMyListPreferenceCommand>
+{
+    public async Task Handle(UpdateMyListPreferenceCommand command, CancellationToken cancellationToken)
+    {
+        var (userId, sessionId) = AccountActor.RequireSession(user);
+        var membership = await memberships.FindByPlatformUserAsync(userId, cancellationToken)
+            ?? throw new DomainException(AccountCodes.MembershipNotFound, "The account has no membership in this tenant.", DomainFault.NotFound);
+
+        membership.SetListPreference(command.ListKey, command.Hidden);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        principals.Evict(sessionId);
+        foreach (var session in await sessions.ListLiveForUserAsync(userId, cancellationToken))
+        {
+            principals.Evict(session.Id);
+        }
+    }
+}

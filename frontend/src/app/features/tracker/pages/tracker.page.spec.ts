@@ -2,13 +2,13 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 
 import { TRACKER_API } from '../../../core/api/tracker.contracts';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { TRACKER_TIMERS, TrackerFacade } from '../state/tracker.facade';
-import { ManualTimers, settle, trackerItem, trackerPage } from '../testing/tracker.fixtures';
+import { ManualTimers, settle, trackerItem, trackerPage, trackerServiceItem } from '../testing/tracker.fixtures';
 import { TrackerPage } from './tracker.page';
 
 describe('TrackerPage (LIS-CR-006, CP-69)', () => {
@@ -76,8 +76,8 @@ describe('TrackerPage (LIS-CR-006, CP-69)', () => {
     expect(rows()[0]?.classList.contains('edge-late')).toBe(true);
     expect(rows()[1]?.classList.contains('edge-ok')).toBe(true);
     const steps = rows().map((row) => row.querySelector<HTMLAnchorElement>('app-tracker-next-step a')?.getAttribute('href'));
-    expect(steps).toEqual(['/billing/payments?visitId=visit-1', '/results/by-accession?accession=ACC-2026-00002', '/registration/accession?visitId=visit-3']);
-    expect(rows()[0]?.querySelector('a.link')?.getAttribute('href')).toBe('/registration/accession?visitId=visit-1');
+    expect(steps).toEqual(['/billing/payments?visitId=visit-1&returnTo=%2F', '/results/by-accession?accession=ACC-2026-00002&returnTo=%2F', '/registration/accession?visitId=visit-3&returnTo=%2F']);
+    expect(rows()[0]?.querySelector('a.link')?.getAttribute('href')).toBe('/registration/accession?visitId=visit-1&returnTo=%2F');
     expect(rows()[0]?.textContent).toContain('tracker.urgent');
     expect(rows()[0]?.textContent).toContain('tracker.time.late');
     expect(rows()[2]?.textContent).toContain('tracker.vipMasked');
@@ -89,7 +89,7 @@ describe('TrackerPage (LIS-CR-006, CP-69)', () => {
 
     expect(rows()[0]?.querySelector('app-tracker-next-step a')).toBeNull();
     expect(rows()[0]?.querySelector('app-tracker-next-step')?.textContent).toContain('tracker.next.TakePayment');
-    expect(rows()[2]?.querySelector('app-tracker-next-step a')?.getAttribute('href')).toBe('/registration/accession?visitId=visit-3');
+    expect(rows()[2]?.querySelector('app-tracker-next-step a')?.getAttribute('href')).toBe('/registration/accession?visitId=visit-3&returnTo=%2F');
   });
 
   it('reads "—" with the "Not in your rights" tooltip where the server left a section out', async () => {
@@ -158,5 +158,68 @@ describe('TrackerPage (LIS-CR-006, CP-69)', () => {
     await render();
     expect(backend.expectOne((request) => request.url === TRACKER_API.visits).request.params.get('view')).toBe('FrontDesk');
     expect(buttonWith('app-tracker-view-tabs button', 'tracker.view.FrontDesk').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  // ---- LIS-CR-014 -------------------------------------------------------------------------------------------------------
+
+  const actionLinks = (row: HTMLTableRowElement | undefined): (string | null)[] =>
+    [...(row?.querySelectorAll<HTMLAnchorElement>('app-tracker-row-actions a') ?? [])].map((link) => link.getAttribute('href'));
+
+  it('T1: offers the CP-10 row actions by permission, each a link carrying returnTo', async () => {
+    await open(['registration.view', 'registration.edit', 'registration.cancel', 'billing.view', 'patients.view', 'samples.view', 'results.view']);
+
+    expect(actionLinks(rows()[0])).toEqual([
+      '/registration/accession?accession=ACC-2026-00001&returnTo=%2F',
+      '/registration/visits/visit-1?returnTo=%2F',
+      '/billing/payments?visitId=visit-1&returnTo=%2F',
+      '/registration/accession?accession=ACC-2026-00001&tab=documents&returnTo=%2F',
+      '/patients/pat-1?returnTo=%2F',
+      '/registration/accession?accession=ACC-2026-00001&tab=samples&returnTo=%2F',
+      '/results/by-accession?accession=ACC-2026-00001&returnTo=%2F',
+      '/registration/accession?accession=ACC-2026-00001&tab=cancel&returnTo=%2F',
+    ]);
+  });
+
+  it('T1: a read-only desk keeps Details and Documents only', async () => {
+    await open(['registration.view']);
+
+    expect(actionLinks(rows()[0])).toEqual(['/registration/accession?accession=ACC-2026-00001&returnTo=%2F', '/registration/accession?accession=ACC-2026-00001&tab=documents&returnTo=%2F']);
+  });
+
+  it('T3: the Visits | Services toggle asks for service rows and shows the service column', async () => {
+    await open(['registration.view']);
+
+    buttonWith('app-tracker-rows-toggle button', 'tracker.rows.services').click();
+    await render();
+    const call = backend.expectOne((request) => request.url === TRACKER_API.visits);
+    expect([call.request.params.get('rows'), call.request.params.get('page')]).toEqual(['Services', '1']);
+    call.flush(trackerPage([], { rows: 'Services', services: [trackerServiceItem(), trackerServiceItem({ lineId: 'line-2', serviceCode: 'CBC', serviceName: 'Blood count', stage: 'AwaitingSample' })], totalCount: 2 }));
+    await render();
+
+    expect(rows().length).toBe(2);
+    expect(host.querySelector('thead')?.textContent).toContain('tracker.column.service');
+    expect(rows()[0]?.textContent).toContain('GLU · Glucose');
+    expect(rows()[1]?.textContent).toContain('tracker.rows.visitStage');   // the visit is in the lab, this line waits for its sample
+    expect(buttonWith('app-tracker-rows-toggle button', 'tracker.rows.services').getAttribute('aria-pressed')).toBe('true');
+    expect(TestBed.inject(Router).url).toBe('/?rows=services');
+  });
+
+  it('T5: writes the filter into the URL, carries it in returnTo and restores a URL that names a state', async () => {
+    await open(['registration.view']);
+    const router = TestBed.inject(Router);
+
+    buttonWith('app-tracker-pipeline-strip button', 'tracker.stage.InLab').click();
+    await render();
+    backend.expectOne((request) => request.url === TRACKER_API.visits).flush(trackerPage([trackerItem()]));
+    await render();
+    expect(router.url).toBe('/?stage=InLab');
+    expect(rows()[0]?.querySelector('a.link')?.getAttribute('href')).toBe('/registration/accession?visitId=visit-1&returnTo=%2F%3Fstage%3DInLab');
+
+    // a return (or back / forward) to a URL naming another state restores it whole
+    await router.navigateByUrl('/?stage=Ready&rows=services&sort=service&dir=desc&layout=table');
+    await render();
+    const restored = backend.expectOne((request) => request.url === TRACKER_API.visits).request.params;
+    expect([restored.get('stage'), restored.get('rows'), restored.get('sort'), restored.get('direction')]).toEqual(['Ready', 'Services', 'service', 'desc']);
+    expect(router.url).toBe('/?stage=Ready&rows=services&sort=service&dir=desc');   // rewritten clean (defaults dropped)
   });
 });

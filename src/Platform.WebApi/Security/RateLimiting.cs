@@ -166,7 +166,8 @@ public sealed class CredentialAccountKeyMiddleware(RequestDelegate next)
             }
             else if (context.Request.Path.Equals(RefreshPath) || context.Request.Path.Equals(SignOutPath))
             {
-                var token = RefreshCookie.Read(context);
+                // LIS-CR-014 G1: the cookie of the portal the request names (?portal=), the one the endpoint will read
+                var token = RefreshCookie.Read(context, RefreshCookie.PortalOf(context));
                 if (token is null)
                 {
                     var body = await ReadBodyAsync(context);

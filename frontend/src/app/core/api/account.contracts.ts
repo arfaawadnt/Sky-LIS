@@ -16,6 +16,11 @@ export interface UpdatePreferencesRequest {
   readonly resultsDensity?: ResultsDensity;
 }
 
+/** LIS-CR-014 T2: the optional columns hidden in one table (column keys); an empty list returns the table to its defaults. */
+export interface UpdateListPreferenceRequest {
+  readonly hidden: readonly string[];
+}
+
 /** Both values are `[CredentialField]`: the envelope interceptor seals them (D-03) once `credential-fields.ts` lists the endpoint. */
 export interface ChangePasswordRequest {
   readonly currentPassword: string;
@@ -229,6 +234,8 @@ export const ACCOUNT_API = {
   /** GET the image (any member), POST multipart `file` / DELETE with settings.manage. */
   laboratoryLogo: '/api/v1/account/laboratory/logo',
   preferences: '/api/v1/account/preferences',
+  /** LIS-CR-014 T2: PUT `…/{listKey}` with `UpdateListPreferenceRequest` (any member, own membership; TEN-015). */
+  listPreferences: '/api/v1/account/preferences/lists',
   password: '/api/v1/account/password',
   auditActors: '/api/v1/account/audit/actors',
   auditExport: '/api/v1/account/audit/export',

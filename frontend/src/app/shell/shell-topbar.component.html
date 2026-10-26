@@ -6,6 +6,8 @@
 
   <app-search-box class="global-search" [fallback]="true" [debounce]="120" [placeholder]="i18n.t('shell.searchPlaceholder')" [label]="i18n.t('shell.searchLabel')" [(value)]="navSearch" (keydown.enter)="searchSubmitted.emit()" />
 
+  <app-return-link [label]="returnLabel()" />
+
   <div class="grow"></div>
 
   @if (branchLabel(); as branch) {

@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input, model, output } from '@angular/core';
-import { Router } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter, map } from 'rxjs';
 
 import { AuthStore } from '../core/auth/auth.store';
 import { displayNameFor } from '../core/auth/display-name';
@@ -9,7 +11,9 @@ import { changeBranchUrl } from '../features/account/account.guards';
 import { SessionBranches } from '../features/account/state/session-branches.service';
 import { IconComponent } from '../shared/ui/icon/icon.component';
 import { SearchBoxComponent } from '../shared/ui/search-box/search-box.component';
+import { ReturnLinkComponent, returnToPath } from '../shared/ui/return-link/return-link.component';
 import { LabBrandComponent } from './lab-brand.component';
+import { registryEntryFor } from './nav.guard';
 
 /**
  * The top bar of the shell (prototypes' `.topbar`): menu button (collapses / expands the sidebar; under 960px opens it
@@ -22,7 +26,7 @@ import { LabBrandComponent } from './lab-brand.component';
  */
 @Component({
   selector: 'app-shell-topbar',
-  imports: [IconComponent, SearchBoxComponent, LabBrandComponent],
+  imports: [IconComponent, SearchBoxComponent, LabBrandComponent, ReturnLinkComponent],
   templateUrl: './shell-topbar.component.html',
   styleUrl: './shell-topbar.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -49,6 +53,15 @@ export class ShellTopbarComponent {
   readonly signOutRequested = output<void>();
 
   protected readonly menuExpanded = computed(() => (this.narrow() ? this.mobileOpen() : !this.collapsed()));
+
+  private readonly currentUrl = toSignal(this.router.events.pipe(filter((event) => event instanceof NavigationEnd), map(() => this.router.url)), { initialValue: this.router.url });
+
+  /** LIS-CR-014 T5: the name of the list a `returnTo` points at (its nav entry), for the Back chip; null = the generic label. */
+  protected readonly returnLabel = computed(() => {
+    const path = returnToPath(this.router.parseUrl(this.currentUrl()).queryParamMap.get('returnTo'));
+    const entry = path === null ? null : registryEntryFor(path);
+    return entry === null ? null : this.i18n.t(entry.i18nKey);
+  });
 
   protected readonly menuLabel = computed(() =>
     this.i18n.t(this.narrow() ? 'shell.openMenu' : this.collapsed() ? 'shell.expandMenu' : 'shell.collapseMenu'));

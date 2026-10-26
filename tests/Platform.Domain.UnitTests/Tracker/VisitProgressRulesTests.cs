@@ -215,4 +215,45 @@ public sealed class VisitProgressRulesTests
         var progress = Of(Facts(samples: outside, visible: Results(ordered: 1)));
         Assert.Equal(TrackerStage.InLab, progress.Stage);   // an outside sample is followed like any other
     }
+
+    // ---- LIS-CR-014 T3: one row per service line ----------------------------------------------------------------------------
+
+    private static ServiceProgressFacts Service(
+        VisitSampleCounts? samples = null,
+        VisitResultCounts? visible = null,
+        VisitResultCounts? all = null,
+        IReadOnlyList<ResultClock>? clocks = null,
+        int openPanics = 0,
+        decimal visitRemaining = 0m,
+        bool claims = false) =>
+        new(samples ?? Received, visible ?? VisitResultCounts.None, all ?? visible ?? VisitResultCounts.None, clocks ?? [], clocks ?? [], openPanics, visitRemaining, claims);
+
+    private static VisitProgress OfService(ServiceProgressFacts facts, bool review = false) => VisitProgressRules.OfService(facts, review, Now, 80, 100);
+
+    [Fact]
+    public void TRK_T3a_each_service_of_a_visit_follows_its_own_samples_and_results()
+    {
+        // one visit: its CBC waits for the tube, its glucose is entered and waits for verification, its lipid profile is verified
+        var cbc = OfService(Service(samples: new VisitSampleCounts(1, 1, 0, 0, 0), visible: Results(ordered: 1)));
+        var glucose = OfService(Service(visible: Results(complete: 1), clocks: [new ResultClock(Now.AddHours(-1), Now.AddHours(2))]));
+        var lipids = OfService(Service(visible: Results(verified: 4)));
+
+        Assert.Equal((TrackerStage.AwaitingSample, TrackerNextStep.CollectSample), (cbc.Stage, cbc.NextStep));
+        Assert.Equal((TrackerStage.AwaitingVerification, TrackerNextStep.VerifyResults, 120), (glucose.Stage, glucose.NextStep, glucose.MinutesLeft));
+        Assert.Equal((TrackerStage.Ready, TrackerNextStep.PrintReport, DelayState.Done), (lipids.Stage, lipids.NextStep, lipids.DelayState));
+    }
+
+    [Fact]
+    public void TRK_T3b_a_service_row_is_never_cancelled_and_its_payment_follows_the_visit_balance()
+    {
+        var unpaid = OfService(Service(visible: Results(verified: 1), visitRemaining: 40m));
+        Assert.Equal((TrackerStage.Ready, TrackerNextStep.TakePayment, true), (unpaid.Stage, unpaid.NextStep, unpaid.ReadyUnpaid));
+
+        var claims = OfService(Service(visible: Results(printed: 1), visitRemaining: 40m, claims: true));
+        Assert.Equal((TrackerStage.Delivered, TrackerNextStep.None, false), (claims.Stage, claims.NextStep, claims.ReadyUnpaid));
+
+        // without samples or results yet (just registered) the line waits for its sample, never Cancelled
+        Assert.Equal(TrackerStage.AwaitingSample, OfService(Service(samples: VisitSampleCounts.None)).Stage);
+        Assert.Equal(1, Service().AsVisitFacts().LiveLines);
+    }
 }

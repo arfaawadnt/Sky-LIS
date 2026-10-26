@@ -501,6 +501,7 @@ Expected: (1) the card shows no treasury, no device and no "request access" link
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-10 — Search registrations and row actions · critical
+LIS-CR-014 (T2, T4): "⋯" at the end of the header row hides Payer and Remaining; the choice survives a sign-out and a sign-in on another browser; *Reset columns* brings them back; Escape returns the focus to "⋯", a click outside closes it. Tick two rows › *Print*: A4 landscape with the laboratory name, the list title, the active filters, the date, "2 rows", the visible columns only and "Page 1 / 1"; the browser's Save as PDF. *Clear selection* › *Excel*: one sheet named after the list, bold header, the date as a date, Patient share and Remaining as numbers, every row of the page. Arabic: document and sheet right to left. A crafted `PUT …/preferences/lists/visits` with `["<b>"]` answers 422 TEN-015.
 Refs: CP-10 · WF-02 · documents (labels, job order, receipt, report).
 Reception › Search registrations (`/registration/visits`).
 1. Search by accession; by patient number; by name; by mobile; date range today; status filters.
@@ -562,6 +563,7 @@ Expected: (1) saved with "Estimated from the age; the age is what is saved."; th
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-REG-16 — Lab Tracker: follow the day's visits · critical
+LIS-CR-014 (T1, T3, T5, T2, T4): each row carries Details, Edit, the Payments and Documents icons and a More menu (Patient, Samples, Results, Cancel services) by permission; open any of them, then use the "Back to Lab Tracker" chip in the top bar: the tracker returns with the same period, view, stage, attention, search and page (the filter is in the address bar). *Visits | Services*: one row per registered service with its result and sample status, next step and time left; the strip counts stay the day's. "⋯" hides Time left (Search registrations keeps its own choice); select rows › *Print* / *Excel*.
 Refs: CP-69 · WF-02, WF-06 · LIS-CR-006 (stages, next step, time left; delivered = printed; ready-but-unpaid is a flag).
 Preconditions: the visits of UAT-REG-03 (paid, results verified in UAT-VER), UAT-REG-09 (saved unpaid), UAT-SMP-02 (a rejected
 sample) and UAT-RES-02 (a panic value) exist today. Sign in as `lab.admin` (every right), then as `uat.reception`.
@@ -843,6 +845,7 @@ Expected: (1) saved; the malformed dial code is refused ("'+' and the country co
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-OPS-07 — Self-service subscription wizard · critical · *gateway*
+LIS-CR-014 (S1–S3): with a manager mobile that already belongs to an account, leaving the field marks it ("This mobile already belongs to an account…") and *Send verification code* does nothing; on step 3 a taken username is marked (SUB-013); *Back* on steps 2–3 returns to step 1 with every value kept — unchanged details *Continue* straight to step 3 without a new code, a changed detail sends a new one; from step 3 the rail's step 2 shows "Mobile verified" with Back / Continue; a mobile refused at step 3 (two-tab race) returns to step 1 with the field marked; a wrong code marks the code field (SUB-010); step 4 has no way back; Arabic check.
 LIS-CR-008 (C-04): step 1 offers City / markaz, District and Area / village after the governorate (optional); the finished client shows the full address on SA-04.
 LIS-CR-007: once Egypt is chosen the `+20` dial code appears beside both mobiles; typing `01012345678` (leading 0) is accepted; the 9-digit refusal is unchanged.
 Refs: CP-01, CP-02 · WF-01 step 1 · BR-25 · PLT S-P1-sub, S-P1-mobile, S-S2-code.
@@ -1004,6 +1007,17 @@ Set-up: a client whose trial ends in two days (SA-04 or the subscription wizard 
 Expected: (1) the administrator sees the banner under the top bar and the modal; the member sees the modal only; both link to the wallet. (2) one SMS and one e-mail to the manager with the days and amount; the second run sends nothing. (3) the member is refused with SUB-020 on the sign-in page; the administrator signs in, the wallet opens, every other page answers SUB-021. (4) the tile counts the two clients; the filters list them with days left and the administrator's mobile; the CSV downloads. (5) 61 refused with SET-002, 7 saved; the three templates exist with their placeholders. (6) right-to-left, Arabic texts.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
+#### UAT-SUP-11 — One browser, two portals · critical
+Refs: CP-03, SA-01, cross-cutting Security · LIS-CR-014 (G1).
+1. Tab A: sign in at `<base>/lab/demo-lab`. Tab B, same browser: sign in at `<base>/admin/login`. Reload both.
+2. In tab B, sign out. Reload tab A.
+3. Sign in again in B; sign out in A.
+4. Open a second laboratory tab A2 and sign out in A. Change the branch in a laboratory tab with A2 open.
+5. From a laboratory session, open `/admin/clients` in a new tab.
+6. DevTools › Application › Cookies.
+Expected: (1) tab A stays signed in and its address does not change; after the reloads each tab keeps its own session. (2) B lands on `/admin/login`; A is still signed in. (3) A lands on `/lab/demo-lab`; B is unaffected. (4) A2 follows to `/lab/demo-lab`, the admin tab does not react; the branch change reaches A2 only. (5) the new tab goes to `/admin/login`; the laboratory tab is untouched. (6) `__Secure-rt` and `__Secure-rta` both exist with Path `/api/v1/auth`, HttpOnly, Secure, SameSite Strict.
+Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
+
 ---
 
 ## 6. Results sheet template
@@ -1143,5 +1157,6 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 0.7 | 2026-10-20 | Claude Code | Sign-in by address (change request LIS-CR-005, BR-28): set-up note (laboratory users at `<base>/lab/<slug>`, Super Admin personas at `<base>/admin/login`), UAT-REG-01 step 1a and expectations (another laboratory, admin address, unknown address, bare address; idle return), UAT-OPS intro (admin address, laboratory user refused), UAT-ADM-01 and the provisioning / subscription expectations print the new address. |
 | 0.8 | 2026-10-22 | Claude Code | New script UAT-REG-16 Lab Tracker (CP-69, change request LIS-CR-006): strip and chips, table and board, next-step links, search, live refresh, desk views, rights, Arabic. Reception persona and coverage updated. |
 | 0.9 | 2026-10-22 | Claude Code | UAT-REG-16 gains step 8 (period picker: yesterday, last 7 days, from / to); rights and Arabic checks become steps 9 and 10. Ids unchanged. |
+| 1.2 | 2026-10-25 | Claude Code | Reviewer round 2 (change request LIS-CR-014): new UAT-SUP-11 (one browser, two portals); notes under UAT-OPS-07 (early mobile / username checks, Back between steps), UAT-REG-10 (column chooser, Print, Excel) and UAT-REG-16 (actions column, Services rows, Back chip, chooser, Print / Excel). Ids unchanged. |
 | 1.1 | 2026-10-25 | Claude Code | Reviewer features (change requests LIS-CR-008, CR-010, CR-011, CR-012, CR-013): new scripts UAT-CSH-11 (cash ledger, cash entries, day close), UAT-SUP-09 (announcements), UAT-SUP-10 (subscription reminders, grace and expiry); notes under UAT-REG-03 (collected outside per sample), UAT-ADM-01 / UAT-OPS-02 / UAT-OPS-07 (localities), UAT-MDR-02 (locality import, template design), UAT-VER-06 (report designs). Ids unchanged. |
 | 1.0 | 2026-10-24 | Claude Code | Reviewer quick wins (change request LIS-CR-007, response LIS-RC-001): UAT-REG-10 / UAT-REG-11 row actions on one line with a *More* menu; UAT-CSH-03 / 04 payment card first, focus on the amount, "Show all"; UAT-REG-01 keep-this-address strip; UAT-REG-03 and UAT-OPS-07 mobiles typed after the dial code; UAT-ADM-10 doctor code left blank → DR-nnn; UAT-RES-03 range shown before entry; UAT-ADM-08 "Used for cultures"; UAT-MDR-02 Microbiology tab names and order (Antibiotic classes, Culture specimens); UAT-OPS-01 silent-clients tile; UAT-ADM-08 / UAT-MDR-02 shortcut sets and test rules in the client menu. Open point 10 closed. Ids unchanged; the per-script notes are the "LIS-CR-007" lines under each script's Refs. |

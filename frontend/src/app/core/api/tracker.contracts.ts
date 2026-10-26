@@ -102,6 +102,30 @@ export interface LabTrackerItem {
 }
 
 /**
+ * One live top-level service line of a visit (LIS-CR-014 T3, `?rows=services`): the visit's fields as `LabTrackerItem` carries
+ * them, except `stage`, `nextStep`, `minutesLeft`, `delayState`, `samples` and `results`, which are the line's own (its tubes and
+ * results, package members included); `visitStage` is the visit's; `payment` is the visit's balance.
+ */
+export interface LabTrackerServiceItem extends LabTrackerItem {
+  readonly lineId: string;
+  readonly serviceId: string;
+  readonly serviceCode: string;
+  readonly serviceName: string;
+  readonly serviceNameAr: string;
+  /** Service | Package. */
+  readonly serviceKind: string;
+  readonly visitStage: LabTrackerStage;
+}
+
+/** The two row modes of the table: one row per visit (default) or one per live top-level service line. */
+export type LabTrackerRowsMode = 'Visits' | 'Services';
+
+/** A service row (the `services` of a `rows=services` page) told from a visit row. */
+export function isServiceRow(row: LabTrackerItem): row is LabTrackerServiceItem {
+  return 'lineId' in row && typeof (row as Partial<LabTrackerServiceItem>).lineId === 'string';
+}
+
+/**
  * The counters of the whole filtered day, before the stage, attention and view filters (so the strip and the chips always show
  * the day): `total` = every visit of the day, one count per stage and one per attention flag.
  */
@@ -131,6 +155,9 @@ export interface LabTrackerPage {
   /** The UTC window read, half-open. */
   readonly fromUtc: string;
   readonly toUtc: string;
+  /** Visits (rows in `items`) or Services (LIS-CR-014 T3: rows in `services`, `items` empty, `totalCount` = service rows). */
+  readonly rows?: LabTrackerRowsMode;
+  readonly services?: readonly LabTrackerServiceItem[] | null;
 }
 
 /**
@@ -150,6 +177,8 @@ export interface LabTrackerQuery extends SortRequest {
   readonly search: string | null;
   readonly page: number;
   readonly pageSize: number;
+  /** `Services` = one row per live top-level line (LIS-CR-014 T3; sort key `service` besides the others); absent = visits. */
+  readonly rows?: LabTrackerRowsMode | null;
 }
 
 /** The counter of a stage. */
@@ -202,10 +231,12 @@ export const TRACKER_API = {
   visits: '/api/v1/tracker/visits',
 } as const;
 
-/** The pages a next step opens (CR-006 §3). */
+/** The pages a next step or a row action opens (CR-006 §3, LIS-CR-014 T1). */
 export const TRACKER_LINKS = {
   accession: '/registration/accession',
   results: '/results/by-accession',
   payments: '/billing/payments',
   worklist: '/results/worklist',
+  visits: '/registration/visits',
+  patients: '/patients',
 } as const;

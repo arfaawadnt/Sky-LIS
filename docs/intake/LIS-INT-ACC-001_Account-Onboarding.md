@@ -291,3 +291,56 @@ the new laboratory there at completion. The laboratory's public card (`GET /api/
 
 Acceptance: `AddressesFlowTests.The_wizard_keeps_the_picked_locality_and_the_register_and_card_print_the_address`; SPA
 `subscribe.page.spec` ("offers city, district and area after the governorate…").
+
+## 21. Change request 2026-10-25 — early checks, field-level refusals and the way back in the subscription wizard (LIS-CR-014, package P-SUB, reviewer notes S1–S3)
+
+**Finding (S1/S2).** Step 1 (`start`) never checked the manager's mobile against existing accounts. Step 3 (`complete`) provisions the
+administrator with the manager's mobile, and user mobiles are unique (`identity.platform_users`, unique index `ux_platform_users_mobile`,
+validation C-03), so a manager mobile already held by a user failed inside the provisioning flush as `UNIQUE-409` ("a record with the same
+unique value already exists") with no field — the reviewer was blocked at *Create account* without knowing whether the mobile or the
+username was the cause. A taken username was refused `CLI-101` by `TenantProvisioner.PrepareAsync`, also without a field.
+
+**Rules (built).**
+- **SUB-011** (409) — the manager's mobile already belongs to a platform user, in any spelling (`IUserMobileNumbers.IsTakenAsync`). Raised by
+  the early check, by `start` before any code is sent, and again by `complete` before provisioning (a mobile taken between steps 1 and 3,
+  e.g. two requests for one mobile). Field `managerMobile`.
+- **SUB-013** (409) — the administrator username is taken (step-3 check and `complete`). Field `username`.
+- **SUB-012** reserved: a laboratory-name rule does not exist (names are not unique); nothing raises it.
+- Every refusal of `start`, `verify` and `complete` that concerns one field names it: the problem details keep their own `code` and add
+  `errors` (field → message) and `rules` (field → `{ rule: <code> }`), the `VALIDATION-400` shape. Mapping (`SubscriptionFields.Of`):
+  GEO-010 `mobile`, GEO-014 `managerMobile`, CLI-003 `email`, GEO-011 `countryId`, GEO-012/013 `governorateId`, GEO-020/021/022
+  `cityId`/`districtId`/`areaId`, SUB-010 `code`, CLI-042/101 and SUB-013 `username`, CLI-040/041 `password`. Mechanism: the new
+  `DomainException.Fields` (SharedKernel) written by `DomainExceptionHandler`.
+
+**Endpoints.** `POST /api/v1/public/subscriptions/check` (`CheckSubscriptionRequest { countryId?, mobile?, managerMobile? }` →
+`SubscriptionCheckResult { issues: [{ field, code }] }`; GEO-010/014 by the country's rule, SUB-011 for the manager's mobile; anonymous,
+rate-limited like `start` with the `credential-account` policy because it tells whether an account holds a number).
+`GET /api/v1/public/subscriptions/{id}/username-available?username=` (same answer shape: CLI-042 or SUB-013; only for a **verified**
+request — SUB-003 otherwise, SUB-001 expired, SUB-404 unknown — so only someone who proved a mobile can probe usernames;
+`credential-challenge` policy). The older `GET check-username` stays (no longer used by the SPA).
+
+**Wizard (SPA).** Leaving a mobile field runs the check and marks the field (SUB-011 / GEO-0xx) before any code is sent; a marked field
+holds the code back. The step rail (`ui/wizard-rail.component.ts`) makes done steps buttons (step 1 from steps 2–3; step 2 from step 3
+shows a "mobile verified" notice with Back / Continue); *Back* on steps 2 and 3 returns to step 1 with every value kept. Leaving step 1
+resumes the current live request when no step-1 value changed (the page language is not a detail): straight to step 3 when verified, to
+step 2 without a new code otherwise; any change starts a **new** request with a new code (the old one is left to expire; it holds nothing).
+The button says *Continue* or *Send verification code* with a hint line. A step-1 field refused at step 3 (SUB-011) returns to step 1, marks
+the field and says "Change the marked mobile number, then continue: a new verification code is sent"; the next send always starts a new
+request. SUB-013 marks the username and the availability line. Keys `public.wizard.{openStep,continue,sameDetails,detailsChanged,
+returnedForDetails,verifiedTitle,verifiedText}`, `public.error.SUB-011`, `public.error.SUB-013`.
+
+**Open questions (assumed answers).**
+- Q-SUB-1: Must the **laboratory's own mobile** be unique among laboratories or users? *Assumed no*: it is stored on the client record only
+  and belongs to no user; refusing it would be a new rule (a lab phone can be an employee's personal number). Only the manager's mobile is
+  refused. Decide with the business owner; the check endpoint already returns per-field issues, so adding the rule is local.
+- Q-SUB-2: Must laboratory **names** be unique? *Assumed no* (no rule today); SUB-012 is reserved.
+- Q-SUB-3: SA-04 (*Add client*, Super Admin) has the same unguarded manager mobile and still answers `UNIQUE-409`. Not changed here (not
+  this package's page); a `CLI-1xx` code with the field would follow the same pattern.
+- The early check reveals whether an account holds a mobile, at the rate of `start` (which must reveal it anyway).
+
+**Acceptance.** `PublicSubscriptionFlowTests` (5): early check per field and per spelling; `start` refuses SUB-011 on `managerMobile` with no
+code sent; two verified requests for one mobile — the second `complete` gets SUB-011 on `managerMobile` (was UNIQUE-409), then SUB-013 on
+`username`, CLI-040 on `password`; the username check of a verified request only; changed details start a new request and a wrong code
+names `code`. SPA: `subscription.facade.spec` (resume without a new code, new request on change, forced new request after a step-3 refusal,
+rail rules, check endpoint) and `subscribe.page.spec` (field marked on leaving a mobile, rail and Back keep values and resume, step-3
+SUB-011 returns to step 1 marked, SUB-013 on the username field).

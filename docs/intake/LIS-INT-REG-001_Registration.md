@@ -552,3 +552,16 @@ generation-0 sample). The tube guard (`app.visit_tubes_guard`) protects number a
 | C02-Q2 | May the flag change after save (edit page)? | No: it is set at registration; the edit page lists it read-only. A mistake is corrected by cancelling and re-ordering the service. |
 | C02-Q3 | How far back may the collection time lie? | 30 days; never in the future (5 minutes of clock skew tolerated). |
 | C02-Q4 | Turnaround clock of an outside sample | Starts at its arrival (registration), not at the outside collection time. |
+
+
+## 21. Change request 2026-10-25 (LIS-CR-014 T2 / T4, package P-TBL) — CP-10 column chooser, print and Excel
+
+| Id | Rule | Where / gate |
+| --- | --- | --- |
+| CP10-TBL-01 | **Optional columns** of Search registrations: Branch, Payer, Patient share, Remaining (chooser "⋯" at the end of the header row, saved per user under the list key `visits`, Foundation intake §12). Accession, Patient, Date, Services, Status always show. | `visits.page.ts` columns; `visits.page.spec.ts` |
+| CP10-TBL-02 | **Selection**: the table is `selection="multi"` (row checkbox, or a click on the row outside its buttons); *Print* and *Excel* take the selected rows of the page, or every row of the page when none is selected; *Clear selection* beside the count. The server CSV *Export* (`registration.export`, the whole filter) stays as it was. | `data-table.component` |
+| CP10-TBL-03 | **Print** = an A4 landscape document (laboratory name, "Search registrations", the active filters — search, from / to or all dates, payer, status, this branch only — the print date and the row count, the visible columns, header row repeated, "Page n / m" in the bottom margin) through the browser's print dialog; the PDF is the browser's "Save as PDF". Arabic prints right to left. | `table-print.component.ts` |
+| CP10-TBL-04 | **Excel** = `.xlsx` (`exceljs`, loaded on demand) with one sheet named after the list, header row bold and frozen, the registration date as a date (local time), patient share and remaining as numbers (`#,##0.00`), a settled balance as "Settled", services as their codes; the file is `<list title>-<yyyy-mm-dd>.xlsx`. | `shared/export/table-export.ts`, `table-export.spec.ts` |
+
+Open question (assumed): print and Excel take the **loaded page** (as the note asks for "the list tables"); a full-filter document stays the
+CSV export. No permission gates *Print* / *Excel*: they show what the user already sees.

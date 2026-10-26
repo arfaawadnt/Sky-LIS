@@ -173,3 +173,42 @@ Business rules in LIS-INT-PLT-001 §21 (state, grace, reminders). What the found
 - **Assumption A12**: the SPA's guards are not changed by this package; once the gate is wired, an expired administrator who opens
   another page sees the page's own error (`account.error.SUB-021`) — the integrator may route such a user to `/account/wallet`
   (like the forced password change goes to the profile).
+
+## 11. Change request 2026-10-25 — one browser, two portals (LIS-CR-014 G1, package P-SES)
+
+Note of the business owner (2026-10-25): "If I open two tabs, one for the admin portal and the other for the client portal, both
+become relevant to each other and the URL changes in the other one." Cause: one refresh cookie (`__Secure-rt`) and one session channel
+for both portals, so a Super Admin sign-in replaced the laboratory session of the browser and the channel sent the other tab to its
+sign-in page (C-01). No migration; no profile change.
+
+| Rule | Statement | Proof |
+| --- | --- | --- |
+| SEC-PORTAL-01 | **A refresh cookie per portal**, same attributes (02 §2.4): laboratory portal `__Secure-rt`, Super Admin portal `__Secure-rta`; `Path=/api/v1/auth; Secure; HttpOnly; SameSite=Strict`, no `Domain`, no `Max-Age`. Under `Lis:Security:AllowInsecureLocalDevelopment` `rt` / `rta` without `Secure`. (`RefreshCookie.NameOf`, `SessionPortal`.) | `AuthPortalSessionsFlowTests.The_portals_have_their_own_cookie_names_secure_and_for_loopback_development`, `…A_laboratory_session_and_a_Super_Admin_session_coexist_in_one_browser` |
+| SEC-PORTAL-02 | **Sign-in writes the cookie of its target** (`admin: true` → `__Secure-rta`, `laboratory` → `__Secure-rt`) and revokes (R2-04) only the session of the presented cookie **of that portal**; the other portal's session in the same browser is untouched. | `…A_sign_in_revokes_the_presented_cookie_of_its_own_portal_only` |
+| SEC-PORTAL-03 | **Refresh and sign-out name their portal** in the query: `POST /api/v1/auth/refresh?portal=admin`, `POST /api/v1/auth/sign-out?portal=admin`; `?portal=client`, no parameter or any other value = the laboratory portal, so requests made before the split (and machine clients, which send the token in the body) keep working. Each reads, rotates and clears only its own cookie. | `…A_refresh_for_the_Super_Admin_rotates_only_its_cookie_and_leaves_the_laboratory_session_untouched`, `…Signing_out_of_one_portal_leaves_the_other_portal_signed_in`, `…A_request_without_a_portal_or_with_portal_client_is_the_laboratory_portal`, existing `AuthFlowTests` (no portal named) |
+| SEC-PORTAL-04 | **Rate limit**: the `refresh` partition keys on the session of the cookie the request's portal names (`CredentialAccountKeyMiddleware`), i.e. the cookie the endpoint reads. **Origin check** (02 §2.3) applies to refresh / sign-out whenever the request carries either cookie. | `AuthFlowTests.Cookie_only_requests_cannot_reach_data_endpoints_and_the_cookie_endpoints_are_csrf_checked` |
+| SEC-PORTAL-05 | **SPA**: the portal of a tab is its address (`SESSION_PORTAL` in `core/auth/session-portal.ts`: `/admin` and below = Super Admin, everything else — `/lab/<slug>`, `/login`, the client pages — laboratory), read at every call. `AuthStore.hydrate` / `refresh` (also the interceptor's replay after a 401) / `signOut` call `?portal=admin` on a Super Admin page and the plain path otherwise. A tab starts only in a session of its own portal (a cookie written before the split may hold the other one: ignored, the user signs in again once). | `auth.store.spec.ts` (one browser, two portals), `auth.interceptor.spec.ts` (Super Admin replay) |
+| SEC-PORTAL-06 | **Tabs follow their own portal only**: the session channel is one `BroadcastChannel` per portal (`platform-session:client`, `platform-session:admin`; a message is posted on and heard from the channel of the tab's current portal), so sign-out, sign-in, branch change, profile change and the idle watcher's `activity` / `renewed` reach the tabs of the same portal and never the other's. The refresh Web Lock is per portal too (`platform-session-refresh:client` / `:admin`, C-02). `signInUrl` still sends each portal to its own sign-in page. | `auth.store.spec.ts` (channel per portal), `refresh-lock.spec.ts` (one lock per portal) |
+
+Upgrade note: a browser signed into the Super Admin before the upgrade holds that session in `__Secure-rt`; after the upgrade the Super
+Admin tab finds no `__Secure-rta` and asks for a sign-in once. Old tabs still running the previous SPA use the former channel name
+`platform-session` and stop hearing the new tabs until reloaded.
+
+
+## 12. Change request 2026-10-25 — list views saved per user (LIS-CR-014 T2, package P-TBL)
+
+Note T2 of the business owner (2026-10-25): *"three dots at the end of the header row of the list view to choose the optional columns
+per user, saved for each user as a favourite view."* The choice is a self-service preference of the member, beside the language and
+the results density (A1), and works the same in the platform tenant.
+
+| Id | Rule | Where / gate |
+| --- | --- | --- |
+| PREF-LIST-01 | **Stored on the membership**: `TenantMembership.ListPreferences` (`app.tenant_memberships.list_preferences`, nullable `character varying(4096)`) holds one JSON document `{ "<listKey>": { "hidden": ["<columnKey>", …] } }` written by the domain only (`ListPreferenceDocument`: keys sorted, compact), so the stored text is stable and the field-change audit sees a change only when the view changes. Not `jsonb`: nothing queries inside the document, and `jsonb` would re-format the text on every read-modify-write. | `MembershipListPreferencesTests` |
+| PREF-LIST-02 | **Rules (TEN-015, 422)**: list and column keys are identifiers (1–64 letters, digits, `.`, `_`, `-`, starting with a letter or digit); at most 40 hidden columns per list; the document at most 4096 characters. A refused save changes nothing. An empty set removes the list (the table shows its defaults); no list left = `null`. | domain tests; `AccountFlowTests.CR014_T2_…` |
+| PREF-LIST-03 | **Endpoint**: `PUT /api/v1/account/preferences/lists/{listKey}` body `{ hidden: [] }` → 204; `UpdateMyListPreferenceCommand` `[RequireAuthenticatedActor]` (any signed-in member, own membership of the session's tenant only; `ACC-404` without one). Every live session of the user is evicted from the principal cache. | `AccountController`, `PreferenceCommands.cs` |
+| PREF-LIST-04 | **Profile**: `AuthProfile.ListPreferences` (map list key → `{ hidden }`, null when none) is read in `SessionPrincipalQuery`'s one elevated query (no second elevated call) and parsed tolerantly: a stored value that is not such a document reads as "no preference" and the next save replaces it. | `ListPreferenceDocument.Parse`, `Profiles.ListPreferencesOf` |
+| PREF-LIST-05 | **SPA**: `AuthStore.updateListPreferences(listKey, hidden)` is optimistic (the profile signal changes at once; the previous view of that list comes back when the save is refused, and the error is rethrown). The shared table reads and saves through `TABLE_PREFERENCES` (`shared/ui/data-table/table-preferences.ts`, default = the store), only when it has a `listKey`; a refusal shows the toast `shared.table.columnsSaveFailed`. Other tabs of the session see the new view at their next profile refresh (the list endpoint is not in `PROFILE_CHANGES`). | `data-table.tools.spec.ts` |
+| PREF-LIST-06 | **Table**: `TableColumn.optional: true` marks a hideable column (never the first; the action column is not a column); `<app-data-table [listKey]="'…'">` shows the "⋯" chooser at the end of the header row (inside the actions header, or in its own header cell when the table has no actions): a popover with one checkbox per optional column and *Reset columns*; keyboard (Enter / Space / Arrow Down open, arrows move, Space toggles, Escape back to the trigger, Tab past the panel closes), outside click, scroll and resize close it. Hidden columns are not rendered (header and cells). Without `listKey` the choice lasts while the page is open. Under 720 px (cards) the header row and so the chooser are not shown. | `data-table.tools.spec.ts` |
+
+List keys in use: `visits` (CP-10 Search registrations), `tracker` (CP-69 Lab Tracker). Migration (integrator, `ListPreferences`): one nullable
+column `app.tenant_memberships.list_preferences character varying(4096)`; no index, no CHECK beyond the length (the domain owns the shape).

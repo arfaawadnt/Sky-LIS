@@ -59,6 +59,15 @@ public sealed class AccountController(ISender sender) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>LIS-CR-014 T2: the columns the member hides in one table (column chooser); any signed-in member, own membership only.</summary>
+    [HttpPut("preferences/lists/{listKey}")]
+    public async Task<IActionResult> UpdateListPreference(string listKey, [FromBody] UpdateListPreferenceRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        await sender.Send(new UpdateMyListPreferenceCommand(listKey, request.Hidden ?? []), cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("password")]
     [EnableRateLimiting(RateLimiting.CredentialAccount)]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)

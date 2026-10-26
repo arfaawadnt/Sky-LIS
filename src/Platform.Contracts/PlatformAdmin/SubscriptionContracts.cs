@@ -43,6 +43,19 @@ public sealed record CompleteSubscriptionRequest
 
 public sealed record SubscriptionCompletedResponse(Guid TenantId, string PortalUrl, string Username);
 
+/// <summary>
+/// LIS-CR-014 (S1): the step-1 fields checked before the code is sent (<c>POST check</c>); every member is optional so the
+/// wizard can check a field as soon as it is typed. With <paramref name="CountryId"/> the mobiles are first checked against the
+/// country's rule (GEO-010 / GEO-014); the manager's mobile is then checked against the platform's accounts (SUB-011).
+/// </summary>
+public sealed record CheckSubscriptionRequest(Guid? CountryId, string? Mobile, string? ManagerMobile);
+
+/// <summary>One refused field of a check: the camelCase request field (<c>mobile</c>, <c>managerMobile</c>, <c>username</c>) and its code.</summary>
+public sealed record SubscriptionFieldIssue(string Field, string Code);
+
+/// <summary>The answer of a check: empty <paramref name="Issues"/> when every checked field is acceptable.</summary>
+public sealed record SubscriptionCheckResult(IReadOnlyList<SubscriptionFieldIssue> Issues);
+
 /// <summary><paramref name="Valid"/>: the username has an acceptable shape; <paramref name="Available"/>: no account uses it.</summary>
 public sealed record UsernameAvailability(string Username, bool Valid, bool Available);
 

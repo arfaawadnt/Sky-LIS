@@ -26,6 +26,7 @@
 
   <div class="pair">
     <app-reg-accession-samples
+      id="accession-samples"
       *appCan="samplesView"
       [samples]="samples()"
       [loading]="facade.samples.isLoading()"
@@ -39,7 +40,7 @@
 
   <app-reg-accession-payments *appCan="billingView" [visitId]="v.id" [account]="account()" [balance]="v.balance" [loading]="facade.account.isLoading()" (receipt)="receipt($event)" />
 
-  <app-section-card [title]="i18n.t('registration.accession.documents.title')">
+  <app-section-card id="accession-documents" [title]="i18n.t('registration.accession.documents.title')">
     <div class="documents">
       <button type="button" class="btn" (click)="printLabels()"><app-icon name="barcode" [size]="15" />{{ i18n.t('registration.labels.title') }}</button>
       <button type="button" class="btn" (click)="printJobOrder()"><app-icon name="printer" [size]="15" />{{ i18n.t('registration.jobOrder.print') }}</button>

@@ -11,6 +11,9 @@ import { REGISTRATION_API, type CancelLinesRequest, type VisitListItem } from '.
 import { AuthStore } from '../../../core/auth/auth.store';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
+import type { TableExport } from '../../../shared/export/table-export';
+import { DataTableComponent } from '../../../shared/ui/data-table/data-table.component';
+import { TABLE_PREFERENCES, type TablePreferences } from '../../../shared/ui/data-table/table-preferences';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { VisitsFacade } from '../state/visits.facade';
 import { cashTier, page as pageOf, settle, visitRow } from '../testing/registration.fixtures';
@@ -68,6 +71,24 @@ class BlankComponent {}
 
 let granted = new Set<string>();
 
+/** LIS-CR-014 T2: the user's saved column choice, kept here instead of the profile. */
+class SpecListPreferences implements TablePreferences {
+  readonly lists = signal<Readonly<Record<string, readonly string[]>>>({});
+  readonly saved: [string, readonly string[]][] = [];
+
+  hidden(listKey: string): readonly string[] {
+    return this.lists()[listKey] ?? [];
+  }
+
+  async save(listKey: string, hidden: readonly string[]): Promise<void> {
+    this.saved.push([listKey, hidden]);
+    this.lists.update((lists) => ({ ...lists, [listKey]: hidden }));
+    await Promise.resolve();
+  }
+}
+
+const listPreferences = new SpecListPreferences();
+
 describe('VisitsPage (CP-10)', () => {
   let backend: HttpTestingController;
   let harness: RouterTestingHarness;
@@ -81,6 +102,7 @@ describe('VisitsPage (CP-10)', () => {
         provideHttpClientTesting(),
         { provide: AuthStore, useValue: { currentBranch: signal<string | null>('b-1'), hasPermission: (key: string) => granted.has(key) } satisfies Pick<AuthStore, 'currentBranch' | 'hasPermission'> },
         { provide: PermissionsService, useValue: { can: (key: string) => granted.has(key) } satisfies Pick<PermissionsService, 'can'> },
+        { provide: TABLE_PREFERENCES, useValue: listPreferences },
         provideRouter([
           { path: 'registration/visits', providers: [VisitsFacade], component: VisitsPage },
           { path: 'results/by-accession', component: BlankComponent },
@@ -137,6 +159,38 @@ describe('VisitsPage (CP-10)', () => {
     const text = await blobs[0]!.text();
     expect(text).not.toContain('2026-10-11T07:28:26');
     expect(text).toContain(new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date('2026-10-11T07:28:26.129944+00:00')));
+  });
+
+  it('offers Branch, Payer, Patient share and Remaining to the column chooser, saved under "visits", and prints the filters (LIS-CR-014)', async () => {
+    listPreferences.lists.set({});
+    listPreferences.saved.length = 0;
+    await open();
+    const host = harness.routeNativeElement!;
+    const headers = (): string[] => [...host.querySelectorAll('thead th:not(.sel):not(.actions)')].map((cell) => cell.textContent?.trim() ?? '');
+    expect(headers()).toContain('registration.column.payer');
+
+    host.querySelector<HTMLButtonElement>('app-column-chooser button')!.click();
+    await tick();
+    harness.detectChanges();
+    const items = [...host.querySelectorAll('.column-chooser-panel .cc-item')];
+    expect(items.map((item) => item.textContent?.trim())).toEqual(['registration.column.branch', 'registration.column.payer', 'registration.column.patientShare', 'registration.column.remaining']);
+    items[1]!.querySelector('input')!.click();
+    await tick();
+    harness.detectChanges();
+    expect(listPreferences.saved).toEqual([['visits', ['payer']]]);
+    expect(headers()).not.toContain('registration.column.payer');
+
+    // Print / Excel: the visible columns, the active filters as the subtitle, typed money cells
+    expect([...host.querySelectorAll('.table-tools button')].map((button) => button.textContent?.trim())).toEqual(['shared.table.print', 'shared.table.excel']);
+    const table = harness.fixture.debugElement.query((element) => element.componentInstance instanceof DataTableComponent).componentInstance as { exportDocument(): TableExport };
+    const document = table.exportDocument();
+    expect(document.title).toBe('registration.visits.title');
+    expect(document.subtitle).toContain('registration.visits.branchOnly');
+    expect(document.columns.map((column) => column.key)).not.toContain('payer');
+    const share = document.rows[0]![document.columns.findIndex((column) => column.key === 'patientShareTotal')];
+    expect(share).toEqual(expect.objectContaining({ numFmt: '#,##0.00' }));
+    expect(document.rows[0]![document.columns.findIndex((column) => column.key === 'services')]).toBe('CBC, GLU');
+    listPreferences.lists.set({});
   });
 
   it('lists the visits with the services styled by status, the balance and every row action for a full role', async () => {

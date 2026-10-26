@@ -28,7 +28,12 @@
 
 <div class="bar">
   <app-tracker-attention-chips [counters]="facade.counters()" [attention]="facade.filter().attention" (attentionToggle)="facade.toggleAttention($event)" />
-  <app-tracker-layout-toggle [layout]="facade.layout()" (layoutChange)="facade.setLayout($event)" />
+  <span class="toggles">
+    @if (facade.layout() === 'table') {
+      <app-tracker-rows-toggle [rows]="facade.filter().rows" (rowsChange)="facade.setRows($event)" />
+    }
+    <app-tracker-layout-toggle [layout]="facade.layout()" (layoutChange)="facade.setLayout($event)" />
+  </span>
 </div>
 
 @if (problem(); as problem) {
@@ -38,7 +43,7 @@
 @if (facade.layout() === 'table') {
   <app-section-card [padded]="false">
     <app-data-table
-      [columns]="columns"
+      [columns]="tableColumns()"
       [rows]="facade.rows()"
       [rowId]="rowId"
       [rowClass]="rowClass"
@@ -51,15 +56,25 @@
       [sort]="facade.sort()"
       [serverSort]="true"
       (sortChange)="facade.setSort($event)"
+      listKey="tracker"
+      selection="multi"
+      [exportable]="true"
+      [printSubtitle]="(facade.filter().from && facade.filter().to ? facade.filter().from + ' – ' + facade.filter().to : (facade.servedDay() ?? today)) + (branchLabel() ? ' · ' + branchLabel() : '')"
     >
       <ng-template appCell="visit" [appCellOf]="facade.rows()" let-row>
         <span class="visit">
-          <a class="link mono" [routerLink]="accessionLink" [queryParams]="{ visitId: row.visitId }">{{ row.accession }}</a>
+          <a class="link mono" [routerLink]="accessionLink" [queryParams]="{ visitId: row.visitId, returnTo: returnTo() }">{{ row.accession }}</a>
           @if (row.urgent) {
             <app-badge tone="bad"><app-icon name="zap" [size]="12" />{{ i18n.t('tracker.urgent') }}</app-badge>
           }
         </span>
         <span class="sub">{{ patient(row) }}</span>
+      </ng-template>
+      <ng-template appCell="service" [appCellOf]="facade.rows()" let-row>
+        <span class="service">{{ service(row) }}</span>
+        @if (visitStage(row); as stage) {
+          <span class="sub">{{ stage }}</span>
+        }
       </ng-template>
       <ng-template appCell="registration" [appCellOf]="facade.rows()" let-row>
         <span class="mono">{{ registeredAt(row) }}</span>
@@ -90,11 +105,14 @@
         <app-tracker-pill [look]="payment(row)" />
       </ng-template>
       <ng-template appCell="nextStep" [appCellOf]="facade.rows()" let-row>
-        <app-tracker-next-step [item]="row" />
+        <app-tracker-next-step [item]="row" [returnTo]="returnTo()" />
         <span class="sub">{{ i18n.t('tracker.stage.' + row.stage) }}</span>
       </ng-template>
       <ng-template appCell="timeLeft" [appCellOf]="facade.rows()" let-row>
         <app-tracker-pill [look]="timeLeft(row)" absent="none" />
+      </ng-template>
+      <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
+        <app-tracker-row-actions [item]="row" [returnTo]="returnTo()" />
       </ng-template>
     </app-data-table>
     @if (page(); as page) {
@@ -108,5 +126,5 @@
       <button type="button" class="btn ghost sm" (click)="facade.toggleStage(null)">{{ i18n.t('tracker.board.showAll') }}</button>
     </p>
   }
-  <app-tracker-board [lanes]="boardLanes()" (more)="facade.showStage($event)" />
+  <app-tracker-board [lanes]="boardLanes()" [returnTo]="returnTo()" (more)="facade.showStage($event)" />
 }

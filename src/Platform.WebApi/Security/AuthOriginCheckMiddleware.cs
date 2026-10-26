@@ -11,6 +11,8 @@ namespace Platform.WebApi.Security;
 /// <c>Origin</c> (or <c>Referer</c>) equals a configured public origin, and the custom header
 /// <c>X-Requested-With: Platform</c>, which a cross-site form cannot set. Every other endpoint is bearer-only and
 /// ignores cookies, so CSRF cannot reach it. Machine clients send the token in the body and skip these checks.
+/// LIS-CR-014 G1: the checks apply when the request carries the refresh cookie of either portal (<c>__Secure-rt</c>,
+/// <c>__Secure-rta</c>), whichever portal the query names.
 /// </summary>
 public sealed class AuthOriginCheckMiddleware(RequestDelegate next, HostSecuritySettings settings)
 {

@@ -17,6 +17,7 @@ import { ProblemCodes, ProblemError, toProblemDetails } from '../api/problem-det
 import { I18nService } from '../i18n/i18n.service';
 import { REFRESH_LOCK } from './refresh-lock';
 import { SESSION_CHANNEL, type SessionMessage } from './session-channel';
+import { SESSION_PORTAL, portalAuthUrl, portalOfTenant } from './session-portal';
 import { BROWSER_NAVIGATION, type SessionEndReason, idleSignInUrl, signInPathFor, signInUrl } from './session-navigation';
 
 export interface CurrentUser {
@@ -41,6 +42,11 @@ export interface CurrentUser {
  * built for; on a change the state is cleared and the tab reloads the sign-in page. Every end of a session (sign-out,
  * lost session, identity change, a sign-in or sign-out in another tab) is a **full page load** (A-01): it discards the
  * in-memory state of every module, which a router navigation would keep. Tabs tell each other through `SESSION_CHANNEL`.
+ *
+ * LIS-CR-014 G1 (one browser, two portals): the laboratory portal and the Super Admin portal have separate sessions — cookie
+ * `__Secure-rt` and `__Secure-rta`. The tab's address decides its portal (`SESSION_PORTAL`: `/admin/**` = Super Admin), and
+ * with it the session that start-up, refresh (also the interceptor's replay) and sign-out act on (`?portal=admin`), the refresh
+ * lock and the session channel. A tab starts only in a session of its own portal.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthStore {
@@ -49,6 +55,8 @@ export class AuthStore {
   private readonly navigation = inject(BROWSER_NAVIGATION);
   private readonly channel = inject(SESSION_CHANNEL);
   private readonly refreshLock = inject(REFRESH_LOCK);
+  /** LIS-CR-014 G1: the portal of the tab (its address) decides which session the cookie endpoints act on. */
+  private readonly portal = inject(SESSION_PORTAL);
 
   private readonly accessToken = signal<string | null>(null);
   private readonly expiresAtUtc = signal<Date | null>(null);
@@ -163,6 +171,40 @@ export class AuthStore {
   }
 
   /**
+   * LIS-CR-014 T2: saves the optional columns the member hides in one table (the column chooser), on the membership of the
+   * session, so every device opens the list the same way. Optimistic: the profile changes at once (the table re-renders) and
+   * returns to the previous view of that list when the save is refused; the error is rethrown for the caller to report.
+   */
+  async updateListPreferences(listKey: string, hidden: readonly string[]): Promise<void> {
+    const withView = (profile: AuthProfile, view: readonly string[]): AuthProfile => {
+      const lists = { ...(profile.listPreferences ?? {}) };
+      if (view.length === 0) {
+        delete lists[listKey];
+      } else {
+        lists[listKey] = { hidden: [...view] };
+      }
+
+      return { ...profile, listPreferences: lists };
+    };
+    const before = this.profileState();
+    const previous = before?.listPreferences?.[listKey]?.hidden ?? [];
+    if (before) {
+      this.profileState.set(withView(before, hidden));
+    }
+
+    try {
+      await firstValueFrom(this.http.put<void>(`${ACCOUNT_API.listPreferences}/${encodeURIComponent(listKey)}`, { hidden }), { defaultValue: undefined });
+    } catch (error: unknown) {
+      const current = this.profileState();
+      if (before && current?.userId === before.userId) {
+        this.profileState.set(withView(current, previous));
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * R2-01: tells the other tabs that this user's own profile changed (`profileChangeInterceptor` calls it after a
    * successful password change or language save). This tab's own caches are refreshed by the caller.
    */
@@ -243,7 +285,8 @@ export class AuthStore {
    */
   async signOut(reason: SessionEndReason | null = null): Promise<void> {
     try {
-      await firstValueFrom(this.http.post<void>(AUTH_API.signOut, null));
+      // LIS-CR-014 G1: ends this portal's session only; the other portal of the browser stays signed in
+      await firstValueFrom(this.http.post<void>(portalAuthUrl(AUTH_API.signOut, this.portal()), null));
     } catch {
       // the server clears the cookie either way; the token is dropped below
     } finally {
@@ -261,10 +304,12 @@ export class AuthStore {
 
   private async refreshOnce(): Promise<string | null> {
     const before = this.profileState();
+    // LIS-CR-014 G1: the session of the tab's portal (`?portal=admin` reads `__Secure-rta`; none, `__Secure-rt`)
+    const portal = this.portal();
     let response: AuthResponse;
     try {
-      // C-02: one refresh at a time across the tabs; a waiting tab sends the cookie the previous refresh has just set
-      response = await this.refreshLock(() => firstValueFrom(this.http.post<AuthResponse>(AUTH_API.refresh, null)));
+      // C-02: one refresh at a time across the tabs of the portal; a waiting tab sends the cookie the previous refresh has just set
+      response = await this.refreshLock(() => firstValueFrom(this.http.post<AuthResponse>(portalAuthUrl(AUTH_API.refresh, portal), null)), portal);
     } catch (error: unknown) {
       if (before !== null && problemCodeOf(error) === ProblemCodes.sessionIdleTimeout) {
         // F-01: the server ended the session after inactivity; every tab lands on the sign-in page that says so
@@ -279,6 +324,12 @@ export class AuthStore {
 
     if (response.step !== 'signed-in' || response.accessToken === null || response.profile === null) {
       this.endSession(before, true);
+      return null;
+    }
+
+    if (before === null && portalOfTenant(response.profile.tenantId) !== portal) {
+      // LIS-CR-014 G1: a tab starts in its own portal's session only (a cookie set before the split may hold the other one)
+      this.clear();
       return null;
     }
 

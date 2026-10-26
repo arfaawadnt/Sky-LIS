@@ -26,6 +26,8 @@ namespace Platform.Application.Tracker.Queries;
 /// the visits register reads them). <paramref name="Stage"/>, <paramref name="Attention"/> and <paramref name="View"/> filter
 /// the rows (names of <see cref="TrackerStage"/>, <see cref="TrackerAttention"/>, <see cref="TrackerView"/>) but not the
 /// counters; <paramref name="Search"/> narrows both. <paramref name="Sort"/> is a key of <see cref="TrackerSortKeys.Visits"/>.
+/// <paramref name="Rows"/> = Visits (default) or Services (LIS-CR-014 T3): one row per live top-level line, filtered by the
+/// line's own stage / attention / view and sorted by a key of <see cref="TrackerSortKeys.Services"/>; the counters stay the visits'.
 /// </summary>
 [RequirePermissionPolicy(PermissionCatalog.Registration, PermissionAction.View)]
 public sealed record GetLabTrackerQuery(
@@ -40,7 +42,12 @@ public sealed record GetLabTrackerQuery(
     int? Page,
     int? PageSize,
     string? Sort = null,
-    string? Direction = null) : IQuery<LabTrackerPage>;
+    string? Direction = null,
+    string? Rows = null) : IQuery<LabTrackerPage>
+{
+    /// <summary>True for <c>rows=services</c> (case-insensitive).</summary>
+    public bool ServiceRows => string.Equals(Rows?.Trim(), LabTrackerRows.Services, StringComparison.OrdinalIgnoreCase);
+}
 
 public sealed class GetLabTrackerValidator : AbstractValidator<GetLabTrackerQuery>
 {
@@ -62,7 +69,13 @@ public sealed class GetLabTrackerValidator : AbstractValidator<GetLabTrackerQuer
         RuleFor(query => query.Search).MaximumLength(MaxSearchLength);
         RuleFor(query => query.Page).GreaterThan(0).When(query => query.Page is not null);
         RuleFor(query => query.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).When(query => query.PageSize is not null);
-        RuleFor(query => query.Sort).SortKeyOf(TrackerSortKeys.Visits);
+        RuleFor(query => query.Rows)
+            .Must(rows => string.IsNullOrWhiteSpace(rows)
+                || string.Equals(rows.Trim(), LabTrackerRows.Visits, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rows.Trim(), LabTrackerRows.Services, StringComparison.OrdinalIgnoreCase))
+            .WithMessage("'rows' must be Visits or Services.");
+        RuleFor(query => query.Sort).SortKeyOf(TrackerSortKeys.Visits).When(query => !query.ServiceRows);
+        RuleFor(query => query.Sort).SortKeyOf(TrackerSortKeys.Services).When(query => query.ServiceRows);
         RuleFor(query => query.Direction).SortDirection();
     }
 }
@@ -108,6 +121,21 @@ public sealed class GetLabTrackerHandler(
 
         var visits = rows.Select(row => new TrackedVisit(row, VisitProgressRules.Of(TrackerRows.Facts(row), rules.ReviewBeforeVerify, rules.NowUtc, rules.WarnPercent, rules.LatePercent))).ToList();
         var counters = TrackerRows.Count(visits);
+
+        if (query.ServiceRows)
+        {
+            var byVisit = visits.ToDictionary(visit => visit.Row.VisitId);
+            var lines = await reader.ReadServicesAsync(filter, cancellationToken).ConfigureAwait(false);
+            var services = lines
+                .Where(line => byVisit.ContainsKey(line.VisitId))
+                .Select(line => TrackerServiceRows.Track(line, byVisit[line.VisitId], rules))
+                .ToList();
+            var chosen = TrackerServiceRows.Select(services, Parse<TrackerStage>(query.Stage), Parse<TrackerAttention>(query.Attention), Parse<TrackerView>(query.View));
+            var sorted = TrackerServiceRows.Order(chosen, ListSort.Of(query.Sort, query.Direction), sections.SeeVip);
+            var serviceItems = sorted.Skip(page.Skip).Take(page.PageSize).Select(service => TrackerServiceRows.Item(service, sections, rules.Today)).ToList();
+            return new LabTrackerPage([], page.Page, page.PageSize, chosen.Count, counters, day, branchId, fromUtc, toUtc, LabTrackerRows.Services, serviceItems);
+        }
+
         var selected = TrackerRows.Select(visits, Parse<TrackerStage>(query.Stage), Parse<TrackerAttention>(query.Attention), Parse<TrackerView>(query.View));
         var ordered = TrackerRows.Order(selected, ListSort.Of(query.Sort, query.Direction), sections.SeeVip);
         var items = ordered.Skip(page.Skip).Take(page.PageSize).Select(visit => TrackerRows.Item(visit, sections, rules.Today)).ToList();
@@ -286,8 +314,11 @@ internal static class TrackerRows
         return age.Years > 0 ? $"{age.Years}y" : age.Months > 0 ? $"{age.Months}m" : $"{age.Days}d";
     }
 
-    private static string ShownName(LabTrackerRow row, bool seeVip) =>
+    internal static string ShownName(LabTrackerRow row, bool seeVip) =>
         row.IsVip && !seeVip ? MaskedName : row.PatientName ?? string.Empty;
+
+    internal static IOrderedEnumerable<T> Direction<T, TKey>(IReadOnlyList<T> rows, Func<T, TKey> key, bool descending, IComparer<TKey> comparer) =>
+        descending ? rows.OrderByDescending(key, comparer) : rows.OrderBy(key, comparer);
 
     private static IOrderedEnumerable<TrackedVisit> ByUrgency(IReadOnlyList<TrackedVisit> visits) =>
         visits.OrderByDescending(visit => visit.Row.Urgent)
@@ -295,8 +326,142 @@ internal static class TrackerRows
             .ThenBy(visit => visit.Progress.MinutesLeft)
             .ThenBy(visit => visit.Row.RegisteredAtUtc);
 
-    private static IOrderedEnumerable<TrackedVisit> Direction<TKey>(IReadOnlyList<TrackedVisit> visits, Func<TrackedVisit, TKey> key, bool descending, IComparer<TKey> comparer) =>
-        descending ? visits.OrderByDescending(key, comparer) : visits.OrderBy(key, comparer);
+    internal static bool Is(string key, string name) => string.Equals(key, name, StringComparison.OrdinalIgnoreCase);
+}
 
-    private static bool Is(string key, string name) => string.Equals(key, name, StringComparison.OrdinalIgnoreCase);
+/// <summary>A service line with its own progress and the tracked visit it belongs to (LIS-CR-014 T3).</summary>
+internal sealed record TrackedService(LabTrackerServiceRow Line, TrackedVisit Visit, VisitProgress Progress);
+
+/// <summary>
+/// The <i>Services</i> rows of the tracker (LIS-CR-014 T3): each live top-level line judged by the visit rules on its own
+/// samples, results and clocks (<see cref="VisitProgressRules.OfService"/>), the payment by the visit's balance; filtered by
+/// the line's own stage / attention / view and ordered like the visits, plus the service code.
+/// </summary>
+internal static class TrackerServiceRows
+{
+    public static TrackedService Track(LabTrackerServiceRow line, TrackedVisit visit, TrackerRules rules)
+    {
+        var row = visit.Row;
+        var facts = new ServiceProgressFacts(
+            line.Samples,
+            line.VisibleResults,
+            line.AllResults,
+            line.VisibleOpenClocks,
+            line.AllOpenClocks,
+            line.VisibleOpenPanics,
+            new VisitBalanceFigures(row.PatientShareTotal, row.Paid, row.Refunded).Remaining,
+            row.BilledThroughClaims);
+        return new TrackedService(line, visit, VisitProgressRules.OfService(facts, rules.ReviewBeforeVerify, rules.NowUtc, rules.WarnPercent, rules.LatePercent));
+    }
+
+    public static IReadOnlyList<TrackedService> Select(IReadOnlyList<TrackedService> services, TrackerStage? stage, TrackerAttention? attention, TrackerView? view) =>
+        [.. services.Where(service =>
+            (stage is not { } wantedStage || service.Progress.Stage == wantedStage)
+            && (attention is not { } wantedFlag || service.Progress.Has(wantedFlag))
+            && (view is not { } wantedView || service.Progress.In(wantedView)))];
+
+    /// <summary>
+    /// The order before paging. Default (and <c>timeLeft</c> ascending): urgent visits first, then the minutes left ascending
+    /// with lines without a clock last, then registration time; the other keys as the visits; <c>service</c> = the code.
+    /// Ties: accession, the line's sequence, then the line id (stable paging).
+    /// </summary>
+    public static IReadOnlyList<TrackedService> Order(IReadOnlyList<TrackedService> services, ListSort sort, bool seeVip)
+    {
+        IOrderedEnumerable<TrackedService> ordered;
+        var descending = sort.Descending;
+        switch (sort.Key)
+        {
+            case null:
+                ordered = ByUrgency(services);
+                break;
+            case var key when TrackerRows.Is(key, TrackerSortKeys.TimeLeft):
+                ordered = descending
+                    ? services.OrderBy(service => service.Progress.MinutesLeft is null).ThenByDescending(service => service.Progress.MinutesLeft).ThenBy(service => service.Visit.Row.RegisteredAtUtc)
+                    : ByUrgency(services);
+                break;
+            case var key when TrackerRows.Is(key, TrackerSortKeys.RegisteredAt):
+                ordered = TrackerRows.Direction(services, service => service.Visit.Row.RegisteredAtUtc, descending, Comparer<DateTimeOffset>.Default);
+                break;
+            case var key when TrackerRows.Is(key, TrackerSortKeys.Accession):
+                ordered = TrackerRows.Direction(services, service => service.Visit.Row.Accession, descending, StringComparer.OrdinalIgnoreCase);
+                break;
+            case var key when TrackerRows.Is(key, TrackerSortKeys.Patient):
+                ordered = TrackerRows.Direction(services, service => TrackerRows.ShownName(service.Visit.Row, seeVip), descending, StringComparer.OrdinalIgnoreCase);
+                break;
+            case var key when TrackerRows.Is(key, TrackerSortKeys.Stage):
+                ordered = TrackerRows.Direction(services, service => (int)service.Progress.Stage, descending, Comparer<int>.Default);
+                break;
+            case var key when TrackerRows.Is(key, TrackerSortKeys.Service):
+                ordered = TrackerRows.Direction(services, service => service.Line.ServiceCode, descending, StringComparer.OrdinalIgnoreCase);
+                break;
+            default:
+                throw new ArgumentException($"The sort key '{sort.Key}' is not allowed for this list.", nameof(sort));
+        }
+
+        return [.. ordered
+            .ThenBy(service => service.Visit.Row.Accession, StringComparer.Ordinal)
+            .ThenBy(service => service.Line.Sequence)
+            .ThenBy(service => service.Line.LineId)];
+    }
+
+    public static LabTrackerServiceItem Item(TrackedService service, TrackerSections sections, DateOnly today)
+    {
+        var (line, progress) = (service.Line, service.Progress);
+        var visit = TrackerRows.Item(service.Visit, sections, today);
+        var hidden = Math.Max(0, line.AllResults.Total - line.VisibleResults.Total);
+        return new LabTrackerServiceItem(
+            line.LineId,
+            line.ServiceId,
+            line.ServiceCode,
+            line.ServiceNameEn,
+            line.ServiceNameAr,
+            line.Kind,
+            visit.VisitId,
+            visit.Accession,
+            visit.PatientId,
+            visit.PatientNumber,
+            visit.PatientName,
+            visit.PatientNameAr,
+            visit.PatientMasked,
+            visit.Gender,
+            visit.AgeText,
+            visit.Urgent,
+            visit.RegisteredAtUtc,
+            visit.RegisteredByName,
+            visit.PayerName,
+            visit.PayerNameAr,
+            visit.TierName,
+            visit.TierNameAr,
+            visit.BranchId,
+            progress.Stage.ToString(),
+            progress.NextStep.ToString(),
+            progress.MinutesLeft,
+            progress.DelayState?.ToString(),
+            visit.Stage,
+            visit.Registration,
+            sections.Samples
+                ? new LabTrackerSamples(line.Samples.Total, line.Samples.Ordered, line.Samples.Collected, line.Samples.Received, line.Samples.Rejected, line.FirstRejectionReasonEn, line.FirstRejectionReasonAr, line.Samples.CollectedOutside)
+                : null,
+            sections.Results
+                ? new LabTrackerResults(
+                    line.VisibleResults.Total,
+                    line.VisibleResults.Ordered,
+                    line.VisibleResults.Complete,
+                    line.VisibleResults.Reviewed,
+                    line.VisibleResults.Verified,
+                    line.VisibleResults.Printed,
+                    hidden,
+                    line.VisiblePanics,
+                    line.VisibleDeltas,
+                    line.FirstPanicTestEn,
+                    line.FirstPanicTestAr)
+                : null,
+            visit.Payment);
+    }
+
+    private static IOrderedEnumerable<TrackedService> ByUrgency(IReadOnlyList<TrackedService> services) =>
+        services.OrderByDescending(service => service.Visit.Row.Urgent)
+            .ThenBy(service => service.Progress.MinutesLeft is null)
+            .ThenBy(service => service.Progress.MinutesLeft)
+            .ThenBy(service => service.Visit.Row.RegisteredAtUtc);
 }

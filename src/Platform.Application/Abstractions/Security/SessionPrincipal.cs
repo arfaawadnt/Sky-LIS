@@ -56,6 +56,9 @@ public sealed record SessionPrincipal(
     /// <summary>CP-19: the member's row density of the results grid (<c>comfortable</c> | <c>compact</c>), null = default; read with the membership.</summary>
     public string? ResultsDensity { get; init; }
 
+    /// <summary>LIS-CR-014 T2: the columns the member hides per table (list key → column keys), read with the membership; empty = defaults.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> ListPreferences { get; init; } = new Dictionary<string, IReadOnlyList<string>>();
+
     public bool IsPrimaryAdministrator { get; init; }
 
     /// <summary>LIS-CR-005: the address of the session's laboratory (<c>saas.tenants.portal_slug</c>), read in the same query; null for the platform tenant or a tenant without a client record.</summary>

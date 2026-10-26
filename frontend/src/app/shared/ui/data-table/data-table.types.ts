@@ -1,5 +1,6 @@
 /** Column and row contracts of `<app-data-table>`. */
 
+import type { ExportCell, TableExport } from '../../export/table-export';
 import type { ServerSort } from '../../forms/paging';
 
 export type CellAlign = 'start' | 'center' | 'end';
@@ -28,6 +29,16 @@ export interface TableColumn<T> {
   readonly mono?: boolean;
   /** Hidden under 960px to keep the card layout short. */
   readonly secondary?: boolean;
+  /**
+   * LIS-CR-014 T2: the user may hide this column with the column chooser (the "⋯" at the end of the header row); saved per
+   * user when the table has a `listKey`. Ignored on the first column, which always shows.
+   */
+  readonly optional?: true;
+  /**
+   * LIS-CR-014 T4: what *Print* and *Excel* write for this column — a typed value (number, `Date`) or a `TypedCell` (Excel
+   * value + printed text). Defaults to `value`, else the row property. Give one to every column whose cell is a template.
+   */
+  readonly exportValue?: (row: T) => ExportCell;
 }
 
 export type SortDirection = 'asc' | 'desc';
@@ -141,4 +152,35 @@ export function sortRows<T>(rows: readonly T[], columns: readonly TableColumn<T>
   const direction = sort.direction === 'asc' ? 1 : -1;
   const key = column.sortValue ?? ((row: T): CellValue => cellValue(column, row));
   return [...rows].sort((a, b) => compareCells(key(a), key(b), lang) * direction);
+}
+
+/** The visible columns of a table with the hidden keys removed; the first column and the non-optional ones always show. */
+export function visibleColumns<T>(columns: readonly TableColumn<T>[], hidden: ReadonlySet<string>): readonly TableColumn<T>[] {
+  return columns.filter((column, index) => index === 0 || column.optional !== true || !hidden.has(column.key));
+}
+
+/** The columns the chooser offers: optional, never the first. */
+export function optionalColumns<T>(columns: readonly TableColumn<T>[]): readonly TableColumn<T>[] {
+  return columns.filter((column, index) => index > 0 && column.optional === true);
+}
+
+/** What *Print* and *Excel* write for one cell: `exportValue`, else `value`, else the row property. */
+export function exportCell<T>(column: TableColumn<T>, row: T): ExportCell {
+  return column.exportValue ? column.exportValue(row) : cellValue(column, row);
+}
+
+/** LIS-CR-014 T4: the document of a table — the given (visible) columns with translated headers, one line per row. */
+export function tableExport<T>(
+  columns: readonly TableColumn<T>[],
+  rows: readonly T[],
+  title: string,
+  subtitle: string | null,
+  translate: (key: string) => string,
+): TableExport {
+  return {
+    title,
+    subtitle,
+    columns: columns.map((column) => ({ key: column.key, header: translate(column.header), align: column.align ?? 'start' })),
+    rows: rows.map((row) => columns.map((column) => exportCell(column, row))),
+  };
 }

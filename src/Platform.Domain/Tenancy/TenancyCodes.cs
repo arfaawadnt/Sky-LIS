@@ -20,5 +20,8 @@ public static class TenancyCodes
 
     /// <summary>The results grid density preference is <c>comfortable</c> or <c>compact</c> (results page, 2026-10-14).</summary>
     public const string ResultsDensityInvalid = "TEN-014";
+
+    /// <summary>LIS-CR-014 T2: the list preferences (column chooser) take identifiers only and stay within 4 KB.</summary>
+    public const string ListPreferencesInvalid = "TEN-015";
     public const string MembershipNotFound = "TEN-404";
 }

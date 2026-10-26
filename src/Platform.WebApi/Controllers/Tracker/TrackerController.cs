@@ -18,7 +18,8 @@ public sealed class TrackerController(ISender sender) : ControllerBase
     /// branch), filtered by <c>stage</c>, <c>attention</c> (Delayed | Panic | Rejected | ReadyUnpaid), <c>view</c> (Reception |
     /// Verification | FrontDesk) and <c>search</c>; sorted by <c>sort</c> (timeLeft | registeredAt | accession | patient |
     /// stage) and <c>direction</c>, then paged. The counters cover the whole filtered day before the stage, attention and
-    /// view filters.
+    /// view filters. <c>rows=services</c> (LIS-CR-014 T3) answers one row per live top-level line in <c>services</c> (its own
+    /// stage, next step and time left; sort key <c>service</c> besides the others); the counters stay the visits'.
     /// </summary>
     [HttpGet("visits")]
     public async Task<ActionResult<LabTrackerPage>> Visits(
@@ -34,6 +35,7 @@ public sealed class TrackerController(ISender sender) : ControllerBase
         [FromQuery] int? pageSize,
         [FromQuery] string? sort,
         [FromQuery] string? direction,
+        [FromQuery] string? rows,
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new GetLabTrackerQuery(day, branchId, from, to, stage, attention, view, search, page, pageSize, sort, direction), cancellationToken));
+        Ok(await sender.Send(new GetLabTrackerQuery(day, branchId, from, to, stage, attention, view, search, page, pageSize, sort, direction, rows), cancellationToken));
 }

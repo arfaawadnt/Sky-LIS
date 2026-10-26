@@ -30,7 +30,17 @@ public static class Profiles
             principal.ResultsDensity,
             principal.IsPrimaryAdministrator,
             principal.PortalSlug,
-            NoticeOf(principal));
+            NoticeOf(principal),
+            ListPreferencesOf(principal));
+    }
+
+    /// <summary>LIS-CR-014 T2: the saved table views of the profile; null when the member has none.</summary>
+    public static IReadOnlyDictionary<string, ListPreferenceView>? ListPreferencesOf(SessionPrincipal principal)
+    {
+        ArgumentNullException.ThrowIfNull(principal);
+        return principal.ListPreferences.Count == 0
+            ? null
+            : principal.ListPreferences.ToDictionary(pair => pair.Key, pair => new ListPreferenceView(pair.Value), StringComparer.Ordinal);
     }
 
     /// <summary>LIS-CR-012: the subscription notice of the profile; null while the subscription is Ok.</summary>

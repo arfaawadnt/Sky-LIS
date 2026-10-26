@@ -83,6 +83,7 @@ public sealed record AuthResponse(
 /// warns a minute before it and signs out at it; the server refuses a refresh after it (<c>AUTH-017</c>).
 /// <see cref="PortalSlug"/> (LIS-CR-005) is the address of the session's laboratory (<c>/lab/{slug}</c>), null for the platform
 /// tenant (the Super Admin signs in at <c>/admin/login</c>): the SPA sends a signed-out or timed-out user back to it.
+/// <see cref="ListPreferences"/> (LIS-CR-014 T2) holds the member's saved table views by list key; null when there are none.
 /// </summary>
 public sealed record AuthProfile(
     Guid UserId,
@@ -102,7 +103,14 @@ public sealed record AuthProfile(
     string? ResultsDensity = null,
     bool IsPrimaryAdministrator = false,
     string? PortalSlug = null,
-    SubscriptionNotice? SubscriptionNotice = null);
+    SubscriptionNotice? SubscriptionNotice = null,
+    IReadOnlyDictionary<string, ListPreferenceView>? ListPreferences = null);
+
+/// <summary>
+/// LIS-CR-014 T2: one table's saved view in <see cref="AuthProfile.ListPreferences"/> (keyed by the table's list key, <c>visits</c>,
+/// <c>tracker</c> …): the optional columns the member hides. A table absent from the map shows its default columns.
+/// </summary>
+public sealed record ListPreferenceView(IReadOnlyList<string> Hidden);
 
 /// <summary>
 /// LIS-CR-012 (C-16): the subscription state of the session's laboratory, read in the session principal's one query; null when

@@ -7180,5 +7180,20 @@ BEGIN
     VALUES ('20261024014426_ReviewFeatures', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261025110631_ListPreferences') THEN
+    ALTER TABLE app.tenant_memberships ADD list_preferences character varying(4096);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261025110631_ListPreferences') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261025110631_ListPreferences', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

@@ -38,7 +38,7 @@ export interface BoardLane {
           }
           <ul class="cards">
             @for (item of lane.items; track item.visitId) {
-              <li><app-tracker-visit-card [item]="item" /></li>
+              <li><app-tracker-visit-card [item]="item" [returnTo]="returnTo()" /></li>
             }
           </ul>
           @if (lane.totalCount > lane.items.length) {
@@ -136,6 +136,9 @@ export class TrackerBoardComponent {
   protected readonly icons = STAGE_ICONS;
 
   readonly lanes = input.required<readonly BoardLane[]>();
+
+  /** The tracker's URL with its filter, passed to every card's link (LIS-CR-014 T5). */
+  readonly returnTo = input<string | null>(null);
   readonly more = output<LabTrackerStage>();
 
   protected count(value: number): string {

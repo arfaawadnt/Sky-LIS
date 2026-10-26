@@ -224,6 +224,158 @@ describe('Public pages (CP-01, CP-02)', () => {
       expect(backend.expectOne(PUBLIC_SUBSCRIPTION_API.start).request.body).toMatchObject({ governorateId: 'giza', cityId: null, districtId: null, areaId: null });
     });
 
+    describe('field-level refusals and the way back (LIS-CR-014)', () => {
+      const LIVE = { subscriptionId: 'sub-1', expiresAtUtc: new Date(Date.now() + 3_600_000).toISOString(), maskedMobile: '+201******679', codeLifetimeSeconds: 300 };
+
+      async function fillDetails(): Promise<void> {
+        setValue(root, 'select[formcontrolname=countryId]', 'eg');
+        await render();
+        backend.expectOne((request) => request.url === PUBLIC_SUBSCRIPTION_API.governorates).flush([{ id: 'cairo', countryId: 'eg', nameEn: 'Cairo', nameAr: 'القاهرة' }]);
+        await render();
+        setValue(root, 'input[formcontrolname=labNameEn]', 'Al Noor Laboratories');
+        setValue(root, 'input[formcontrolname=labNameAr]', 'مختبرات النور');
+        setValue(root, 'select[formcontrolname=governorateId]', 'cairo');
+        await render();
+        backend.match((request) => request.url === '/api/v1/public/cities').forEach((request) => request.flush([]));
+        setValue(root, 'input[formcontrolname=address]', 'Nasr City');
+        setValue(root, 'app-mobile-input[formcontrolname=mobile] input.number', '01012345678');
+        setValue(root, 'input[formcontrolname=managerName]', 'Ahmed Hassan');
+        setValue(root, 'app-mobile-input[formcontrolname=managerMobile] input.number', '01012345679');
+        await render();
+      }
+
+      function fieldOf(name: string): HTMLElement {
+        const field = root.querySelector(`[formcontrolname=${name}]`)?.closest('app-form-field');
+        if (!(field instanceof HTMLElement)) {
+          throw new Error(`no field ${name}`);
+        }
+
+        return field;
+      }
+
+      async function submit(): Promise<void> {
+        (root.querySelector('form button[type=submit]') as HTMLButtonElement).click();
+        await render();
+      }
+
+      async function reachAccountStep(): Promise<void> {
+        await fillDetails();
+        await submit();
+        backend.expectOne(PUBLIC_SUBSCRIPTION_API.start).flush(LIVE);
+        await render();
+        setValue(root, 'input[formcontrolname=code]', '123456');
+        await submit();
+        backend.expectOne(PUBLIC_SUBSCRIPTION_API.verify).flush(null, { status: 204, statusText: 'No Content' });
+        await render();
+        expect(root.querySelector('input[formcontrolname=username]')).not.toBeNull();
+      }
+
+      async function submitAccount(): Promise<void> {
+        setValue(root, 'input[formcontrolname=username]', 'noor.admin');
+        setValue(root, 'input[formcontrolname=password]', 'a long passphrase');
+        setValue(root, 'input[formcontrolname=confirmation]', 'a long passphrase');
+        await submit();
+      }
+
+      it('marks a mobile that already belongs to an account on its field when the user leaves it, before any code is sent', async () => {
+        await fillDetails();
+        root.querySelector('app-mobile-input[formcontrolname=managerMobile] input.number')?.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+        await render();
+        const check = backend.expectOne(PUBLIC_SUBSCRIPTION_API.check);
+        expect(check.request.body).toEqual({ countryId: 'eg', mobile: '+201012345678', managerMobile: '+201012345679' });
+        check.flush({ issues: [{ field: 'managerMobile', code: 'SUB-011' }] });
+        await render();
+        await render();
+        expect(fieldOf('managerMobile').classList.contains('invalid')).toBe(true);
+        expect(fieldOf('mobile').classList.contains('invalid')).toBe(false);
+
+        await submit();
+        backend.expectNone(PUBLIC_SUBSCRIPTION_API.start); // the marked field holds the code back
+
+        // start refuses the same way, naming the field
+        setValue(root, 'app-mobile-input[formcontrolname=managerMobile] input.number', '01012345670');
+        await submit();
+        backend
+          .expectOne(PUBLIC_SUBSCRIPTION_API.start)
+          .flush({ type: 'about:blank', title: 'in use', status: 409, code: 'SUB-011', errors: { managerMobile: ['in use'] }, rules: { managerMobile: [{ rule: 'SUB-011' }] } }, { status: 409, statusText: 'Conflict' });
+        await render();
+        expect(fieldOf('managerMobile').classList.contains('invalid')).toBe(true);
+        expect(root.querySelector('input[formcontrolname=code]')).toBeNull();
+      });
+
+      it('goes back from steps 2 and 3 with every value kept and resumes without a new code when nothing changed', async () => {
+        await reachAccountStep();
+        const rail = (): HTMLButtonElement[] => [...root.querySelectorAll<HTMLButtonElement>('app-wizard-rail button.step-link')];
+        expect(rail().length).toBe(2); // steps 1 and 2 are done
+
+        rail()[0]?.click();
+        await render();
+        expect(root.querySelector<HTMLInputElement>('input[formcontrolname=labNameEn]')?.value).toBe('Al Noor Laboratories');
+        expect(root.textContent).toContain('public.wizard.sameDetails');
+        expect(root.querySelector('form button[type=submit]')?.textContent).toContain('public.wizard.continue');
+
+        await submit();
+        backend.expectNone(PUBLIC_SUBSCRIPTION_API.start);
+        expect(root.querySelector('input[formcontrolname=username]')).not.toBeNull(); // straight to step 3: the mobile is verified
+
+        // the done step 2 of the rail shows the verified notice
+        rail()[1]?.click();
+        await render();
+        expect(root.textContent).toContain('public.wizard.verifiedTitle');
+        expect(root.querySelector('input[formcontrolname=code]')).toBeNull();
+
+        // Back from there, change a detail: a new request and a new code
+        [...root.querySelectorAll<HTMLButtonElement>('.wizard-actions button')].find((button) => button.textContent?.includes('public.wizard.back'))?.click();
+        await render();
+        setValue(root, 'input[formcontrolname=address]', '12 Tahrir St.');
+        await render();
+        expect(root.textContent).toContain('public.wizard.detailsChanged');
+        await submit();
+        expect(backend.expectOne(PUBLIC_SUBSCRIPTION_API.start).request.body).toMatchObject({ address: '12 Tahrir St.' });
+      });
+
+      it('has a Back button on step 3 that keeps the account values out of step 1', async () => {
+        await reachAccountStep();
+        const back = [...root.querySelectorAll<HTMLButtonElement>('.wizard-actions button')].find((button) => button.textContent?.includes('public.wizard.back'));
+        expect(back).toBeDefined();
+        back?.click();
+        await render();
+        expect(root.querySelector<HTMLInputElement>('input[formcontrolname=managerName]')?.value).toBe('Ahmed Hassan');
+      });
+
+      it('returns to step 1 with the mobile marked when step 3 refuses it, and sends a new code once it is changed', async () => {
+        await reachAccountStep();
+        await submitAccount();
+        backend
+          .expectOne(PUBLIC_SUBSCRIPTION_API.complete)
+          .flush(
+            { type: 'about:blank', title: 'in use', status: 409, code: 'SUB-011', errors: { managerMobile: ['in use'] }, rules: { managerMobile: [{ rule: 'SUB-011' }] } },
+            { status: 409, statusText: 'Conflict' },
+          );
+        await render();
+        await render();
+        expect(root.querySelector('input[formcontrolname=labNameEn]')).not.toBeNull();
+        expect(root.textContent).toContain('public.wizard.returnedForDetails');
+        expect(fieldOf('managerMobile').classList.contains('invalid')).toBe(true);
+
+        setValue(root, 'app-mobile-input[formcontrolname=managerMobile] input.number', '01012345670');
+        await submit();
+        expect(backend.expectOne(PUBLIC_SUBSCRIPTION_API.start).request.body).toMatchObject({ managerMobile: '+201012345670' });
+      });
+
+      it('shows a username refused by step 3 on the username field and stays on step 3', async () => {
+        await reachAccountStep();
+        await submitAccount();
+        backend
+          .expectOne(PUBLIC_SUBSCRIPTION_API.complete)
+          .flush({ type: 'about:blank', title: 'taken', status: 409, code: 'SUB-013', errors: { username: ['taken'] } }, { status: 409, statusText: 'Conflict' });
+        await render();
+        expect(fieldOf('username').classList.contains('invalid')).toBe(true);
+        expect(root.querySelector('.availability')?.getAttribute('data-state')).toBe('taken');
+        expect(root.querySelector('input[formcontrolname=labNameEn]')).toBeNull();
+      });
+    });
+
     it('opens the sign-in address of the new laboratory from the last step, the username prefilled (LIS-CR-005)', async () => {
       const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       const facade = TestBed.inject(SubscriptionFacade);

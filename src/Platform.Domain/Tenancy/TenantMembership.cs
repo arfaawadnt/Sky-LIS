@@ -77,6 +77,12 @@ public sealed class TenantMembership : AggregateRoot, ITenantScoped
     /// <summary>CP-19: the member's row density of the results grid, <c>comfortable</c> or <c>compact</c>; null = the default.</summary>
     public string? PreferredResultsDensity { get; private set; }
 
+    /// <summary>
+    /// LIS-CR-014 T2: the member's list views (the columns hidden per table, the column chooser's "favourite view") as the JSON
+    /// document of <see cref="ListPreferenceDocument"/>; null = every table shows its default columns.
+    /// </summary>
+    public string? ListPreferences { get; private set; }
+
     /// <summary>Job title shown on the user list and on signed reports (CP-38).</summary>
     public string? Designation { get; private set; }
 
@@ -171,6 +177,17 @@ public sealed class TenantMembership : AggregateRoot, ITenantScoped
         Require(SupportedResultsDensities.Contains(value), TenancyCodes.ResultsDensityInvalid, "The results density must be 'comfortable' or 'compact'.", DomainFault.Validation);
         PreferredResultsDensity = value;
     }
+
+    /// <summary>
+    /// LIS-CR-014 T2: the columns the member hides in one table (an empty set returns that table to its default columns); a
+    /// self-service preference like the language. TEN-015 for a key that is not an identifier or a document beyond 4 KB.
+    /// </summary>
+    public void SetListPreference(string listKey, IEnumerable<string> hiddenColumns) =>
+        ListPreferences = ListPreferenceDocument.With(ListPreferences, listKey, hiddenColumns);
+
+    /// <summary>The columns the member hides in one table (empty when none).</summary>
+    public IReadOnlyList<string> HiddenColumnsOf(string listKey) =>
+        ListPreferenceDocument.Parse(ListPreferences).TryGetValue(listKey, out var hidden) ? hidden : [];
 
     /// <summary>
     /// U4 Assign the role whose privileges the member inherits: same tenant (TEN-011), active (ORG-010); the primary

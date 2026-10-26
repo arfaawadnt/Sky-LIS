@@ -25,58 +25,6 @@
   margin: var(--sp-1) 0 0;
 }
 
-.steps {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--sp-2);
-  list-style: none;
-  padding: 0;
-  margin: var(--sp-4) 0 var(--sp-5);
-}
-
-.step {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  padding-block-end: var(--sp-2);
-  border-block-end: 3px solid var(--line-soft);
-}
-
-.step.active {
-  color: var(--blue-2);
-  border-block-end-color: var(--blue);
-}
-
-.step.done {
-  color: var(--ok);
-  border-block-end-color: var(--ok);
-}
-
-.step-dot {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--line-soft);
-  color: var(--ink-2);
-  font-size: var(--fs-xs);
-}
-
-.step.active .step-dot {
-  background: var(--grad);
-  color: #fff;
-}
-
-.step.done .step-dot {
-  background: var(--ok-soft);
-  color: var(--ok);
-}
-
 form {
   display: grid;
   gap: var(--sp-3);
@@ -205,10 +153,6 @@ a.btn {
 @media (max-width: 720px) {
   .wizard {
     padding: var(--sp-4);
-  }
-
-  .steps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

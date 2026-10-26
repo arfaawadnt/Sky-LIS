@@ -22,6 +22,9 @@ import { TrackerApi } from '../data/tracker.api';
 /** The two layouts over the same data and filters: A · Pipeline board (table) and B · Stage lanes (board). */
 export type TrackerLayout = 'table' | 'board';
 
+/** The rows of the table (LIS-CR-014 T3): one per visit, or one per live top-level service line; the board stays visit-based. */
+export type TrackerRowMode = 'visits' | 'services';
+
 /**
  * The tracker filter as the page edits it: `day` null = today in the laboratory's time zone (the server's default); a
  * `from` / `to` range (laboratory wall-clock `yyyy-MM-ddTHH:mm`, both or neither) replaces the day.
@@ -34,21 +37,36 @@ export interface TrackerFilter {
   readonly attention: LabTrackerAttention | null;
   readonly view: LabTrackerView | null;
   readonly search: string | null;
+  readonly rows: TrackerRowMode;
   readonly page: number;
   readonly pageSize: number;
 }
 
 export function defaultTrackerFilter(): TrackerFilter {
-  return { day: null, from: null, to: null, stage: null, attention: null, view: null, search: null, page: 1, pageSize: 50 };
+  return { day: null, from: null, to: null, stage: null, attention: null, view: null, search: null, rows: 'visits', page: 1, pageSize: 50 };
 }
 
-/** The server keys of the sortable table columns (allow-list `timeLeft`, `registeredAt`, `accession`, `patient`, `stage`). */
+/**
+ * The server keys of the sortable table columns (allow-list `timeLeft`, `registeredAt`, `accession`, `patient`, `stage`;
+ * `service` with service rows only, LIS-CR-014 T3).
+ */
 export const TRACKER_SORT_KEYS: SortKeyMap = {
   visit: 'accession',
+  service: 'service',
   registration: 'registeredAt',
   nextStep: 'stage',
   timeLeft: 'timeLeft',
 };
+
+/** The table column that sorts by the service code: only with service rows. */
+export const SERVICE_SORT_COLUMN = 'service';
+
+/** Everything the tracker keeps in its URL (LIS-CR-014 T5): the filter with its rows mode and page, the column order and the layout. */
+export interface TrackerUrlState {
+  readonly filter: TrackerFilter;
+  readonly sort: TableSort | null;
+  readonly layout: TrackerLayout;
+}
 
 /** Cards per lane of the board; the rest is reached through "+ n more" (the table filtered by that stage). */
 export const LANE_PAGE_SIZE = 20;
@@ -126,6 +144,7 @@ export class TrackerFacade {
       stage: filter.stage,
       page: filter.page,
       pageSize: filter.pageSize,
+      rows: filter.rows === 'services' ? 'Services' : null,
       ...sortParams(serverSortOf(this.sort(), TRACKER_SORT_KEYS, () => this.i18n.lang())),
     };
   });
@@ -141,7 +160,18 @@ export class TrackerFacade {
     loader: ({ params, abortSignal }) => this.load(params, abortSignal),
   });
 
-  readonly rows = computed<readonly LabTrackerItem[]>(() => (this.list.hasValue() ? this.list.value().items : []));
+  /** The rows of the table: visits, or (service rows) the service lines, which carry every visit field too. */
+  readonly rows = computed<readonly LabTrackerItem[]>(() => {
+    if (!this.list.hasValue()) {
+      return [];
+    }
+
+    const page = this.list.value();
+    return this.filter().rows === 'services' ? (page.services ?? []) : page.items;
+  });
+
+  /** What the URL keeps (LIS-CR-014 T5); the page writes it with replace state and restores it on open. */
+  readonly urlState = computed<TrackerUrlState>(() => ({ filter: this.filter(), sort: this.sort(), layout: this.layout() }));
 
   readonly totalCount = computed(() => (this.list.hasValue() ? this.list.value().totalCount : 0));
 
@@ -223,6 +253,26 @@ export class TrackerFacade {
 
   setLayout(layout: TrackerLayout): void {
     this.layout.set(layout);
+  }
+
+  /** *Visits | Services* (LIS-CR-014 T3): the other rows start at page 1; the service-code order has no meaning for visits. */
+  setRows(rows: TrackerRowMode): void {
+    if (rows === this.filter().rows) {
+      return;
+    }
+
+    if (rows === 'visits' && this.sort()?.key === SERVICE_SORT_COLUMN) {
+      this.sort.set(null);
+    }
+
+    this.update({ rows });
+  }
+
+  /** The state read from the URL on open, on a return or on the browser's back / forward (LIS-CR-014 T5). */
+  restore(state: TrackerUrlState): void {
+    this.filter.set(state.filter);
+    this.sort.set(state.sort);
+    this.layout.set(state.layout);
   }
 
   /** "+ n more" on a lane: the table filtered by that stage. */

@@ -5,6 +5,7 @@ import type { PageRequest } from '../../../core/api/paging';
 import { PATIENTS_PERMISSIONS, type RegisterPatientRequest } from '../../../core/api/patients.contracts';
 import { type CancelLinesRequest, REGISTRATION_PERMISSIONS, VISIT_STATUSES, type VisitListItem } from '../../../core/api/registration.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { dateCell, moneyCell } from '../../../shared/export/table-export';
 import { problemMessage } from '../../../shared/forms/problem-text';
 import { PatientFormComponent } from '../../../shared/patient/patient-form.component';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
@@ -82,16 +83,80 @@ export class VisitsPage {
   protected readonly current = signal<VisitListItem | null>(null);
 
   protected readonly columns: readonly TableColumn<VisitListItem>[] = [
-    { key: 'accession', header: 'registration.column.accession', width: '150px' },
-    { key: 'patient', header: 'registration.column.patient' },
-    { key: 'branch', header: 'registration.column.branch', secondary: true, value: (row) => pick(row.branchNameEn, row.branchNameAr, this.i18n.lang()) },
-    { key: 'registeredAtUtc', header: 'registration.column.date', value: (row) => dateTime(row.registeredAtUtc, this.i18n.lang()), secondary: true },
-    { key: 'payer', header: 'registration.column.payer' },
-    { key: 'services', header: 'registration.column.services' },
-    { key: 'patientShareTotal', header: 'registration.column.patientShare', align: 'end', value: (row) => money(row.patientShareTotal, this.i18n.lang()) },
-    { key: 'remaining', header: 'registration.column.remaining', align: 'end' },
-    { key: 'status', header: 'registration.column.status', width: '110px' },
+    { key: 'accession', header: 'registration.column.accession', width: '150px', exportValue: (row) => (row.urgent ? `${row.accession} · ${this.i18n.t('registration.flag.urgent')}` : row.accession) },
+    { key: 'patient', header: 'registration.column.patient', exportValue: (row) => [this.patientName(row), row.patientNumber ?? ''].filter((part) => part !== '').join(' · ') },
+    { key: 'branch', header: 'registration.column.branch', secondary: true, optional: true, value: (row) => pick(row.branchNameEn, row.branchNameAr, this.i18n.lang()) },
+    {
+      key: 'registeredAtUtc',
+      header: 'registration.column.date',
+      value: (row) => dateTime(row.registeredAtUtc, this.i18n.lang()),
+      exportValue: (row) => dateCell(row.registeredAtUtc, dateTime(row.registeredAtUtc, this.i18n.lang())),
+      secondary: true,
+    },
+    { key: 'payer', header: 'registration.column.payer', optional: true, exportValue: (row) => [this.name(row.payerNameEn, row.payerNameAr), this.name(row.tierNameEn, row.tierNameAr)].filter((part) => part !== '').join(' · ') },
+    { key: 'services', header: 'registration.column.services', exportValue: (row) => row.lines.filter((line) => line.kind !== 'PackageMember').map((line) => line.code).join(', ') },
+    {
+      key: 'patientShareTotal',
+      header: 'registration.column.patientShare',
+      align: 'end',
+      optional: true,
+      value: (row) => money(row.patientShareTotal, this.i18n.lang()),
+      exportValue: (row) => moneyCell(row.patientShareTotal, money(row.patientShareTotal, this.i18n.lang())),
+    },
+    {
+      key: 'remaining',
+      header: 'registration.column.remaining',
+      align: 'end',
+      optional: true,
+      exportValue: (row) => (row.remaining === 0 ? this.i18n.t('registration.visits.settled') : moneyCell(row.remaining, money(row.remaining, this.i18n.lang()))),
+    },
+    { key: 'status', header: 'registration.column.status', width: '110px', exportValue: (row) => this.i18n.t('registration.status.' + row.status) },
   ];
+
+  /** LIS-CR-014 T4: the rows ticked for *Print* / *Excel* (none = every row of the page). */
+  protected readonly selected = signal<readonly string[]>([]);
+
+  /** LIS-CR-014 T4: the filters in force, printed under the list title. */
+  protected readonly printSubtitle = computed(() => {
+    const facade = this.facade;
+    const parts: string[] = [];
+    const filter = (label: string, value: string): void => {
+      parts.push(this.i18n.tf('registration.visits.printFilter', { label, value }));
+    };
+    const text = facade.text().trim();
+    if (text !== '') {
+      filter(this.i18n.t('registration.visits.search'), text);
+    }
+
+    const { from, to } = facade.days();
+    if (from === '' && to === '') {
+      parts.push(this.i18n.t('registration.visits.allDates'));
+    } else {
+      if (from !== '') {
+        filter(this.i18n.t('registration.visits.from'), from);
+      }
+
+      if (to !== '') {
+        filter(this.i18n.t('registration.visits.to'), to);
+      }
+    }
+
+    const payer = facade.payers().find((candidate) => candidate.id === facade.payerId());
+    if (payer) {
+      filter(this.i18n.t('registration.column.payer'), this.name(payer.nameEn, payer.nameAr));
+    }
+
+    const status = facade.status();
+    if (status !== null) {
+      filter(this.i18n.t('registration.column.status'), this.i18n.t('registration.status.' + status));
+    }
+
+    if (facade.branchOnly()) {
+      parts.push(this.i18n.t('registration.visits.branchOnly'));
+    }
+
+    return parts.join(' · ');
+  });
 
   protected readonly rows = computed<readonly VisitListItem[]>(() => (this.facade.visits.hasValue() ? this.facade.visits.value().items : []));
   protected readonly total = computed(() => (this.facade.visits.hasValue() ? this.facade.visits.value().totalCount : 0));

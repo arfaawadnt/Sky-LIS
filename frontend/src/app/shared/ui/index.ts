@@ -18,6 +18,7 @@ export type { FieldKind, FieldSchema, FormValue, MasterDataAdapter, MasterDataCo
 export { OverlayStackService } from './overlay/overlay-stack.service';
 export { PageHeaderComponent, type Breadcrumb } from './page-header/page-header.component';
 export { PaginatorComponent } from './paginator/paginator.component';
+export { RETURN_TO_PARAM, RETURN_TO_MAX_LENGTH, ReturnLinkComponent, returnToPath, safeReturnTo } from './return-link/return-link.component';
 export { SearchBoxComponent } from './search-box/search-box.component';
 export { SearchFocusService } from './search-box/search-focus.service';
 export { SectionCardComponent } from './section-card/section-card.component';

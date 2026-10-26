@@ -75,6 +75,48 @@ public sealed record LabTrackerItem(
     LabTrackerPayment? Payment);
 
 /// <summary>
+/// One live top-level service line of a visit (LIS-CR-014 T3, <c>?rows=services</c>): the service as ordered
+/// (<see cref="ServiceCode"/>, names, <see cref="ServiceKind"/> Service | Package), then the visit's identity, patient, payer
+/// and registration exactly as <see cref="LabTrackerItem"/> carries them. <see cref="Stage"/>, <see cref="NextStep"/>,
+/// <see cref="MinutesLeft"/>, <see cref="DelayState"/>, <see cref="Samples"/> and <see cref="Results"/> are the line's own (its
+/// tubes and its results, package members included); <see cref="VisitStage"/> is the visit's; <see cref="Payment"/> is the
+/// visit's balance (a payment is taken for the visit). The sections are null without the module's view permission.
+/// </summary>
+public sealed record LabTrackerServiceItem(
+    Guid LineId,
+    Guid ServiceId,
+    string ServiceCode,
+    string ServiceName,
+    string ServiceNameAr,
+    string ServiceKind,
+    Guid VisitId,
+    string Accession,
+    Guid PatientId,
+    string? PatientNumber,
+    string PatientName,
+    string? PatientNameAr,
+    bool PatientMasked,
+    string? Gender,
+    string? AgeText,
+    bool Urgent,
+    DateTimeOffset RegisteredAtUtc,
+    string? RegisteredByName,
+    string? PayerName,
+    string? PayerNameAr,
+    string? TierName,
+    string? TierNameAr,
+    Guid BranchId,
+    string Stage,
+    string NextStep,
+    int? MinutesLeft,
+    string? DelayState,
+    string VisitStage,
+    LabTrackerRegistration Registration,
+    LabTrackerSamples? Samples,
+    LabTrackerResults? Results,
+    LabTrackerPayment? Payment);
+
+/// <summary>
 /// The counters of the whole filtered day (day, branch, search) <b>before</b> the stage, attention and view filters, so the
 /// strip and the chips always show the day: <see cref="Total"/> every visit, one count per stage and one per attention flag.
 /// </summary>
@@ -94,6 +136,9 @@ public sealed record LabTrackerCounters(
 /// <summary>
 /// A page of the tracker: the rows of the filtered day after the stage / attention / view filters, ordered before paging;
 /// <see cref="Day"/> the laboratory day read (echoed after the default applied) and <see cref="BranchId"/> the branch.
+/// <see cref="Rows"/> is Visits (the rows are <see cref="Items"/>) or Services (LIS-CR-014 T3: the rows are
+/// <see cref="Services"/>, <see cref="Items"/> is empty and <see cref="TotalCount"/> counts service rows); the counters are
+/// the visits' in both.
 /// </summary>
 public sealed record LabTrackerPage(
     IReadOnlyList<LabTrackerItem> Items,
@@ -104,4 +149,13 @@ public sealed record LabTrackerPage(
     DateOnly Day,
     Guid BranchId,
     DateTimeOffset FromUtc,
-    DateTimeOffset ToUtc);
+    DateTimeOffset ToUtc,
+    string Rows = LabTrackerRows.Visits,
+    IReadOnlyList<LabTrackerServiceItem>? Services = null);
+
+/// <summary>The two row modes of the tracker table (<c>?rows=</c>, case-insensitive; absent = Visits).</summary>
+public static class LabTrackerRows
+{
+    public const string Visits = "Visits";
+    public const string Services = "Services";
+}

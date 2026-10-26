@@ -3,6 +3,23 @@
   min-width: 0;
 }
 
+/* LIS-CR-014 T4: Print / Excel above the table */
+.table-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.tools-note {
+  margin-inline-end: auto;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
 .table-wrap {
   overflow: auto;
   max-width: 100%;
@@ -223,6 +240,10 @@ tr.state td {
     letter-spacing: 0.03em;
     text-align: start;
     flex: none;
+  }
+
+  td.chooser {
+    display: none;
   }
 
   td.sel::before,

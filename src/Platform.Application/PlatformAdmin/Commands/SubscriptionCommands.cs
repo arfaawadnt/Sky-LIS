@@ -82,18 +82,30 @@ public sealed class StartSubscriptionHandler(
     ISecurityEventLog events,
     IUnitOfWork unitOfWork,
     IClock clock,
-    ILocalityLookup localities) : ICommandHandler<StartSubscriptionCommand, SubscriptionStarted>
+    ILocalityLookup localities,
+    IUserMobileNumbers mobiles) : ICommandHandler<StartSubscriptionCommand, SubscriptionStarted>
 {
     public async Task<SubscriptionStarted> Handle(StartSubscriptionCommand command, CancellationToken cancellationToken)
     {
-        var country = await countries.GetForUpdateAsync(command.CountryId, cancellationToken)
-            ?? throw new DomainException(PlatformAdminCodes.CountryNotFound, "Country not found.", DomainFault.NotFound);
-        var governorate = await governorates.GetForUpdateAsync(command.GovernorateId, cancellationToken)
-            ?? throw new DomainException(PlatformAdminCodes.GovernorateNotFound, "Governorate not found.", DomainFault.NotFound);
+        SubscriptionRequest request;
+        try
+        {
+            var country = await countries.GetForUpdateAsync(command.CountryId, cancellationToken)
+                ?? throw new DomainException(PlatformAdminCodes.CountryNotFound, "Country not found.", DomainFault.NotFound);
+            var governorate = await governorates.GetForUpdateAsync(command.GovernorateId, cancellationToken)
+                ?? throw new DomainException(PlatformAdminCodes.GovernorateNotFound, "Governorate not found.", DomainFault.NotFound);
 
-        var profile = ClientProfile.Create(command.LabNameEn, command.LabNameAr, country, governorate.Id, command.Address, command.Mobile, command.LicenceNo, command.ManagerName, command.ManagerMobile, command.Email);
-        var request = SubscriptionRequest.Start(profile, country, governorate, command.Language ?? country.Language, clock.UtcNow);
-        request.Locate(await LocalityChecks.ResolveAsync(localities, governorate.Id, command.CityId, command.DistrictId, command.AreaId, cancellationToken));
+            var profile = ClientProfile.Create(command.LabNameEn, command.LabNameAr, country, governorate.Id, command.Address, command.Mobile, command.LicenceNo, command.ManagerName, command.ManagerMobile, command.Email);
+            // LIS-CR-014 S1: a manager mobile an account already holds is refused here, on its field, before any code is sent
+            await SubscriptionChecks.EnsureManagerMobileFreeAsync(mobiles, profile.ManagerMobile, cancellationToken);
+            request = SubscriptionRequest.Start(profile, country, governorate, command.Language ?? country.Language, clock.UtcNow);
+            request.Locate(await LocalityChecks.ResolveAsync(localities, governorate.Id, command.CityId, command.DistrictId, command.AreaId, cancellationToken));
+        }
+        catch (DomainException refusal)
+        {
+            throw SubscriptionFields.Named(refusal);
+        }
+
         requests.Add(request);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -149,7 +161,7 @@ public sealed class VerifySubscriptionHandler(ISubscriptionRequestRepository req
         if (!await otp.VerifyAsync(SubscriptionOtp.Purpose, request.ManagerMobile, command.Code.Trim(), cancellationToken))
         {
             await events.WriteAsync(new SecurityEvent(PlatformAdminSecurityEvents.SubscriptionVerifyFailed, SecurityEvent.Warning, Detail: $"subscription:{request.Id}"), cancellationToken);
-            throw new DomainException(PlatformAdminCodes.CodeRejected, "The code is not valid, or it has expired.", DomainFault.Validation);
+            throw new DomainException(PlatformAdminCodes.CodeRejected, "The code is not valid, or it has expired.", DomainFault.Validation) { Fields = [SubscriptionFields.Code] };
         }
 
         request.MarkVerified(clock.UtcNow);
@@ -192,22 +204,39 @@ public sealed class CompleteSubscriptionHandler(
     ISecurityEventLog events,
     IUnitOfWork unitOfWork,
     IClock clock,
-    ILocalityLookup localities) : ICommandHandler<CompleteSubscriptionCommand, SubscriptionCompletedResponse>
+    ILocalityLookup localities,
+    IUserMobileNumbers mobiles) : ICommandHandler<CompleteSubscriptionCommand, SubscriptionCompletedResponse>
 {
     public async Task<SubscriptionCompletedResponse> Handle(CompleteSubscriptionCommand command, CancellationToken cancellationToken)
     {
         var request = await SubscriptionLookup.RequireAsync(requests, command.SubscriptionId, cancellationToken);
         request.EnsureCanComplete(clock.UtcNow);
 
-        // LIS-CR-008 C-04: the locality picked at step 1, checked again (rows may have moved on since; inactive ones stay accepted)
-        var locality = await LocalityChecks.ResolveAsync(localities, request.GovernorateId, request.CityId, request.DistrictId, request.AreaId, cancellationToken);
         var provisioner = new TenantProvisioner(tenants, wallets, countries, governorates, plans, users, branches, administrators, masterData, hasher, settings, tenantScope, clock);
-        var spec = new ProvisionTenantSpec(
-            request.NameEn, request.NameAr, request.CountryId, request.GovernorateId, request.Address, request.Mobile, request.LicenceNo,
-            request.ManagerName, request.ManagerMobile, request.Email, PlanId: null, PortalSlug: null, TenantSource.Subscription, request.Language,
-            command.Username, command.Password, locality);
+        PreparedTenant prepared;
+        try
+        {
+            // LIS-CR-014 S1/S2: what used to fail inside provisioning as an anonymous UNIQUE-409 (ux_platform_users_mobile) or as
+            // CLI-101 is refused first, on its field: the manager mobile (the wizard returns to step 1), then the username.
+            await SubscriptionChecks.EnsureManagerMobileFreeAsync(mobiles, request.ManagerMobile, cancellationToken);
+            if (await users.UsernameExistsAsync(TenantProvisioner.NormaliseUsername(command.Username), cancellationToken))
+            {
+                throw SubscriptionChecks.UsernameInUse();
+            }
 
-        var prepared = await provisioner.PrepareAsync(spec, cancellationToken);
+            // LIS-CR-008 C-04: the locality picked at step 1, checked again (rows may have moved on since; inactive ones stay accepted)
+            var locality = await LocalityChecks.ResolveAsync(localities, request.GovernorateId, request.CityId, request.DistrictId, request.AreaId, cancellationToken);
+            var spec = new ProvisionTenantSpec(
+                request.NameEn, request.NameAr, request.CountryId, request.GovernorateId, request.Address, request.Mobile, request.LicenceNo,
+                request.ManagerName, request.ManagerMobile, request.Email, PlanId: null, PortalSlug: null, TenantSource.Subscription, request.Language,
+                command.Username, command.Password, locality);
+            prepared = await provisioner.PrepareAsync(spec, cancellationToken);
+        }
+        catch (DomainException refusal)
+        {
+            throw SubscriptionFields.Named(refusal);
+        }
+
         await provisioningScope.RunAsync(prepared.Tenant.Id, async ct =>
         {
             await provisioner.StageAsync(prepared, ct);

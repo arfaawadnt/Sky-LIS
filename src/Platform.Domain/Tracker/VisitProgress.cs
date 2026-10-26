@@ -91,6 +91,26 @@ public sealed record VisitProgressFacts(
     bool BilledThroughClaims);
 
 /// <summary>
+/// The facts of one live top-level service line of a visit (LIS-CR-014 T3, the tracker's <i>Services</i> rows): the live
+/// samples of its tubes (its own and its package members'), its live results (visible and all) with their clocks and
+/// visible unsigned panics, and the money the <b>visit</b> still owes (a balance is the visit's, never a line's: BR-14).
+/// </summary>
+public sealed record ServiceProgressFacts(
+    VisitSampleCounts Samples,
+    VisitResultCounts VisibleResults,
+    VisitResultCounts AllResults,
+    IReadOnlyList<ResultClock> VisibleOpenClocks,
+    IReadOnlyList<ResultClock> AllOpenClocks,
+    int VisibleOpenPanics,
+    decimal VisitRemaining,
+    bool BilledThroughClaims)
+{
+    /// <summary>The line read as a visit of one live line, so the visit rules apply unchanged.</summary>
+    public VisitProgressFacts AsVisitFacts() =>
+        new(1, Samples, VisibleResults, AllResults, VisibleOpenClocks, AllOpenClocks, VisibleOpenPanics, VisitRemaining, BilledThroughClaims);
+}
+
+/// <summary>
 /// What the tracker shows of a visit: stage, next step, minutes to the earliest expected time of an unsigned result
 /// (negative = late; null without one), the delay colour (worst of the unsigned results; Done when every result is
 /// signed; null without results) and the attention flags.
@@ -165,6 +185,17 @@ public static class VisitProgressRules
             live && facts.Samples.Rejected > 0,
             stage is TrackerStage.Ready or TrackerStage.Delivered && owes,
             owes);
+    }
+
+    /// <summary>
+    /// The progress of one live top-level service line (LIS-CR-014 T3): the same rules over the line's own samples, results
+    /// and clocks, as a visit of one live line (so never Cancelled); the payment step and the "ready but unpaid" flag follow
+    /// the visit's balance, because a payment is taken for the visit.
+    /// </summary>
+    public static VisitProgress OfService(ServiceProgressFacts facts, bool reviewBeforeVerify, DateTimeOffset nowUtc, int warnPercent, int latePercent)
+    {
+        ArgumentNullException.ThrowIfNull(facts);
+        return Of(facts.AsVisitFacts(), reviewBeforeVerify, nowUtc, warnPercent, latePercent);
     }
 
     public static TrackerStage StageOf(int liveLines, VisitSampleCounts samples, VisitResultCounts results, bool reviewBeforeVerify)

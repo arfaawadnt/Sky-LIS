@@ -22,6 +22,7 @@ public sealed class AccountFlowTests(ApiFactory factory) : IClassFixture<ApiFact
     private const string Desk = "/api/v1/support/desk/tickets";
     private const string Profile = "/api/v1/account/profile";
     private const string Preferences = "/api/v1/account/preferences";
+    private const string ListPreferences = "/api/v1/account/preferences/lists/";
     private const string PasswordPath = "/api/v1/account/password";
     private const string Dashboard = "/api/v1/dashboard/branch";
     private const string AuditActors = "/api/v1/account/audit/actors";
@@ -139,6 +140,46 @@ public sealed class AccountFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(Preferences, new UpdatePreferencesRequest(null, "compact"))).StatusCode);
         var withDensity = (await (await auth.RefreshAsync(cookie)).Content.ReadFromJsonAsync<AuthResponse>())!.Profile!;
         Assert.Equal(("ar", "compact"), (withDensity.Language, withDensity.ResultsDensity));
+    }
+
+    [DatabaseFact]
+    public async Task CR014_T2_the_columns_a_member_hides_are_saved_per_list_and_the_next_refresh_profile_carries_them()
+    {
+        var (username, _, _) = await factory.SeedUserAsync();
+        var auth = new AuthClient(factory.CreateClient());
+        var (signedIn, cookie, _) = await auth.SignInExpectingSuccessAsync(username, ApiFactory.Password);
+        Assert.Null(signedIn.Profile!.ListPreferences);
+        var client = Authorized(auth.Http, signedIn.AccessToken!);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(ListPreferences + "visits", new UpdateListPreferenceRequest(["payer", "branch"]))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(ListPreferences + "tracker", new UpdateListPreferenceRequest(["timeLeft"]))).StatusCode);
+        var saved = (await (await auth.RefreshAsync(cookie)).Content.ReadFromJsonAsync<AuthResponse>())!.Profile!.ListPreferences!;
+        Assert.Equal(["payer", "branch"], saved["visits"].Hidden);
+        Assert.Equal(["timeLeft"], saved["tracker"].Hidden);
+
+        // TEN-015: a key that is not an identifier; the saved views stay as they were
+        var badColumn = await client.PutAsJsonAsync(ListPreferences + "visits", new UpdateListPreferenceRequest(["<b>"]));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, badColumn.StatusCode);
+        Assert.Equal("TEN-015", await AuthClient.CodeOf(badColumn));
+        var badList = await client.PutAsJsonAsync(ListPreferences + "bad%20list", new UpdateListPreferenceRequest(["payer"]));
+        Assert.Equal("TEN-015", await AuthClient.CodeOf(badList));
+        var tooMany = await client.PutAsJsonAsync(ListPreferences + "visits", new UpdateListPreferenceRequest(Enumerable.Range(0, 41).Select(i => $"c{i}").ToList()));
+        Assert.Equal("TEN-015", await AuthClient.CodeOf(tooMany));
+
+        // an empty set returns the list to its defaults; the other list keeps its view
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(ListPreferences + "visits", new UpdateListPreferenceRequest([]))).StatusCode);
+        var after = (await (await auth.RefreshAsync(cookie)).Content.ReadFromJsonAsync<AuthResponse>())!.Profile!.ListPreferences!;
+        Assert.False(after.ContainsKey("visits"));
+        Assert.Equal(["timeLeft"], after["tracker"].Hidden);
+
+        // the platform tenant's memberships work the same; anonymous callers are refused
+        var (staff, _, _) = await factory.SeedUserAsync(tenantId: TenantIds.Platform, permissions: null);
+        var staffAuth = new AuthClient(factory.CreateClient());
+        var (staffIn, staffCookie, _) = await staffAuth.SignInExpectingSuccessAsync(staff, ApiFactory.Password);
+        var staffClient = Authorized(staffAuth.Http, staffIn.AccessToken!);
+        Assert.Equal(HttpStatusCode.NoContent, (await staffClient.PutAsJsonAsync(ListPreferences + "clients", new UpdateListPreferenceRequest(["plan"]))).StatusCode);
+        Assert.Equal(["plan"], (await (await staffAuth.RefreshAsync(staffCookie)).Content.ReadFromJsonAsync<AuthResponse>())!.Profile!.ListPreferences!["clients"].Hidden);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await factory.CreateClient().PutAsJsonAsync(ListPreferences + "visits", new UpdateListPreferenceRequest(["payer"]))).StatusCode);
     }
 
     [DatabaseFact]

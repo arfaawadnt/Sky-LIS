@@ -217,6 +217,7 @@
   "visits.allDates": "كل التواريخ",
   "visits.all": "الكل",
   "visits.branchOnly": "هذا الفرع فقط",
+  "visits.printFilter": "{label}: {value}",
   "visits.loadError": "تعذر تحميل الزيارات.",
   "visits.empty": "لا توجد زيارة مطابقة.",
   "visits.emptyHint": "وسّع نطاق التواريخ أو امسح التصفية أو ابحث برقم الزيارة.",

@@ -19,8 +19,8 @@ namespace Platform.Infrastructure.Persistence.Tracker;
 /// </summary>
 internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
 {
-    /// <summary>The visits of the day; <c>{0}</c> is the search clause (empty without a search).</summary>
-    internal const string VisitsSql = """
+    /// <summary>The visits of the day (the first CTE of both statements); <c>{0}</c> is the search clause (empty without a search).</summary>
+    internal const string DayVisitsSql = """
         WITH day_visits AS (
             SELECT v.tenant_id, v.id, v.accession, v.patient_id, v.branch_id, v.payer_id, v.contract_tier_id, v.batch_id,
                    v.urgent, v.registered_at_utc, v.created_by_display_name, v.patient_share_total
@@ -29,6 +29,11 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
               AND v.registered_at_utc >= @from AND v.registered_at_utc < @to
               {0}
         ),
+
+        """;
+
+    /// <summary>The per-visit aggregates of the visits of the day (after <see cref="DayVisitsSql"/>).</summary>
+    internal const string VisitsSql = DayVisitsSql + """
         line_counts AS (
             SELECT l.visit_id,
                    count(*) FILTER (WHERE l.status <> 'Cancelled')::int AS live_lines,
@@ -129,6 +134,96 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
         """;
 
     /// <summary>
+    /// The live top-level lines (services and packages) of the visits of the day with their per-line aggregates (LIS-CR-014
+    /// T3, after <see cref="DayVisitsSql"/>): a package member and its tubes and results fold into its package
+    /// (<c>line_family</c>: every live line of the day with its top-level line); the tubes of a line are the tubes its lines
+    /// name and the tubes its results were ordered on; its samples are the live samples of those tubes, its results the live
+    /// results of its lines, visible by the same result rights as the visits statement.
+    /// </summary>
+    internal const string ServicesSql = DayVisitsSql + """
+        line_family AS (
+            SELECT l.id AS line_id, COALESCE(l.parent_line_id, l.id) AS top_id, l.tube_id
+            FROM app.visit_lines l
+            JOIN day_visits d ON d.tenant_id = l.tenant_id AND d.id = l.visit_id
+            WHERE l.status <> 'Cancelled'
+        ),
+        result_rows AS (
+            SELECT f.top_id, r.id, r.tube_id, r.status, r.is_panic, r.delta_flag, r.test_id, r.service_sequence, r.member_order,
+                   r.clock_start_utc, r.expected_at_utc,
+                   r.status IN ('Ordered', 'Complete', 'Reviewed') AS open,
+                   (@unrestricted
+                    OR r.clinical_group_id = ANY(@all_branch_groups)
+                    OR EXISTS (SELECT 1 FROM unnest(@pair_branches, @pair_groups) AS g(branch_id, group_id)
+                               WHERE g.branch_id = r.branch_id AND g.group_id = r.clinical_group_id)) AS visible
+            FROM app.results r
+            JOIN day_visits d ON d.tenant_id = r.tenant_id AND d.id = r.visit_id
+            JOIN line_family f ON f.line_id = r.line_id
+            WHERE r.status <> 'Cancelled'
+        ),
+        line_tubes AS (
+            SELECT f.top_id, f.tube_id FROM line_family f WHERE f.tube_id IS NOT NULL
+            UNION
+            SELECT x.top_id, x.tube_id FROM result_rows x WHERE x.tube_id IS NOT NULL
+        ),
+        day_samples AS (
+            SELECT s.tube_id, s.status, s.collected_outside, s.rejection_reason_name_en, s.rejection_reason_name_ar, s.rejected_at_utc, s.sample_number
+            FROM app.samples s
+            JOIN day_visits d ON d.tenant_id = s.tenant_id AND d.id = s.visit_id
+        ),
+        sample_counts AS (
+            SELECT t.top_id,
+                   count(*) FILTER (WHERE s.status NOT IN ('Cancelled', 'Replaced'))::int AS total,
+                   count(*) FILTER (WHERE s.status = 'Ordered')::int AS ordered,
+                   count(*) FILTER (WHERE s.status = 'Collected')::int AS collected,
+                   count(*) FILTER (WHERE s.status = 'Received')::int AS received,
+                   count(*) FILTER (WHERE s.status = 'Rejected')::int AS rejected,
+                   count(*) FILTER (WHERE s.status NOT IN ('Cancelled', 'Replaced') AND s.collected_outside)::int AS outside,
+                   (array_agg(s.rejection_reason_name_en ORDER BY s.rejected_at_utc, s.sample_number) FILTER (WHERE s.status = 'Rejected'))[1] AS rejection_en,
+                   (array_agg(s.rejection_reason_name_ar ORDER BY s.rejected_at_utc, s.sample_number) FILTER (WHERE s.status = 'Rejected'))[1] AS rejection_ar
+            FROM line_tubes t
+            JOIN day_samples s ON s.tube_id = t.tube_id
+            GROUP BY t.top_id
+        ),
+        result_counts AS (
+            SELECT x.top_id,
+                   count(*) FILTER (WHERE x.status = 'Ordered')::int AS all_ordered,
+                   count(*) FILTER (WHERE x.status = 'Complete')::int AS all_complete,
+                   count(*) FILTER (WHERE x.status = 'Reviewed')::int AS all_reviewed,
+                   count(*) FILTER (WHERE x.status = 'Verified')::int AS all_verified,
+                   count(*) FILTER (WHERE x.status = 'Printed')::int AS all_printed,
+                   count(*) FILTER (WHERE x.visible AND x.status = 'Ordered')::int AS vis_ordered,
+                   count(*) FILTER (WHERE x.visible AND x.status = 'Complete')::int AS vis_complete,
+                   count(*) FILTER (WHERE x.visible AND x.status = 'Reviewed')::int AS vis_reviewed,
+                   count(*) FILTER (WHERE x.visible AND x.status = 'Verified')::int AS vis_verified,
+                   count(*) FILTER (WHERE x.visible AND x.status = 'Printed')::int AS vis_printed,
+                   count(*) FILTER (WHERE x.visible AND x.is_panic)::int AS vis_panic,
+                   count(*) FILTER (WHERE x.visible AND x.is_panic AND x.open)::int AS vis_open_panic,
+                   count(*) FILTER (WHERE x.visible AND x.delta_flag)::int AS vis_delta,
+                   (array_agg(x.test_id ORDER BY x.service_sequence, x.member_order, x.id) FILTER (WHERE x.visible AND x.is_panic))[1] AS panic_test_id,
+                   array_agg(x.clock_start_utc ORDER BY x.expected_at_utc, x.id) FILTER (WHERE x.visible AND x.open) AS vis_starts,
+                   array_agg(x.expected_at_utc ORDER BY x.expected_at_utc, x.id) FILTER (WHERE x.visible AND x.open) AS vis_expected,
+                   array_agg(x.clock_start_utc ORDER BY x.expected_at_utc, x.id) FILTER (WHERE x.open) AS all_starts,
+                   array_agg(x.expected_at_utc ORDER BY x.expected_at_utc, x.id) FILTER (WHERE x.open) AS all_expected
+            FROM result_rows x
+            GROUP BY x.top_id
+        )
+        SELECT l.visit_id, l.id, l.service_id, l.service_code, l.service_name_en, l.service_name_ar, l.kind, l.sequence,
+               COALESCE(sc.total, 0), COALESCE(sc.ordered, 0), COALESCE(sc.collected, 0), COALESCE(sc.received, 0), COALESCE(sc.rejected, 0),
+               COALESCE(sc.outside, 0), sc.rejection_en, sc.rejection_ar,
+               COALESCE(rc.vis_ordered, 0), COALESCE(rc.vis_complete, 0), COALESCE(rc.vis_reviewed, 0), COALESCE(rc.vis_verified, 0), COALESCE(rc.vis_printed, 0),
+               COALESCE(rc.all_ordered, 0), COALESCE(rc.all_complete, 0), COALESCE(rc.all_reviewed, 0), COALESCE(rc.all_verified, 0), COALESCE(rc.all_printed, 0),
+               COALESCE(rc.vis_panic, 0), COALESCE(rc.vis_open_panic, 0), COALESCE(rc.vis_delta, 0),
+               t.name_en, t.name_ar,
+               rc.vis_starts, rc.vis_expected, rc.all_starts, rc.all_expected
+        FROM app.visit_lines l
+        JOIN day_visits d ON d.tenant_id = l.tenant_id AND d.id = l.visit_id
+        LEFT JOIN sample_counts sc ON sc.top_id = l.id
+        LEFT JOIN result_counts rc ON rc.top_id = l.id
+        LEFT JOIN app.tests t ON t.tenant_id = l.tenant_id AND t.id = rc.panic_test_id
+        WHERE l.kind <> 'PackageMember' AND l.status <> 'Cancelled'
+        """;
+
+    /// <summary>
     /// The search clause: accession, a sample number of the visit and the patient number contain the text; the Latin or
     /// Arabic name contains it unless the file is VIP and the user lacks See-VIP (A-03); the mobile contains the digits when
     /// the text is a number. Patterns are escaped with a backslash and every ILIKE names its escape.
@@ -145,19 +240,25 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
                                         OR (@mobile IS NOT NULL AND p.mobile LIKE @mobile))))))
         """;
 
-    public async Task<IReadOnlyList<LabTrackerRow>> ReadAsync(LabTrackerFilter filter, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<LabTrackerRow>> ReadAsync(LabTrackerFilter filter, CancellationToken cancellationToken) =>
+        ReadAllAsync(VisitsSql, filter, Row, cancellationToken);
+
+    public Task<IReadOnlyList<LabTrackerServiceRow>> ReadServicesAsync(LabTrackerFilter filter, CancellationToken cancellationToken) =>
+        ReadAllAsync(ServicesSql, filter, ServiceRow, cancellationToken);
+
+    private async Task<IReadOnlyList<TRow>> ReadAllAsync<TRow>(string sql, LabTrackerFilter filter, Func<DbDataReader, TRow> map, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(filter);
         var connection = context.Database.GetDbConnection();
         await context.Database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var command = Command(connection, filter, context.CurrentTenantIdOrNil);
+            await using var command = Command(connection, sql, filter, context.CurrentTenantIdOrNil);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            var rows = new List<LabTrackerRow>();
+            var rows = new List<TRow>();
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                rows.Add(Row(reader));
+                rows.Add(map(reader));
             }
 
             return rows;
@@ -172,11 +273,11 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
     internal static string ContainsPattern(string text) =>
         "%" + text.Trim().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
 
-    private static DbCommand Command(DbConnection connection, LabTrackerFilter filter, Guid tenantId)
+    private static DbCommand Command(DbConnection connection, string sql, LabTrackerFilter filter, Guid tenantId)
     {
         var search = string.IsNullOrWhiteSpace(filter.Search) ? null : filter.Search;
         var command = connection.CreateCommand();
-        command.CommandText = string.Format(System.Globalization.CultureInfo.InvariantCulture, VisitsSql, search is null ? string.Empty : SearchSql);
+        command.CommandText = string.Format(System.Globalization.CultureInfo.InvariantCulture, sql, search is null ? string.Empty : SearchSql);
         var visibility = filter.Visibility;
         var pairs = visibility.GroupIdsByBranch.SelectMany(entry => entry.Value.Select(group => (Branch: entry.Key, Group: group))).ToArray();
         command.Parameters.Add(new NpgsqlParameter("tenant", NpgsqlDbType.Uuid) { Value = tenantId });
@@ -243,6 +344,33 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
             reader.GetDecimal(50),
             reader.GetDecimal(51),
             reader.GetBoolean(52));
+    }
+
+    private static LabTrackerServiceRow ServiceRow(DbDataReader reader)
+    {
+        string? Text(int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+
+        return new LabTrackerServiceRow(
+            reader.GetGuid(0),
+            reader.GetGuid(1),
+            reader.GetGuid(2),
+            reader.GetString(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.GetString(6),
+            reader.GetInt32(7),
+            new VisitSampleCounts(reader.GetInt32(8), reader.GetInt32(9), reader.GetInt32(10), reader.GetInt32(11), reader.GetInt32(12), reader.GetInt32(13)),
+            Text(14),
+            Text(15),
+            new VisitResultCounts(reader.GetInt32(16), reader.GetInt32(17), reader.GetInt32(18), reader.GetInt32(19), reader.GetInt32(20)),
+            new VisitResultCounts(reader.GetInt32(21), reader.GetInt32(22), reader.GetInt32(23), reader.GetInt32(24), reader.GetInt32(25)),
+            reader.GetInt32(26),
+            reader.GetInt32(27),
+            reader.GetInt32(28),
+            Text(29),
+            Text(30),
+            Clocks(reader, 31, 32),
+            Clocks(reader, 33, 34));
     }
 
     private static IReadOnlyList<ResultClock> Clocks(DbDataReader reader, int starts, int expected)

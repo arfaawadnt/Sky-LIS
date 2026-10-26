@@ -547,6 +547,20 @@ QMS source is never read or copied (section 1); everything here is written from 
   `Application/PlatformAdmin/Counters/`), public list with `PublicCacheItem` (max-age 300), `GET /api/v1/account/announcements`,
   `SettingKeys.HideAnnouncements` = a client flag (`SettingKeys.IsClientFlag`, SET-004: laboratories cannot change client flags), SA page
   `/admin/announcements` (nav group Platform), sign-in hero slot `[authHero]` of `auth-frame`, `app-welcome-announcement` on the dashboard.
+- Change request LIS-CR-014 (2026-10-25, `docs/build/CR-2026-10-25_Reviewer-Round-2.md`; migration `ListPreferences`): **subscribe
+  checks** — `SubscriptionChecks` (`POST /api/v1/public/subscriptions/check`, SUB-011 manager mobile in use, SUB-013 username in use,
+  `GET …/{id}/username-available` for a verified request only), `SubscriptionFields.Named` attaches the field to single-field refusals and
+  `DomainException.Fields` makes `DomainExceptionHandler` add `errors` / `rules` to any coded refusal; the wizard's Back keeps the values
+  and re-sends a code only on a changed detail. **Session per portal** — `RefreshCookie` names `__Secure-rt` (client) / `__Secure-rta`
+  (admin; `rt` / `rta` insecure), `SessionPortal`, `?portal=admin|client` on refresh and sign-out (default client), sign-in writes the
+  cookie of its target and revokes only that portal's presented cookie; SPA `core/auth/session-portal.ts` (`SESSION_PORTAL`, the URL
+  decides), channel `platform-session:<portal>`, lock `platform-session-refresh:<portal>`, the store ignores a start-up session of the other
+  portal. **List preferences** — `TenantMembership.ListPreferences` (canonical JSON ≤ 4 KB, `ListPreferenceDocument`, TEN-015),
+  `PUT /api/v1/account/preferences/lists/{listKey}`, `AuthProfile.ListPreferences` read in `SessionPrincipalQuery`, `AuthStore.
+  updateListPreferences`; `app-data-table [listKey] [exportable] [exportTitle] [printSubtitle]`, `TableColumn.optional / exportValue`,
+  `app-column-chooser`, `TablePrintComponent` (A4 landscape through `PrintService`), `shared/export/table-export.ts` (`buildTableWorkbook`,
+  typed cells). **Tracker** — `rows=services` (`LabTrackerServiceItem`, sort key `service`), the filter in the URL query, actions column
+  navigating with `returnTo`, `shared/ui/return-link` (`app-return-link`, in-app paths only) mounted in the shell top bar.
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

@@ -211,6 +211,7 @@
   "visits.allDates": "All dates",
   "visits.all": "All",
   "visits.branchOnly": "This branch only",
+  "visits.printFilter": "{label}: {value}",
   "visits.loadError": "The visits could not be loaded.",
   "visits.empty": "No visit matches.",
   "visits.emptyHint": "Widen the dates, clear the filters or search by accession.",

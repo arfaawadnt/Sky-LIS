@@ -128,7 +128,7 @@ describe('authInterceptor + csrfInterceptor (01 §6.4)', () => {
 
     const call = firstValueFrom(http.put('/api/v1/account/password', { current: 'a', next: 'b' })).catch((error: unknown) => error);
     backend.expectOne('/api/v1/account/password').flush({ code: 'AUTH-006', title: 'expired', status: 401 }, { status: 401, statusText: 'Unauthorized' });
-    backend.expectOne(AUTH_API.refresh).flush(signedIn('token-of-y', 'u2', 't1'));
+    backend.expectOne(`${AUTH_API.refresh}?portal=admin`).flush(signedIn('token-of-y', 'u2', 't1'));   // the tab's address is a Super Admin page
     await settle();
 
     backend.expectNone('/api/v1/account/password');
@@ -136,6 +136,22 @@ describe('authInterceptor + csrfInterceptor (01 §6.4)', () => {
     expect(store.isAuthenticated()).toBe(false);
     expect(store.token()).toBeNull();
     expect(navigation.loads).toEqual(['/login']);
+  });
+
+  it('replays a Super Admin request after the refresh of the Super Admin session (LIS-CR-014 G1)', async () => {
+    await signInWith('stale');
+    navigation.url = '/admin/clients';
+
+    const call = firstValueFrom(http.get<string>('/api/v1/platform/clients'));
+    backend.expectOne('/api/v1/platform/clients').flush(null, { status: 401, statusText: 'Unauthorized' });
+    backend.expectNone(AUTH_API.refresh);   // never the laboratory session of the same browser
+    backend.expectOne(`${AUTH_API.refresh}?portal=admin`).flush(signedIn('fresh'));
+    await settle();
+
+    const replay = backend.expectOne('/api/v1/platform/clients');
+    expect(replay.request.headers.get('Authorization')).toBe('Bearer fresh');
+    replay.flush('clients');
+    expect(await call).toBe('clients');
   });
 
   it('never replays a request when the refresh comes back in another tenant (C-01)', async () => {

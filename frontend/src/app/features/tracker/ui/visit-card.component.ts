@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 
 import { type LabTrackerItem, TRACKER_LINKS } from '../../../core/api/tracker.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { RETURN_TO_PARAM } from '../../../shared/ui/return-link/return-link.component';
 import { StatusPillComponent } from './status-pill.component';
 import { cardFlag, num, outsideLook, patientLine, payerLine, paymentLook, progressLabel, progressOf, timeLeftLook } from './tracker-format';
 
@@ -16,7 +17,7 @@ import { cardFlag, num, outsideLook, patientLine, payerLine, paymentLook, progre
   template: `
     <article class="card" [class.urgent]="item().urgent">
       <header class="top">
-        <a class="acc mono" [routerLink]="accessionLink" [queryParams]="{ visitId: item().visitId }">{{ item().accession }}</a>
+        <a class="acc mono" [routerLink]="accessionLink" [queryParams]="accessionQuery()">{{ item().accession }}</a>
         <app-tracker-pill [look]="timeLeft()" absent="none" />
       </header>
       <p class="patient">{{ patient() }}</p>
@@ -132,6 +133,14 @@ export class VisitCardComponent {
   protected readonly accessionLink = TRACKER_LINKS.accession;
 
   readonly item = input.required<LabTrackerItem>();
+
+  /** The tracker's URL with its filter, added to the accession link as `returnTo` (LIS-CR-014 T5). */
+  readonly returnTo = input<string | null>(null);
+
+  protected readonly accessionQuery = computed(() => {
+    const returnTo = this.returnTo();
+    return returnTo === null ? { visitId: this.item().visitId } : { visitId: this.item().visitId, [RETURN_TO_PARAM]: returnTo };
+  });
 
   protected readonly timeLeft = computed(() => timeLeftLook(this.item().minutesLeft, this.item().delayState, this.i18n));
   protected readonly patient = computed(() => patientLine(this.item(), this.i18n));

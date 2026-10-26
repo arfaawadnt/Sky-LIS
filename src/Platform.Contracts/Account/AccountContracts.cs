@@ -12,6 +12,12 @@ namespace Platform.Contracts.Account;
 /// </summary>
 public sealed record UpdatePreferencesRequest(string? Language = null, string? ResultsDensity = null);
 
+/// <summary>
+/// LIS-CR-014 T2 (<c>PUT /api/v1/account/preferences/lists/{listKey}</c>): the optional columns the member hides in one table; an
+/// empty list returns the table to its default columns. Keys are identifiers (letters, digits, <c>.</c>, <c>_</c>, <c>-</c>; TEN-015).
+/// </summary>
+public sealed record UpdateListPreferenceRequest(IReadOnlyList<string>? Hidden = null);
+
 /// <summary>A2 (CP-65 / SA-21): both passwords travel in the credential envelope (D-03).</summary>
 public sealed record ChangePasswordRequest
 {

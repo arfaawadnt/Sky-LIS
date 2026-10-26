@@ -235,7 +235,32 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+Change request LIS-CR-014 (2026-10-25, `docs/build/CR-2026-10-25_Reviewer-Round-2.md`): the business owner's second round after 0.22.0 —
+three subscribe-portal defects, the two-portals session defect and five Lab Tracker requests, built as four packages and integrated
+with the migration `ListPreferences`.
+
+- **Subscribe wizard (S1–S3).** A manager mobile that already belongs to an account is refused on its own field — when the field is left
+  (`POST /api/v1/public/subscriptions/check`), at *Send code* and again at *Create account* (SUB-011); a taken username is refused on the
+  username field (SUB-013, `GET /api/v1/public/subscriptions/{id}/username-available`); a step-1 field refused at step 3 returns the user
+  to step 1 with the field marked. *Back* on steps 2 and 3 and clickable done steps return to the laboratory details with every value
+  kept: unchanged details continue without a new code, changed details send a new one (`ui/wizard-rail.component.ts`). Coded refusals
+  that concern one field now carry `errors` / `rules` naming it (`DomainException.Fields`). The reviewer was blocked by the
+  administrator user's unique mobile (`UNIQUE-409` at provisioning) with no field named.
+- **One browser, two portals (G1).** The laboratory portal and the Super Admin portal keep separate sessions: refresh cookies
+  `__Secure-rt` and `__Secure-rta` (`rt` / `rta` in insecure local development), `POST /api/v1/auth/refresh|sign-out?portal=admin|client`
+  (default client), a sign-in revokes only its own portal's previous session; the SPA takes the portal from the tab's address
+  (`/admin/**`), with the session channel and the refresh lock per portal (`platform-session:client|admin`), so tabs of one portal follow
+  each other and never the other portal's. A Super Admin signed in before the upgrade signs in once more.
+- **Lab Tracker (T1, T3, T5).** Each row carries the Search-registrations action set (Details, Edit, Payments, Documents; More: Patient,
+  Samples, Results, Cancel services) by permission; *Visits | Services* shows one row per registered service
+  (`GET /api/v1/tracker/visits?rows=services`, `LabTrackerServiceItem`); the whole filter lives in the page address and every action
+  carries `returnTo`, so the "Back to …" chip in the top bar (`shared/ui/return-link`) returns to the tracker with its criteria.
+- **Lists (T2, T4).** A "⋯" at the end of the header row of Search registrations and the Lab Tracker chooses the optional columns, saved
+  per user (`PUT /api/v1/account/preferences/lists/{listKey}`, `AuthProfile.listPreferences`, TEN-015, column
+  `app.tenant_memberships.list_preferences`); *Print* (A4 landscape with page numbers and the filters as subtitle; PDF through the
+  browser's Save as PDF) and *Excel* (`.xlsx`, typed numbers and dates) of the visible columns of the selected rows or of every row shown
+  (`shared/export/table-export.ts`, `app-data-table [listKey] [exportable] [printSubtitle]`, `TableColumn.optional / exportValue`).
+- Documents: SRS 1.8, UAT 1.2 (UAT-SUP-11), intakes ACC, FND, REG, TRK.
 
 ### v0.22.1 — 2026-10-25
 

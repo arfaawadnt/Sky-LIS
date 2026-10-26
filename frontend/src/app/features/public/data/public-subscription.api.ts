@@ -3,11 +3,13 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import {
+  type CheckSubscriptionRequest,
   type CompleteSubscriptionRequest,
   PUBLIC_SUBSCRIPTION_API,
   type PublicCountry,
   type PublicGovernorate,
   type StartSubscriptionRequest,
+  type SubscriptionCheckResult,
   type SubscriptionCompletedResponse,
   type SubscriptionStarted,
   type UsernameAvailability,
@@ -44,6 +46,17 @@ export class PublicSubscriptionApi {
 
   complete(request: CompleteSubscriptionRequest): Promise<SubscriptionCompletedResponse> {
     return firstValueFrom(this.http.post<SubscriptionCompletedResponse>(PUBLIC_SUBSCRIPTION_API.complete, request));
+  }
+
+  /** LIS-CR-014 S1: the step-1 mobiles before the code is sent (SUB-011, GEO-010 / GEO-014 per field). */
+  check(request: CheckSubscriptionRequest): Promise<SubscriptionCheckResult> {
+    return firstValueFrom(this.http.post<SubscriptionCheckResult>(PUBLIC_SUBSCRIPTION_API.check, request));
+  }
+
+  /** LIS-CR-014 S2: the username of a verified request (SUB-013 taken, CLI-042 shape). */
+  usernameAvailable(subscriptionId: string, username: string): Promise<SubscriptionCheckResult> {
+    const params = new HttpParams({ fromObject: { username } });
+    return firstValueFrom(this.http.get<SubscriptionCheckResult>(PUBLIC_SUBSCRIPTION_API.usernameAvailable(subscriptionId), { params }));
   }
 
   checkUsername(username: string): Promise<UsernameAvailability> {

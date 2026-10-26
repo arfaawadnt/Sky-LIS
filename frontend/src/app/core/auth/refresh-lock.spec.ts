@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { AUTH_API, type AuthResponse } from '../api/auth.contracts';
 import { AuthStore } from './auth.store';
-import { REFRESH_LOCK, REFRESH_LOCK_NAME, type RefreshLock, browserRefreshLock, directRefreshLock } from './refresh-lock';
+import { REFRESH_LOCK, type RefreshLock, browserRefreshLock, directRefreshLock, refreshLockName } from './refresh-lock';
 import { FakeBrowserNavigation, provideSessionTesting } from './session-testing';
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -13,7 +13,7 @@ const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve,
 /** A Web Locks double with one exclusive lock per name and a FIFO queue, like the browser's. */
 class FakeLockManager {
   readonly requested: string[] = [];
-  private tail: Promise<unknown> = Promise.resolve();
+  private readonly tails = new Map<string, Promise<unknown>>();
   refuse: Error | null = null;
 
   request(name: string, options: { signal?: AbortSignal }, callback: () => Promise<unknown>): Promise<unknown> {
@@ -22,14 +22,14 @@ class FakeLockManager {
       return Promise.reject(this.refuse);
     }
 
-    const run = this.tail.then(() => {
+    const run = (this.tails.get(name) ?? Promise.resolve()).then(() => {
       if (options.signal?.aborted) {
         throw new DOMException('aborted', 'AbortError');
       }
 
       return callback();
     });
-    this.tail = run.catch(() => undefined);
+    this.tails.set(name, run.catch(() => undefined));
     return run;
   }
 }
@@ -74,7 +74,29 @@ describe('Refresh lock across tabs (C-02)', () => {
     expect(await first).toBe('one');
     expect(await second).toBe('two');
     expect(order).toEqual(['first:start', 'first:end', 'second:start']);
-    expect(locks.requested).toEqual([REFRESH_LOCK_NAME, REFRESH_LOCK_NAME]);
+    expect(locks.requested).toEqual([refreshLockName('client'), refreshLockName('client')]);
+  });
+
+  it('keeps one lock per portal: a Super Admin refresh never waits for a laboratory one (LIS-CR-014 G1)', async () => {
+    const locks = new FakeLockManager();
+    const lock = browserRefreshLock(asLocks(locks));
+    let releaseLab: () => void = () => undefined;
+    const order: string[] = [];
+
+    const lab = lock(() => new Promise<string>((resolve) => {
+      order.push('lab:start');
+      releaseLab = () => resolve('lab');
+    }), 'client');
+    const admin = lock(async () => {
+      order.push('admin:start');
+      return 'admin';
+    }, 'admin');
+
+    expect(await admin).toBe('admin');
+    expect(order).toEqual(['lab:start', 'admin:start']);
+    releaseLab();
+    expect(await lab).toBe('lab');
+    expect(locks.requested).toEqual(['platform-session-refresh:client', 'platform-session-refresh:admin']);
   });
 
   it('refreshes anyway when the lock is not granted, and never runs a started task twice', async () => {

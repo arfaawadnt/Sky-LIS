@@ -44,6 +44,16 @@ export interface AuthProfile {
    * nothing to say. The shell shows `app-subscription-banner` (administrators) and `app-subscription-modal` from it.
    */
   readonly subscriptionNotice?: SubscriptionNotice | null;
+  /**
+   * LIS-CR-014 T2: the member's saved table views by list key (`visits`, `tracker` …): the optional columns hidden by the
+   * column chooser. Absent or null = every table shows its default columns. Saved with `AuthStore.updateListPreferences`.
+   */
+  readonly listPreferences?: Readonly<Record<string, ListPreferenceView>> | null;
+}
+
+/** LIS-CR-014 T2: one table's saved view — the keys of the optional columns the member hides. */
+export interface ListPreferenceView {
+  readonly hidden: readonly string[];
 }
 
 /** LIS-CR-012: how urgent the subscription is (`Ok` never reaches the SPA: the notice is then null). */

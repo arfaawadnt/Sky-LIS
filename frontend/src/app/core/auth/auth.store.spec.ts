@@ -6,7 +6,10 @@ import { TestBed } from '@angular/core/testing';
 import { ACCOUNT_API } from '../api/account.contracts';
 import { AUTH_API, type AuthResponse } from '../api/auth.contracts';
 import { AuthStore } from './auth.store';
-import { broadcastSessionChannel, readSessionMessage } from './session-channel';
+import type { Portal } from '../portal/portal';
+import { REFRESH_LOCK, type RefreshLock, refreshLockName } from './refresh-lock';
+import { broadcastSessionChannel, readSessionMessage, sessionChannelName } from './session-channel';
+import { portalAuthUrl, portalOfUrl } from './session-portal';
 import { PLATFORM_TENANT_ID } from '../tenancy/tenant-ids';
 import { idleSignInUrl, isLoginRoute, laboratorySlugOf, meaningfulReturnUrl, normaliseLaboratorySlug, signInUrl } from './session-navigation';
 import { FakeBrowserNavigation, FakeSessionChannel, provideSessionTesting } from './session-testing';
@@ -128,9 +131,101 @@ describe('AuthStore (D-01, P-61)', () => {
     navigation.url = '/admin/clients';
 
     const refresh = store.refresh();
-    http.expectOne(AUTH_API.refresh).flush({ code: 'AUTH-012', title: 'rejected', status: 401 }, { status: 401, statusText: 'Unauthorized' });
+    http.expectOne(`${AUTH_API.refresh}?portal=admin`).flush({ code: 'AUTH-012', title: 'rejected', status: 401 }, { status: 401, statusText: 'Unauthorized' });
     await refresh;
     expect(navigation.loads).toEqual(['/admin/login?returnUrl=%2Fadmin%2Fclients']);
+  });
+
+  describe('one browser, two portals (LIS-CR-014 G1)', () => {
+    it('starts a Super Admin page from the Super Admin session (?portal=admin)', async () => {
+      navigation.url = '/admin/clients';
+      const pending = store.hydrate();
+      http.expectNone(AUTH_API.refresh);
+      http.expectOne(`${AUTH_API.refresh}?portal=admin`).flush(signedIn('token-admin', null, 'a1', PLATFORM_TENANT_ID));
+      await pending;
+
+      expect(store.isAuthenticated()).toBe(true);
+      expect(store.currentTenant()).toBe(PLATFORM_TENANT_ID);
+    });
+
+    it('starts a laboratory page from the laboratory session (no portal named)', async () => {
+      navigation.url = '/lab/nile-lab';
+      const pending = store.hydrate();
+      http.expectOne(AUTH_API.refresh).flush(signedIn('token-lab'));
+      await pending;
+
+      expect(store.currentTenant()).toBe('t1');
+    });
+
+    it('never starts a tab in the other portal\'s session (a cookie set before the split)', async () => {
+      navigation.url = '/registration/visits';
+      const pending = store.hydrate();
+      http.expectOne(AUTH_API.refresh).flush(signedIn('token-admin', null, 'a1', PLATFORM_TENANT_ID));
+      await pending;
+
+      expect(store.isAuthenticated()).toBe(false);
+      expect(store.token()).toBeNull();
+      expect(navigation.loads).toEqual([]);   // no session of this portal: the page's own guards decide
+    });
+
+    it('signs out of the Super Admin portal only, and lands on its sign-in page', async () => {
+      const pending = store.signIn('root', 'secret', { admin: true });
+      http.expectOne(AUTH_API.signIn).flush(signedIn('token-1', null, 'a1', PLATFORM_TENANT_ID));
+      await pending;
+      navigation.url = '/admin/clients';
+
+      const signOut = store.signOut();
+      http.expectNone(AUTH_API.signOut);
+      http.expectOne(`${AUTH_API.signOut}?portal=admin`).flush(null, { status: 204, statusText: 'No Content' });
+      await signOut;
+      expect(navigation.loads).toEqual(['/admin/login']);
+      expect(channel.posted.at(-1)).toEqual({ kind: 'signed-out' });
+    });
+
+    it('refreshes under the lock of the tab\'s portal', async () => {
+      const portals: (Portal | undefined)[] = [];
+      const recordingLock: RefreshLock = (task, portal) => {
+        portals.push(portal);
+        return task();
+      };
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          provideZonelessChangeDetection(),
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          ...provideSessionTesting(navigation, channel),
+          { provide: REFRESH_LOCK, useValue: recordingLock },
+        ],
+      });
+      const portalStore = TestBed.inject(AuthStore);
+      const backend = TestBed.inject(HttpTestingController);
+      navigation.url = '/admin';
+      const admin = portalStore.refresh();
+      backend.expectOne(`${AUTH_API.refresh}?portal=admin`).flush(signedIn('token-a', null, 'a1', PLATFORM_TENANT_ID));
+      await admin;
+      navigation.url = '/results/worklist';
+      const client = portalStore.refresh();
+      backend.expectOne(AUTH_API.refresh).flush(signedIn('token-c', null, 'a1', PLATFORM_TENANT_ID));
+      await client;
+
+      expect(portals).toEqual(['admin', 'client']);
+      backend.verify();
+      http = backend;   // the outer afterEach verifies the module in use
+    });
+
+    it('reads the portal from the address: /admin and below is the Super Admin', () => {
+      expect(portalOfUrl('/admin')).toBe('admin');
+      expect(portalOfUrl('/admin/login/recover')).toBe('admin');
+      expect(portalOfUrl('/admin?x=1')).toBe('admin');
+      expect(portalOfUrl('/administration')).toBe('client');
+      expect(portalOfUrl('/lab/nile-lab')).toBe('client');
+      expect(portalOfUrl('/login')).toBe('client');
+      expect(portalOfUrl('/')).toBe('client');
+      expect(portalAuthUrl(AUTH_API.refresh, 'client')).toBe(AUTH_API.refresh);
+      expect(portalAuthUrl(AUTH_API.signOut, 'admin')).toBe('/api/v1/auth/sign-out?portal=admin');
+      expect(refreshLockName('admin')).toBe('platform-session-refresh:admin');
+    });
   });
 
   it('exposes the branch of the session and replaces the profile after selecting one (CP-04)', async () => {
@@ -417,20 +512,35 @@ describe('session channel and sign-in URL helpers', () => {
     expect(readSessionMessage(null)).toBeNull();
   });
 
-  it('posts and receives through the browser channel of the window', () => {
-    const channel = broadcastSessionChannel({ BroadcastChannel: FakeBroadcastChannel } as unknown as Window & typeof globalThis);
-    const browser = FakeBroadcastChannel.instances.at(-1);
+  it('posts and receives on the browser channel of the tab\'s portal only (LIS-CR-014 G1)', () => {
+    let portal: Portal = 'client';
+    const view = { BroadcastChannel: FakeBroadcastChannel } as unknown as Window & typeof globalThis;
+    const channel = broadcastSessionChannel(view, () => portal);
     const received: unknown[] = [];
     const stop = channel.listen((message) => received.push(message));
-    channel.post({ kind: 'signed-out' });
-    browser?.emit({ kind: 'signed-in', userId: 'u2', tenantId: 't' });
-    browser?.emit({ kind: 'junk' });
-    stop();
-    browser?.emit({ kind: 'signed-out' });
+    const named = (name: string): FakeBroadcastChannel | undefined => FakeBroadcastChannel.instances.filter((instance) => instance.name === name).at(-1);
+    const client = named('platform-session:client');
+    const admin = named('platform-session:admin');
 
-    expect(browser?.name).toBe('platform-session');
-    expect(browser?.sent).toEqual([{ kind: 'signed-out' }]);
-    expect(received).toEqual([{ kind: 'signed-in', userId: 'u2', tenantId: 't' }]);
+    channel.post({ kind: 'signed-out' });
+    admin?.emit({ kind: 'signed-in', userId: 'a1', tenantId: 'p' });   // the Super Admin tabs' business
+    client?.emit({ kind: 'signed-in', userId: 'u2', tenantId: 't' });
+    client?.emit({ kind: 'junk' });
+    portal = 'admin';   // the tab moved to a Super Admin page
+    channel.post({ kind: 'signed-out', reason: 'idle' });
+    client?.emit({ kind: 'signed-out' });
+    admin?.emit({ kind: 'renewed', userId: 'a1', tenantId: 'p' });
+    stop();
+    admin?.emit({ kind: 'signed-out' });
+
+    expect(sessionChannelName('client')).toBe('platform-session:client');
+    expect(sessionChannelName('admin')).toBe('platform-session:admin');
+    expect(client?.sent).toEqual([{ kind: 'signed-out' }]);
+    expect(admin?.sent).toEqual([{ kind: 'signed-out', reason: 'idle' }]);
+    expect(received).toEqual([
+      { kind: 'signed-in', userId: 'u2', tenantId: 't' },
+      { kind: 'renewed', userId: 'a1', tenantId: 'p' },
+    ]);
     expect(() => broadcastSessionChannel(null).post({ kind: 'signed-out' })).not.toThrow();
   });
 

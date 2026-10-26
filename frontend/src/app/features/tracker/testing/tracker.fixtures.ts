@@ -1,4 +1,4 @@
-import { EMPTY_TRACKER_COUNTERS, type LabTrackerCounters, type LabTrackerItem, type LabTrackerPage } from '../../../core/api/tracker.contracts';
+import { EMPTY_TRACKER_COUNTERS, type LabTrackerCounters, type LabTrackerItem, type LabTrackerPage, type LabTrackerServiceItem } from '../../../core/api/tracker.contracts';
 import type { TrackerTimers } from '../state/tracker.facade';
 
 /** Runs the resource effects and lets the promises settle; `whenStable()` would wait for the very requests a test flushes. */
@@ -33,6 +33,11 @@ export function trackerItem(overrides: Partial<LabTrackerItem> = {}): LabTracker
     payment: { status: 'Paid', patientShare: 150, paid: 150, remaining: 0 },
     ...overrides,
   };
+}
+
+/** A service row (LIS-CR-014 T3): the visit fields of `trackerItem` plus the line. */
+export function trackerServiceItem(overrides: Partial<LabTrackerServiceItem> = {}): LabTrackerServiceItem {
+  return { ...trackerItem(), lineId: 'line-1', serviceId: 'svc-1', serviceCode: 'GLU', serviceName: 'Glucose', serviceNameAr: 'جلوكوز', serviceKind: 'Service', visitStage: 'InLab', ...overrides };
 }
 
 export function trackerCounters(overrides: Partial<LabTrackerCounters> = {}): LabTrackerCounters {

@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { TRACKER_API, TRACKER_LANES } from '../../../core/api/tracker.contracts';
 import { problemDetailsInterceptor } from '../../../core/http/problem-details.interceptor';
-import { ManualTimers, resetVisibility, setVisibility, settle, trackerCounters, trackerItem, trackerPage } from '../testing/tracker.fixtures';
+import { ManualTimers, resetVisibility, setVisibility, settle, trackerCounters, trackerItem, trackerPage, trackerServiceItem } from '../testing/tracker.fixtures';
 import { LANE_PAGE_SIZE, TRACKER_TIMERS, TrackerFacade } from './tracker.facade';
 
 describe('TrackerFacade (LIS-CR-006)', () => {
@@ -69,6 +69,29 @@ describe('TrackerFacade (LIS-CR-006)', () => {
       sort: 'timeLeft',
       direction: 'desc',
     });
+  });
+
+  it('LIS-CR-014 T3: asks for service rows, shows them, and drops the service order when going back to visits', async () => {
+    await run();
+    visits().forEach((call) => call.flush(trackerPage([trackerItem()])));
+    await run();
+
+    facade.setPage({ page: 2, pageSize: 50 });
+    facade.setRows('services');
+    facade.setSort({ key: 'service', direction: 'desc' });
+    await run();
+    const call = backend.expectOne((request) => request.url === TRACKER_API.visits);
+    expect([call.request.params.get('rows'), call.request.params.get('sort'), call.request.params.get('page')]).toEqual(['Services', 'service', '1']);
+    call.flush(trackerPage([], { rows: 'Services', services: [trackerServiceItem()] }));
+    await run();
+    expect(facade.rows().map((row) => (row as { lineId?: string }).lineId)).toEqual(['line-1']);
+    expect(facade.urlState().filter.rows).toBe('services');
+
+    facade.setRows('visits');
+    await run();
+    const back = backend.expectOne((request) => request.url === TRACKER_API.visits).request.params;
+    expect([back.get('rows'), back.get('sort')]).toEqual([null, null]);
+    expect(facade.sort()).toBeNull();
   });
 
   it('sends a from / to range in place of the day, and a day in place of the range', async () => {

@@ -82,6 +82,21 @@ public sealed class PublicSubscriptionsController(ISender sender) : ControllerBa
         return Ok(await sender.Send(new CompleteSubscriptionCommand(request.SubscriptionId, request.Username, request.Password), cancellationToken));
     }
 
+    /// <summary>LIS-CR-014 S1: the step-1 mobiles checked before the code is sent (per-field issues; rate-limited like start).</summary>
+    [HttpPost("check")]
+    [EnableRateLimiting(RateLimiting.CredentialAccount)]
+    public async Task<ActionResult<SubscriptionCheckResult>> Check([FromBody] CheckSubscriptionRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return Ok(await sender.Send(new CheckSubscriptionDetailsQuery(request.CountryId, request.Mobile, request.ManagerMobile), cancellationToken));
+    }
+
+    /// <summary>LIS-CR-014 S2: step 3's username check for a verified request (issues CLI-042 / SUB-013).</summary>
+    [HttpGet("{id:guid}/username-available")]
+    [EnableRateLimiting(RateLimiting.CredentialChallenge)]
+    public async Task<ActionResult<SubscriptionCheckResult>> UsernameAvailable(Guid id, [FromQuery] string? username, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new CheckSubscriptionUsernameQuery(id, username ?? string.Empty), cancellationToken));
+
     [HttpGet("check-username")]
     [EnableRateLimiting(RateLimiting.CredentialChallenge)]
     public async Task<ActionResult<UsernameAvailability>> CheckUsername([FromQuery] string? username, CancellationToken cancellationToken) =>

@@ -1,3 +1,13 @@
+@if (exportable()) {
+  <div class="table-tools">
+    @if (exportsSelection()) {
+      <span class="tools-note">{{ exportHint() }}</span>
+      <button type="button" class="btn sm ghost" (click)="clearSelection()">{{ i18n.t('shared.table.clearSelection') }}</button>
+    }
+    <button type="button" class="btn sm ghost" [disabled]="exporting() || exportRows().length === 0" [title]="exportHint()" (click)="print()"><app-icon name="printer" [size]="14" />{{ i18n.t('shared.table.print') }}</button>
+    <button type="button" class="btn sm ghost" [disabled]="exporting() || exportRows().length === 0" [title]="exportHint()" (click)="excel()"><app-icon name="arrow-down" [size]="14" />{{ i18n.t('shared.table.excel') }}</button>
+  </div>
+}
 <div class="table-wrap" [attr.aria-busy]="loading() ? 'true' : null">
   <table class="g" [class.compact]="compact()" [class.zebra]="zebra()" [class.interactive]="interactive()" [class.selectable]="selection() !== 'none'">
     @if (caption(); as caption) {
@@ -10,7 +20,7 @@
             <input type="checkbox" [checked]="allSelected()" [indeterminate]="someSelected()" (change)="toggleAll()" [attr.aria-label]="i18n.t('shared.table.selectAll')" />
           </th>
         }
-        @for (column of columns(); track column.key) {
+        @for (column of shownColumns(); track column.key) {
           <th [style.width]="column.width ?? null" [class]="'al-' + (column.align ?? 'start')" [class.secondary]="column.secondary ?? false" [attr.aria-sort]="ariaSort(column)">
             @if (column.sortable) {
               <button type="button" class="sort-btn" (click)="toggleSort(column)">
@@ -23,7 +33,14 @@
           </th>
         }
         @if (actions()) {
-          <th class="actions">{{ i18n.t('shared.table.actions') }}</th>
+          <th class="actions">
+            {{ i18n.t('shared.table.actions') }}
+            @if (choices().length > 0) {
+              <app-column-chooser [choices]="choices()" (toggled)="toggleColumn($event)" (resetAll)="resetColumns()" />
+            }
+          </th>
+        } @else if (chooserCell()) {
+          <th class="actions chooser"><app-column-chooser [choices]="choices()" (toggled)="toggleColumn($event)" (resetAll)="resetColumns()" /></th>
         }
       </tr>
     </thead>
@@ -63,7 +80,7 @@
               <input type="checkbox" [checked]="isSelected(row)" (change)="toggle(row)" [attr.aria-label]="i18n.t('shared.table.selectRow')" />
             </td>
           }
-          @for (column of columns(); track column.key) {
+          @for (column of shownColumns(); track column.key) {
             <td [class]="'al-' + (column.align ?? 'start')" [class.mono]="column.mono ?? false" [class.secondary]="column.secondary ?? false" [attr.data-label]="i18n.t(column.header)">
               @if (templateFor(column.key); as template) {
                 <ng-container *ngTemplateOutlet="template; context: { $implicit: row, row: row, index: i }" />
@@ -78,6 +95,8 @@
                 <ng-container *ngTemplateOutlet="actionsTemplate; context: { $implicit: row, row: row, index: i }" />
               </div>
             </td>
+          } @else if (chooserCell()) {
+            <td class="actions chooser"></td>
           }
         </tr>
       }

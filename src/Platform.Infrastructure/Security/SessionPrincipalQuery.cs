@@ -6,6 +6,7 @@ using Platform.Application.Identity;
 using Platform.Domain.Organization;
 using Platform.Domain.PlatformAdmin;
 using Platform.Domain.Settings;
+using Platform.Domain.Tenancy;
 using Platform.Infrastructure.Persistence;
 using Platform.Infrastructure.Persistence.Settings;
 using Platform.SharedKernel.Abstractions;
@@ -77,6 +78,7 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                     MembershipName = membership.FullName,
                     membership.PreferredLanguage,
                     membership.PreferredResultsDensity,
+                    membership.ListPreferences,
                     membership.BranchIds,
                     membership.DepartmentIds,
                     IsPrimaryAdministrator = (bool?)membership.IsPrimaryAdministrator,
@@ -150,6 +152,7 @@ public sealed class SessionPrincipalQuery(AppDbContext context, ITenantContextAc
                 {
                     SpecialRights = EffectivePrivileges.SpecialRightsOf(role?.SpecialRights, row.SpecialRightsOverride),
                     ResultsDensity = row.PreferredResultsDensity,
+                    ListPreferences = ListPreferenceDocument.Parse(row.ListPreferences),
                     ResultRights = role?.ResultRightValues() ?? [],
                     MembershipId = row.MembershipId,
                     RoleId = role?.Id,

@@ -28,7 +28,7 @@
     Host name of the binding (required for the production site; optional for -Test).
 .PARAMETER CertificateThumbprint
     Thumbprint of a certificate in Cert:\LocalMachine\My for the https binding (required for the production site
-    unless -AllowHttp; without it the refresh cookie __Secure-rt cannot be set).
+    unless -AllowHttp; without it the refresh cookies __Secure-rt / __Secure-rta cannot be set).
 .PARAMETER Port
     Binding port: default 443 (production) or 8081 (test).
 .PARAMETER Test
@@ -160,7 +160,7 @@ Write-Host "  mode          : $($PSCmdlet.ParameterSetName)$(if ($WhatIfPreferen
 Write-Host ''
 
 if (-not $Test -and -not $HostHeader) { throw 'The production site needs -HostHeader (the public host name of the portal).' }
-if (-not $Test -and -not $useTls -and -not $AllowHttp) { throw 'The production site needs -CertificateThumbprint: without TLS the browser refuses the __Secure-rt refresh cookie. Use -AllowHttp for a smoke-only binding.' }
+if (-not $Test -and -not $useTls -and -not $AllowHttp) { throw 'The production site needs -CertificateThumbprint: without TLS the browser refuses the __Secure-rt / __Secure-rta refresh cookie. Use -AllowHttp for a smoke-only binding.' }
 
 if (-not $WhatIfPreference) { Assert-Administrator }
 Import-Module WebAdministration -ErrorAction Stop

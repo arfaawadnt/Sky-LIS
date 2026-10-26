@@ -23,6 +23,18 @@ public sealed partial class DomainExceptionHandler(ILogger<DomainExceptionHandle
     {
         switch (exception)
         {
+            case DomainException { Fields.Count: > 0 } fielded:
+                // LIS-CR-014: a refusal about named fields keeps its own code and lists the fields like a validation failure
+                // (errors = the message, rules = the code), so a form marks the field where it lives.
+                await ProblemResponse.WriteAsync(
+                    httpContext,
+                    StatusOf(fielded.Fault),
+                    fielded.Message,
+                    fielded.Code,
+                    fielded.Fields.Distinct(StringComparer.Ordinal).ToDictionary(field => field, _ => new[] { fielded.Message }, StringComparer.Ordinal),
+                    fielded.Fields.Distinct(StringComparer.Ordinal).ToDictionary(field => field, _ => new IReadOnlyDictionary<string, object>[] { CodeRule(fielded.Code) }, StringComparer.Ordinal));
+                return true;
+
             case DomainException domain:
                 await ProblemResponse.WriteAsync(httpContext, StatusOf(domain.Fault), domain.Message, domain.Code);
                 return true;
@@ -94,6 +106,8 @@ public sealed partial class DomainExceptionHandler(ILogger<DomainExceptionHandle
 
         return rule;
     }
+
+    private static IReadOnlyDictionary<string, object> CodeRule(string code) => new Dictionary<string, object>(StringComparer.Ordinal) { ["rule"] = code };
 
     private static bool IsFiniteNumber(object? value) => value switch
     {

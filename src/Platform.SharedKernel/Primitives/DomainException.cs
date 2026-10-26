@@ -39,6 +39,13 @@ public class DomainException : Exception
     public string Code { get; }
 
     public DomainFault Fault { get; }
+
+    /// <summary>
+    /// The request fields the refusal is about (camelCase DTO names such as <c>managerMobile</c>), so a form marks the field
+    /// itself (LIS-CR-014 P-SUB); the problem details then carry <c>errors</c> and <c>rules</c> for them. Empty when the refusal
+    /// concerns no single field.
+    /// </summary>
+    public IReadOnlyList<string> Fields { get; init; } = [];
 }
 
 /// <summary>Raised by a guarded state machine when an action is not allowed in the current state.</summary>

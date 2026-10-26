@@ -43,22 +43,27 @@ public sealed class AuthController(ISender sender) : ControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
         // R2-04: the cookie this browser still holds is about to be overwritten; the handler ends the session it names.
-        var result = await sender.Send(new SignInCommand(request.Laboratory, request.Admin, request.Username, request.Password, ClientIp(), UserAgent(), RefreshCookie.Read(HttpContext)), cancellationToken);
+        // LIS-CR-014 G1: only the cookie of the portal signed into (Super Admin: __Secure-rta, laboratory: __Secure-rt); the
+        // other portal's session in the same browser is not this sign-in's business.
+        var portal = RefreshCookie.PortalOfSignIn(request.Admin);
+        var result = await sender.Send(new SignInCommand(request.Laboratory, request.Admin, request.Username, request.Password, ClientIp(), UserAgent(), RefreshCookie.Read(HttpContext, portal)), cancellationToken);
 
         if (result.Step == AuthResponse.StepSignedIn && result.RefreshToken is not null && result.Kind == SessionKind.Browser)
         {
-            RefreshCookie.Write(HttpContext, result.RefreshToken);
+            RefreshCookie.Write(HttpContext, portal, result.RefreshToken);
         }
 
         return Ok(new AuthResponse(result.Step, result.AccessToken?.Token, result.AccessToken?.ExpiresAtUtc, null, result.Profile));
     }
 
+    /// <summary>LIS-CR-014 G1: <c>?portal=admin</c> refreshes the Super Admin session (<c>__Secure-rta</c>); none, or <c>client</c>, the laboratory one.</summary>
     [HttpPost("refresh")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimiting.Refresh)]
     public async Task<ActionResult<AuthResponse>> PostRefresh([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RefreshRequest? body, CancellationToken cancellationToken)
     {
-        var fromCookie = RefreshCookie.Read(HttpContext);
+        var portal = RefreshCookie.PortalOf(HttpContext);
+        var fromCookie = RefreshCookie.Read(HttpContext, portal);
         var result = await sender.Send(new RefreshSessionCommand(fromCookie ?? body?.RefreshToken, ClientIp(), UserAgent()), cancellationToken);
 
         if (fromCookie is not null)
@@ -67,7 +72,7 @@ public sealed class AuthController(ISender sender) : ControllerBase
             // other tab's response set is the current one and stays untouched.
             if (result.RefreshToken is not null)
             {
-                RefreshCookie.Write(HttpContext, result.RefreshToken);
+                RefreshCookie.Write(HttpContext, portal, result.RefreshToken);
             }
 
             return Ok(new AuthResponse(AuthResponse.StepSignedIn, result.AccessToken.Token, result.AccessToken.ExpiresAtUtc, null, result.Profile));
@@ -76,12 +81,14 @@ public sealed class AuthController(ISender sender) : ControllerBase
         return Ok(new AuthResponse(AuthResponse.StepSignedIn, result.AccessToken.Token, result.AccessToken.ExpiresAtUtc, result.RefreshToken, result.Profile));
     }
 
+    /// <summary>LIS-CR-014 G1: ends and clears the session of the portal named by <c>?portal=</c> only; the other portal stays signed in.</summary>
     [HttpPost("sign-out")]
     [AllowAnonymous]
     public async Task<IActionResult> PostSignOut([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] SignOutRequest? body, CancellationToken cancellationToken)
     {
-        await sender.Send(new SignOutCommand(RefreshCookie.Read(HttpContext) ?? body?.RefreshToken), cancellationToken);
-        RefreshCookie.Clear(HttpContext);
+        var portal = RefreshCookie.PortalOf(HttpContext);
+        await sender.Send(new SignOutCommand(RefreshCookie.Read(HttpContext, portal) ?? body?.RefreshToken), cancellationToken);
+        RefreshCookie.Clear(HttpContext, portal);
         return NoContent();
     }
 

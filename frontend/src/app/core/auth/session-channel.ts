@@ -1,6 +1,9 @@
 import { DOCUMENT } from '@angular/common';
 import { InjectionToken, type Provider, inject } from '@angular/core';
 
+import type { Portal } from '../portal/portal';
+import { PORTALS, SESSION_PORTAL } from './session-portal';
+
 /**
  * What one tab tells the others of the same browser (C-01). The refresh cookie is shared by every tab, so a sign-in
  * or a sign-out in one tab changes who the others would act as on their next refresh: they reload instead. A
@@ -13,6 +16,10 @@ import { InjectionToken, type Provider, inject } from '@angular/core';
  *
  * Validation F-05 (change of branch, CP-04): the branch belongs to the server session, which every tab shares; `branch-changed`
  * tells the other tabs of the same identity to show the new branch, and the pages keyed by it re-read.
+ *
+ * LIS-CR-014 G1 (one browser, two portals): each portal has its own refresh cookie and so its own session, and every message
+ * travels on the channel **of the tab's portal** (`platform-session:client`, `platform-session:admin`). Tabs of one portal
+ * follow each other (sign-in, sign-out, branch, profile, idle); a tab of the other portal never hears them.
  */
 export type SessionMessage =
   | { readonly kind: 'signed-out'; readonly reason?: 'idle' }
@@ -32,8 +39,13 @@ export interface SessionChannel {
   listen(handler: (message: SessionMessage) => void): () => void;
 }
 
-/** The channel's name; one per origin. */
+/** The stem of the channels' names; one channel per portal of the origin (LIS-CR-014 G1). */
 export const SESSION_CHANNEL_NAME = 'platform-session';
+
+/** The channel of a portal: `platform-session:client`, `platform-session:admin`. */
+export function sessionChannelName(portal: Portal): string {
+  return `${SESSION_CHANNEL_NAME}:${portal}`;
+}
 
 const NO_CHANNEL: SessionChannel = { post: () => undefined, listen: () => () => undefined };
 
@@ -73,29 +85,52 @@ export function readSessionMessage(data: unknown): SessionMessage | null {
   return null;
 }
 
-/** `BroadcastChannel` between the tabs of this origin (no web storage involved); silent where the browser has none. */
-export function broadcastSessionChannel(view: (Window & typeof globalThis) | null): SessionChannel {
-  const channel = view && typeof view.BroadcastChannel === 'function' ? new view.BroadcastChannel(SESSION_CHANNEL_NAME) : null;
-  if (channel === null) {
+/**
+ * `BroadcastChannel` between the tabs of this origin (no web storage involved); silent where the browser has none. One channel
+ * per portal (LIS-CR-014 G1): a message goes out on the channel of the portal the tab is in when it posts, and a handler hears
+ * a message only from the channel of the portal the tab is in when it arrives (`portal` is read each time, so a tab that moves
+ * between portals follows).
+ */
+export function broadcastSessionChannel(view: (Window & typeof globalThis) | null, portal: () => Portal = () => 'client'): SessionChannel {
+  if (!view || typeof view.BroadcastChannel !== 'function') {
     return NO_CHANNEL;
   }
 
+  const channels = new Map<Portal, BroadcastChannel>();
+  const channelOf = (of: Portal): BroadcastChannel => {
+    let channel = channels.get(of);
+    if (channel === undefined) {
+      channel = new view.BroadcastChannel(sessionChannelName(of));
+      channels.set(of, channel);
+    }
+
+    return channel;
+  };
+
   return {
-    post: (message) => channel.postMessage(message),
+    post: (message) => channelOf(portal()).postMessage(message),
     listen: (handler) => {
-      const listener = (event: MessageEvent<unknown>): void => {
-        const message = readSessionMessage(event.data);
-        if (message !== null) {
-          handler(message);
-        }
-      };
-      channel.addEventListener('message', listener);
-      return () => channel.removeEventListener('message', listener);
+      const stops = PORTALS.map((of) => {
+        const channel = channelOf(of);
+        const listener = (event: MessageEvent<unknown>): void => {
+          if (portal() !== of) {
+            return;   // the other portal's session: never this tab's business
+          }
+
+          const message = readSessionMessage(event.data);
+          if (message !== null) {
+            handler(message);
+          }
+        };
+        channel.addEventListener('message', listener);
+        return () => channel.removeEventListener('message', listener);
+      });
+      return () => stops.forEach((stop) => stop());
     },
   };
 }
 
-/** Wires the tabs of the browser together (C-01); `app.config.ts` only, so specs keep the silent default. */
+/** Wires the tabs of the browser together (C-01), per portal (LIS-CR-014 G1); `app.config.ts` only, so specs keep the silent default. */
 export function provideSessionSync(): Provider {
-  return { provide: SESSION_CHANNEL, useFactory: () => broadcastSessionChannel(inject(DOCUMENT).defaultView) };
+  return { provide: SESSION_CHANNEL, useFactory: () => broadcastSessionChannel(inject(DOCUMENT).defaultView, inject(SESSION_PORTAL)) };
 }

@@ -107,7 +107,8 @@ describe('SubscriptionFacade (CP-02)', () => {
     expect(facade.verify.problem()?.code).toBe('SUB-010');
   });
 
-  it('checks the username after a pause and reports taken, invalid and available', async () => {
+  it('checks the username of the verified request after a pause and reports taken, invalid and available (LIS-CR-014 S2)', async () => {
+    facade.started.set(STARTED);
     vi.useFakeTimers();
     facade.checkUsername('ab');
     expect(facade.usernameState()).toBe('invalid');
@@ -115,9 +116,100 @@ describe('SubscriptionFacade (CP-02)', () => {
     facade.checkUsername('Lab.Admin');
     expect(facade.usernameState()).toBe('checking');
     vi.advanceTimersByTime(450);
-    const check = backend.expectOne((request) => request.url === PUBLIC_SUBSCRIPTION_API.checkUsername);
+    const check = backend.expectOne((request) => request.url === PUBLIC_SUBSCRIPTION_API.usernameAvailable('sub-1'));
     expect(check.request.params.get('username')).toBe('lab.admin');
-    check.flush({ username: 'lab.admin', valid: true, available: false });
+    check.flush({ issues: [{ field: 'username', code: 'SUB-013' }] });
     await vi.waitFor(() => expect(facade.usernameState()).toBe('taken'));
+
+    facade.checkUsername('lab.owner');
+    vi.advanceTimersByTime(450);
+    backend.expectOne((request) => request.url === PUBLIC_SUBSCRIPTION_API.usernameAvailable('sub-1')).flush({ issues: [] });
+    await vi.waitFor(() => expect(facade.usernameState()).toBe('available'));
+  });
+
+  describe('back to the details (LIS-CR-014 S3)', () => {
+    const LIVE: SubscriptionStarted = { ...STARTED, expiresAtUtc: new Date(Date.now() + 3_600_000).toISOString() };
+
+    async function startAndVerify(): Promise<void> {
+      await runEffects();
+      backend.expectOne(PUBLIC_SUBSCRIPTION_API.countries).flush([EGYPT]);
+      const moved = facade.continueFromDetails(START_REQUEST);
+      await settle();
+      backend.expectOne(PUBLIC_SUBSCRIPTION_API.start).flush(LIVE);
+      expect(await moved).toBe(true);
+      const verified = facade.verify.execute({ subscriptionId: 'sub-1', code: '123456' });
+      await settle();
+      backend.expectOne(PUBLIC_SUBSCRIPTION_API.verify).flush(null, { status: 204, statusText: 'No Content' });
+      await verified;
+      expect(facade.step()).toBe(3);
+    }
+
+    it('offers the done steps of the rail from steps 2 and 3, never from the last step', async () => {
+      await startAndVerify();
+      expect([1, 2, 3, 4].filter((step) => facade.canOpenStep(step as 1 | 2 | 3 | 4))).toEqual([1, 2]);
+      facade.openStep(2);
+      expect(facade.reviewingVerified()).toBe(true);
+      facade.continueVerified();
+      expect(facade.step()).toBe(3);
+
+      facade.step.set(4);
+      expect(facade.canOpenStep(1)).toBe(false);
+      facade.backToDetails();
+      expect(facade.step()).toBe(4);
+    });
+
+    it('resumes the verified request without a new code when no detail changed', async () => {
+      await startAndVerify();
+      facade.backToDetails();
+      expect(facade.step()).toBe(1);
+
+      expect(await facade.continueFromDetails({ ...START_REQUEST, language: 'ar' })).toBe(true);   // the page language is not a detail
+      backend.expectNone(PUBLIC_SUBSCRIPTION_API.start);
+      expect(facade.step()).toBe(3);
+      backend.verify();
+    });
+
+    it('starts a new request, and a new code, when a detail changed', async () => {
+      await startAndVerify();
+      facade.backToDetails();
+
+      const moved = facade.continueFromDetails({ ...START_REQUEST, managerMobile: '01099999999' });
+      await settle();
+      backend.expectOne(PUBLIC_SUBSCRIPTION_API.start).flush({ ...LIVE, subscriptionId: 'sub-2' });
+      expect(await moved).toBe(true);
+      expect(facade.step()).toBe(2);
+      expect(facade.verified()).toBe(false);
+      expect(facade.started()?.subscriptionId).toBe('sub-2');
+    });
+
+    it('forces a new request after a step-1 field was refused at step 3', async () => {
+      await startAndVerify();
+      facade.returnForDetails();
+      expect(facade.step()).toBe(1);
+      expect(facade.returnedForDetails()).toBe(true);
+
+      const moved = facade.continueFromDetails(START_REQUEST);
+      await settle();
+      backend
+        .expectOne(PUBLIC_SUBSCRIPTION_API.start)
+        .flush({ type: 'about:blank', title: 'in use', status: 409, code: 'SUB-011', errors: { managerMobile: ['in use'] } }, { status: 409, statusText: 'Conflict' });
+      expect(await moved).toBe(false);
+      expect(facade.start.problem()?.errors?.['managerMobile']).toEqual(['in use']);
+      expect(facade.step()).toBe(1);
+    });
+
+    it('checks the step-1 mobiles and answers no issue when the check fails', async () => {
+      const answer = facade.checkDetails({ countryId: 'eg', mobile: null, managerMobile: '+201012345679' });
+      await settle();
+      const check = backend.expectOne(PUBLIC_SUBSCRIPTION_API.check);
+      expect(check.request.body).toEqual({ countryId: 'eg', mobile: null, managerMobile: '+201012345679' });
+      check.flush({ issues: [{ field: 'managerMobile', code: 'SUB-011' }] });
+      expect((await answer).issues).toEqual([{ field: 'managerMobile', code: 'SUB-011' }]);
+
+      const failed = facade.checkDetails({ countryId: null, mobile: '+201012345678', managerMobile: null });
+      await settle();
+      backend.expectOne(PUBLIC_SUBSCRIPTION_API.check).flush({ code: 'RATE-429' }, { status: 429, statusText: 'Too Many' });
+      expect((await failed).issues).toEqual([]);
+    });
   });
 });

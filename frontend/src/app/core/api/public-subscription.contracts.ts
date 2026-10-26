@@ -3,8 +3,8 @@
  * Anonymous endpoints, rate-limited like sign-in; one hour from `start` to `complete`. The wizard pages are built by
  * the account module from this file.
  *
- * Flow: `GET countries` → `GET governorates?countryId` → `POST start` (code sent to the manager's mobile, SUB-…) →
- * `POST verify` (or `POST resend`) → `GET check-username` while typing → `POST complete` (password sealed by the
+ * Flow: `GET countries` → `GET governorates?countryId` → `POST check` (mobiles, LIS-CR-014) → `POST start` (code sent to the manager's mobile, SUB-…) →
+ * `POST verify` (or `POST resend`) → `GET {id}/username-available` while typing → `POST complete` (password sealed by the
  * credential envelope; the confirmation is compared in the browser) → `portalUrl`.
  */
 
@@ -82,6 +82,24 @@ export interface SubscriptionCompletedResponse {
   readonly username: string;
 }
 
+/** LIS-CR-014 (S1): the step-1 fields checked before the code is sent; every member optional (a field is checked once typed). */
+export interface CheckSubscriptionRequest {
+  readonly countryId: string | null;
+  readonly mobile: string | null;
+  readonly managerMobile: string | null;
+}
+
+/** One refused field of a check: the request field (`mobile`, `managerMobile`, `username`, `countryId`) and its code. */
+export interface SubscriptionFieldIssue {
+  readonly field: string;
+  readonly code: string;
+}
+
+/** The answer of `POST check` and `GET {id}/username-available`: no issues = every checked field is acceptable. */
+export interface SubscriptionCheckResult {
+  readonly issues: readonly SubscriptionFieldIssue[];
+}
+
 export interface UsernameAvailability {
   readonly username: string;
   readonly valid: boolean;
@@ -96,6 +114,10 @@ export const PUBLIC_SUBSCRIPTION_API = {
   verify: '/api/v1/public/subscriptions/verify',
   complete: '/api/v1/public/subscriptions/complete',
   checkUsername: '/api/v1/public/subscriptions/check-username',
+  /** LIS-CR-014: `POST` the step-1 mobiles before the code is sent (SUB-011 per field). */
+  check: '/api/v1/public/subscriptions/check',
+  /** LIS-CR-014: `GET {id}/username-available?username=` of a verified request (SUB-013 taken, CLI-042 shape). */
+  usernameAvailable: (subscriptionId: string): string => `/api/v1/public/subscriptions/${encodeURIComponent(subscriptionId)}/username-available`,
 } as const;
 
 /**
@@ -108,7 +130,8 @@ export const SUBSCRIPTION_PASSWORD_RULE = { minLength: 8, maxLength: 128 } as co
  * Refusal codes the wizard shows: SUB-001 expired (start again), SUB-002 not pending, SUB-003 not verified,
  * SUB-004 too many codes, SUB-010 wrong code, SUB-404 unknown request, GEO-010 laboratory mobile length, GEO-014 manager
  * mobile length, GEO-011/012/013 place, CLI-040 password too short, CLI-041 password contains the username, CLI-042 username shape,
- * CLI-101 username taken, RATE-429 too many attempts.
+ * CLI-101 username taken, RATE-429 too many attempts; LIS-CR-014: SUB-011 the manager's mobile already belongs to an account (field
+ * `managerMobile`), SUB-013 the username is taken (field `username`). A refusal about one field names it in `errors`.
  */
 export const SUBSCRIPTION_CODES = {
   expired: 'SUB-001',
@@ -123,4 +146,6 @@ export const SUBSCRIPTION_CODES = {
   passwordContainsUsername: 'CLI-041',
   usernameInvalid: 'CLI-042',
   usernameTaken: 'CLI-101',
+  mobileInUse: 'SUB-011',
+  usernameInUse: 'SUB-013',
 } as const;

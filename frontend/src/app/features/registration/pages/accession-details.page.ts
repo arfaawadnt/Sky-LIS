@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRender, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import { BILLING_PERMISSIONS } from '../../../core/api/billing.contracts';
@@ -32,6 +32,9 @@ import { type VisitPatientTarget, VisitPatientDrawerComponent } from '../ui/visi
  * `?accession=` or `?visitId=` (the URL is the source of truth: the search strip, the match list and previous / next
  * navigate, so the browser's back button and a shared link work), or empty with the search strip focused. Cards show
  * only for the permission their module checks; buttons are affordance (`*appCan`), the server decides.
+ * LIS-CR-014: `?tab=documents|samples` scrolls to that card and `?tab=cancel` opens the cancel-services dialog once the visit
+ * is shown (the Lab Tracker's row actions); `?returnTo=` is kept on the page's own navigation (search, previous / next, edit)
+ * so the shell's "Back to …" chip stays.
  */
 @Component({
   selector: 'app-registration-accession-page',
@@ -67,6 +70,16 @@ export class AccessionDetailsPage {
   /** `?accession=` (links from other pages, previous / next) or `?visitId=` (the registration success panel). */
   readonly accession = input<string>();
   readonly visitId = input<string>();
+
+  /** `?tab=` (LIS-CR-014 T1): the card to show first — documents, samples — or cancel (the cancel-services dialog). */
+  readonly tab = input<string>();
+
+  /** `?returnTo=` (LIS-CR-014 T5): the list this page was opened from; passed on, never navigated to here. */
+  readonly returnTo = input<string>();
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector = inject(Injector);
+  private appliedTab: string | null = null;
 
   protected readonly permissions = REGISTRATION_PERMISSIONS;
   protected readonly samplesView = SAMPLES_PERMISSIONS.view;
@@ -108,6 +121,45 @@ export class AccessionDetailsPage {
         }
       });
     });
+    effect(() => {
+      const visit = this.visit();
+      const tab = this.tab();
+      untracked(() => this.showTab(visit?.id ?? null, tab ?? null));
+    });
+  }
+
+  /** Applies `?tab=` once per visit and tab, after the visit is shown. */
+  private showTab(visitId: string | null, tab: string | null): void {
+    const key = visitId === null || tab === null ? null : `${visitId}:${tab}`;
+    if (key === null || key === this.appliedTab) {
+      return;
+    }
+
+    this.appliedTab = key;
+    if (tab === 'cancel') {
+      this.facade.cancel.reset();
+      this.cancelLines.set([]);
+      this.cancelOpen.set(true);
+      return;
+    }
+
+    if (tab === 'documents' || tab === 'samples') {
+      afterNextRender(
+        () => {
+          const card = this.host.querySelector<HTMLElement>(`#accession-${tab}`);
+          if (card !== null && typeof card.scrollIntoView === 'function') {
+            card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          }
+        },
+        { injector: this.injector },
+      );
+    }
+  }
+
+  /** The page's own query with `returnTo` kept. */
+  private withReturn(queryParams: Record<string, string>): Record<string, string> {
+    const returnTo = this.returnTo();
+    return returnTo ? { ...queryParams, returnTo } : queryParams;
   }
 
   // ---- search and navigation -----------------------------------------------------------------------------------------
@@ -156,12 +208,13 @@ export class AccessionDetailsPage {
   protected edit(): void {
     const visit = this.visit();
     if (visit !== null) {
-      void this.router.navigate(['/registration/visits', visit.id]);
+      const returnTo = this.returnTo();
+      void this.router.navigate(['/registration/visits', visit.id], returnTo ? { queryParams: { returnTo } } : {});
     }
   }
 
   private goTo(accession: string): Promise<boolean> {
-    return this.router.navigate(['/registration/accession'], { queryParams: { accession } });
+    return this.router.navigate(['/registration/accession'], { queryParams: this.withReturn({ accession }) });
   }
 
   // ---- patient -----------------------------------------------------------------------------------------------------------

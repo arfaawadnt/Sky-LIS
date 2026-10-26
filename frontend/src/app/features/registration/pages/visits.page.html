@@ -54,6 +54,11 @@
     [emptyTitle]="i18n.t('registration.visits.empty')"
     [emptyMessage]="i18n.t('registration.visits.emptyHint')"
     [caption]="i18n.t('registration.visits.title')"
+    listKey="visits"
+    selection="multi"
+    [(selected)]="selected"
+    [exportable]="true"
+    [printSubtitle]="printSubtitle()"
   >
     <ng-template appCell="accession" [appCellOf]="rows()" let-row>
       <b class="mono">{{ row.accession }}</b>

@@ -102,3 +102,47 @@ No new code. `TENANT-004` (no session branch), `AUTHZ-001` (403) without `regist
 `VisitSampleCounts.CollectedOutside` / `AnyCollectedOutside` in `VisitProgress.cs`. The stage, next step and flags do not change: an
 outside sample is followed like any other. The SPA shows an "ext" pill (`tracker.samples.ext`, title `tracker.samples.extTitle`) beside
 the samples pill in the table and on the board card when the count is above zero; present only with `samples.view`, like the section.
+
+## 19. Change request 2026-10-25 (LIS-CR-014, package P-TRK, reviewer points T1, T3, T5) — actions, service rows, filter in the URL, return shortcut
+
+**T1 — actions column (like CP-10, LIS-CR-007 C-06).** Every table row (visit or service) ends with `app-tracker-row-actions`
+(`features/tracker/ui/row-actions.component.ts`): *Details* (`/registration/accession?accession=`), *Edit* (`/registration/visits/:id`,
+`registration.edit`), the *Payments* icon (`/billing/payments?visitId=`, `billing.view`) and the *Documents* icon
+(`/registration/accession?accession=&tab=documents`), then the shared `app-row-menu`: *Patient* (`/patients/:patientId`, `patients.view`),
+*Samples* (`…&tab=samples`, `samples.view`), *Results* (`/results/by-accession?accession=`, `results.view`), *Cancel services*
+(`…&tab=cancel`, `registration.cancel`). The tracker cannot import the registration feature, so every action is a router link (the
+targets do the work; `*appCan` is affordance only). The next-step button stays. The accession page (CP-10b) gained `?tab=`:
+`documents` / `samples` scroll to that card (ids `accession-documents`, `accession-samples`), `cancel` opens the cancel-services dialog
+with no line preselected, once per visit and tab after the visit is shown.
+
+**T3 — *Visits | Services* rows.** `GET /api/v1/tracker/visits?rows=services` (case-insensitive; `visits` or absent = one row per visit;
+anything else VALIDATION-400) answers `LabTrackerPage.Rows = "Services"`, `Items = []` and `Services` = one `LabTrackerServiceItem` per
+live top-level line (kind Service or Package, status not Cancelled): the service code / names / kind, the visit's identity, patient
+(VIP masked as A-03), payer and registration, and the line's **own** stage, next step, minutes left, delay state, samples and results;
+`VisitStage` is the visit's and `Payment` the visit's balance. Reader: `ILabTrackerReader.ReadServicesAsync` = the same `day_visits` CTE
+(search included) + `line_family` (every live line with its top-level line: package members fold into their package), the line's tubes
+(its lines' `tube_id` ∪ its results' `tube_id`), live samples of those tubes (a tube shared by two lines counts for both), and the
+per-line result aggregates with the same result-rights visibility. Rules: `VisitProgressRules.OfService(ServiceProgressFacts)` = the visit
+rules over the line as a visit of one live line (never Cancelled); TakePayment / ReadyUnpaid follow the visit's balance. The stage,
+attention and view filters apply to the line's own progress; `TotalCount` counts service rows; **the counters stay the visits'**.
+Sort keys `TrackerSortKeys.Services` = the visit keys + `service` (code); `service` with visit rows is VALIDATION-400. Tie-break:
+accession, line sequence, line id. The board stays visit-based (the toggle shows with the table only).
+
+**T5 — filter in the URL, return shortcut.** The table's whole state is the URL query (`features/tracker/state/tracker-url.ts`): `day` |
+`from`+`to`, `stage`, `attention`, `view`, `search`, `rows=services`, `page`, `size`, `sort` (table column key) + `dir=desc`,
+`layout=board`; only non-default values are written. On open a URL naming any of these keys wins (a return, a shared link, back /
+forward); a URL without them (the menu) keeps the facade's state and is rewritten from it; every change is written with
+`replaceUrl`. Malformed values are dropped (default) and the URL rewritten clean. Every row action, the accession link, the next-step
+link and the board card link carry `returnTo=<the tracker URL>`. New shared `shared/ui/return-link/return-link.component.ts`
+(`app-return-link`, input `label`): reads `returnTo` from the current URL, accepts only in-app paths (`safeReturnTo`: starts with one `/`,
+no `//`, no `\`, no scheme, no control or white-space character, ≤ 2000 chars), renders the chip "Back to {label}" (default "Back to the
+list") and navigates there; hidden when absent or equal to the page shown. Mounted once by the integrator in the shell top bar. The
+accession page keeps `returnTo` on its own navigation (search, previous / next, edit).
+
+Assumptions (Q9–Q11, the business owner may change them): **Q9** a service row's payment is the visit's balance (payments are taken per
+visit); **Q10** a service row is filtered by its own stage, not the visit's (the visit's stage shows under the service when it differs);
+**Q11** opening the tracker from the menu keeps the last filter of the session (the facade's), a link with a filter replaces it.
+
+Tests: domain `TRK_T3a/T3b`; functional `Service_rows_follow_each_line_on_its_own_while_the_counters_stay_the_visits`; specs
+`tracker-url.spec.ts`, `return-link.component.spec.ts`, facade (service rows), page (actions by permission, services toggle, URL round
+trip), accession page (`?tab=cancel`, `returnTo` kept).

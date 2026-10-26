@@ -278,6 +278,22 @@ describe('AccessionDetailsPage (CP-10b)', () => {
     await answerVisit(visitDetail({ id: 'v-2', accession: 'ACC-2026-00002' }));
   });
 
+  it('LIS-CR-014: ?tab=cancel opens the cancel dialog once the visit shows; ?returnTo is kept on the navigation of the page', async () => {
+    const page = await open('/registration/accession?accession=ACC-2026-00001&tab=cancel&returnTo=' + encodeURIComponent('/tracker?stage=Ready'));
+    expect(page.cancelOpen()).toBe(false);
+    await answerVisit();
+    expect(page.cancelOpen()).toBe(true);
+    expect(page.cancelLines()).toEqual([]);   // the dialog lists the lines to choose from
+    expect(harness.routeNativeElement!.querySelector('#accession-documents')).not.toBeNull();
+    expect(harness.routeNativeElement!.querySelector('#accession-samples')).not.toBeNull();
+
+    const search = page.onSearch('Mona');
+    await settle();
+    backend.expectOne((request) => request.url === REGISTRATION_API.visits && request.params.get('name') === 'Mona').flush(pageOf([visitRow({ id: 'v-2', accession: 'ACC-2026-00002' })]));
+    await search;
+    expect(TestBed.inject(Router).url).toBe('/registration/accession?accession=ACC-2026-00002&returnTo=%2Ftracker%3Fstage%3DReady');
+  });
+
   it('opens the cancel dialog with the row preselected and collects a sample after a confirm', async () => {
     const page = await open();
     await answerVisit();

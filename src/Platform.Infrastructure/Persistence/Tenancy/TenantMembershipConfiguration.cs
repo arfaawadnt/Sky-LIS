@@ -42,6 +42,9 @@ internal sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<T
         builder.Property(membership => membership.PreferredLanguage).HasMaxLength(5).IsRequired();
         // results grid density (results page, 2026-10-14); the domain CHECK ck_tenant_memberships_preferred_results_density_domain is declared in the migration
         builder.Property(membership => membership.PreferredResultsDensity).HasMaxLength(16);
+        // LIS-CR-014 T2: the column chooser's list views, a JSON document written by the domain only (ListPreferenceDocument);
+        // character varying(4096): the exact text the domain wrote (jsonb would re-format it) and the 4 KB bound in the type
+        builder.Property(membership => membership.ListPreferences).HasMaxLength(ListPreferenceDocument.MaxLength);
 
         // Staff profile and BR-17 overrides (CP-38, intake LIS-INT-ORG-001 §5).
         builder.Property(membership => membership.Designation).HasMaxLength(TenantMembership.MaxDesignationLength);
