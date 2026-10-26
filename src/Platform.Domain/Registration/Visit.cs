@@ -584,7 +584,7 @@ public sealed class Visit : AggregateRoot, ITenantScoped
     {
         var needs = lines.Select(pair => NeedsTube(pair.Line) ? pair.Spec : null).ToList();
         var plan = TubePlanner.Assign(ExistingTubes(), [.. needs.Select(spec => spec?.Need)]);
-        // a new tube is named by a need of its own key: a compatible condition joins a new tube only when its target is needed too (LIS-CR-015 M4)
+        // a new tube is named by a need of its own key: compatible needs share the tube of the best-priority member actually needed (LIS-CR-015 M4)
         var created = plan.NewTubes.Select(key => VisitTube.Create(Id, sampleNumbers.Next(), needs.First(spec => spec is not null && spec.Key == key)!, nowUtc)).ToList();
         _tubes.AddRange(created);
 

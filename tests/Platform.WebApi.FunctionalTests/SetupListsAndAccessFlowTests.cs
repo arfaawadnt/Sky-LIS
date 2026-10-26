@@ -194,6 +194,7 @@ public sealed class SetupListsAndAccessFlowTests(ApiFactory factory) : IClassFix
         {
             ("/api/v1/catalogue/clinical-groups", CatalogueSortKeys.ClinicalGroups),
             ("/api/v1/catalogue/sample-types", CatalogueSortKeys.SampleTypes),
+            ("/api/v1/catalogue/sample-compatibility-groups", CatalogueSortKeys.SampleCompatibilityGroups),   // LIS-CR-015 M4 (groups)
             (Units, CatalogueSortKeys.Units),
             ("/api/v1/catalogue/patient-conditions", CatalogueSortKeys.PatientConditions),
             ("/api/v1/catalogue/services", CatalogueSortKeys.Services),

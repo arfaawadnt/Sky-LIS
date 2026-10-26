@@ -1,33 +1,49 @@
 <app-page-header [title]="i18n.t('catalogue-a.compatible.title')" [subtitle]="i18n.t('catalogue-a.compatible.subtitle')">
   <app-catalogue-export-button pageActions ngProjectAs="[pageActions]" *appCan="permissions.export" [exporter]="exportCsv" />
+  <button pageActions ngProjectAs="[pageActions]" type="button" class="btn primary" *appCan="permissions.create" (click)="openCreate()"><app-icon name="plus" [size]="16" />{{ i18n.t('catalogue-a.compatible.add') }}</button>
 </app-page-header>
 
 <app-section-card [padded]="false">
   <app-toolbar>
     <app-search-box toolbarFilters [placeholder]="i18n.t('catalogue-a.compatible.searchPlaceholder')" (searchChange)="facade.setSearch($event)" />
+    <label toolbarFilters class="filter">
+      <span class="visually-hidden">{{ i18n.t('catalogue-a.compatible.status') }}</span>
+      <select class="inp" (change)="onStatusFilter($event)">
+        <option value="active" [selected]="facade.filter().isActive === true">{{ i18n.t('catalogue-a.compatible.statusActive') }}</option>
+        <option value="inactive" [selected]="facade.filter().isActive === false">{{ i18n.t('catalogue-a.compatible.statusInactive') }}</option>
+        <option value="all" [selected]="facade.filter().isActive === null">{{ i18n.t('catalogue-a.compatible.statusAll') }}</option>
+      </select>
+    </label>
     <button toolbarActions type="button" class="btn ghost" (click)="facade.list.reload()"><app-icon name="refresh" [size]="15" />{{ i18n.t('catalogue-a.refresh') }}</button>
   </app-toolbar>
 
   @if (facade.list.error()) {
     <p class="problem list-problem" role="alert">{{ i18n.t('catalogue-a.loadError') }}</p>
   }
-  <p class="muted small list-problem">{{ i18n.t('catalogue-a.compatible.hint') }}</p>
+  <p class="muted small list-problem">{{ i18n.t('catalogue-a.compatible.note') }}</p>
 
-  <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.list.isLoading()" [caption]="i18n.t('catalogue-a.compatible.title')" [emptyTitle]="i18n.t('catalogue-a.compatible.empty')" (rowActivate)="open($event)">
-    <ng-template appCell="mergesInto" [appCellOf]="facade.rows()" let-row>
-      @if (row.targetCode === null) {
-        <span class="muted">{{ mergesIntoText(row) }}</span>
-      } @else {
-        <app-badge tone="info">{{ mergesIntoText(row) }}</app-badge>
-      }
+  <app-data-table [columns]="columns" [rows]="facade.rows()" [loading]="facade.list.isLoading()" [caption]="i18n.t('catalogue-a.compatible.title')" [emptyTitle]="i18n.t('catalogue-a.compatible.empty')" [sort]="facade.sort()" [serverSort]="true" (sortChange)="facade.setSort($event)" (rowActivate)="openEdit($event)">
+    <ng-template appCell="members" [appCellOf]="facade.rows()" let-row>
+      <app-catalogue-b-chips [chips]="chips(row)" [max]="6" />
     </ng-template>
     <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
-      <app-badge [status]="rowStatus(row)" />
-      @if (canEditRow(row)) {
-        <button type="button" class="row-btn" *appCan="permissions.edit" (click)="open(row)" [attr.aria-label]="i18n.tf('catalogue-a.compatible.edit', { code: row.typeCode })" [title]="i18n.tf('catalogue-a.compatible.edit', { code: row.typeCode })"><app-icon name="edit" [size]="15" /></button>
-      }
+      <app-badge [status]="row.isActive ? 'Active' : 'Inactive'" />
+      <button type="button" class="row-btn edit" *appCan="permissions.edit" (click)="openEdit(row)" [attr.aria-label]="i18n.tf('catalogue-a.compatible.edit', { code: row.code })" [title]="i18n.tf('catalogue-a.compatible.edit', { code: row.code })"><app-icon name="edit" [size]="15" /></button>
+      <button type="button" class="row-btn power" [class.danger]="row.isActive" *appCan="permissions.edit" (click)="toggleActive(row)" [attr.aria-label]="i18n.t(row.isActive ? 'catalogue-a.deactivate' : 'catalogue-a.activate')" [title]="i18n.t(row.isActive ? 'catalogue-a.deactivate' : 'catalogue-a.activate')"><app-icon name="power" [size]="15" /></button>
     </ng-template>
   </app-data-table>
+
+  <app-paginator [page]="facade.filter().page" [pageSize]="facade.filter().pageSize" [totalCount]="facade.totalCount()" (pageChange)="facade.setPage($event)" />
 </app-section-card>
 
-<app-compatible-conditions-drawer [(open)]="drawerOpen" [sampleType]="editing()" [saving]="facade.save.pending()" [problem]="facade.save.problem()" (save)="save($event)" (closed)="onClosed()" />
+<app-compatibility-group-drawer
+  [(open)]="drawerOpen"
+  [group]="editing()"
+  [sampleTypes]="facade.sampleTypeOptions()"
+  [conditions]="facade.conditions()"
+  [saving]="saving()"
+  [problem]="saveProblem()"
+  (needConditions)="loadConditions($event)"
+  (save)="save($event)"
+  (closed)="onClosed()"
+/>

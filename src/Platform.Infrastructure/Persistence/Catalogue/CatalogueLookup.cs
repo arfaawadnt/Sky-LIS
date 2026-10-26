@@ -82,6 +82,7 @@ internal sealed class CatalogueLookup(AppDbContext context) : ICatalogueLookup
         }
 
         var sampleTypes = await context.Set<SampleType>().AsNoTracking().Where(sampleType => ids.Contains(sampleType.Id)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var compatibility = await CompatibilityGroupsAsync(ids, cancellationToken).ConfigureAwait(false);
         return sampleTypes.Select(sampleType => new CatalogueSampleTypeInfo(
             sampleType.Id,
             sampleType.Code,
@@ -90,7 +91,37 @@ internal sealed class CatalogueLookup(AppDbContext context) : ICatalogueLookup
             sampleType.Name.Ar,
             sampleType.IsActive,
             sampleType.Conditions.OrderBy(condition => condition.Code, StringComparer.Ordinal)
-                .Select(condition => new CatalogueSampleConditionInfo(condition.Id, condition.Code, condition.Name.En, condition.Name.Ar, condition.IsActive, condition.MergesIntoConditionId)).ToList())).ToList();
+                .Select(condition => new CatalogueSampleConditionInfo(condition.Id, condition.Code, condition.Name.En, condition.Name.Ar, condition.IsActive)).ToList(),
+            compatibility.Where(group => group.Members.Any(member => member.SampleTypeId == sampleType.Id)).ToList())).ToList();
+    }
+
+    /// <summary>
+    /// LIS-CR-015 M4: the active compatibility groups with a member of one of <paramref name="sampleTypeIds"/>, each with its
+    /// available members only (sample type active, condition active and of that type; a member deactivated since is ignored).
+    /// </summary>
+    private async Task<IReadOnlyList<CatalogueCompatibilityGroupInfo>> CompatibilityGroupsAsync(IReadOnlyCollection<Guid> sampleTypeIds, CancellationToken cancellationToken)
+    {
+        var groups = await context.Set<SampleCompatibilityGroup>().AsNoTracking()
+            .Where(group => group.IsActive && group.Members.Any(member => sampleTypeIds.Contains(member.SampleTypeId)))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        if (groups.Count == 0)
+        {
+            return [];
+        }
+
+        var memberTypeIds = groups.SelectMany(group => group.Members.Select(member => member.SampleTypeId)).Distinct().ToList();
+        var memberTypes = (await context.Set<SampleType>().AsNoTracking().Where(sampleType => memberTypeIds.Contains(sampleType.Id)).ToListAsync(cancellationToken).ConfigureAwait(false))
+            .ToDictionary(sampleType => sampleType.Id);
+
+        bool Available(SampleCompatibilityMember member) =>
+            memberTypes.TryGetValue(member.SampleTypeId, out var type) && type.IsActive && (member.SampleConditionId is not { } conditionId || type.HasCondition(conditionId, mustBeActive: true));
+
+        return groups
+            .Select(group => new CatalogueCompatibilityGroupInfo(
+                group.Id,
+                group.Code,
+                group.Members.Where(Available).Select(member => new CatalogueCompatibilityMemberInfo(member.SampleTypeId, member.SampleConditionId, member.Priority)).ToList()))
+            .ToList();
     }
 
     public async Task<CatalogueRangeBandInfo?> ResolveRangeAsync(Guid testId, GenderRestriction sex, PatientAge age, Guid? patientConditionId, CancellationToken cancellationToken)

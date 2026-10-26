@@ -85,19 +85,6 @@ public sealed class GetSampleTypeHandler(ISampleTypeRepository sampleTypes) : IQ
         ?? throw new DomainException(SampleTypeCodes.NotFound, "Sample type not found.", DomainFault.NotFound);
 }
 
-/// <summary>
-/// Compatible sample conditions (LIS-CR-015 M4): every sample type (≤ <see cref="CatalogueALimits.MaxExportRows"/>, by code)
-/// with its conditions and the condition each merges into; the page searches and exports the loaded list.
-/// </summary>
-[RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
-public sealed record ListCompatibleConditionsQuery : IQuery<IReadOnlyList<CompatibleSampleTypeView>>;
-
-public sealed class ListCompatibleConditionsHandler(ISampleTypeRepository sampleTypes) : IQueryHandler<ListCompatibleConditionsQuery, IReadOnlyList<CompatibleSampleTypeView>>
-{
-    public Task<IReadOnlyList<CompatibleSampleTypeView>> Handle(ListCompatibleConditionsQuery query, CancellationToken cancellationToken) =>
-        sampleTypes.ListCompatibilityAsync(cancellationToken);
-}
-
 [RequirePermissionPolicy(PermissionCatalog.Catalogue, PermissionAction.View)]
 public sealed record ListMeasurementUnitsQuery(string? Search, bool? IsActive, int? Page, int? PageSize, string? Sort = null, string? Direction = null) : IQuery<Paged<MeasurementUnitListItem>>;
 

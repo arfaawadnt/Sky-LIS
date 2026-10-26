@@ -7,9 +7,9 @@ public sealed record TubeKey(Guid ClinicalGroupId, Guid SampleTypeId, Guid? Samp
 
 /// <summary>
 /// What a tube is made of, resolved from the catalogue by the order planner: the merge key plus the names printed on
-/// labels and the job order (snapshot at tube creation, LDM §2.2 label content). <paramref name="MergesIntoConditionId"/>
-/// (LIS-CR-015 M4) is the active condition of the same sample type whose tube this need may join (compatible conditions):
-/// the planner uses it only when that tube is live on the visit or needed by the same request.
+/// labels and the job order (snapshot at tube creation, LDM §2.2 label content). <paramref name="Compatibility"/>
+/// (LIS-CR-015 M4) is the active compatibility group of the (sample type, condition) pair, null when it is in none: the
+/// planner shares one tube between needs of the same clinical group in the same group.
 /// </summary>
 public sealed record TubeSpec(
     Guid ClinicalGroupId,
@@ -22,15 +22,12 @@ public sealed record TubeSpec(
     string SampleTypeNameAr,
     string? SampleConditionNameEn,
     string? SampleConditionNameAr,
-    Guid? MergesIntoConditionId = null)
+    TubeCompatibility? Compatibility = null)
 {
     public TubeKey Key => new(ClinicalGroupId, SampleTypeId, SampleConditionId);
 
-    /// <summary>The key of the tube this need may join instead of its own (same group and type, the target condition); null when none.</summary>
-    public TubeKey? MergeKey => MergesIntoConditionId is { } target && target != SampleConditionId ? Key with { SampleConditionId = target } : null;
-
     /// <summary>This spec as a need of <see cref="TubePlanner"/>.</summary>
-    public TubePlanner.Need Need => new(Key, MergeKey);
+    public TubePlanner.Need Need => new(Key, Compatibility);
 }
 
 /// <summary>

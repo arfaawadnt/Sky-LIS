@@ -235,6 +235,13 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
+- **Compatible samples redesigned as groups** (CP-71, the business owner's correction of 2026-10-26): the Setup page now
+  groups any sample type / condition pairs the laboratory treats as compatible, in its own priority order (members may mix sample
+  types; a pair belongs to at most one active group; CAT-280…287); `/api/v1/catalogue/sample-compatibility-groups`. At registration
+  (BR-02) the services of one visit and one clinical group whose samples share a group get one sample, named after the first member
+  present; a later service joins an existing sample of its group, which is never renamed. Migration `CompatibilityGroups`
+  (`app.sample_compatibility_groups`, `app.sample_compatibility_members`, RLS; drops the unused
+  `sample_conditions.merges_into_condition_id` of 0.25.0). Menu label "Compatible samples".
 _Nothing yet._
 
 ### v0.25.1 — 2026-10-26

@@ -579,10 +579,13 @@ QMS source is never read or copied (section 1); everything here is written from 
   saved before the change) consumed by `OrderPlanner.WithFormulaOperandsAsync`: operand lines `VisitLineKind.FormulaOperand` / origin
   `Formula`, price 0, not top-level, follow their formula on cancel / release, REG-026 alone, REG-207 warning for an unusable operand
   service, `VisitOrderItem.FormulaServiceId/VisibleOnReceipt`, `visit_lines.visible_on_receipt` (CHECKs `ck_visit_lines_member`,
-  `ck_visit_lines_formula_operand`, `ck_visit_lines_receipt`); the invoice leaves out invisible lines; **compatible sample conditions**
-  (`SampleCondition.MergesIntoConditionId`, `SampleType.SetCompatibleConditions`, CAT-280…285, `GET/PUT …/sample-types/…/compatible-conditions`,
-  page `pages-a/compatible-conditions.page.*`): `TubeSpec.MergesIntoConditionId` / `Need`, `TubePlanner` joins the target's tube only
-  when it is live on the visit or needed in the same request (never reversed, never re-keyed). Open points: UAT open points 14–16.
+  `ck_visit_lines_formula_operand`, `ck_visit_lines_receipt`); the invoice leaves out invisible lines; **compatible samples**
+  (redesigned the same day as groups, migration `CompatibilityGroups`: `SampleCompatibilityGroup` → `app.sample_compatibility_groups` /
+  `_members` (RLS, pair unique per group NULLS NOT DISTINCT, `ck_sample_compatibility_members_priority`), CAT-280…287, a pair in at most
+  one active group (handler check), `/api/v1/catalogue/sample-compatibility-groups`, page `pages-a/compatible-conditions.page.*` +
+  `ui-a/compatibility-group-drawer`, nav label "Compatible samples"): `CatalogueSampleTypeInfo.CompatibilityGroups` → `TubeSpec.Compatibility`;
+  `TubePlanner` per clinical group: a need joins a live tube of its group, else the group's new needs open one tube keyed after the
+  best-priority member needed; existing tubes are never re-keyed. Open points: UAT open points 14–16.
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

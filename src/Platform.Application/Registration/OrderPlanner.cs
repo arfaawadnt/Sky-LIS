@@ -649,10 +649,13 @@ public sealed class OrderPlanner(ICatalogueLookup catalogue, IOrderRulesLookup r
 
         var condition = service.SampleConditionId is { } conditionId ? sampleType.Conditions.FirstOrDefault(candidate => candidate.Id == conditionId) : null;
 
-        // LIS-CR-015 M4: a compatible condition may join the tube of its active target (same type; the planner decides when)
-        var mergesInto = condition?.MergesIntoConditionId is { } targetId && sampleType.Conditions.Any(candidate => candidate.Id == targetId && candidate.IsActive && candidate.MergesIntoConditionId is null)
-            ? targetId
-            : (Guid?)null;
+        // LIS-CR-015 M4: the active compatibility group of the (type, condition) pair; the planner decides which tube is shared
+        var member = sampleType.CompatibilityGroups?
+            .SelectMany(candidate => candidate.Members.Where(entry => entry.SampleTypeId == typeId && entry.SampleConditionId == service.SampleConditionId).Select(entry => (Group: candidate, entry.Priority)))
+            .FirstOrDefault();
+        var compatibility = member is { Group: { } compatible } found
+            ? new TubeCompatibility(compatible.Id, found.Priority, [.. compatible.Members.Select(entry => new CompatibleTubeMember(entry.SampleTypeId, entry.SampleConditionId, entry.Priority))])
+            : null;
         return new TubeSpec(
             groupId,
             typeId,
@@ -664,7 +667,7 @@ public sealed class OrderPlanner(ICatalogueLookup catalogue, IOrderRulesLookup r
             sampleType.NameAr,
             condition?.NameEn,
             condition?.NameAr,
-            mergesInto);
+            compatibility);
     }
 
     private async Task CheckFrequencyAsync(

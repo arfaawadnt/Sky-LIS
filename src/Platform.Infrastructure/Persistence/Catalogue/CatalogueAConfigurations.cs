@@ -64,11 +64,6 @@ internal sealed class SampleConditionConfiguration : IEntityTypeConfiguration<Sa
         builder.OwnsOne(condition => condition.Name, CatalogueAMapping.Bilingual<SampleCondition>("name"));
         builder.Navigation(condition => condition.Name).IsRequired();
         builder.Property(condition => condition.IsActive).IsRequired();
-
-        // LIS-CR-015 M4: the compatible condition this one merges into (same tenant; same type and one level are domain rules)
-        builder.Property(condition => condition.MergesIntoConditionId);
-        builder.HasOne<SampleCondition>().WithMany().HasForeignKey(condition => new { condition.TenantId, condition.MergesIntoConditionId }).IsRequired(false).OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_sample_conditions_merges_into");
     }
 }
 

@@ -378,7 +378,7 @@ internal static class OrderPlanViews
 
     /// <summary>
     /// The tubes of the dry run as <see cref="Visit"/> would assign them; <paramref name="merged"/> maps the own key of a need
-    /// whose compatible condition joined its target's tube to that tube's key (LIS-CR-015 M4), so line previews point at it.
+    /// that shares a compatible tube (LIS-CR-015 M4 compatibility group) to that tube's key, so line previews point at it.
     /// </summary>
     private static List<TubePreview> Tubes(IReadOnlyList<VisitOrderItem> items, Visit? visit, out Dictionary<string, string> merged)
     {
@@ -402,7 +402,7 @@ internal static class OrderPlanViews
                 merged[KeyText(item.Tube.Key)] = key;
             }
 
-            // the tube is named by a need of its own key (the target of a merge), else by the existing tube it joins
+            // the tube is named by a need of its own key (the best-priority member needed), else by the existing tube it joins
             var spec = tubeKey == item.Tube.Key ? item.Tube : needs.Select(need => need.Tube!).FirstOrDefault(candidate => candidate.Key == tubeKey);
             var existingTube = assignment.ExistingTubeId is { } tubeId ? visit!.Tubes.First(tube => tube.Id == tubeId) : null;
             var preview = previews.FirstOrDefault(candidate => candidate.Key == key && candidate.ExistingTubeId == existingTube?.Id);
@@ -421,7 +421,7 @@ internal static class OrderPlanViews
         return previews;
     }
 
-    /// <summary>A line preview (and its members) pointing at the tube its compatible condition merged into, when it did.</summary>
+    /// <summary>A line preview (and its members) pointing at the compatible tube it shares, when it does.</summary>
     private static OrderLinePreview Merged(OrderLinePreview preview, Dictionary<string, string> merged) =>
         merged.Count == 0
             ? preview

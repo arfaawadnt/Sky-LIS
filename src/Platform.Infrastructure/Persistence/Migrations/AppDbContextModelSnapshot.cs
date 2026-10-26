@@ -2225,6 +2225,116 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Platform.Domain.Catalogue.SampleCompatibilityGroup", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_display_name");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<string>("ModifiedByDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("modified_by_display_name");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_sample_compatibility_groups");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sample_compatibility_groups_tenant_id_code");
+
+                    b.ToTable("sample_compatibility_groups", "app");
+                });
+
+            modelBuilder.Entity("Platform.Domain.Catalogue.SampleCompatibilityMember", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_id");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.Property<Guid?>("SampleConditionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sample_condition_id");
+
+                    b.Property<Guid>("SampleTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sample_type_id");
+
+                    b.HasKey("TenantId", "Id")
+                        .HasName("pk_sample_compatibility_members");
+
+                    b.HasIndex("TenantId", "SampleConditionId")
+                        .HasDatabaseName("ix_sample_compatibility_members_tenant_id_sample_condition_id");
+
+                    b.HasIndex("TenantId", "SampleTypeId", "SampleConditionId")
+                        .HasDatabaseName("ix_sample_compatibility_members_sample");
+
+                    b.HasIndex("TenantId", "GroupId", "SampleTypeId", "SampleConditionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sample_compatibility_members_pair");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("TenantId", "GroupId", "SampleTypeId", "SampleConditionId"), false);
+
+                    b.ToTable("sample_compatibility_members", "app");
+                });
+
             modelBuilder.Entity("Platform.Domain.Catalogue.SampleCondition", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -2245,19 +2355,12 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
-                    b.Property<Guid?>("MergesIntoConditionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("merges_into_condition_id");
-
                     b.Property<Guid>("SampleTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("sample_type_id");
 
                     b.HasKey("TenantId", "Id")
                         .HasName("pk_sample_conditions");
-
-                    b.HasIndex("TenantId", "MergesIntoConditionId")
-                        .HasDatabaseName("ix_sample_conditions_tenant_id_merges_into_condition_id");
 
                     b.HasIndex("TenantId", "SampleTypeId", "Code")
                         .IsUnique()
@@ -9772,14 +9875,69 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Platform.Domain.Catalogue.SampleCondition", b =>
+            modelBuilder.Entity("Platform.Domain.Catalogue.SampleCompatibilityGroup", b =>
                 {
+                    b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
+                        {
+                            b1.Property<Guid>("SampleCompatibilityGroupTenantId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("tenant_id");
+
+                            b1.Property<Guid>("SampleCompatibilityGroupId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Ar")
+                                .IsRequired()
+                                .HasMaxLength(400)
+                                .HasColumnType("character varying(400)")
+                                .HasColumnName("name_ar");
+
+                            b1.Property<string>("En")
+                                .IsRequired()
+                                .HasMaxLength(400)
+                                .HasColumnType("character varying(400)")
+                                .HasColumnName("name_en");
+
+                            b1.HasKey("SampleCompatibilityGroupTenantId", "SampleCompatibilityGroupId")
+                                .HasName("pk_sample_compatibility_groups");
+
+                            b1.ToTable("sample_compatibility_groups", "app");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SampleCompatibilityGroupTenantId", "SampleCompatibilityGroupId")
+                                .HasConstraintName("fk_sample_compatibility_groups_sample_compatibility_groups_ten");
+                        });
+
+                    b.Navigation("Name")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Platform.Domain.Catalogue.SampleCompatibilityMember", b =>
+                {
+                    b.HasOne("Platform.Domain.Catalogue.SampleCompatibilityGroup", null)
+                        .WithMany("Members")
+                        .HasForeignKey("TenantId", "GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_sample_compatibility_members_sample_compatibility_groups_te");
+
                     b.HasOne("Platform.Domain.Catalogue.SampleCondition", null)
                         .WithMany()
-                        .HasForeignKey("TenantId", "MergesIntoConditionId")
+                        .HasForeignKey("TenantId", "SampleConditionId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_sample_conditions_merges_into");
+                        .HasConstraintName("fk_sample_compatibility_members_sample_condition");
 
+                    b.HasOne("Platform.Domain.Catalogue.SampleType", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SampleTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sample_compatibility_members_sample_type");
+                });
+
+            modelBuilder.Entity("Platform.Domain.Catalogue.SampleCondition", b =>
+                {
                     b.HasOne("Platform.Domain.Catalogue.SampleType", null)
                         .WithMany("Conditions")
                         .HasForeignKey("TenantId", "SampleTypeId")
@@ -11685,6 +11843,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.Navigation("Paragraphs");
 
                     b.Navigation("RangeBands");
+                });
+
+            modelBuilder.Entity("Platform.Domain.Catalogue.SampleCompatibilityGroup", b =>
+                {
+                    b.Navigation("Members");
                 });
 
             modelBuilder.Entity("Platform.Domain.Catalogue.SampleType", b =>

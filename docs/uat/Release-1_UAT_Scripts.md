@@ -1,6 +1,6 @@
 # Sky LIS — Release 1 User Acceptance Test Scripts (LIS-UAT-001)
 
-Version 1.3 · 2026-10-26 · Status: draft for review by the business owner (1.3: reviewer round 3, LIS-CR-015; 1.2: reviewer round 2 — see the revision history).
+Version 1.4 · 2026-10-26 · Status: draft for review by the business owner (1.4: Compatible samples as groups; 1.3: reviewer round 3, LIS-CR-015; 1.2: reviewer round 2 — see the revision history).
 
 Sources: business SRS LIS-SRS-001 (`docs/srs`, page ids CP-nn / SA-nn, workflows WF-nn, rules BR-nn), the module intakes
 (`docs/intake`, acceptance scenario ids and refusal codes), the Release-1 scope record (`docs/build/MODULES.md` §6, wave 4),
@@ -240,7 +240,7 @@ Expected: (1) "Your language was saved."; the sign-in page and the portal open i
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 #### UAT-ADM-12 — Master data round 3: preparation options, member setup, formula tools and operands, compatible conditions · standard
-Refs: CP-46 · CP-40 · CP-41 · new page Compatible sample conditions · BR-02 · change request LIS-CR-015 (M1–M4).
+Refs: CP-46 · CP-40 · CP-41 · CP-71 Compatible samples · BR-02 · change request LIS-CR-015 (M1–M4).
 Sign in as `lab.admin` at `<base>/lab/demo-lab`.
 1. Setup › Preparations › `Add`, type *Option list*: two empty option rows appear. Type "8 h", press Enter (focus moves to a new row), type "12 h". Paste three lines into one row.
 2. Type "8 H" in another row. Then remove it, move a row up and save. Reopen the question.
@@ -250,9 +250,9 @@ Sign in as `lab.admin` at `<base>/lab/demo-lab`.
 6. Open a package › Members: open a member service, then press *Back*.
 7. Setup › Tests › open a formula test (or create one, type *Formula*) › Formula tab: use the tool buttons (an operator, `ROUND( )` around a selection, `@AGE`), then *Check formula*.
 8. In the operand table pick a service for one test, tick *Visible in receipt*, set another to "None — not ordered". Save and reopen.
-9. Setup › Compatible sample conditions: for Serum choose Random → *merges into* Fasting. Save. Then try a condition merging into itself, into an inactive condition, and a chain (A → B while B → C).
+9. Setup › Compatible samples › `Add group`: code `SUGAR`, name "Sugar samples" / "عينات السكر", members 1 · Serum · Fasting, 2 · Serum · Random. Save. Then add a second group holding Serum · Random, and a group with one member only.
 10. Arabic check of the four screens.
-Expected: (1) one row per line; the paste becomes three rows. (2) the duplicate row is marked "already in the list" and saving is refused; after the fix the options come back in the saved order. (3) "at least two different options" under the list. (4) the test editor opens with a *Back* chip; the chip returns to the service, re-read from the server. (5) *Cancel* stays; *Open without saving* discards the change; *Save and open* saves then opens. (6) *Back* returns to the package. (7) each button inserts at the caret; the check normalises the text. (8) the choices are kept; "None" shows a warning and disables its checkbox; a service that does not carry the test is refused `CAT-067`. (9) the pair is saved; the three wrong choices are refused (`CAT-281`, `CAT-282`, `CAT-283` / `CAT-284`). (10) labels in Arabic, layout right to left.
+Expected: (1) one row per line; the paste becomes three rows. (2) the duplicate row is marked "already in the list" and saving is refused; after the fix the options come back in the saved order. (3) "at least two different options" under the list. (4) the test editor opens with a *Back* chip; the chip returns to the service, re-read from the server. (5) *Cancel* stays; *Open without saving* discards the change; *Save and open* saves then opens. (6) *Back* returns to the package. (7) each button inserts at the caret; the check normalises the text. (8) the choices are kept; "None" shows a warning and disables its checkbox; a service that does not carry the test is refused `CAT-067`. (9) SUGAR is listed with its members in order; the second group is refused `CAT-284` naming SUGAR; one member is refused `CAT-280`. (10) labels in Arabic, layout right to left.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 ### 5.2 Accounts (UAT-FIN)
@@ -616,8 +616,10 @@ Refs: CP-06 · CP-12 · CP-23 · BR-02 · change request LIS-CR-015 (M3b, M3c, M
 5. In the formula setup tick *Visible in receipt* for CREA; register again and open the receipt.
 6. Register the formula service together with CREA ordered by hand.
 7. Register a Fasting service and a Random service of the same unit and sample type; look at the tube preview and the labels.
-8. Register the Random service alone.
-Expected: (1) CREA listed at 0.00 "for formula …". (2) CREA under the formula line at 0.00; the total counts the formula only; one tube per sample need; after saving, CREA has results to enter and the formula computes once CREA is entered. (3) CREA alone is refused `REG-026`; cancelling the formula cancels CREA too. (4) the receipt leaves CREA out; the job order lists "↳ CREA · for formula …". (5) CREA prints at 0.00 with "for formula …". (6) no operand line is added (CREA is already ordered). (7) one tube and one sample "Serum · Fasting" holding both services, one label. (8) one tube "Serum · Random".
+8. Register the Random service alone; then add the Fasting service to that visit.
+9. Register two services of different units whose samples are in the group.
+10. Deactivate SUGAR and register the Fasting and Random services again.
+Expected: (1) CREA listed at 0.00 "for formula …". (2) CREA under the formula line at 0.00; the total counts the formula only; one tube per sample need; after saving, CREA has results to enter and the formula computes once CREA is entered. (3) CREA alone is refused `REG-026`; cancelling the formula cancels CREA too. (4) the receipt leaves CREA out; the job order lists "↳ CREA · for formula …". (5) CREA prints at 0.00 with "for formula …". (6) no operand line is added (CREA is already ordered). (7) one tube and one sample "Serum · Fasting" holding both services, one label. (8) one tube "Serum · Random"; the Fasting service joins that tube, which keeps its name. (9) two tubes, one per unit. (10) two tubes again.
 Result: ☐ Pass ☐ Fail · Tester ____ · Date ____ · Defect ____
 
 ### 5.5 Phlebotomist / technician — sample side (UAT-SMP)
@@ -1174,7 +1176,7 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 13 | Route-provided facades outlive their pages (Angular keeps the route injector): a list page opened again showed the previous visit's data — even another sign-in's — until `Refresh` (D-14, fixed for the platform, organization and catalogue features by re-reading on open; D-08 was the billing case). The laboratory features (registration, patients, results, pricing, treasury, …) follow the same pattern and need the same treatment. | MDR-01, all list pages |
 | 14 | LIS-CR-015 M3b: the service ordered for a formula operand is chosen per operand in the formula setup (default the test's own single-test service); an operand already on the visit is not added again; an operand line is free and follows its formula. When two formulas share one operand, cancelling the first formula also cancels the operand the second still needs. Confirm, or decide that the operand moves to the remaining formula. | REG-17 |
 | 15 | LIS-CR-015 M3c: *Visible in receipt* applies to the itemised Receipt / invoice and is off by default; the job order always lists operands. Confirm. | REG-17 |
-| 16 | LIS-CR-015 M4: a condition merges into its target only when the target's sample is in the same visit (existing or in the same registration); one level; within one unit (clinical group) and sample type; an existing Random sample is not renamed when Fasting is added later. Confirm. | REG-17, ADM-12 |
+| 16 | LIS-CR-015 M4 (Compatible samples): the laboratory groups sample type / condition pairs in its own order; within one visit and one unit (clinical group) the services whose samples share a group get one sample named after the first member present; a later service joins an existing sample of its group, which is never renamed (a Fasting test added to a visit that has a Random sample uses that sample). Confirm. | REG-17, ADM-12 |
 
 ## 10. Revision history
 
@@ -1189,6 +1191,7 @@ UAT data; add one if the laboratory's catalogue uses them), BR-21…BR-23 (auto-
 | 0.7 | 2026-10-20 | Claude Code | Sign-in by address (change request LIS-CR-005, BR-28): set-up note (laboratory users at `<base>/lab/<slug>`, Super Admin personas at `<base>/admin/login`), UAT-REG-01 step 1a and expectations (another laboratory, admin address, unknown address, bare address; idle return), UAT-OPS intro (admin address, laboratory user refused), UAT-ADM-01 and the provisioning / subscription expectations print the new address. |
 | 0.8 | 2026-10-22 | Claude Code | New script UAT-REG-16 Lab Tracker (CP-69, change request LIS-CR-006): strip and chips, table and board, next-step links, search, live refresh, desk views, rights, Arabic. Reception persona and coverage updated. |
 | 0.9 | 2026-10-22 | Claude Code | UAT-REG-16 gains step 8 (period picker: yesterday, last 7 days, from / to); rights and Arabic checks become steps 9 and 10. Ids unchanged. |
+| 1.4 | 2026-10-26 | Claude Code | Compatible samples redesigned as groups (CP-71): UAT-ADM-12 step 9, UAT-REG-17 steps 7–10 and open point 16 rewritten. Ids unchanged. |
 | 1.3 | 2026-10-26 | Claude Code | Reviewer round 3 (change request LIS-CR-015): new UAT-ADM-12 (preparation options as rows, member setup from the service grid, formula tools and operands, compatible sample conditions) and UAT-REG-17 (formula operands at registration and on the receipt, merged compatible samples); open points 14–16. Ids unchanged. |
 | 1.2 | 2026-10-25 | Claude Code | Reviewer round 2 (change request LIS-CR-014): new UAT-SUP-11 (one browser, two portals); notes under UAT-OPS-07 (early mobile / username checks, Back between steps), UAT-REG-10 (column chooser, Print, Excel) and UAT-REG-16 (actions column, Services rows, Back chip, chooser, Print / Excel). Ids unchanged. |
 | 1.1 | 2026-10-25 | Claude Code | Reviewer features (change requests LIS-CR-008, CR-010, CR-011, CR-012, CR-013): new scripts UAT-CSH-11 (cash ledger, cash entries, day close), UAT-SUP-09 (announcements), UAT-SUP-10 (subscription reminders, grace and expiry); notes under UAT-REG-03 (collected outside per sample), UAT-ADM-01 / UAT-OPS-02 / UAT-OPS-07 (localities), UAT-MDR-02 (locality import, template design), UAT-VER-06 (report designs). Ids unchanged. |

@@ -19,16 +19,3 @@ public sealed record SampleTypeListItem(Guid Id, string Code, string ShortName, 
 public sealed record SampleConditionView(Guid Id, string Code, string NameEn, string NameAr, bool IsActive);
 
 public sealed record SampleTypeDetail(Guid Id, string Code, string ShortName, string NameEn, string NameAr, bool IsActive, IReadOnlyList<SampleConditionView> Conditions, bool ForCulture = false);
-
-// Compatible sample conditions (LIS-CR-015 M4): a condition whose tests join the tube of another condition of the same type.
-
-/// <summary>One entry of the compatibility map: <paramref name="MergesIntoConditionId"/> null = the condition keeps its own sample.</summary>
-public sealed record SampleConditionPairItem(Guid ConditionId, Guid? MergesIntoConditionId);
-
-/// <summary>The full map of one sample type; conditions not listed keep their own sample.</summary>
-public sealed record SaveCompatibleConditionsRequest(IReadOnlyList<SampleConditionPairItem> Pairs);
-
-public sealed record CompatibleConditionView(Guid Id, string Code, string NameEn, string NameAr, bool IsActive, Guid? MergesIntoConditionId);
-
-/// <summary>A sample type with its conditions and the condition each merges into (the compatible sample conditions page).</summary>
-public sealed record CompatibleSampleTypeView(Guid Id, string Code, string ShortName, string NameEn, string NameAr, bool IsActive, IReadOnlyList<CompatibleConditionView> Conditions);

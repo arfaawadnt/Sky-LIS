@@ -1,31 +1,36 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 
 import { CATALOGUE_A_PERMISSIONS } from '../../../core/api/catalogue-a.contracts';
-import type { CompatibleSampleTypeView, SampleConditionPairItem } from '../../../core/api/compatible-conditions.contracts';
+import type { CompatibilityMemberView, CreateSampleCompatibilityGroupRequest, SampleCompatibilityGroupView } from '../../../core/api/sample-compatibility.contracts';
+import type { ProblemDetails } from '../../../core/api/problem-details';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { localizedPick } from '../../../shared/forms/localized-text';
+import { problemMessage } from '../../../shared/forms/problem-text';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CanDirective } from '../../../shared/ui/can.directive';
 import { CellTemplateDirective, RowActionsTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
 import { DataTableComponent } from '../../../shared/ui/data-table/data-table.component';
-import type { TableColumn } from '../../../shared/ui/data-table/data-table.types';
+import { type TableColumn, localizedSortKey } from '../../../shared/ui/data-table/data-table.types';
+import { ConfirmService } from '../../../shared/ui/dialog/confirm.service';
 import { IconComponent } from '../../../shared/ui/icon/icon.component';
 import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
+import { PaginatorComponent } from '../../../shared/ui/paginator/paginator.component';
 import { SearchBoxComponent } from '../../../shared/ui/search-box/search-box.component';
 import { SectionCardComponent } from '../../../shared/ui/section-card/section-card.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ToolbarComponent } from '../../../shared/ui/toolbar/toolbar.component';
 import { csvFileName, downloadCsv, toCsv, yesNo } from '../data-a/csv-export';
-import { type CompatibleRow, CompatibleConditionsFacade } from '../state-a/compatible-conditions.facade';
-import { CompatibleConditionsDrawerComponent } from '../ui-a/compatible-conditions-drawer.component';
+import { SampleCompatibilityFacade } from '../state-a/sample-compatibility.facade';
+import { CatalogueBChipsComponent, type CatalogueBChip } from '../ui-b/catalogue-b-chips.component';
+import { CompatibilityGroupDrawerComponent } from '../ui-a/compatibility-group-drawer.component';
 import { CatalogueExportButtonComponent } from '../ui-a/export-button.component';
 
 /**
- * Compatible sample conditions (change request LIS-CR-015, note M4): every sample type with its conditions and the
- * condition each merges into. At registration a condition that merges into P joins P's tube when that tube is in the same
- * visit (one sample named after P); alone it keeps its own sample. Edited per sample type in a drawer (`catalogue.edit`).
- * Mounted at `/catalogue/compatible-conditions` and `/admin/catalogue/compatible-conditions`.
+ * Compatible samples (change request LIS-CR-015, note M4 as restated on 2026-10-26): groups of sample types / conditions
+ * the laboratory sets together. Within one processing unit, the tests of a visit whose samples are in one group share one
+ * sample, named after the first member ordered among those present. Mounted at `/catalogue/compatible-conditions` and
+ * `/admin/catalogue/compatible-conditions`.
  */
 @Component({
   selector: 'app-compatible-conditions-page',
@@ -37,11 +42,13 @@ import { CatalogueExportButtonComponent } from '../ui-a/export-button.component'
     DataTableComponent,
     CellTemplateDirective,
     RowActionsTemplateDirective,
+    PaginatorComponent,
     BadgeComponent,
     IconComponent,
     CanDirective,
     CatalogueExportButtonComponent,
-    CompatibleConditionsDrawerComponent,
+    CatalogueBChipsComponent,
+    CompatibilityGroupDrawerComponent,
   ],
   templateUrl: './compatible-conditions.page.html',
   styleUrl: './catalogue-list.css',
@@ -49,19 +56,20 @@ import { CatalogueExportButtonComponent } from '../ui-a/export-button.component'
 })
 export class CompatibleConditionsPage {
   protected readonly i18n = inject(I18nService);
-  protected readonly facade = inject(CompatibleConditionsFacade);
-  private readonly permissionsService = inject(PermissionsService);
+  protected readonly facade = inject(SampleCompatibilityFacade);
   private readonly toast = inject(ToastService);
+  private readonly confirm = inject(ConfirmService);
+  private readonly permissionsService = inject(PermissionsService);
 
   protected readonly permissions = CATALOGUE_A_PERMISSIONS;
 
   protected readonly drawerOpen = signal(false);
-  protected readonly editing = signal<CompatibleSampleTypeView | null>(null);
+  protected readonly editing = signal<SampleCompatibilityGroupView | null>(null);
 
-  protected readonly columns: readonly TableColumn<CompatibleRow>[] = [
-    { key: 'sampleType', header: 'catalogue-a.compatible.column.sampleType', sortable: true, value: (row) => `${row.typeCode} · ${this.pick(row.typeNameEn, row.typeNameAr)}` },
-    { key: 'condition', header: 'catalogue-a.compatible.column.condition', sortable: true, value: (row) => (row.conditionCode === null ? '' : `${row.conditionCode} · ${this.pick(row.conditionNameEn, row.conditionNameAr)}`) },
-    { key: 'mergesInto', header: 'catalogue-a.compatible.column.mergesInto', sortable: true, value: (row) => this.mergesIntoText(row) },
+  protected readonly columns: readonly TableColumn<SampleCompatibilityGroupView>[] = [
+    { key: 'code', header: 'catalogue-a.compatible.column.code', mono: true, sortable: true, width: '140px' },
+    { key: 'name', header: 'catalogue-a.compatible.column.name', sortable: true, sortKey: localizedSortKey('name'), value: (row) => this.pick(row.nameEn, row.nameAr) },
+    { key: 'members', header: 'catalogue-a.compatible.column.members', value: (row) => row.members.map((member) => this.memberText(member)).join(', ') },
   ];
 
   constructor() {
@@ -69,68 +77,101 @@ export class CompatibleConditionsPage {
     this.facade.refresh();
   }
 
-  protected readonly exportCsv = (): Promise<void> => {
+  protected readonly exportCsv = async (): Promise<void> => {
+    const rows = await this.facade.exportRows();
     const t = (key: string): string => this.i18n.t(`catalogue-a.compatible.column.${key}`);
     downloadCsv(
-      csvFileName('compatible-sample-conditions'),
-      toCsv(this.facade.rows(), [
-        { header: t('typeCode'), value: (row) => row.typeCode },
-        { header: t('sampleType'), value: (row) => this.pick(row.typeNameEn, row.typeNameAr) },
-        { header: t('conditionCode'), value: (row) => row.conditionCode ?? '' },
-        { header: t('condition'), value: (row) => (row.conditionCode === null ? '' : this.pick(row.conditionNameEn, row.conditionNameAr)) },
-        { header: t('mergesInto'), value: (row) => this.mergesIntoText(row) },
-        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => yesNo((key) => this.i18n.t(key), row.conditionCode === null ? row.typeActive : row.conditionActive) },
+      csvFileName('compatible-samples'),
+      toCsv(rows, [
+        { header: t('code'), value: (row) => row.code },
+        { header: this.i18n.t('catalogue-a.csv.nameEn'), value: (row) => row.nameEn },
+        { header: this.i18n.t('catalogue-a.csv.nameAr'), value: (row) => row.nameAr },
+        { header: t('members'), value: (row) => row.members.map((member) => this.memberText(member)).join(' | ') },
+        { header: this.i18n.t('catalogue-a.csv.active'), value: (row) => yesNo((key) => this.i18n.t(key), row.isActive) },
       ]),
     );
-    return Promise.resolve();
   };
 
-  /** Only a type with at least two conditions has something to merge. */
-  protected canEditRow(row: CompatibleRow): boolean {
-    return (this.facade.typeOf(row.sampleTypeId)?.conditions.length ?? 0) > 1;
+  protected chips(row: SampleCompatibilityGroupView): readonly CatalogueBChip[] {
+    return row.members.map((member) => ({ key: `${member.sampleTypeId}|${member.sampleConditionId ?? '-'}`, text: this.memberText(member), title: this.memberText(member), inactive: !member.available }));
   }
 
-  protected open(row: CompatibleRow): void {
-    if (!this.permissionsService.can(CATALOGUE_A_PERMISSIONS.edit) || !this.canEditRow(row)) {
-      return;
-    }
+  protected memberText(member: CompatibilityMemberView): string {
+    const type = this.pick(member.sampleTypeNameEn, member.sampleTypeNameAr);
+    const condition = member.sampleConditionId === null ? this.i18n.t('catalogue-a.compatible.noCondition') : this.pick(member.sampleConditionNameEn ?? '', member.sampleConditionNameAr ?? '');
+    return `${member.priority} · ${type} · ${condition}`;
+  }
 
-    this.facade.save.reset();
-    this.editing.set(this.facade.typeOf(row.sampleTypeId));
+  protected openCreate(): void {
+    this.facade.create.reset();
+    this.editing.set(null);
     this.drawerOpen.set(true);
   }
 
-  protected async save(pairs: readonly SampleConditionPairItem[]): Promise<void> {
-    const type = this.editing();
-    if (type === null || this.facade.save.pending()) {
+  protected openEdit(row: SampleCompatibilityGroupView): void {
+    if (!this.permissionsService.can(CATALOGUE_A_PERMISSIONS.edit)) {
       return;
     }
 
-    await this.facade.save.execute({ sampleTypeId: type.id, pairs });
-    if (this.facade.save.problem() === null) {
+    this.facade.update.reset();
+    this.editing.set(row);
+    this.drawerOpen.set(true);
+  }
+
+  protected loadConditions(sampleTypeId: string): void {
+    void this.facade.loadConditions(sampleTypeId);
+  }
+
+  protected saving(): boolean {
+    return this.facade.create.pending() || this.facade.update.pending();
+  }
+
+  protected saveProblem(): ProblemDetails | null {
+    return this.editing() === null ? this.facade.create.problem() : this.facade.update.problem();
+  }
+
+  protected async save(request: CreateSampleCompatibilityGroupRequest): Promise<void> {
+    if (this.saving()) {
+      return;
+    }
+
+    const editing = this.editing();
+    const done =
+      editing === null
+        ? (await this.facade.create.execute(request)) !== null
+        : (await this.facade.update.execute({ id: editing.id, request: { nameEn: request.nameEn, nameAr: request.nameAr, members: request.members } })) !== null;
+    if (done) {
       this.toast.success(this.i18n.t('catalogue-a.compatible.saved'));
       this.drawerOpen.set(false);
     }
   }
 
-  protected onClosed(): void {
-    this.editing.set(null);
-    this.facade.save.reset();
-  }
-
-  protected rowStatus(row: CompatibleRow): string {
-    return (row.conditionCode === null ? row.typeActive : row.conditionActive && row.typeActive) ? 'Active' : 'Inactive';
-  }
-
-  protected mergesIntoText(row: CompatibleRow): string {
-    if (row.conditionCode === null) {
-      return this.i18n.t('catalogue-a.compatible.noConditions');
+  protected async toggleActive(row: SampleCompatibilityGroupView): Promise<void> {
+    const key = row.isActive ? 'confirmDeactivate' : 'confirmActivate';
+    const confirmed = await this.confirm.confirm({ title: this.i18n.t(`catalogue-a.${key}.title`), message: this.i18n.tf(`catalogue-a.${key}.message`, { code: row.code }), danger: row.isActive });
+    if (!confirmed) {
+      return;
     }
 
-    return row.targetCode === null ? this.i18n.t('catalogue-a.compatible.ownSample') : `${row.targetCode} · ${this.pick(row.targetNameEn, row.targetNameAr)}`;
+    if ((await this.facade.activation.execute({ id: row.id, active: !row.isActive })) !== null) {
+      this.toast.success(this.i18n.t(row.isActive ? 'catalogue-a.deactivated' : 'catalogue-a.activated'));
+      return;
+    }
+
+    const problem = this.facade.activation.problem();
+    this.toast.error(problem ? problemMessage(this.i18n, 'catalogue-a.compatible', problem) : this.i18n.t('shared.error.generic'));
   }
 
-  private pick(en: string | null, ar: string | null): string {
-    return localizedPick({ en: en ?? '', ar: ar ?? '' }, this.i18n.lang());
+  protected onStatusFilter(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.facade.setActiveFilter(value === 'all' ? null : value === 'active');
+  }
+
+  protected onClosed(): void {
+    this.editing.set(null);
+  }
+
+  private pick(en: string, ar: string): string {
+    return localizedPick({ en, ar }, this.i18n.lang());
   }
 }

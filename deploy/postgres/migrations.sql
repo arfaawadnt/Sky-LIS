@@ -7294,5 +7294,137 @@ BEGIN
     VALUES ('20261026105529_ReviewerRound3', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    ALTER TABLE app.sample_conditions DROP CONSTRAINT fk_sample_conditions_merges_into;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    DROP INDEX app.ix_sample_conditions_tenant_id_merges_into_condition_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    ALTER TABLE app.sample_conditions DROP COLUMN merges_into_condition_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    CREATE TABLE app.sample_compatibility_groups (
+        id uuid NOT NULL,
+        tenant_id uuid NOT NULL,
+        code character varying(20) NOT NULL,
+        name_en character varying(400) NOT NULL,
+        name_ar character varying(400) NOT NULL,
+        is_active boolean NOT NULL,
+        revision integer NOT NULL,
+        created_at_utc timestamp with time zone NOT NULL,
+        created_by_user_id uuid,
+        created_by_display_name character varying(200),
+        modified_at_utc timestamp with time zone,
+        modified_by_user_id uuid,
+        modified_by_display_name character varying(200),
+        CONSTRAINT pk_sample_compatibility_groups PRIMARY KEY (tenant_id, id)
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    CREATE TABLE app.sample_compatibility_members (
+        id uuid NOT NULL,
+        tenant_id uuid NOT NULL,
+        group_id uuid NOT NULL,
+        sample_type_id uuid NOT NULL,
+        sample_condition_id uuid,
+        priority integer NOT NULL,
+        CONSTRAINT pk_sample_compatibility_members PRIMARY KEY (tenant_id, id),
+        CONSTRAINT fk_sample_compatibility_members_sample_compatibility_groups_te FOREIGN KEY (tenant_id, group_id) REFERENCES app.sample_compatibility_groups (tenant_id, id) ON DELETE CASCADE,
+        CONSTRAINT fk_sample_compatibility_members_sample_condition FOREIGN KEY (tenant_id, sample_condition_id) REFERENCES app.sample_conditions (tenant_id, id) ON DELETE RESTRICT,
+        CONSTRAINT fk_sample_compatibility_members_sample_type FOREIGN KEY (tenant_id, sample_type_id) REFERENCES app.sample_types (tenant_id, id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    CREATE UNIQUE INDEX ix_sample_compatibility_groups_tenant_id_code ON app.sample_compatibility_groups (tenant_id, code);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    CREATE INDEX ix_sample_compatibility_members_sample ON app.sample_compatibility_members (tenant_id, sample_type_id, sample_condition_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    CREATE INDEX ix_sample_compatibility_members_tenant_id_sample_condition_id ON app.sample_compatibility_members (tenant_id, sample_condition_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    CREATE UNIQUE INDEX ux_sample_compatibility_members_pair ON app.sample_compatibility_members (tenant_id, group_id, sample_type_id, sample_condition_id) NULLS NOT DISTINCT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    ALTER TABLE app.sample_compatibility_groups ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE app.sample_compatibility_groups FORCE ROW LEVEL SECURITY;
+    CREATE POLICY tenant_isolation ON app.sample_compatibility_groups
+        USING (
+            tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid
+            OR current_setting('app.bypass_rls', true) = 'on'
+        )
+        WITH CHECK (
+            tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid
+            OR current_setting('app.bypass_rls', true) = 'on'
+        );
+    ALTER TABLE app.sample_compatibility_members ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE app.sample_compatibility_members FORCE ROW LEVEL SECURITY;
+    CREATE POLICY tenant_isolation ON app.sample_compatibility_members
+        USING (
+            tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid
+            OR current_setting('app.bypass_rls', true) = 'on'
+        )
+        WITH CHECK (
+            tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid
+            OR current_setting('app.bypass_rls', true) = 'on'
+        );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    ALTER TABLE app.sample_compatibility_members ADD CONSTRAINT ck_sample_compatibility_members_priority CHECK (priority > 0);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026174815_CompatibilityGroups') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261026174815_CompatibilityGroups', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

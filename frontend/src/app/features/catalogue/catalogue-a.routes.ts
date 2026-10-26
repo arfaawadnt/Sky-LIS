@@ -3,8 +3,8 @@ import type { CanDeactivateFn, Routes } from '@angular/router';
 import type { ServiceSequencePage } from './pages-a/service-sequence.page';
 import { CatalogueAOptions } from './state-a/catalogue-a-options';
 import { ServicesListFacade, TestsListFacade } from './state-a/catalogue-lists.facade';
-import { CompatibleConditionsFacade } from './state-a/compatible-conditions.facade';
 import { ServiceEditorFacade } from './state-a/service-editor.facade';
+import { SampleCompatibilityFacade } from './state-a/sample-compatibility.facade';
 import { ServiceSequenceFacade } from './state-a/service-sequence.facade';
 import { TestEditorFacade } from './state-a/test-editor.facade';
 
@@ -19,8 +19,8 @@ const leaveSequence: CanDeactivateFn<ServiceSequencePage> = (page) => page.canLe
 export const CATALOGUE_A_ROUTES: Routes = [
   { path: 'clinical-groups', loadComponent: () => import('./pages-a/clinical-groups.page').then((m) => m.ClinicalGroupsPage) },
   { path: 'sample-types', loadComponent: () => import('./pages-a/sample-types.page').then((m) => m.SampleTypesPage) },
-  // LIS-CR-015 M4: compatible sample conditions (a condition whose tests join another condition's tube in the same visit)
-  { path: 'compatible-conditions', providers: [CompatibleConditionsFacade], loadComponent: () => import('./pages-a/compatible-conditions.page').then((m) => m.CompatibleConditionsPage) },
+  // LIS-CR-015 M4: compatible samples (groups of sample types / conditions whose tests share one sample in a visit)
+  { path: 'compatible-conditions', providers: [SampleCompatibilityFacade], loadComponent: () => import('./pages-a/compatible-conditions.page').then((m) => m.CompatibleConditionsPage) },
   { path: 'units', loadComponent: () => import('./pages-a/units.page').then((m) => m.UnitsPage) },
   { path: 'patient-conditions', loadComponent: () => import('./pages-a/patient-conditions.page').then((m) => m.PatientConditionsPage) },
   {

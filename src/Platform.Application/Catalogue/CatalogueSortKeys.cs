@@ -11,6 +11,7 @@ public static class CatalogueSortKeys
 {
     public static readonly SortKeys ClinicalGroups = new("code", "nameEn", "nameAr", "displayOrder");
     public static readonly SortKeys SampleTypes = new("code", "nameEn", "nameAr");
+    public static readonly SortKeys SampleCompatibilityGroups = new("code", "nameEn", "nameAr");
     public static readonly SortKeys Units = new("name");
     public static readonly SortKeys PatientConditions = new("nameEn", "nameAr");
     public static readonly SortKeys Services = new("sequence", "code", "nameEn", "nameAr");
