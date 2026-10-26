@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.23.0** · released 2026-10-26 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.23.1** · released 2026-10-26 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -234,6 +234,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.23.1 — 2026-10-26
 
 - **Service start after a reboot** (incident of 2026-10-26 on WIN-9S2KO4FA64L: the machine rebooted at 11:04, `NTLIS` failed to
   start at 11:08 with the service-controller events 7009 / 7000, "timeout 30000 ms waiting for the service to connect", and
