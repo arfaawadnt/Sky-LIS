@@ -235,7 +235,8 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Installation record**: WIN-9S2KO4FA64L upgraded to 0.26.0 on 2026-10-26 (`docs/deploy/Installations.md`): migration
+  `CompatibilityGroups` applied with the API stopped, configuration unchanged, smoke test 20 / 20 by name and by IP.
 
 ### v0.26.0 — 2026-10-26
 
