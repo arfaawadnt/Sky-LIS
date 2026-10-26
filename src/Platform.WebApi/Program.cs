@@ -22,6 +22,7 @@ builder.Services.AddSingleton(provider => SecurityConfiguration.ReadOptions(prov
 builder.Services.AddSingleton(provider => SecurityConfiguration.ReadSessionPolicy(provider.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton(provider => SecurityConfiguration.ReadOutbox(provider.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton(provider => SecurityConfiguration.ReadNotifications(provider.GetRequiredService<IConfiguration>()));   // pickup directory, SMTP, HTTP SMS
+builder.Services.AddHostedService<StartupGuardsHostedService>();   // first hosted service: forbidden keys, ConfigGuard, bind guard, relaxation event, database target and role guard — after the SCM connects, before the server listens (WebApiHardeningTests)
 builder.Services.AddHostedService<OutboxHostedService>();   // 01 §7; Lis:Outbox:Enabled=false keeps the loop idle
 builder.Services.AddSingleton(provider => SecurityConfiguration.ReadWalletCharge(provider.GetRequiredService<IConfiguration>()));
 builder.Services.AddHostedService<WalletChargeHostedService>();   // W2 monthly subscription charge; Lis:Jobs:WalletCharge:Enabled=false keeps it idle
@@ -47,8 +48,6 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 var app = builder.Build();
-
-await StartupGuards.RunAsync(app);   // forbidden keys, ConfigGuard, bind guard, relaxation event, database target and role guard
 
 // The pipeline is the sequence of 02 §5.4, applied from data so it cannot drift (WebApiHardeningTests).
 foreach (var step in PipelineOrder.Sequence)

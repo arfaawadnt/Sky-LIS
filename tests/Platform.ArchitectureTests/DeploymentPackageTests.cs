@@ -223,6 +223,8 @@ public sealed partial class DeploymentPackageTests
         Assert.Contains("ASPNETCORE_ENVIRONMENT=Production", api, StringComparison.Ordinal);
         Assert.Contains("Microsoft.Extensions.Hosting.WindowsServices.dll", api, StringComparison.Ordinal);
         Assert.Contains("/health/ready", api, StringComparison.Ordinal);
+        Assert.Contains("[string[]] $DependsOn", api, StringComparison.Ordinal);   // the database service starts first at boot (2026-10-26)
+        Assert.Contains("'depend=', ($DependsOn -join '/')", api, StringComparison.Ordinal);
 
         var site = File.ReadAllText(Path.Combine(WindowsFolder, "install-ui-site.ps1"));
         Assert.Contains("'lis-ui-test'", site, StringComparison.Ordinal);

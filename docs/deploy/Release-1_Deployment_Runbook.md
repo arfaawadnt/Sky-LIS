@@ -236,7 +236,10 @@ the scripts at hand; the scripts contain no secret. Replicate `E:\lis-backups` o
 4. **Stop the API** so no request runs across the schema change: `Stop-Service NTLIS`.
 5. **Migrations**: `psql -U lis_owner -d lis -v ON_ERROR_STOP=1 -f migrations.sql` with `PGCLIENTENCODING=UTF8` (idempotent; applies only what is missing).
 6. **Service**: `install-api-service.ps1 -PackagePath …\api` (no `-ConfigSource` unless the configuration changed; the
-   script keeps the current build as `app.previous`, installs, starts and waits for `/health/ready`).
+   script keeps the current build as `app.previous`, installs, starts and waits for `/health/ready`). When the database
+   runs on the same host as a Windows service, pass `-DependsOn <its service name>` (`LIS_POSTGRES` for the private
+   instance) once: the service controller then starts the API after the database at boot (the dependency is kept by
+   later installs that omit the parameter).
 7. **Site**: `install-ui-site.ps1 -PackagePath …\ui -HostHeader … -CertificateThumbprint …` (previous content kept).
 8. **Smoke test** (§5.6). Sign in once in a browser.
 9. **Rollback**, if needed, in this order:

@@ -67,44 +67,53 @@ public static class StartupGuards
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
-    public static async Task RunAsync(WebApplication app)
+    /// <summary>
+    /// Runs every guard against the built host. Called from <see cref="StartupGuardsHostedService"/>, the first hosted
+    /// service, so that under the Windows service lifetime the process has already reported itself to the service
+    /// controller before any database or configuration work begins (SCM start timeout, 2026-10-26).
+    /// </summary>
+    public static async Task RunAsync(IServiceProvider services, IConfiguration configuration, IHostEnvironment environment, ILogger logger, IEnumerable<string> serverUrls, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(app);
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(serverUrls);
 
-        RefuseForbiddenKeys(app.Configuration);
-        ConfigGuard.Enforce(app.Services.GetRequiredService<SecurityOptions>(), app.Services.GetRequiredService<SessionPolicy>());
-        var notifications = app.Services.GetRequiredService<NotificationOptions>();
-        ConfigGuard.EnforceNotifications(notifications, app.Environment.IsProduction());
-        ConfigGuard.EnforcePortalBaseUrl(app.Configuration[ConfigGuard.PortalBaseUrlKey], app.Environment.IsProduction());   // LIS-CR-005
+        RefuseForbiddenKeys(configuration);
+        ConfigGuard.Enforce(services.GetRequiredService<SecurityOptions>(), services.GetRequiredService<SessionPolicy>());
+        var notifications = services.GetRequiredService<NotificationOptions>();
+        ConfigGuard.EnforceNotifications(notifications, environment.IsProduction());
+        ConfigGuard.EnforcePortalBaseUrl(configuration[ConfigGuard.PortalBaseUrlKey], environment.IsProduction());   // LIS-CR-005
         if (notifications.RevealCodes)
         {
-            app.Logger.LogWarning("{Key} is on: one-time codes of the subscription wizard are shown on the page (interim until an SMS gateway is configured)", NotificationOptions.RevealCodesKey);
+            logger.LogWarning("{Key} is on: one-time codes of the subscription wizard are shown on the page (interim until an SMS gateway is configured)", NotificationOptions.RevealCodesKey);
         }
 
-        var bindViolations = InspectBindings(ConfiguredBindings(app.Configuration).Concat(app.Urls));
+        var bindViolations = InspectBindings(ConfiguredBindings(configuration).Concat(serverUrls));
         if (bindViolations.Count > 0)
         {
             throw new SecurityConfigurationException(bindViolations);
         }
 
-        var postgres = SecurityConfiguration.ReadConnectionString(app.Configuration)
+        var postgres = SecurityConfiguration.ReadConnectionString(configuration)
             ?? throw new InvalidOperationException($"{SecurityConfiguration.ConnectionStringKey} is required. Set it with 'dotnet user-secrets set' or the Lis__Database__ConnectionString environment variable.");
 
-        using var scope = app.Services.CreateScope();
+        using var scope = services.CreateScope();
         var events = scope.ServiceProvider.GetRequiredService<ISecurityEventLog>();
-        if (app.Services.GetRequiredService<HostSecuritySettings>().AllowInsecureLocalDevelopment)
+        if (services.GetRequiredService<HostSecuritySettings>().AllowInsecureLocalDevelopment)
         {
-            await events.WriteAsync(new SecurityEvent(SecurityEvents.SecurityRelaxationActive, SecurityEvent.Error, Detail: "Lis:Security:AllowInsecureLocalDevelopment"), CancellationToken.None);
+            await events.WriteAsync(new SecurityEvent(SecurityEvents.SecurityRelaxationActive, SecurityEvent.Error, Detail: "Lis:Security:AllowInsecureLocalDevelopment"), cancellationToken);
         }
 
         try
         {
-            await DatabaseRoleGuard.EnforceAsync(postgres, CancellationToken.None);
-            app.Logger.LogInformation("database target {Target}", DatabaseRoleGuard.Describe(postgres));
+            await DatabaseRoleGuard.EnforceAsync(postgres, cancellationToken);
+            logger.LogInformation("database target {Target}", DatabaseRoleGuard.Describe(postgres));
         }
         catch (InvalidOperationException exception)
         {
-            await events.WriteAsync(new SecurityEvent(SecurityEvents.RoleGuardViolation, SecurityEvent.Error, Detail: exception.Message), CancellationToken.None);
+            await events.WriteAsync(new SecurityEvent(SecurityEvents.RoleGuardViolation, SecurityEvent.Error, Detail: exception.Message), cancellationToken);
             throw;
         }
     }

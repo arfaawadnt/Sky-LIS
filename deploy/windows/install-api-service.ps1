@@ -14,6 +14,10 @@
     The service runs as the virtual account NT SERVICE\<service> (no password to manage), delayed-auto start, restart
     on failure, with ASPNETCORE_ENVIRONMENT=Production pinned in its own environment block so that it never inherits
     another application's machine-wide value. Kestrel stays on loopback (5100 production, 5180 test); IIS proxies.
+    -DependsOn names the services that must be running first (the local PostgreSQL service when the database is on
+    the same host, e.g. LIS_POSTGRES): the service controller then starts the API after them at boot. The process
+    reports itself to the controller before its start-up guards run (StartupGuardsHostedService), so a slow cold
+    start no longer trips the controller's 30 s start timeout (found 2026-10-26).
 
     The script is idempotent and supports -WhatIf (prints the plan, touches nothing). It refuses a package whose host
     is not service-aware (Microsoft.Extensions.Hosting.WindowsServices.dll missing), a configuration that still carries
@@ -31,6 +35,9 @@
     Default C:\lis-app.
 .PARAMETER Rollback
     Swap app.previous back into place and restart (no package needed).
+.PARAMETER DependsOn
+    Service names the API service depends on (sc.exe depend=); each must exist on this host. Given, they replace the
+    dependencies of an existing service; omitted, an existing service keeps its dependencies.
 .PARAMETER NoStart
     Install without starting the service.
 .PARAMETER HealthTimeoutSeconds
@@ -61,6 +68,9 @@ param(
     [string] $InstallRoot = 'C:\lis-app',
 
     [switch] $NoStart,
+
+    [ValidatePattern('^[A-Za-z0-9_.-]+$')]
+    [string[]] $DependsOn = @(),
 
     [ValidateRange(10, 900)]
     [int] $HealthTimeoutSeconds = 120
@@ -330,13 +340,20 @@ if ($PSCmdlet.ShouldProcess($appDir, "Copy package $PackagePath")) {
 
 # --- service ------------------------------------------------------------------------------------------------------
 $binPath = "`"$exe`""
+# sc.exe takes the dependencies as one forward-slash separated list; each must be an installed service or the start fails (1075).
+foreach ($dependency in $DependsOn) {
+    if (-not (Get-ServiceOrNull $dependency)) { throw "-DependsOn names '$dependency', which is not a service of this host." }
+}
+$dependencyArguments = @()
+if ($DependsOn.Count -gt 0) { $dependencyArguments = @('depend=', ($DependsOn -join '/')) }
+$dependencyText = if ($DependsOn.Count -gt 0) { ", depends on $($DependsOn -join ', ')" } else { '' }
 if (-not $existing) {
-    if ($PSCmdlet.ShouldProcess($serviceName, "Create service ($binPath, $serviceAccount, delayed-auto)")) {
-        Invoke-Sc @('create', $serviceName, 'binPath=', $binPath, 'start=', 'delayed-auto', 'obj=', $serviceAccount, 'DisplayName=', $displayName) | Out-Null
+    if ($PSCmdlet.ShouldProcess($serviceName, "Create service ($binPath, $serviceAccount, delayed-auto$dependencyText)")) {
+        Invoke-Sc (@('create', $serviceName, 'binPath=', $binPath, 'start=', 'delayed-auto', 'obj=', $serviceAccount, 'DisplayName=', $displayName) + $dependencyArguments) | Out-Null
     }
 } else {
-    if ($PSCmdlet.ShouldProcess($serviceName, "Update service ($binPath, $serviceAccount, delayed-auto)")) {
-        Invoke-Sc @('config', $serviceName, 'binPath=', $binPath, 'start=', 'delayed-auto', 'obj=', $serviceAccount, 'DisplayName=', $displayName) | Out-Null
+    if ($PSCmdlet.ShouldProcess($serviceName, "Update service ($binPath, $serviceAccount, delayed-auto$dependencyText)")) {
+        Invoke-Sc (@('config', $serviceName, 'binPath=', $binPath, 'start=', 'delayed-auto', 'obj=', $serviceAccount, 'DisplayName=', $displayName) + $dependencyArguments) | Out-Null
     }
 }
 if ($PSCmdlet.ShouldProcess($serviceName, 'Set description, failure actions and environment')) {

@@ -246,7 +246,10 @@ QMS source is never read or copied (section 1); everything here is written from 
   limits follow the 02 §5.2 matrix (policies `credential-account`, `credential-challenge`, `refresh`, global chain),
   in-process counters. Endpoints: `GET/POST /api/v1/auth/{credential-challenge,sign-in,refresh,sign-out,me}`,
   `/.well-known/jwks.json`, `/health/{live,ready}`. Every setting is read lazily from `IConfiguration` (a test host
-  injects configuration at `Build()`); `StartupGuards.RunAsync` enforces forbidden keys, ConfigGuard, loopback bind,
+  injects configuration at `Build()`); `StartupGuardsHostedService` (the first hosted service, a plain `IHostedService`: under
+  `UseWindowsService` the host connects to the service controller before it starts hosted services, and work placed before `app.Run()`
+  exceeded the controller's 30 s start timeout on a cold boot, 2026-10-26; gate in WebApiHardeningTests) runs `StartupGuards.RunAsync`,
+  which enforces forbidden keys, ConfigGuard, loopback bind,
   relaxation event and `DatabaseRoleGuard`. Secrets and rotation runbooks: `deploy/SECRETS.md`; dev secrets:
   `node scripts/new-dev-secrets.mjs` (user-secrets store). Security events currently go to the structured log
   (`LoggerSecurityEventLog`) until the audit ledger lands.

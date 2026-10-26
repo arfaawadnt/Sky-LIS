@@ -3,6 +3,7 @@ using System.Text.Json;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using Platform.Application.Identity;
 using Platform.Application.Settings.Commands;
@@ -77,6 +78,27 @@ public sealed class WebApiHardeningTests
         Assert.Contains("foreach (var step in PipelineOrder.Sequence)", program, StringComparison.Ordinal);
         Assert.Contains("Filters.Add<CredentialTransportFilter>()", program, StringComparison.Ordinal);
         Assert.DoesNotContain("app.UseCors", program, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Under the Windows service lifetime the host connects to the service controller when it starts; work placed before
+    /// <c>app.Run()</c> counts against the controller's 30 s start timeout and left NTLIS stopped after a reboot
+    /// (2026-10-26). The guards therefore run inside the first hosted service, as a plain IHostedService whose refusal
+    /// still fails the start.
+    /// </summary>
+    [Fact]
+    public void The_start_up_guards_run_inside_the_first_hosted_service_not_before_the_host_starts()
+    {
+        var program = File.ReadAllText(Path.Combine(WebApiFolder, "Program.cs"));
+        Assert.DoesNotContain("StartupGuards.RunAsync(", program, StringComparison.Ordinal);
+
+        var registrations = System.Text.RegularExpressions.Regex.Matches(program, @"AddHostedService<(\w+)>\(\)").Select(match => match.Groups[1].Value).ToList();
+        Assert.NotEmpty(registrations);
+        Assert.Equal(nameof(StartupGuardsHostedService), registrations[0]);
+        Assert.Single(registrations, nameof(StartupGuardsHostedService));
+
+        Assert.True(typeof(IHostedService).IsAssignableFrom(typeof(StartupGuardsHostedService)));
+        Assert.False(typeof(BackgroundService).IsAssignableFrom(typeof(StartupGuardsHostedService)), "a BackgroundService returns from StartAsync before its work completes; a refusing guard would not stop the host");
     }
 
     [Fact]

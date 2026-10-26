@@ -181,7 +181,7 @@ and `/.well-known` to the service on the same origin (URL Rewrite + ARR), and Po
 | Script | Purpose |
 | --- | --- |
 | `publish.ps1` | builds `publish/<version>/{api,tools,ui}` + `manifest.json` from `VERSION` (build box) |
-| `install-api-service.ps1` | installs or updates `NTLIS` (`-Test`: `NTLIS_TEST` on 5180), validates `appsettings.Production.json`, health probe, `-Rollback` |
+| `install-api-service.ps1` | installs or updates `NTLIS` (`-Test`: `NTLIS_TEST` on 5180), validates `appsettings.Production.json`, health probe, `-DependsOn` (service dependencies, e.g. `LIS_POSTGRES`), `-Rollback` |
 | `install-ui-site.ps1` | installs or updates `lis-ui` (`-Test`: `lis-ui-test` on 8081) with `web.config` (SPA fallback, proxy, headers, caching), `-Rollback` |
 | `backup-database.ps1`, `restore-database.ps1` | `pg_dump -Fc` into `E:\lis-backups` with retention; restore into a named `lis*` database for drills |
 | `smoke-test.ps1` | health, JWKS, SPA and proxy checks after a deployment |
@@ -235,7 +235,18 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Service start after a reboot** (incident of 2026-10-26 on WIN-9S2KO4FA64L: the machine rebooted at 11:04, `NTLIS` failed to
+  start at 11:08 with the service-controller events 7009 / 7000, "timeout 30000 ms waiting for the service to connect", and
+  stayed stopped until it was started by hand at 11:46). Cause: under `UseWindowsService` the host reports itself to the
+  service controller only when `app.Run()` starts, and everything placed before it — the start-up guards with their
+  database round trip — counted against the controller's 30 s start timeout, which a cold start on the rebooting VM
+  exceeded (a warm start takes 4 s). Fix: `StartupGuardsHostedService`, the first hosted service of the process (a plain
+  `IHostedService`, so a refusing guard still fails the start), runs `StartupGuards.RunAsync` after the controller has
+  been told the service is starting and before the server listens; gate
+  `WebApiHardeningTests.The_start_up_guards_run_inside_the_first_hosted_service_not_before_the_host_starts`.
+- **Installer** `install-api-service.ps1 -DependsOn <service,…>` (`sc.exe depend=`; each name must be an installed service):
+  the API service starts after the named services at boot — `LIS_POSTGRES` on a host that runs the private PostgreSQL
+  instance. Omitted, an existing service keeps its dependencies. Gate in `DeploymentPackageTests`.
 
 ### v0.23.0 — 2026-10-26
 
