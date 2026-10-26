@@ -1,6 +1,6 @@
 # Sky LIS
 
-<!-- version:start -->**Version 0.23.2** · released 2026-10-26 · [release history](#release-history)<!-- version:end -->
+<!-- version:start -->**Version 0.24.0** · released 2026-10-26 · [release history](#release-history)<!-- version:end -->
 
 Sky LIS is National Technology's cloud, multi-tenant **Laboratory Information System**. One web application serves
 two portals:
@@ -234,6 +234,10 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 ## Release history
 
 ### Unreleased
+
+_Nothing yet._
+
+### v0.24.0 — 2026-10-26
 
 - **Lab Tracker Services rows read like the worklist** (CP-69, request of 2026-10-26): the Services table now shows the
   worklist page's columns in its order (patient no., accession, sample, patient, age / sex, service with its clinical group,
