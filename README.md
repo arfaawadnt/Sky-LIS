@@ -235,7 +235,9 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Installation record**: WIN-9S2KO4FA64L upgraded to 0.23.1 on 2026-10-26 (`docs/deploy/Installations.md`), with the
+  reboot incident of the same morning (service left stopped by the 30 s start timeout) and its fix; the service now
+  depends on `LIS_POSTGRES`.
 
 ### v0.23.1 — 2026-10-26
 
