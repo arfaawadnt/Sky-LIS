@@ -38,4 +38,23 @@ public sealed class TrackerController(ISender sender) : ControllerBase
         [FromQuery] string? rows,
         CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetLabTrackerQuery(day, branchId, from, to, stage, attention, view, search, page, pageSize, sort, direction, rows), cancellationToken));
+
+    /// <summary>
+    /// The worklist report of the service rows of the same filter (change request of 2026-10-26): letterhead, period and every
+    /// row in the list's order, at most 2 000; <c>truncated</c> when the filter holds more.
+    /// </summary>
+    [HttpGet("visits/documents/worklist")]
+    public async Task<ActionResult<LabTrackerWorklistDocument>> WorklistDocument(
+        [FromQuery] DateOnly? day,
+        [FromQuery] Guid? branchId,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] string? stage,
+        [FromQuery] string? attention,
+        [FromQuery] string? view,
+        [FromQuery] string? search,
+        [FromQuery] string? sort,
+        [FromQuery] string? direction,
+        CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new GetLabTrackerWorklistDocumentQuery(new GetLabTrackerQuery(day, branchId, from, to, stage, attention, view, search, 1, null, sort, direction, LabTrackerRows.Services)), cancellationToken));
 }

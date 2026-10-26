@@ -41,6 +41,12 @@ export function money(value: number, lang: string): string {
   return new Intl.NumberFormat(locale(lang), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 }
 
+/** The local date and time of an instant (`26/10/2026, 09:42`), as the worklist shows its times. */
+export function dateTime(iso: string, lang: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : new Intl.DateTimeFormat(locale(lang), { dateStyle: 'short', timeStyle: 'short' }).format(date);
+}
+
 /** The local time of an instant (`09:42`). */
 export function clockTime(iso: string, lang: string): string {
   const date = new Date(iso);

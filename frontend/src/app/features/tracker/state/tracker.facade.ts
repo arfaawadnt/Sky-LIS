@@ -14,6 +14,7 @@ import {
   TRACKER_LANES,
 } from '../../../core/api/tracker.contracts';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { mutation } from '../../../core/state/mutation';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { sortParams } from '../../../shared/forms/paging';
 import { type SortKeyMap, type TableSort, serverSortOf } from '../../../shared/ui/data-table/data-table.types';
@@ -48,18 +49,31 @@ export function defaultTrackerFilter(): TrackerFilter {
 
 /**
  * The server keys of the sortable table columns (allow-list `timeLeft`, `registeredAt`, `accession`, `patient`, `stage`;
- * `service` with service rows only, LIS-CR-014 T3).
+ * with service rows also `service`, `status`, `expected`, `delay`: LIS-CR-014 T3 and the worklist columns of 2026-10-26).
  */
 export const TRACKER_SORT_KEYS: SortKeyMap = {
   visit: 'accession',
-  service: 'service',
   registration: 'registeredAt',
   nextStep: 'stage',
   timeLeft: 'timeLeft',
+  accession: 'accession',
+  patient: 'patient',
+  service: 'service',
+  status: 'status',
+  expected: 'expected',
+  delay: 'delay',
 };
 
-/** The table column that sorts by the service code: only with service rows. */
-export const SERVICE_SORT_COLUMN = 'service';
+/** The sortable columns of each row mode: the visit table and the worklist-like service table share none. */
+const SORT_COLUMNS: Readonly<Record<TrackerRowMode, readonly string[]>> = {
+  visits: ['visit', 'registration', 'nextStep', 'timeLeft'],
+  services: ['accession', 'patient', 'service', 'status', 'expected', 'delay'],
+};
+
+/** True when a column orders the table of that row mode (a URL or a mode switch never keeps another table's order). */
+export function sortColumnFits(key: string, rows: TrackerRowMode): boolean {
+  return SORT_COLUMNS[rows].includes(key);
+}
 
 /** Everything the tracker keeps in its URL (LIS-CR-014 T5): the filter with its rows mode and page, the column order and the layout. */
 export interface TrackerUrlState {
@@ -154,6 +168,9 @@ export class TrackerFacade {
     const filter = this.filter();
     return { day: filter.day, from: filter.from, to: filter.to, branchId: null, attention: filter.attention, view: filter.view, search: filter.search };
   });
+
+  /** The worklist report of the service rows of the current filter and order (change request of 2026-10-26). */
+  readonly worklistDocument = mutation(() => this.api.worklistDocument(this.query()));
 
   readonly list = resource({
     params: () => (this.layout() === 'table' ? this.query() : undefined),
@@ -255,13 +272,14 @@ export class TrackerFacade {
     this.layout.set(layout);
   }
 
-  /** *Visits | Services* (LIS-CR-014 T3): the other rows start at page 1; the service-code order has no meaning for visits. */
+  /** *Visits | Services* (LIS-CR-014 T3): the other rows start at page 1; an order of the other table's columns is dropped. */
   setRows(rows: TrackerRowMode): void {
     if (rows === this.filter().rows) {
       return;
     }
 
-    if (rows === 'visits' && this.sort()?.key === SERVICE_SORT_COLUMN) {
+    const sort = this.sort();
+    if (sort !== null && !sortColumnFits(sort.key, rows)) {
       this.sort.set(null);
     }
 

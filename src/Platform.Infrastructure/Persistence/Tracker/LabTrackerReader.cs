@@ -149,7 +149,7 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
         ),
         result_rows AS (
             SELECT f.top_id, r.id, r.tube_id, r.status, r.is_panic, r.delta_flag, r.test_id, r.service_sequence, r.member_order,
-                   r.clock_start_utc, r.expected_at_utc,
+                   r.clock_start_utc, r.expected_at_utc, r.verified_at_utc, r.clinical_group_id,
                    r.status IN ('Ordered', 'Complete', 'Reviewed') AS open,
                    (@unrestricted
                     OR r.clinical_group_id = ANY(@all_branch_groups)
@@ -166,7 +166,7 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
             SELECT x.top_id, x.tube_id FROM result_rows x WHERE x.tube_id IS NOT NULL
         ),
         day_samples AS (
-            SELECT s.tube_id, s.status, s.collected_outside, s.rejection_reason_name_en, s.rejection_reason_name_ar, s.rejected_at_utc, s.sample_number
+            SELECT s.tube_id, s.status, s.collected_outside, s.rejection_reason_name_en, s.rejection_reason_name_ar, s.rejected_at_utc, s.sample_number, s.collected_at_utc
             FROM app.samples s
             JOIN day_visits d ON d.tenant_id = s.tenant_id AND d.id = s.visit_id
         ),
@@ -179,7 +179,9 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
                    count(*) FILTER (WHERE s.status = 'Rejected')::int AS rejected,
                    count(*) FILTER (WHERE s.status NOT IN ('Cancelled', 'Replaced') AND s.collected_outside)::int AS outside,
                    (array_agg(s.rejection_reason_name_en ORDER BY s.rejected_at_utc, s.sample_number) FILTER (WHERE s.status = 'Rejected'))[1] AS rejection_en,
-                   (array_agg(s.rejection_reason_name_ar ORDER BY s.rejected_at_utc, s.sample_number) FILTER (WHERE s.status = 'Rejected'))[1] AS rejection_ar
+                   (array_agg(s.rejection_reason_name_ar ORDER BY s.rejected_at_utc, s.sample_number) FILTER (WHERE s.status = 'Rejected'))[1] AS rejection_ar,
+                   (array_agg(s.sample_number ORDER BY s.sample_number) FILTER (WHERE s.status NOT IN ('Cancelled', 'Replaced')))[1] AS first_sample,
+                   min(s.collected_at_utc) FILTER (WHERE s.status NOT IN ('Cancelled', 'Replaced')) AS first_collected
             FROM line_tubes t
             JOIN day_samples s ON s.tube_id = t.tube_id
             GROUP BY t.top_id
@@ -203,7 +205,11 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
                    array_agg(x.clock_start_utc ORDER BY x.expected_at_utc, x.id) FILTER (WHERE x.visible AND x.open) AS vis_starts,
                    array_agg(x.expected_at_utc ORDER BY x.expected_at_utc, x.id) FILTER (WHERE x.visible AND x.open) AS vis_expected,
                    array_agg(x.clock_start_utc ORDER BY x.expected_at_utc, x.id) FILTER (WHERE x.open) AS all_starts,
-                   array_agg(x.expected_at_utc ORDER BY x.expected_at_utc, x.id) FILTER (WHERE x.open) AS all_expected
+                   array_agg(x.expected_at_utc ORDER BY x.expected_at_utc, x.id) FILTER (WHERE x.open) AS all_expected,
+                   (array_agg(x.clinical_group_id ORDER BY x.visible DESC, x.service_sequence, x.member_order, x.id))[1] AS group_id,
+                   (array_agg(x.clock_start_utc ORDER BY x.visible DESC, x.expected_at_utc DESC, x.id) FILTER (WHERE NOT x.open))[1] AS signed_start,
+                   (array_agg(x.expected_at_utc ORDER BY x.visible DESC, x.expected_at_utc DESC, x.id) FILTER (WHERE NOT x.open))[1] AS signed_expected,
+                   (array_agg(x.verified_at_utc ORDER BY x.visible DESC, x.expected_at_utc DESC, x.id) FILTER (WHERE NOT x.open))[1] AS signed_verified
             FROM result_rows x
             GROUP BY x.top_id
         )
@@ -214,12 +220,15 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
                COALESCE(rc.all_ordered, 0), COALESCE(rc.all_complete, 0), COALESCE(rc.all_reviewed, 0), COALESCE(rc.all_verified, 0), COALESCE(rc.all_printed, 0),
                COALESCE(rc.vis_panic, 0), COALESCE(rc.vis_open_panic, 0), COALESCE(rc.vis_delta, 0),
                t.name_en, t.name_ar,
-               rc.vis_starts, rc.vis_expected, rc.all_starts, rc.all_expected
+               rc.vis_starts, rc.vis_expected, rc.all_starts, rc.all_expected,
+               sc.first_sample, sc.first_collected, g.name_en, g.name_ar,
+               rc.signed_start, rc.signed_expected, rc.signed_verified
         FROM app.visit_lines l
         JOIN day_visits d ON d.tenant_id = l.tenant_id AND d.id = l.visit_id
         LEFT JOIN sample_counts sc ON sc.top_id = l.id
         LEFT JOIN result_counts rc ON rc.top_id = l.id
         LEFT JOIN app.tests t ON t.tenant_id = l.tenant_id AND t.id = rc.panic_test_id
+        LEFT JOIN app.clinical_groups g ON g.tenant_id = l.tenant_id AND g.id = rc.group_id
         WHERE l.kind <> 'PackageMember' AND l.status <> 'Cancelled'
         """;
 
@@ -370,8 +379,16 @@ internal sealed class LabTrackerReader(AppDbContext context) : ILabTrackerReader
             Text(29),
             Text(30),
             Clocks(reader, 31, 32),
-            Clocks(reader, 33, 34));
+            Clocks(reader, 33, 34),
+            Text(35),
+            Moment(reader, 36),
+            Text(37),
+            Text(38),
+            Moment(reader, 39) is { } start && Moment(reader, 40) is { } expected ? new SignedResultClock(start, expected, Moment(reader, 41)) : null);
     }
+
+    private static DateTimeOffset? Moment(DbDataReader reader, int ordinal) =>
+        reader.IsDBNull(ordinal) ? null : Instant(reader.GetFieldValue<DateTime>(ordinal));
 
     private static IReadOnlyList<ResultClock> Clocks(DbDataReader reader, int starts, int expected)
     {

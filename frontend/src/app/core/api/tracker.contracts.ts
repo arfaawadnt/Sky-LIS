@@ -4,6 +4,7 @@
  */
 
 import type { SortRequest } from './paging';
+import type { ReportLetterhead } from './results.contracts';
 
 /** The stage of a visit, in the server's order of precedence (CR-006 §0). */
 export type LabTrackerStage = 'Cancelled' | 'AwaitingSample' | 'InLab' | 'AwaitingVerification' | 'Ready' | 'Delivered';
@@ -115,6 +116,24 @@ export interface LabTrackerServiceItem extends LabTrackerItem {
   /** Service | Package. */
   readonly serviceKind: string;
   readonly visitStage: LabTrackerStage;
+  /**
+   * The worklist columns (change request of 2026-10-26: the service rows read like CP-18). The first live sample of the line and
+   * the count of its live samples, its sample status (Rejected while a sample waits for a new one, else the least advanced) and
+   * earliest collection: null / 0 without `samples.view`. The least advanced result and the clinical group: null without
+   * `results.view`. The clock of the unsigned result that has consumed most of its turnaround (all signed: the one expected last,
+   * measured at its verification, state Done): null without results.
+   */
+  readonly sampleNumber?: string | null;
+  readonly sampleCount?: number;
+  readonly sampleStatus?: string | null;
+  readonly collectedAtUtc?: string | null;
+  readonly resultStatus?: string | null;
+  readonly groupNameEn?: string | null;
+  readonly groupNameAr?: string | null;
+  readonly expectedAtUtc?: string | null;
+  readonly delaySeconds?: number | null;
+  readonly consumedPercent?: number | null;
+  readonly turnaroundState?: LabTrackerDelayState | null;
 }
 
 /** The two row modes of the table: one row per visit (default) or one per live top-level service line. */
@@ -158,13 +177,16 @@ export interface LabTrackerPage {
   /** Visits (rows in `items`) or Services (LIS-CR-014 T3: rows in `services`, `items` empty, `totalCount` = service rows). */
   readonly rows?: LabTrackerRowsMode;
   readonly services?: readonly LabTrackerServiceItem[] | null;
+  /** The tenant's delay thresholds (`delayWarnPercent`, `delayLatePercent`) for the service rows' legend. */
+  readonly warnPercent?: number;
+  readonly latePercent?: number;
 }
 
 /**
  * `GET /api/v1/tracker/visits` [registration.view]. `day` = laboratory day `yyyy-MM-dd` (absent = today in the tenant
  * time zone); `from` / `to` (together, laboratory wall-clock `yyyy-MM-ddTHH:mm`, inclusive to the minute, at most 31 days)
  * replace the day; `branchId` absent = the session branch. `sort`: `timeLeft` (default), `registeredAt`, `accession`,
- * `patient`, `stage`.
+ * `patient`, `stage`; with `rows=Services` also `service`, `status`, `expected`, `delay`.
  */
 export interface LabTrackerQuery extends SortRequest {
   readonly day: string | null;
@@ -227,8 +249,23 @@ export const EMPTY_TRACKER_COUNTERS: LabTrackerCounters = {
   readyUnpaid: 0,
 };
 
+/**
+ * The worklist report of the service rows of a filter (`GET …/visits/documents/worklist`, change request of 2026-10-26): the
+ * letterhead, when and by whom it was printed, the period read and the rows in the list's order, at most 2 000.
+ */
+export interface LabTrackerWorklistDocument {
+  readonly letterhead: ReportLetterhead;
+  readonly generatedAtUtc: string;
+  readonly generatedBy: string | null;
+  readonly fromUtc: string;
+  readonly toUtc: string;
+  readonly rows: readonly LabTrackerServiceItem[];
+  readonly truncated: boolean;
+}
+
 export const TRACKER_API = {
   visits: '/api/v1/tracker/visits',
+  worklistDocument: '/api/v1/tracker/visits/documents/worklist',
 } as const;
 
 /** The pages a next step or a row action opens (CR-006 §3, LIS-CR-014 T1). */

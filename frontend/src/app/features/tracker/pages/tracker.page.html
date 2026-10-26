@@ -31,6 +31,11 @@
   <span class="toggles">
     @if (facade.layout() === 'table') {
       <app-tracker-rows-toggle [rows]="facade.filter().rows" (rowsChange)="facade.setRows($event)" />
+      @if (facade.filter().rows === 'services') {
+        <button type="button" class="btn primary sm" [disabled]="facade.worklistDocument.pending()" (click)="printWorklist()">
+          <app-icon name="printer" [size]="15" />{{ i18n.t('tracker.report.print') }}
+        </button>
+      }
     }
     <app-tracker-layout-toggle [layout]="facade.layout()" (layoutChange)="facade.setLayout($event)" />
   </span>
@@ -42,79 +47,86 @@
 
 @if (facade.layout() === 'table') {
   <app-section-card [padded]="false">
-    <app-data-table
-      [columns]="tableColumns()"
-      [rows]="facade.rows()"
-      [rowId]="rowId"
-      [rowClass]="rowClass"
-      [loading]="facade.list.isLoading()"
-      [interactive]="false"
-      [emptyTitle]="i18n.t('tracker.empty')"
-      [emptyMessage]="i18n.t('tracker.emptyHint')"
-      [caption]="i18n.t('tracker.title')"
-      [compact]="true"
-      [sort]="facade.sort()"
-      [serverSort]="true"
-      (sortChange)="facade.setSort($event)"
-      listKey="tracker"
-      selection="multi"
-      [exportable]="true"
-      [printSubtitle]="(facade.filter().from && facade.filter().to ? facade.filter().from + ' – ' + facade.filter().to : (facade.servedDay() ?? today)) + (branchLabel() ? ' · ' + branchLabel() : '')"
-    >
-      <ng-template appCell="visit" [appCellOf]="facade.rows()" let-row>
-        <span class="visit">
-          <a class="link mono" [routerLink]="accessionLink" [queryParams]="{ visitId: row.visitId, returnTo: returnTo() }">{{ row.accession }}</a>
-          @if (row.urgent) {
-            <app-badge tone="bad"><app-icon name="zap" [size]="12" />{{ i18n.t('tracker.urgent') }}</app-badge>
-          }
-        </span>
-        <span class="sub">{{ patient(row) }}</span>
-      </ng-template>
-      <ng-template appCell="service" [appCellOf]="facade.rows()" let-row>
-        <span class="service">{{ service(row) }}</span>
-        @if (visitStage(row); as stage) {
-          <span class="sub">{{ stage }}</span>
-        }
-      </ng-template>
-      <ng-template appCell="registration" [appCellOf]="facade.rows()" let-row>
-        <span class="mono">{{ registeredAt(row) }}</span>
-        <span class="sub">{{ registrationLine(row) }}</span>
-      </ng-template>
-      <ng-template appCell="samples" [appCellOf]="facade.rows()" let-row>
-        <span class="pills">
-          <app-tracker-pill [look]="samples(row)" />
-          @if (outside(row); as ext) {
-            <app-tracker-pill [look]="ext" />
-          }
-        </span>
-      </ng-template>
-      <ng-template appCell="results" [appCellOf]="facade.rows()" let-row>
-        <span class="pills">
-          <app-tracker-pill [look]="results(row)" />
-          @if (row.results; as results) {
-            @if (results.panic > 0) {
-              <app-badge tone="bad" [attr.title]="results.firstPanicTest"><app-icon name="zap" [size]="12" />{{ i18n.t('tracker.flag.panic') }}</app-badge>
+    @if (facade.filter().rows === 'services') {
+      <app-tracker-service-table
+        [rows]="serviceRows()"
+        [loading]="facade.list.isLoading()"
+        [sort]="facade.sort()"
+        [warnPercent]="page()?.warnPercent ?? 80"
+        [latePercent]="page()?.latePercent ?? 100"
+        [returnTo]="returnTo()"
+        [printSubtitle]="printSubtitle()"
+        (sortChange)="facade.setSort($event)"
+      />
+    } @else {
+      <app-data-table
+        [columns]="columns"
+        [rows]="facade.rows()"
+        [rowId]="rowId"
+        [rowClass]="rowClass"
+        [loading]="facade.list.isLoading()"
+        [interactive]="false"
+        [emptyTitle]="i18n.t('tracker.empty')"
+        [emptyMessage]="i18n.t('tracker.emptyHint')"
+        [caption]="i18n.t('tracker.title')"
+        [compact]="true"
+        [sort]="facade.sort()"
+        [serverSort]="true"
+        (sortChange)="facade.setSort($event)"
+        listKey="tracker"
+        selection="multi"
+        [exportable]="true"
+        [printSubtitle]="printSubtitle()"
+      >
+        <ng-template appCell="visit" [appCellOf]="facade.rows()" let-row>
+          <span class="visit">
+            <a class="link mono" [routerLink]="accessionLink" [queryParams]="{ visitId: row.visitId, returnTo: returnTo() }">{{ row.accession }}</a>
+            @if (row.urgent) {
+              <app-badge tone="bad"><app-icon name="zap" [size]="12" />{{ i18n.t('tracker.urgent') }}</app-badge>
             }
-            @if (results.hidden > 0) {
-              <span class="sub">{{ i18n.tc('tracker.results.hidden', results.hidden, { count: count(results.hidden) }) }}</span>
+          </span>
+          <span class="sub">{{ patient(row) }}</span>
+        </ng-template>
+        <ng-template appCell="registration" [appCellOf]="facade.rows()" let-row>
+          <span class="mono">{{ registeredAt(row) }}</span>
+          <span class="sub">{{ registrationLine(row) }}</span>
+        </ng-template>
+        <ng-template appCell="samples" [appCellOf]="facade.rows()" let-row>
+          <span class="pills">
+            <app-tracker-pill [look]="samples(row)" />
+            @if (outside(row); as ext) {
+              <app-tracker-pill [look]="ext" />
             }
-          }
-        </span>
-      </ng-template>
-      <ng-template appCell="payment" [appCellOf]="facade.rows()" let-row>
-        <app-tracker-pill [look]="payment(row)" />
-      </ng-template>
-      <ng-template appCell="nextStep" [appCellOf]="facade.rows()" let-row>
-        <app-tracker-next-step [item]="row" [returnTo]="returnTo()" />
-        <span class="sub">{{ i18n.t('tracker.stage.' + row.stage) }}</span>
-      </ng-template>
-      <ng-template appCell="timeLeft" [appCellOf]="facade.rows()" let-row>
-        <app-tracker-pill [look]="timeLeft(row)" absent="none" />
-      </ng-template>
-      <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
-        <app-tracker-row-actions [item]="row" [returnTo]="returnTo()" />
-      </ng-template>
-    </app-data-table>
+          </span>
+        </ng-template>
+        <ng-template appCell="results" [appCellOf]="facade.rows()" let-row>
+          <span class="pills">
+            <app-tracker-pill [look]="results(row)" />
+            @if (row.results; as results) {
+              @if (results.panic > 0) {
+                <app-badge tone="bad" [attr.title]="results.firstPanicTest"><app-icon name="zap" [size]="12" />{{ i18n.t('tracker.flag.panic') }}</app-badge>
+              }
+              @if (results.hidden > 0) {
+                <span class="sub">{{ i18n.tc('tracker.results.hidden', results.hidden, { count: count(results.hidden) }) }}</span>
+              }
+            }
+          </span>
+        </ng-template>
+        <ng-template appCell="payment" [appCellOf]="facade.rows()" let-row>
+          <app-tracker-pill [look]="payment(row)" />
+        </ng-template>
+        <ng-template appCell="nextStep" [appCellOf]="facade.rows()" let-row>
+          <app-tracker-next-step [item]="row" [returnTo]="returnTo()" />
+          <span class="sub">{{ i18n.t('tracker.stage.' + row.stage) }}</span>
+        </ng-template>
+        <ng-template appCell="timeLeft" [appCellOf]="facade.rows()" let-row>
+          <app-tracker-pill [look]="timeLeft(row)" absent="none" />
+        </ng-template>
+        <ng-template appRowActions [appRowActionsOf]="facade.rows()" let-row>
+          <app-tracker-row-actions [item]="row" [returnTo]="returnTo()" />
+        </ng-template>
+      </app-data-table>
+    }
     @if (page(); as page) {
       <app-paginator [page]="page.page" [pageSize]="page.pageSize" [totalCount]="page.totalCount" (pageChange)="onPage($event)" />
     }

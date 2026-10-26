@@ -235,7 +235,15 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+- **Lab Tracker Services rows read like the worklist** (CP-69, request of 2026-10-26): the Services table now shows the
+  worklist page's columns in its order (patient no., accession, sample, patient, age / sex, service with its clinical group,
+  test status, sample status, collected, expected result, delay, consumed share), its row colours and its legend by the
+  tenant's delay thresholds, with the tracker's row actions, column chooser (list key `tracker-services`), Print and Excel. A
+  line reads its least advanced result and sample, its first sample ("+n" for more) and the clock of the unsigned result that
+  has consumed most of its turnaround (`ServiceWorklistRules`); new server sort keys `status`, `expected`, `delay`.
+- **Print worklist on the Lab Tracker** (Services rows): `GET /api/v1/tracker/visits/documents/worklist` [registration.view]
+  returns every service row of the filter in the list's order (at most 2 000) with the letterhead; printed A4 landscape as the
+  worklist page's bench list, with an empty result box per row.
 
 ### v0.23.2 — 2026-10-26
 

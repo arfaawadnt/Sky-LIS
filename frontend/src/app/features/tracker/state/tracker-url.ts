@@ -1,7 +1,7 @@
 import { TRACKER_ATTENTION, type LabTrackerAttention, type LabTrackerStage, type LabTrackerView } from '../../../core/api/tracker.contracts';
 import type { TableSort } from '../../../shared/ui/data-table/data-table.types';
 
-import { SERVICE_SORT_COLUMN, TRACKER_SORT_KEYS, type TrackerFilter, type TrackerUrlState, defaultTrackerFilter } from './tracker.facade';
+import { TRACKER_SORT_KEYS, type TrackerFilter, type TrackerUrlState, defaultTrackerFilter, sortColumnFits } from './tracker.facade';
 
 // LIS-CR-014 T5: the whole tracker filter lives in the URL query (`/tracker?day=…&stage=…`), so a page opened from a row and
 // left through its "Back to Lab Tracker" chip (`returnTo`) comes back with the same criteria. Only values that differ from
@@ -106,7 +106,7 @@ export function trackerUrlState(params: QueryReader): TrackerUrlState | null {
   };
 
   const sortKey = text('sort');
-  const sortable = sortKey !== null && Object.hasOwn(TRACKER_SORT_KEYS, sortKey) && (sortKey !== SERVICE_SORT_COLUMN || rows === 'services');
+  const sortable = sortKey !== null && Object.hasOwn(TRACKER_SORT_KEYS, sortKey) && sortColumnFits(sortKey, rows);
   const sort: TableSort | null = sortable ? { key: sortKey, direction: text('dir') === 'desc' ? 'desc' : 'asc' } : null;
 
   return { filter, sort, layout: text('layout') === 'board' ? 'board' : 'table' };

@@ -56,11 +56,6 @@ app-tracker-view-tabs,
   gap: var(--sp-2);
 }
 
-.service {
-  font-weight: 600;
-  white-space: nowrap;
-}
-
 .problem {
   margin-block-end: var(--sp-3);
 }

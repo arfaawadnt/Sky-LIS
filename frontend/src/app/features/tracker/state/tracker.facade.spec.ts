@@ -94,6 +94,25 @@ describe('TrackerFacade (LIS-CR-006)', () => {
     expect(facade.sort()).toBeNull();
   });
 
+  it('keeps an order only on the table it belongs to: a visit order is dropped for service rows and the reverse', async () => {
+    await run();
+    visits().forEach((call) => call.flush(trackerPage([])));
+
+    facade.setSort({ key: 'timeLeft', direction: 'asc' });
+    facade.setRows('services');
+    await run();
+    expect(facade.sort()).toBeNull();
+    visits().forEach((call) => call.flush(trackerPage([], { rows: 'Services', services: [] })));
+
+    facade.setSort({ key: 'expected', direction: 'desc' });
+    await run();
+    const params = backend.expectOne((request) => request.url === TRACKER_API.visits).request.params;
+    expect([params.get('rows'), params.get('sort'), params.get('direction')]).toEqual(['Services', 'expected', 'desc']);
+
+    facade.setRows('visits');
+    expect(facade.sort()).toBeNull();
+  });
+
   it('sends a from / to range in place of the day, and a day in place of the range', async () => {
     await run();
     visits().forEach((call) => call.flush(trackerPage([])));

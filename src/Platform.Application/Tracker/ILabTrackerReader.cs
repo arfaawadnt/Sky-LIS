@@ -82,7 +82,9 @@ public sealed record LabTrackerRow(
 /// One live top-level line of a visit for the tracker's <i>Services</i> rows (LIS-CR-014 T3): the service as ordered (code,
 /// names, sequence), the live samples of the tubes of the line and its package members, its live results (visible by the
 /// user's result rights and all) with the clocks of the unsigned ones, the visible panic / delta counts and the first visible
-/// panic test. A sample shared by two lines (one tube) counts for both.
+/// panic test. A sample shared by two lines (one tube) counts for both. For the worklist columns of the rows (change request
+/// of 2026-10-26): the first live sample number and the earliest collection, the clinical group of the line's first result
+/// (a visible one first), and the clock of the signed result expected last (a visible one first).
 /// </summary>
 public sealed record LabTrackerServiceRow(
     Guid VisitId,
@@ -104,7 +106,12 @@ public sealed record LabTrackerServiceRow(
     string? FirstPanicTestEn,
     string? FirstPanicTestAr,
     IReadOnlyList<ResultClock> VisibleOpenClocks,
-    IReadOnlyList<ResultClock> AllOpenClocks);
+    IReadOnlyList<ResultClock> AllOpenClocks,
+    string? FirstSampleNumber = null,
+    DateTimeOffset? FirstCollectedAtUtc = null,
+    string? GroupNameEn = null,
+    string? GroupNameAr = null,
+    SignedResultClock? LastSignedClock = null);
 
 /// <summary>The sortable columns of the tracker (allow-list; the handler orders the whole filtered day before paging).</summary>
 public static class TrackerSortKeys
@@ -118,8 +125,15 @@ public static class TrackerSortKeys
     /// <summary>The service code (the <i>Services</i> rows only, LIS-CR-014 T3).</summary>
     public const string Service = "service";
 
+    /// <summary>The worklist columns of the <i>Services</i> rows (change request of 2026-10-26): test status, expected result, delay.</summary>
+    public const string Status = "status";
+
+    public const string Expected = "expected";
+
+    public const string Delay = "delay";
+
     public static readonly SortKeys Visits = new(TimeLeft, RegisteredAt, Accession, Patient, Stage);
 
-    /// <summary>The keys of the <i>Services</i> rows: the visit keys and the service code.</summary>
-    public static readonly SortKeys Services = new(TimeLeft, RegisteredAt, Accession, Patient, Stage, Service);
+    /// <summary>The keys of the <i>Services</i> rows: the visit keys, the service code and the worklist columns.</summary>
+    public static readonly SortKeys Services = new(TimeLeft, RegisteredAt, Accession, Patient, Stage, Service, Status, Expected, Delay);
 }

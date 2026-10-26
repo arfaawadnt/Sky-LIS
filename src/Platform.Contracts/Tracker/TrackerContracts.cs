@@ -1,3 +1,5 @@
+using Platform.Contracts.Results;
+
 namespace Platform.Contracts.Tracker;
 
 // Lab Tracker (change request LIS-CR-006, intake LIS-INT-TRK-001): GET /api/v1/tracker/visits. One row per visit of the
@@ -81,6 +83,13 @@ public sealed record LabTrackerItem(
 /// <see cref="MinutesLeft"/>, <see cref="DelayState"/>, <see cref="Samples"/> and <see cref="Results"/> are the line's own (its
 /// tubes and its results, package members included); <see cref="VisitStage"/> is the visit's; <see cref="Payment"/> is the
 /// visit's balance (a payment is taken for the visit). The sections are null without the module's view permission.
+/// The worklist columns (change request of 2026-10-26, the rows read like CP-18): <see cref="SampleNumber"/> the first live sample
+/// of the line and <see cref="SampleCount"/> its live samples, <see cref="SampleStatus"/> (Rejected while a sample waits for a new
+/// one, else the least advanced) and <see cref="CollectedAtUtc"/> the earliest collection, all null / 0 without <c>samples.view</c>;
+/// <see cref="ResultStatus"/> the least advanced result and the clinical group of the line, null without <c>results.view</c>;
+/// <see cref="ExpectedAtUtc"/>, <see cref="DelaySeconds"/>, <see cref="ConsumedPercent"/> and <see cref="TurnaroundState"/> the
+/// clock of the unsigned result that has consumed most of its turnaround (or, once all are signed, of the one expected last,
+/// measured at its verification; state Done), null without results.
 /// </summary>
 public sealed record LabTrackerServiceItem(
     Guid LineId,
@@ -114,7 +123,18 @@ public sealed record LabTrackerServiceItem(
     LabTrackerRegistration Registration,
     LabTrackerSamples? Samples,
     LabTrackerResults? Results,
-    LabTrackerPayment? Payment);
+    LabTrackerPayment? Payment,
+    string? SampleNumber = null,
+    int SampleCount = 0,
+    string? SampleStatus = null,
+    DateTimeOffset? CollectedAtUtc = null,
+    string? ResultStatus = null,
+    string? GroupNameEn = null,
+    string? GroupNameAr = null,
+    DateTimeOffset? ExpectedAtUtc = null,
+    long? DelaySeconds = null,
+    decimal? ConsumedPercent = null,
+    string? TurnaroundState = null);
 
 /// <summary>
 /// The counters of the whole filtered day (day, branch, search) <b>before</b> the stage, attention and view filters, so the
@@ -151,7 +171,23 @@ public sealed record LabTrackerPage(
     DateTimeOffset FromUtc,
     DateTimeOffset ToUtc,
     string Rows = LabTrackerRows.Visits,
-    IReadOnlyList<LabTrackerServiceItem>? Services = null);
+    IReadOnlyList<LabTrackerServiceItem>? Services = null,
+    int WarnPercent = 80,
+    int LatePercent = 100);
+
+/// <summary>
+/// The worklist report of the tracker's service rows (change request of 2026-10-26): the laboratory letterhead, when and by whom
+/// it was printed, the period read and the rows in the list's order; <see cref="Truncated"/> when the filter held more rows than
+/// the report takes.
+/// </summary>
+public sealed record LabTrackerWorklistDocument(
+    ReportLetterhead Letterhead,
+    DateTimeOffset GeneratedAtUtc,
+    string? GeneratedBy,
+    DateTimeOffset FromUtc,
+    DateTimeOffset ToUtc,
+    IReadOnlyList<LabTrackerServiceItem> Rows,
+    bool Truncated);
 
 /// <summary>The two row modes of the tracker table (<c>?rows=</c>, case-insensitive; absent = Visits).</summary>
 public static class LabTrackerRows

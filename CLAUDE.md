@@ -513,6 +513,12 @@ QMS source is never read or copied (section 1); everything here is written from 
   wall-clock `DateTime`, together, From ≤ To, ≤ `GetLabTrackerValidator.MaxRangeDays` = 31) replace `Day`; the window is
   `[InstantUtc(From), InstantUtc(To) + 1 min)` through `ReportPeriod.InstantUtc`; `LabTrackerPage.FromUtc/ToUtc` echo it. SPA
   `ui/period-picker.component.ts` (presets today / yesterday / a day / last 7 days / custom; `TrackerFacade.setRange`).
+  **Services rows = worklist view (2026-10-26)**: `ui/service-table.component.ts` shows the CP-18 columns, colours and legend
+  (`LabTrackerPage.WarnPercent/LatePercent`); a line's worklist fields come from `Domain/Tracker/ServiceWorklistRules.cs`
+  (least advanced result / sample, worst clock) and the extra columns of `ServicesSql`; sort keys `status`, `expected`, `delay`
+  (services only; `sortColumnFits` drops an order that belongs to the other table); *Print worklist* =
+  `GET /api/v1/tracker/visits/documents/worklist` (`GetLabTrackerWorklistDocumentQuery`, reuses `GetLabTrackerHandler.ComposeAsync`)
+  printed by `ui/tracker-worklist.document.ts`.
 - Change request LIS-CR-007 (2026-10-24, `docs/build/CR-2026-10-24_Review-Quick-Wins.md`, from the review response LIS-RC-001 in
   `docs/review/`; migration `ReviewQuickWins` = `app.sample_types.for_culture` + the dated block in `CatalogueA.migration.sql`): CP-51 /
   CP-52 switched to Release 1; **row actions** never wrap — `shared/ui/data-table/row-menu.component.ts` (`app-row-menu`, popover top

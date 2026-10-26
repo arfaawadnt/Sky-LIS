@@ -37,7 +37,28 @@ export function trackerItem(overrides: Partial<LabTrackerItem> = {}): LabTracker
 
 /** A service row (LIS-CR-014 T3): the visit fields of `trackerItem` plus the line. */
 export function trackerServiceItem(overrides: Partial<LabTrackerServiceItem> = {}): LabTrackerServiceItem {
-  return { ...trackerItem(), lineId: 'line-1', serviceId: 'svc-1', serviceCode: 'GLU', serviceName: 'Glucose', serviceNameAr: 'جلوكوز', serviceKind: 'Service', visitStage: 'InLab', ...overrides };
+  return {
+    ...trackerItem(),
+    lineId: 'line-1',
+    serviceId: 'svc-1',
+    serviceCode: 'GLU',
+    serviceName: 'Glucose',
+    serviceNameAr: 'جلوكوز',
+    serviceKind: 'Service',
+    visitStage: 'InLab',
+    sampleNumber: 'S-0001',
+    sampleCount: 2,
+    sampleStatus: 'Received',
+    collectedAtUtc: '2026-10-22T07:40:00Z',
+    resultStatus: 'Complete',
+    groupNameEn: 'Chemistry',
+    groupNameAr: 'الكيمياء',
+    expectedAtUtc: '2026-10-22T10:30:00Z',
+    delaySeconds: 0,
+    consumedPercent: 40,
+    turnaroundState: 'OnTime',
+    ...overrides,
+  };
 }
 
 export function trackerCounters(overrides: Partial<LabTrackerCounters> = {}): LabTrackerCounters {

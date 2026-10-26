@@ -4,10 +4,12 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import type { PageRequest } from '../../../core/api/paging';
 import { ProblemError } from '../../../core/api/problem-details';
-import { type LabTrackerItem, TRACKER_LINKS, isServiceRow } from '../../../core/api/tracker.contracts';
+import { type LabTrackerItem, type LabTrackerServiceItem, TRACKER_LINKS, isServiceRow } from '../../../core/api/tracker.contracts';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { dateCell } from '../../../shared/export/table-export';
 import { problemMessage } from '../../../shared/forms/problem-text';
+import { PrintService } from '../../../shared/print/print.service';
+import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { BadgeComponent } from '../../../shared/ui/badge/badge.component';
 import { CellTemplateDirective, RowActionsTemplateDirective } from '../../../shared/ui/data-table/cell-template.directive';
 import { DataTableComponent } from '../../../shared/ui/data-table/data-table.component';
@@ -26,9 +28,11 @@ import { PeriodPickerComponent } from '../ui/period-picker.component';
 import { PipelineStripComponent } from '../ui/pipeline-strip.component';
 import { TrackerRowActionsComponent } from '../ui/row-actions.component';
 import { RowsToggleComponent } from '../ui/rows-toggle.component';
+import { TrackerServiceTableComponent } from '../ui/service-table.component';
+import { TrackerWorklistDocumentComponent } from '../ui/tracker-worklist.document';
 import { StatusPillComponent } from '../ui/status-pill.component';
 import { type BoardLane, TrackerBoardComponent } from '../ui/tracker-board.component';
-import { type StatusLook, clockTime, delayEdge, localToday, num, outsideLook, patientLine, payerLine, paymentLook, pickName, resultsLook, samplesLook, timeLeftLook } from '../ui/tracker-format';
+import { type StatusLook, clockTime, delayEdge, localToday, num, outsideLook, patientLine, payerLine, paymentLook, resultsLook, samplesLook, timeLeftLook } from '../ui/tracker-format';
 import { ViewTabsComponent } from '../ui/view-tabs.component';
 
 /**
@@ -62,6 +66,7 @@ import { ViewTabsComponent } from '../ui/view-tabs.component';
     TrackerBoardComponent,
     TrackerRowActionsComponent,
     RowsToggleComponent,
+    TrackerServiceTableComponent,
   ],
   templateUrl: './tracker.page.html',
   styleUrl: './tracker.page.css',
@@ -70,6 +75,8 @@ import { ViewTabsComponent } from '../ui/view-tabs.component';
 export class TrackerPage {
   protected readonly i18n = inject(I18nService);
   protected readonly facade = inject(TrackerFacade);
+  private readonly print = inject(PrintService);
+  private readonly toast = inject(ToastService);
   protected readonly accessionLink = TRACKER_LINKS.accession;
 
   protected readonly today = localToday();
@@ -91,12 +98,15 @@ export class TrackerPage {
     { key: 'timeLeft', header: 'tracker.column.timeLeft', sortable: true, width: '140px', optional: true, exportValue: (row) => lookText(this.timeLeft(row)) },
   ];
 
-  /** LIS-CR-014 T3: with service rows the service is the second column, sortable by its code. */
-  private readonly serviceColumn: TableColumn<LabTrackerItem> = { key: 'service', header: 'tracker.column.service', sortable: true, exportValue: (row) => this.service(row) };
+  /** LIS-CR-014 T3 and the change request of 2026-10-26: the service rows, shown with the worklist's columns. */
+  protected readonly serviceRows = computed<readonly LabTrackerServiceItem[]>(() => this.facade.rows().filter(isServiceRow));
 
-  protected readonly tableColumns = computed<readonly TableColumn<LabTrackerItem>[]>(() => {
-    const [first, ...rest] = this.columns;
-    return this.facade.filter().rows === 'services' && first !== undefined ? [first, this.serviceColumn, ...rest] : this.columns;
+  /** The period and the branch under the title of a printed list. */
+  protected readonly printSubtitle = computed(() => {
+    const filter = this.facade.filter();
+    const period = filter.from && filter.to ? `${filter.from} – ${filter.to}` : (this.facade.servedDay() ?? this.today);
+    const branch = this.branchLabel();
+    return branch ? `${period} · ${branch}` : period;
   });
 
   private readonly router = inject(Router);
@@ -195,20 +205,21 @@ export class TrackerPage {
     });
   }
 
-  /** A visit row is keyed by its visit, a service row by its line. */
-  protected readonly rowId = (row: LabTrackerItem): string => (isServiceRow(row) ? row.lineId : row.visitId);
-
-  /** "GLU · Glucose" in the page language (service rows only). */
-  protected service(row: LabTrackerItem): string {
-    return isServiceRow(row) ? `${row.serviceCode} · ${pickName(row.serviceName, row.serviceNameAr, this.i18n.lang()) ?? row.serviceName}` : '';
-  }
-
-  /** The visit's own stage under a service row whose stage differs ("Visit: in the lab"). */
-  protected visitStage(row: LabTrackerItem): string | null {
-    return isServiceRow(row) && row.visitStage !== row.stage ? this.i18n.tf('tracker.rows.visitStage', { stage: this.i18n.t('tracker.stage.' + row.visitStage) }) : null;
-  }
+  /** A visit row is keyed by its visit. */
+  protected readonly rowId = (row: LabTrackerItem): string => row.visitId;
 
   protected readonly rowClass = (row: LabTrackerItem): string | null => delayEdge(row.delayState, row.minutesLeft);
+
+  /** The worklist report of the service rows (change request of 2026-10-26), like the worklist page's *Print worklist*. */
+  protected async printWorklist(): Promise<void> {
+    const doc = await this.facade.worklistDocument.execute(undefined);
+    if (doc === null) {
+      this.toast.error(problemMessage(this.i18n, 'tracker', this.facade.worklistDocument.problem()));
+      return;
+    }
+
+    await this.print.print({ title: this.i18n.t('tracker.report.title'), size: 'A4', landscape: true, component: { type: TrackerWorklistDocumentComponent, inputs: { doc } } });
+  }
 
   protected onPage(page: PageRequest): void {
     this.facade.setPage(page);

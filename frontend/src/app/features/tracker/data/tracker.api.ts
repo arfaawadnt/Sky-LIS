@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { ORGANIZATION_API, type SelectableBranch, type SelectableBranchesResponse } from '../../../core/api/organization.contracts';
-import { type LabTrackerPage, type LabTrackerQuery, TRACKER_API } from '../../../core/api/tracker.contracts';
+import { type LabTrackerPage, type LabTrackerQuery, type LabTrackerWorklistDocument, TRACKER_API } from '../../../core/api/tracker.contracts';
 import { toHttpParams } from '../../../shared/forms/paging';
 
 /** Typed calls of the Lab Tracker; URLs are built with `HttpParams`, never by string concatenation (pitfall P-60). */
@@ -28,6 +28,23 @@ export class TrackerApi {
       rows: query.rows ?? null,
     });
     return firstValueFrom(this.http.get<LabTrackerPage>(TRACKER_API.visits, { params })).then(abortable(signal));
+  }
+
+  /** The worklist report of the service rows of the filter (its period, search, stage, attention, view and order; no paging). */
+  worklistDocument(query: LabTrackerQuery): Promise<LabTrackerWorklistDocument> {
+    const params = toHttpParams({
+      day: query.day,
+      from: query.from,
+      to: query.to,
+      branchId: query.branchId,
+      stage: query.stage,
+      attention: query.attention,
+      view: query.view,
+      search: query.search,
+      sort: query.sort,
+      direction: query.direction,
+    });
+    return firstValueFrom(this.http.get<LabTrackerWorklistDocument>(TRACKER_API.worklistDocument, { params }));
   }
 
   /** The session branch for the header chip; tolerant (no chip when the list cannot be read). */

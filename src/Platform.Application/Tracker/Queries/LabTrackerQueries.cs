@@ -3,6 +3,7 @@ using Platform.Application.Abstractions.Messaging;
 using Platform.Application.Abstractions.Persistence;
 using Platform.Application.Abstractions.Security;
 using Platform.Application.Abstractions.Settings;
+using Platform.Application.Organization;
 using Platform.Application.Patients;
 using Platform.Application.Results;
 using Platform.Contracts.Common;
@@ -11,6 +12,7 @@ using Platform.Domain.Authorization;
 using Platform.Domain.Billing;
 using Platform.Domain.Patients;
 using Platform.Domain.Reporting;
+using Platform.Domain.Results;
 using Platform.Domain.Settings;
 using Platform.Domain.Tracker;
 using Platform.SharedKernel.Abstractions;
@@ -89,9 +91,16 @@ public sealed class GetLabTrackerHandler(
     ILaboratoryCountry laboratoryCountry,
     IClock clock) : IQueryHandler<GetLabTrackerQuery, LabTrackerPage>
 {
-    public async Task<LabTrackerPage> Handle(GetLabTrackerQuery query, CancellationToken cancellationToken)
+    public Task<LabTrackerPage> Handle(GetLabTrackerQuery query, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(query);
         var page = PageRequest.Normalized(query.Page, query.PageSize);
+        return ComposeAsync(query, page.Page, page.PageSize, page.Skip, cancellationToken);
+    }
+
+    /// <summary>The page <paramref name="pageNumber"/> of <paramref name="pageSize"/> rows after <paramref name="skip"/>; the worklist report reads one long page.</summary>
+    internal async Task<LabTrackerPage> ComposeAsync(GetLabTrackerQuery query, int pageNumber, int pageSize, int skip, CancellationToken cancellationToken)
+    {
         var branchId = query.BranchId ?? BranchScope.Require(user);
         var zone = await laboratoryZone.FindAsync(cancellationToken).ConfigureAwait(false);
         var now = clock.UtcNow;
@@ -132,19 +141,57 @@ public sealed class GetLabTrackerHandler(
                 .ToList();
             var chosen = TrackerServiceRows.Select(services, Parse<TrackerStage>(query.Stage), Parse<TrackerAttention>(query.Attention), Parse<TrackerView>(query.View));
             var sorted = TrackerServiceRows.Order(chosen, ListSort.Of(query.Sort, query.Direction), sections.SeeVip);
-            var serviceItems = sorted.Skip(page.Skip).Take(page.PageSize).Select(service => TrackerServiceRows.Item(service, sections, rules.Today)).ToList();
-            return new LabTrackerPage([], page.Page, page.PageSize, chosen.Count, counters, day, branchId, fromUtc, toUtc, LabTrackerRows.Services, serviceItems);
+            var serviceItems = sorted.Skip(skip).Take(pageSize).Select(service => TrackerServiceRows.Item(service, sections, rules.Today)).ToList();
+            return new LabTrackerPage([], pageNumber, pageSize, chosen.Count, counters, day, branchId, fromUtc, toUtc, LabTrackerRows.Services, serviceItems, rules.WarnPercent, rules.LatePercent);
         }
 
         var selected = TrackerRows.Select(visits, Parse<TrackerStage>(query.Stage), Parse<TrackerAttention>(query.Attention), Parse<TrackerView>(query.View));
         var ordered = TrackerRows.Order(selected, ListSort.Of(query.Sort, query.Direction), sections.SeeVip);
-        var items = ordered.Skip(page.Skip).Take(page.PageSize).Select(visit => TrackerRows.Item(visit, sections, rules.Today)).ToList();
-        return new LabTrackerPage(items, page.Page, page.PageSize, selected.Count, counters, day, branchId, fromUtc, toUtc);
+        var items = ordered.Skip(skip).Take(pageSize).Select(visit => TrackerRows.Item(visit, sections, rules.Today)).ToList();
+        return new LabTrackerPage(items, pageNumber, pageSize, selected.Count, counters, day, branchId, fromUtc, toUtc);
     }
 
     private static TEnum? Parse<TEnum>(string? value)
         where TEnum : struct, Enum =>
         string.IsNullOrWhiteSpace(value) ? null : Enum.Parse<TEnum>(value.Trim(), ignoreCase: true);
+}
+
+/// <summary>
+/// The worklist report of the tracker (change request of 2026-10-26, "a worklist report button like the worklist page's"): the
+/// service rows of <paramref name="Filter"/> (period, search, stage, attention, view, order; <c>rows</c> is always Services) with
+/// the laboratory letterhead, at most <see cref="GetLabTrackerWorklistDocumentHandler.MaxRows"/> rows. Same permission as the list.
+/// </summary>
+[RequirePermissionPolicy(PermissionCatalog.Registration, PermissionAction.View)]
+public sealed record GetLabTrackerWorklistDocumentQuery(GetLabTrackerQuery Filter) : IQuery<LabTrackerWorklistDocument>;
+
+public sealed class GetLabTrackerWorklistDocumentValidator : AbstractValidator<GetLabTrackerWorklistDocumentQuery>
+{
+    public GetLabTrackerWorklistDocumentValidator() => RuleFor(query => query.Filter).NotNull().SetValidator(new GetLabTrackerValidator());
+}
+
+public sealed class GetLabTrackerWorklistDocumentHandler(
+    ILabTrackerReader reader,
+    ITenantSettings settings,
+    IUserPrivileges privileges,
+    ICurrentUser user,
+    ILaboratoryTimeZone laboratoryZone,
+    ILaboratoryCountry laboratoryCountry,
+    IResultReferenceLookup references,
+    IUserDirectory directory,
+    IClock clock) : IQueryHandler<GetLabTrackerWorklistDocumentQuery, LabTrackerWorklistDocument>
+{
+    public const int MaxRows = 2000;
+
+    public async Task<LabTrackerWorklistDocument> Handle(GetLabTrackerWorklistDocumentQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var tracker = new GetLabTrackerHandler(reader, settings, privileges, user, laboratoryZone, laboratoryCountry, clock);
+        var page = await tracker.ComposeAsync(query.Filter with { Rows = LabTrackerRows.Services }, 1, MaxRows, 0, cancellationToken).ConfigureAwait(false);
+        var rows = page.Services ?? [];
+        var letterhead = await references.LetterheadAsync(page.BranchId, cancellationToken).ConfigureAwait(false);
+        var printedBy = await ResultsActor.NameOfAsync(user, directory, cancellationToken).ConfigureAwait(false);
+        return new LabTrackerWorklistDocument(letterhead, clock.UtcNow, printedBy, page.FromUtc, page.ToUtc, rows, page.TotalCount > rows.Count);
+    }
 }
 
 /// <summary>The tenant rules and the instant the progress is judged at.</summary>
@@ -330,7 +377,7 @@ internal static class TrackerRows
 }
 
 /// <summary>A service line with its own progress and the tracked visit it belongs to (LIS-CR-014 T3).</summary>
-internal sealed record TrackedService(LabTrackerServiceRow Line, TrackedVisit Visit, VisitProgress Progress);
+internal sealed record TrackedService(LabTrackerServiceRow Line, TrackedVisit Visit, VisitProgress Progress, ServiceTurnaround? Turnaround, ResultStatus? Status);
 
 /// <summary>
 /// The <i>Services</i> rows of the tracker (LIS-CR-014 T3): each live top-level line judged by the visit rules on its own
@@ -351,7 +398,11 @@ internal static class TrackerServiceRows
             line.VisibleOpenPanics,
             new VisitBalanceFigures(row.PatientShareTotal, row.Paid, row.Refunded).Remaining,
             row.BilledThroughClaims);
-        return new TrackedService(line, visit, VisitProgressRules.OfService(facts, rules.ReviewBeforeVerify, rules.NowUtc, rules.WarnPercent, rules.LatePercent));
+        // the worklist columns read the results the progress reads: the visible ones, else all of them (intake Q1)
+        var useVisible = line.VisibleResults.Total > 0;
+        var turnaround = ServiceWorklistRules.TurnaroundOf(useVisible ? line.VisibleOpenClocks : line.AllOpenClocks, line.LastSignedClock, rules.NowUtc, rules.WarnPercent, rules.LatePercent);
+        var status = ServiceWorklistRules.StatusOf(useVisible ? line.VisibleResults : line.AllResults);
+        return new TrackedService(line, visit, VisitProgressRules.OfService(facts, rules.ReviewBeforeVerify, rules.NowUtc, rules.WarnPercent, rules.LatePercent), turnaround, status);
     }
 
     public static IReadOnlyList<TrackedService> Select(IReadOnlyList<TrackedService> services, TrackerStage? stage, TrackerAttention? attention, TrackerView? view) =>
@@ -393,6 +444,15 @@ internal static class TrackerServiceRows
                 break;
             case var key when TrackerRows.Is(key, TrackerSortKeys.Service):
                 ordered = TrackerRows.Direction(services, service => service.Line.ServiceCode, descending, StringComparer.OrdinalIgnoreCase);
+                break;
+            case var key when TrackerRows.Is(key, TrackerSortKeys.Status):
+                ordered = NullsLast(services, service => service.Status is { } status ? (int)status : (int?)null, descending);
+                break;
+            case var key when TrackerRows.Is(key, TrackerSortKeys.Expected):
+                ordered = NullsLast(services, service => service.Turnaround?.ExpectedAtUtc, descending);
+                break;
+            case var key when TrackerRows.Is(key, TrackerSortKeys.Delay):
+                ordered = NullsLast(services, service => service.Turnaround?.DelaySeconds, descending);
                 break;
             default:
                 throw new ArgumentException($"The sort key '{sort.Key}' is not allowed for this list.", nameof(sort));
@@ -456,7 +516,26 @@ internal static class TrackerServiceRows
                     line.FirstPanicTestEn,
                     line.FirstPanicTestAr)
                 : null,
-            visit.Payment);
+            visit.Payment,
+            sections.Samples ? line.FirstSampleNumber : null,
+            sections.Samples ? line.Samples.Total : 0,
+            sections.Samples ? ServiceWorklistRules.SampleStatusOf(line.Samples)?.ToString() : null,
+            sections.Samples ? line.FirstCollectedAtUtc : null,
+            sections.Results ? service.Status?.ToString() : null,
+            sections.Results ? line.GroupNameEn : null,
+            sections.Results ? line.GroupNameAr : null,
+            service.Turnaround?.ExpectedAtUtc,
+            service.Turnaround?.DelaySeconds,
+            service.Turnaround?.ConsumedPercent,
+            service.Turnaround?.State.ToString());
+    }
+
+    /// <summary>The worklist columns order lines without the value last in either direction.</summary>
+    private static IOrderedEnumerable<TrackedService> NullsLast<TKey>(IReadOnlyList<TrackedService> services, Func<TrackedService, TKey?> key, bool descending)
+        where TKey : struct
+    {
+        var withValueFirst = services.OrderBy(service => key(service) is null);
+        return descending ? withValueFirst.ThenByDescending(key) : withValueFirst.ThenBy(key);
     }
 
     private static IOrderedEnumerable<TrackedService> ByUrgency(IReadOnlyList<TrackedService> services) =>

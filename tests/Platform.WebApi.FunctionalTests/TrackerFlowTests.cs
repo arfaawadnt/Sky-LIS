@@ -221,6 +221,29 @@ public sealed class TrackerFlowTests(ApiFactory factory) : IClassFixture<ApiFact
         Assert.InRange(cbc.MinutesLeft!.Value, 1439, 1440);
         Assert.Equal(("InLab", "EnterResults"), (alone.Stage, alone.NextStep));
 
+        // the worklist columns of a line (change request of 2026-10-26): sample, sample status, test status, group, clock
+        Assert.Equal((1, "Received", "Complete"), (glucose.SampleCount, glucose.SampleStatus, glucose.ResultStatus));
+        Assert.False(string.IsNullOrEmpty(glucose.SampleNumber));
+        Assert.NotNull(glucose.CollectedAtUtc);
+        Assert.False(string.IsNullOrEmpty(glucose.GroupNameEn));
+        Assert.Equal((0L, "OnTime"), (glucose.DelaySeconds, glucose.TurnaroundState));
+        Assert.NotNull(glucose.ExpectedAtUtc);
+        Assert.InRange(glucose.ConsumedPercent!.Value, 0m, 1m);
+        Assert.Equal(("Ordered", 0L), (cbc.ResultStatus, cbc.DelaySeconds));   // followed on all its results, as the stage
+        Assert.Equal((80, 100), (page.WarnPercent, page.LatePercent));
+        var byStatus = (await client.GetFromJsonAsync<LabTrackerPage>($"{Tracker}?rows=services&sort=status&direction=desc"))!;
+        Assert.Equal(glucose.LineId, byStatus.Services![0].LineId);   // Complete before Ordered
+
+        // the worklist report: every service row of the filter in the list's order, with the letterhead and the period
+        var report = (await client.GetFromJsonAsync<LabTrackerWorklistDocument>($"{Tracker}/documents/worklist?sort=service"))!;
+        var listed = (await client.GetFromJsonAsync<LabTrackerPage>($"{Tracker}?rows=services&sort=service"))!;
+        Assert.Equal(listed.Services!.Select(row => row.LineId), report.Rows.Select(row => row.LineId));
+        Assert.False(report.Truncated);
+        Assert.False(string.IsNullOrEmpty(report.Letterhead.LabNameEn));
+        Assert.Equal((page.FromUtc, page.ToUtc), (report.FromUtc, report.ToUtc));
+        var inLabReport = (await client.GetFromJsonAsync<LabTrackerWorklistDocument>($"{Tracker}/documents/worklist?stage=InLab"))!;
+        Assert.Equal(2, inLabReport.Rows.Count);
+
         // the line's own stage filters the rows; sort by the service code, then accession and sequence
         var inLab = (await client.GetFromJsonAsync<LabTrackerPage>($"{Tracker}?rows=services&stage=InLab"))!;
         Assert.Equal(new[] { cbc.LineId, alone.LineId }.Order(), inLab.Services!.Select(row => row.LineId).Order());

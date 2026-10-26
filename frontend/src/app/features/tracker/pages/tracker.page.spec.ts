@@ -9,6 +9,8 @@ import { problemDetailsInterceptor } from '../../../core/http/problem-details.in
 import { PermissionsService } from '../../../core/permissions/permissions.service';
 import { TRACKER_TIMERS, TrackerFacade } from '../state/tracker.facade';
 import { ManualTimers, settle, trackerItem, trackerPage, trackerServiceItem } from '../testing/tracker.fixtures';
+import { type PrintRequest, PrintService } from '../../../shared/print/print.service';
+import { TrackerWorklistDocumentComponent } from '../ui/tracker-worklist.document';
 import { TrackerPage } from './tracker.page';
 
 describe('TrackerPage (LIS-CR-006, CP-69)', () => {
@@ -186,22 +188,70 @@ describe('TrackerPage (LIS-CR-006, CP-69)', () => {
     expect(actionLinks(rows()[0])).toEqual(['/registration/accession?accession=ACC-2026-00001&returnTo=%2F', '/registration/accession?accession=ACC-2026-00001&tab=documents&returnTo=%2F']);
   });
 
-  it('T3: the Visits | Services toggle asks for service rows and shows the service column', async () => {
+  it('T3: the Visits | Services toggle asks for service rows and shows them with the worklist columns', async () => {
     await open(['registration.view']);
 
     buttonWith('app-tracker-rows-toggle button', 'tracker.rows.services').click();
     await render();
     const call = backend.expectOne((request) => request.url === TRACKER_API.visits);
     expect([call.request.params.get('rows'), call.request.params.get('page')]).toEqual(['Services', '1']);
-    call.flush(trackerPage([], { rows: 'Services', services: [trackerServiceItem(), trackerServiceItem({ lineId: 'line-2', serviceCode: 'CBC', serviceName: 'Blood count', stage: 'AwaitingSample' })], totalCount: 2 }));
+    call.flush(
+      trackerPage([], {
+        rows: 'Services',
+        services: [trackerServiceItem(), trackerServiceItem({ lineId: 'line-2', serviceCode: 'CBC', serviceName: 'Blood count', turnaroundState: 'Late', delaySeconds: 2_100, consumedPercent: 135 })],
+        totalCount: 2,
+        warnPercent: 70,
+        latePercent: 90,
+      }),
+    );
     await render();
 
+    // the worklist's columns in its order, its row colours and its legend by the tenant thresholds (change request of 2026-10-26)
     expect(rows().length).toBe(2);
-    expect(host.querySelector('thead')?.textContent).toContain('tracker.column.service');
+    const headers = [...host.querySelectorAll('app-tracker-service-table thead th')].map((cell) => cell.textContent?.trim()).filter((text) => !!text);
+    expect(headers.filter((text) => text?.startsWith('tracker.service.column.'))).toEqual(
+      ['patientNumber', 'accession', 'sample', 'patient', 'ageSex', 'service', 'status', 'sampleStatus', 'collected', 'expected', 'delay', 'consumed'].map((key) => `tracker.service.column.${key}`),
+    );
     expect(rows()[0]?.textContent).toContain('GLU · Glucose');
-    expect(rows()[1]?.textContent).toContain('tracker.rows.visitStage');   // the visit is in the lab, this line waits for its sample
+    expect(rows()[0]?.textContent).toContain('Chemistry');
+    expect(rows()[0]?.textContent).toContain('tracker.service.status.Complete');
+    expect(rows()[0]?.textContent).toContain('S-0001 tracker.service.moreSamples');
+    expect(rows()[1]?.classList.contains('delay-late')).toBe(true);
+    expect(rows()[1]?.textContent).toContain('tracker.time.minutes');   // 35 min past the expected result
+    expect(rows()[1]?.querySelector('a.link')?.getAttribute('href')).toBe('/registration/accession?visitId=visit-1&returnTo=%2F%3Frows%3Dservices');
+    expect(host.querySelector('app-tracker-service-table .legend')?.textContent).toContain('tracker.service.legendWarn');
     expect(buttonWith('app-tracker-rows-toggle button', 'tracker.rows.services').getAttribute('aria-pressed')).toBe('true');
     expect(TestBed.inject(Router).url).toBe('/?rows=services');
+
+    // a worklist column orders the service rows on the server
+    buttonWith('app-tracker-service-table thead button', 'tracker.service.column.delay').click();
+    await render();
+    const sorted = backend.expectOne((request) => request.url === TRACKER_API.visits).request.params;
+    expect([sorted.get('rows'), sorted.get('sort')]).toEqual(['Services', 'delay']);
+  });
+
+  it('prints the worklist report of the service rows of the filter, like the worklist page', async () => {
+    await open(['registration.view']);
+    const printed: PrintRequest[] = [];
+    vi.spyOn(TestBed.inject(PrintService), 'print').mockImplementation((request) => {
+      printed.push(request);
+      return Promise.resolve();
+    });
+    expect(host.textContent).not.toContain('tracker.report.print');   // the visit rows have no worklist report
+
+    buttonWith('app-tracker-rows-toggle button', 'tracker.rows.services').click();
+    await render();
+    backend.expectOne((request) => request.url === TRACKER_API.visits).flush(trackerPage([], { rows: 'Services', services: [trackerServiceItem()], totalCount: 1 }));
+    await render();
+
+    buttonWith('button', 'tracker.report.print').click();
+    await render();
+    const call = backend.expectOne((request) => request.url === TRACKER_API.worklistDocument);
+    expect([call.request.params.has('page'), call.request.params.has('rows')]).toEqual([false, false]);
+    call.flush({ letterhead: { labNameEn: 'Demo Lab', labNameAr: 'مختبر', branchNameEn: 'Main', branchNameAr: 'الرئيسي' }, generatedAtUtc: '2026-10-26T09:00:00Z', generatedBy: 'Lab Admin', fromUtc: '2026-10-25T21:00:00Z', toUtc: '2026-10-26T21:00:00Z', rows: [trackerServiceItem()], truncated: false });
+    await render();
+
+    expect(printed.map((request) => [request.title, request.landscape, request.component?.type])).toEqual([['tracker.report.title', true, TrackerWorklistDocumentComponent]]);
   });
 
   it('T5: writes the filter into the URL, carries it in returnTo and restores a URL that names a state', async () => {
@@ -217,6 +267,7 @@ describe('TrackerPage (LIS-CR-006, CP-69)', () => {
 
     // a return (or back / forward) to a URL naming another state restores it whole
     await router.navigateByUrl('/?stage=Ready&rows=services&sort=service&dir=desc&layout=table');
+    // (a visit-table order in a services URL, or a worklist order in a visits URL, is ignored: sortColumnFits)
     await render();
     const restored = backend.expectOne((request) => request.url === TRACKER_API.visits).request.params;
     expect([restored.get('stage'), restored.get('rows'), restored.get('sort'), restored.get('direction')]).toEqual(['Ready', 'Services', 'service', 'desc']);
