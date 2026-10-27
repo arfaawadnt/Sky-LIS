@@ -17,12 +17,14 @@ namespace Platform.Application.Identity;
 /// membership in <see cref="TenantIds.Platform"/> and the role "Platform Administrator" holding every catalogued
 /// permission. Idempotent: an existing user, membership or role is reused and the role's keys are brought up to the
 /// current catalogue. Used by the DevTools command <c>seed-platform-admin</c> and by the functional tests; the
-/// production bootstrap of the first administrator goes through the same code.
+/// production bootstrap of the first administrator goes through the same code. The platform row of the tenant registry is
+/// ensured first (<see cref="IPlatformTenantRecord"/>).
 /// </summary>
 public sealed class PlatformAdministratorSeeder(
     IPlatformUserRepository users,
     ITenantMembershipRepository memberships,
     IRoleRepository roles,
+    IPlatformTenantRecord platformTenant,
     IPasswordHasher hasher,
     ICurrentTenantSetter tenantSetter,
     IUnitOfWork unitOfWork,
@@ -36,6 +38,7 @@ public sealed class PlatformAdministratorSeeder(
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
         var now = clock.UtcNow;
+        await platformTenant.EnsureAsync(cancellationToken);   // the registry row every platform-tenant row references (DbReviewTenantKeys)
 
         using (tenantSetter.ForTenant(TenantIds.Platform))
         {

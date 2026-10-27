@@ -16,7 +16,7 @@ internal sealed class SupportTicketConfiguration : IEntityTypeConfiguration<Supp
     public void Configure(EntityTypeBuilder<SupportTicket> builder)
     {
         builder.ToTable("support_tickets", AppDbContext.SaasSchema);
-        builder.HasKey(ticket => ticket.Id);
+        builder.HasKey(ticket => new { ticket.TenantId, ticket.Id });   // database team review 2026-10-26, comment 4: (tenant_id, id)
         builder.Property(ticket => ticket.Id).ValueGeneratedNever();
 
         builder.Property(ticket => ticket.TenantId).IsRequired();
@@ -42,15 +42,16 @@ internal sealed class SupportTicketConfiguration : IEntityTypeConfiguration<Supp
         builder.OwnsMany(ticket => ticket.Replies, reply =>
         {
             reply.ToTable("support_ticket_replies", AppDbContext.SaasSchema);
-            reply.WithOwner().HasForeignKey("SupportTicketId");
+            reply.WithOwner().HasForeignKey("TenantId", "SupportTicketId");   // the ticket's tenant, filled by EF from the owner
+            reply.Metadata.SetConstraintName("fk_support_ticket_replies_ticket");
             reply.Property(value => value.Id).ValueGeneratedNever();
-            reply.HasKey(value => value.Id);
+            reply.HasKey("TenantId", nameof(SupportTicketReply.Id));
             reply.Property(value => value.AuthorUserId).IsRequired();
             reply.Property(value => value.AuthorName).HasMaxLength(SupportTicket.MaxNameLength).IsRequired();
             reply.Property(value => value.Text).HasMaxLength(SupportTicket.MaxTextLength).IsRequired();
             reply.Property(value => value.FromPlatform).IsRequired();
             reply.Property(value => value.AtUtc).IsRequired();
-            reply.HasIndex("SupportTicketId", nameof(SupportTicketReply.AtUtc)).HasDatabaseName("ix_support_ticket_replies_ticket_at");
+            reply.HasIndex("TenantId", "SupportTicketId", nameof(SupportTicketReply.AtUtc)).HasDatabaseName("ix_support_ticket_replies_ticket_at");
         });
         builder.Navigation(ticket => ticket.Replies).HasField("_replies").UsePropertyAccessMode(PropertyAccessMode.Field);
 

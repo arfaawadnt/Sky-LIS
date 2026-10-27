@@ -24,7 +24,8 @@ internal sealed class SampleCompatibilityGroupConfiguration : IEntityTypeConfigu
 
         builder.HasMany(group => group.Members).WithOne()
             .HasForeignKey(member => new { member.TenantId, member.GroupId })
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Cascade)
+            .HasConstraintName("fk_sample_compatibility_members_group");   // the default name reached 62 characters (DB review)
         builder.Navigation(group => group.Members).HasField("_members").UsePropertyAccessMode(PropertyAccessMode.Field).AutoInclude();
     }
 }

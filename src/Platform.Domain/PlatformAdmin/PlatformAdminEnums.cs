@@ -8,6 +8,19 @@ public enum TenantStatus
     Inactive = 2,
 }
 
+/// <summary>
+/// What a row of <c>saas.tenants</c> is (database team review 2026-10-26, comments 3–4: the table is the registry of every tenant,
+/// so every <c>tenant_id</c> has a foreign key to it). <see cref="Laboratory"/> is a client (SA-04) and the only kind the
+/// application reads: the EF model filters the table on it. <see cref="Platform"/> is the one row of
+/// <c>TenantIds.Platform</c> (National Technology's own tenant), written by migration <c>DbReviewTenantKeys</c> and by
+/// <c>PlatformTenantRecord</c>, never by the domain.
+/// </summary>
+public enum TenantKind
+{
+    Laboratory = 0,
+    Platform = 1,
+}
+
 /// <summary>How the client was created (SA-04 "source").</summary>
 public enum TenantSource
 {

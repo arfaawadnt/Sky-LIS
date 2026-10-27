@@ -47,7 +47,7 @@ internal sealed class BillingDirectory(AppDbContext context) : IBillingDirectory
     public const string DefaultLabNameEn = "Laboratory";
     public const string DefaultLabNameAr = "المختبر";
 
-    private const string TenantSql = "SELECT t.id, t.name_en, t.name_ar FROM saas.tenants t WHERE t.id = {0}";
+    private const string TenantSql = "SELECT t.id, t.name_en, t.name_ar FROM saas.tenants t WHERE t.id = {0} AND t.kind = 'Laboratory'";
     private const string BranchSql = "SELECT b.id, b.name_en, b.name_ar FROM app.branches b WHERE b.tenant_id = {0} AND b.id = {1}";
     private const string PatientsSql = "SELECT p.id, p.number, p.full_name FROM app.patients p WHERE p.tenant_id = {0} AND p.id = ANY({1})";
     private const string ServicesSql = "SELECT s.id, s.code, s.name_en, s.name_ar FROM app.services s WHERE s.tenant_id = {0} AND s.id = ANY({1})";

@@ -141,7 +141,10 @@ public sealed class DatabaseFixture : IAsyncLifetime
             await TruncateAsync(context);
         });
 
-        _appProvider = new ServiceCollection().AddInfrastructure(TestDatabase.AppConnection!).BuildServiceProvider();
+        _appProvider = new ServiceCollection()
+            .AddInfrastructure(TestDatabase.AppConnection!)
+            .ConfigureDbContext<AppDbContext>((_, options) => options.AddInterceptors(new TestTenantRegistrationInterceptor()))
+            .BuildServiceProvider();
     }
 
     public async Task DisposeAsync()
@@ -164,8 +167,17 @@ public sealed class DatabaseFixture : IAsyncLifetime
             .BuildServiceProvider();
 
     /// <summary>A runtime-role scope bound to a tenant (or unresolved when <paramref name="tenantId"/> is null) with an optional actor, branch and correlation id.</summary>
-    public IServiceScope AppScope(Guid? tenantId, Guid? userId = null, string displayName = "Integration tester", Guid? branchId = null, string? correlationId = null)
+    /// <param name="registerTenant">
+    /// True (default): the tenant is registered in <c>saas.tenants</c> first (<see cref="TestTenants"/>; every tenant_id references it
+    /// since DbReviewTenantKeys). False for a provisioning scope, whose own flush adds the tenant's client record.
+    /// </param>
+    public IServiceScope AppScope(Guid? tenantId, Guid? userId = null, string displayName = "Integration tester", Guid? branchId = null, string? correlationId = null, bool registerTenant = true)
     {
+        if (tenantId is { } registered && registerTenant)
+        {
+            TestTenants.EnsureLaboratory(registered);
+        }
+
         var scope = AppProvider.CreateScope();
         var tenant = scope.ServiceProvider.GetRequiredService<TenantContextAccessor>();
         if (tenantId is { } id)
@@ -186,9 +198,16 @@ public sealed class DatabaseFixture : IAsyncLifetime
         return scope;
     }
 
-    /// <summary>Runs on an owner-role context: lis_owner has BYPASSRLS and owns the tables, so no elevation is needed.</summary>
-    public static Task TruncateAsync(AppDbContext context) =>
-        context.Database.ExecuteSqlRawAsync(TestDatabase.TruncateAllSql);
+    /// <summary>
+    /// Runs on an owner-role context: lis_owner has BYPASSRLS and owns the tables, so no elevation is needed. The registry row of the
+    /// platform tenant goes with the truncation and is written again at once, as the migration wrote it (DbReviewTenantKeys).
+    /// </summary>
+    public static async Task TruncateAsync(AppDbContext context)
+    {
+        await context.Database.ExecuteSqlRawAsync(TestDatabase.TruncateAllSql);
+        TestTenants.Forget();
+        await context.Database.ExecuteSqlRawAsync(Platform.Infrastructure.Persistence.PlatformAdmin.PlatformTenantRecord.EnsureSql);
+    }
 }
 
 [CollectionDefinition(Name)]

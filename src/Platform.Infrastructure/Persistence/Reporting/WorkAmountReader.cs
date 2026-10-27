@@ -136,7 +136,7 @@ internal sealed class ReportLetterhead(AppDbContext context) : IReportLetterhead
     public const string DefaultLabNameEn = "Laboratory";
     public const string DefaultLabNameAr = "المختبر";
 
-    private const string TenantSql = "SELECT t.name_en, t.name_ar FROM saas.tenants t WHERE t.id = {0}";
+    private const string TenantSql = "SELECT t.name_en, t.name_ar FROM saas.tenants t WHERE t.id = {0} AND t.kind = 'Laboratory'";
 
     public async Task<WorkAmountLetterhead> GetAsync(Guid branchId, CancellationToken cancellationToken)
     {

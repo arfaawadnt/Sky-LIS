@@ -176,15 +176,18 @@ public sealed class FieldChangeInterceptor(ICurrentUser currentUser, ITenantCont
             return;
         }
 
-        // The dependent's FK properties hold the owner's key values, tenant first for tenant tables.
+        // The dependent's FK properties hold the owner's key values, tenant first for tenant tables. The owner's tenant decides only for a
+        // tenant-scoped owner; a platform-level owner keyed (tenant_id, id) (a support ticket, DbReviewTenantKeys) is recorded like the
+        // owner itself, under the tenant of the scope (TenantOf).
+        var ownerIsTenantScoped = typeof(ITenantScoped).IsAssignableFrom(owner.ClrType);
         Guid? tenantId = null;
         string? ownerId = null;
         for (var i = 0; i < ownership.Properties.Count; i++)
         {
             var value = entry.Property(ownership.Properties[i].Name).CurrentValue ?? entry.Property(ownership.Properties[i].Name).OriginalValue;
-            if (ownerKey.Properties[i].Name == nameof(ITenantScoped.TenantId) && value is Guid tenantValue)
+            if (ownerKey.Properties[i].Name == nameof(ITenantScoped.TenantId))
             {
-                tenantId = tenantValue;
+                tenantId = ownerIsTenantScoped && value is Guid tenantValue ? tenantValue : null;
             }
             else
             {
@@ -192,7 +195,7 @@ public sealed class FieldChangeInterceptor(ICurrentUser currentUser, ITenantCont
             }
         }
 
-        tenantId ??= typeof(ITenantScoped).IsAssignableFrom(owner.ClrType) ? null : tenant.CurrentTenantId;
+        tenantId ??= ownerIsTenantScoped ? null : tenant.CurrentTenantId;
         if (tenantId is null || ownerId is null)
         {
             return;

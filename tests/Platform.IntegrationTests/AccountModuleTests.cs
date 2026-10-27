@@ -159,7 +159,9 @@ public sealed class AccountModuleTests(DatabaseFixture fixture)
 
         var members = await directory.ListMembersAsync(CancellationToken.None);
         Assert.Equal(["Mona Adel", "Omar Samir"], members.Select(member => member.DisplayName).ToArray());
-        Assert.Null(await scope.ServiceProvider.GetRequiredService<ILaboratoryProfileLookup>().FindAsync(tenant, CancellationToken.None));   // no client record
+        var profiles = scope.ServiceProvider.GetRequiredService<ILaboratoryProfileLookup>();
+        Assert.Equal(TestTenants.LaboratoryNamePrefix + tenant.ToString("N")[..8], (await profiles.FindAsync(tenant, CancellationToken.None))?.NameEn);   // the fixture's placeholder record
+        Assert.Null(await profiles.FindAsync(TenantIds.Platform, CancellationToken.None));   // the platform's registry row is no laboratory (DbReviewTenantKeys)
     }
 
     [DatabaseFact]

@@ -586,6 +586,14 @@ QMS source is never read or copied (section 1); everything here is written from 
   `ui-a/compatibility-group-drawer`, nav label "Compatible samples"): `CatalogueSampleTypeInfo.CompatibilityGroups` → `TubeSpec.Compatibility`;
   `TubePlanner` per clinical group: a need joins a live tube of its group, else the group's new needs open one tube keyed after the
   best-priority member needed; existing tubes are never re-keyed. Open points: UAT open points 14–16.
+- Database team review (2026-10-26; migrations `DbReviewTextAndNames`, `DbReviewTenantKeys`): strings ≥ `AppDbContext.LongTextThreshold`
+  (1000) map to `text`; identifiers < 62 characters; IP columns `inet` (gates in `ConventionTests`). **Tenant registry**: `saas.tenants.kind`
+  (`TenantKind` Laboratory | Platform); the platform row (`TenantIds.Platform`, nullable country / governorate / plan only for it, CHECK
+  `ck_tenants_laboratory_place`) is written by the migration and `IPlatformTenantRecord` (`PlatformAdministratorSeeder`, DevTools) and hidden
+  by the `Tenant` query filter `Kind == Laboratory` and `kind = 'Laboratory'` in raw SQL; every tenant_id has `fk_<table>_tenant` →
+  `saas.tenants(id)` (`TenantForeignKeyConvention`), so **a tenant must be registered before any of its rows** (tests: `TestTenants` /
+  fixture interceptors; DevTools seeds register first); the saas wallet / ticket tables and `identity.machine_credentials` are keyed
+  `(tenant_id, id)`. Tenants found with data but no client record were registered by the migration as Inactive "Unregistered laboratory …".
 - Not yet built: MFA/TOTP endpoints, step-up re-authentication, the retention purge (and other scheduled jobs beyond the wallet charge), the OpenAPI
   document and generated client, and the Release-2 modules (analyser integration UI, auto-verification, quality control,
   claims, financial reports; their backends exist where MODULES.md says so and stay hidden under `RELEASE_SCOPE = 'R1'`).

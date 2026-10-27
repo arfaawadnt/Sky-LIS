@@ -275,7 +275,7 @@ public sealed class PlatformAdminModuleTests(DatabaseFixture fixture)
     {
         var profile = ClientProfile.Create("Lab " + slug, "مختبر " + slug, country, governorate.Id, "Street 1", "01012345678", null, "Manager", "01112223333", null);
         var tenant = Tenant.Provision(profile, country, governorate, plan, slug, source, "en", trialDays, at ?? Now);
-        using var scope = fixture.AppScope(tenant.Id);   // the provisioning scope: the new tenant (intake §11)
+        using var scope = fixture.AppScope(tenant.Id, registerTenant: false);   // the provisioning scope: the new tenant (intake §11)
         scope.ServiceProvider.GetRequiredService<ITenantRepository>().Add(tenant);
         scope.ServiceProvider.GetRequiredService<IWalletRepository>().Add(Wallet.Open(tenant.Id, country.CurrencyCode, Now.AddMonths(1)));
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);

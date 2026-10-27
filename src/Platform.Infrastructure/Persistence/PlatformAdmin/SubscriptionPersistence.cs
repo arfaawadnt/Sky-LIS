@@ -23,6 +23,8 @@ internal sealed class SubscriptionReminderConfiguration : IEntityTypeConfigurati
     public void Configure(EntityTypeBuilder<SubscriptionReminder> builder)
     {
         builder.ToTable("subscription_reminders", AppDbContext.SaasSchema);
+        builder.HasKey(reminder => new { reminder.TenantId, reminder.Id });   // database team review 2026-10-26, comment 4: (tenant_id, id)
+        builder.Property(reminder => reminder.Id).ValueGeneratedNever();
         builder.Property(reminder => reminder.Kind).IsRequired();
         builder.Property(reminder => reminder.DueKey).HasMaxLength(SubscriptionReminders.MaxKeyLength).IsRequired();
         builder.Property(reminder => reminder.TemplateCode).HasMaxLength(SubscriptionReminder.MaxTemplateCodeLength).IsRequired();
@@ -30,7 +32,7 @@ internal sealed class SubscriptionReminderConfiguration : IEntityTypeConfigurati
         builder.Property(reminder => reminder.SentAtUtc).IsRequired();
         builder.HasIndex(reminder => new { reminder.TenantId, reminder.DueKey }).IsUnique();
         builder.HasIndex(reminder => new { reminder.TenantId, reminder.SentAtUtc });
-        builder.HasOne<Tenant>().WithMany().HasForeignKey(reminder => reminder.TenantId).OnDelete(DeleteBehavior.Restrict);
+        // the foreign key to saas.tenants is the convention of AppDbContext (fk_subscription_reminders_tenant)
     }
 }
 

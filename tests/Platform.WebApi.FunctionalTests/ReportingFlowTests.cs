@@ -27,6 +27,7 @@ public sealed class ReportingFlowTests(ApiFactory factory) : IClassFixture<ApiFa
         var lab = Guid.CreateVersion7();
         var patient = Guid.CreateVersion7();
         var installed = await ActivityInstalledAsync();
+        await factory.EnsureClientRecordAsync(lab);   // every tenant_id references saas.tenants (DbReviewTenantKeys)
         if (installed)
         {
             await InsertVisitAsync(lab, patient, factory.Clock.UtcNow);

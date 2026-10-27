@@ -214,6 +214,11 @@ internal static class RawRows
     public static async Task InsertAsync(string qualifiedTable, IReadOnlyDictionary<string, object?> values)
     {
         var (schema, table) = (qualifiedTable.Split('.')[0], qualifiedTable.Split('.')[1]);
+        if (values.TryGetValue("tenant_id", out var tenant) && tenant is Guid tenantId)
+        {
+            await TestTenants.EnsureLaboratoryAsync(tenantId);   // every tenant_id references saas.tenants (DbReviewTenantKeys)
+        }
+
         await using var connection = new NpgsqlConnection(TestDatabase.OwnerConnection);
         await connection.OpenAsync();
 

@@ -114,7 +114,7 @@ public sealed class ClientLastActivityReaderTests(DatabaseFixture fixture)
         var slug = "sil-" + Guid.CreateVersion7().ToString("N")[^10..];
         var profile = ClientProfile.Create("Lab " + slug, "مختبر " + slug, country, governorate.Id, "Street 1", "01012345678", null, "Manager", "01112223333", null);
         var tenant = Tenant.Provision(profile, country, governorate, plan, slug, TenantSource.Subscription, "en", 14, Now);
-        using var scope = fixture.AppScope(tenant.Id);
+        using var scope = fixture.AppScope(tenant.Id, registerTenant: false);
         scope.ServiceProvider.GetRequiredService<ITenantRepository>().Add(tenant);
         scope.ServiceProvider.GetRequiredService<IWalletRepository>().Add(Wallet.Open(tenant.Id, country.CurrencyCode, Now.AddMonths(1)));
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);

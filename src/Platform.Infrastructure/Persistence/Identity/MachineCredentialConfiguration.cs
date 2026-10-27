@@ -5,9 +5,9 @@ using Platform.Domain.Identity;
 namespace Platform.Infrastructure.Persistence.Identity;
 
 /// <summary>
-/// <c>identity.machine_credentials</c> (02 §6.3): no row-level security and a single-column key, like
-/// <c>refresh_sessions</c> — the token exchange finds the row by client id before any tenant is known. The tenant is an
-/// ordinary column every management read filters on. Scopes are a <c>text[]</c>; the service user is one per credential.
+/// <c>identity.machine_credentials</c> (02 §6.3): no row-level security — the token exchange finds the row by its unique
+/// client id before any tenant is known. The tenant is an ordinary column every management read filters on and leads the
+/// key <c>(tenant_id, id)</c> (database team review 2026-10-26, comment 4). Scopes are a <c>text[]</c>; the service user is one per credential.
 /// </summary>
 internal sealed class MachineCredentialConfiguration : IEntityTypeConfiguration<MachineCredential>
 {
@@ -15,7 +15,7 @@ internal sealed class MachineCredentialConfiguration : IEntityTypeConfiguration<
     {
         builder.ToTable("machine_credentials", AppDbContext.IdentitySchema);
 
-        builder.HasKey(credential => credential.Id);
+        builder.HasKey(credential => new { credential.TenantId, credential.Id });   // database team review 2026-10-26, comment 4: (tenant_id, id); found by the unique client id
         builder.Property(credential => credential.Id).ValueGeneratedNever();
 
         builder.Property(credential => credential.TenantId).IsRequired();

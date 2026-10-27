@@ -123,6 +123,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Account.SupportTicket", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
@@ -151,7 +155,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
+                        .HasColumnType("text")
                         .HasColumnName("description");
 
                     b.Property<string>("LaboratoryNameAr")
@@ -229,11 +233,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("subject");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("Id")
+                    b.HasKey("TenantId", "Id")
                         .HasName("pk_support_tickets");
 
                     b.HasIndex("OpenedByUserId")
@@ -326,7 +326,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Note")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("note");
 
                     b.Property<string>("Number")
@@ -1484,7 +1484,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("FormulaExpression")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("formula_expression");
 
                     b.Property<string>("FormulaOperands")
@@ -2681,7 +2681,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Precaution")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("precaution");
 
                     b.Property<bool>("PrintAlone")
@@ -2925,7 +2925,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Text")
                         .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
+                        .HasColumnType("text")
                         .HasColumnName("text");
 
                     b.Property<string>("Title")
@@ -3020,6 +3020,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Identity.MachineCredential", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
@@ -3112,11 +3116,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("service_user_id");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("Id")
+                    b.HasKey("TenantId", "Id")
                         .HasName("pk_machine_credentials");
 
                     b.HasIndex("ClientId")
@@ -3386,6 +3386,9 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.HasIndex("RefreshTokenHash")
                         .IsUnique()
                         .HasDatabaseName("ix_refresh_sessions_refresh_token_hash");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_refresh_sessions_tenant_id");
 
                     b.ToTable("refresh_sessions", "identity", t =>
                         {
@@ -3909,14 +3912,14 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.HasKey("TenantId", "Id")
                         .HasName("pk_site_agents");
 
-                    b.HasIndex("MachineCredentialId")
-                        .HasDatabaseName("ix_site_agents_machine_credential_id");
-
                     b.HasIndex("ServiceUserId")
                         .HasDatabaseName("ix_site_agents_service_user");
 
                     b.HasIndex("TenantId", "BranchId")
                         .HasDatabaseName("ix_site_agents_branch");
+
+                    b.HasIndex("TenantId", "MachineCredentialId")
+                        .HasDatabaseName("ix_site_agents_tenant_id_machine_credential_id");
 
                     b.HasIndex("TenantId", "Name")
                         .IsUnique()
@@ -4190,7 +4193,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("MergeReason")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("merge_reason");
 
                     b.Property<DateTimeOffset?>("MergedAtUtc")
@@ -4367,7 +4370,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("DeactivationReason")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("deactivation_reason");
 
                     b.Property<string>("FileName")
@@ -4885,7 +4888,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.Property<string>("Display")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("display");
 
                     b.HasKey("CodeSystemId", "Code")
@@ -5189,13 +5192,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.Property<string>("TextAr")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("text")
                         .HasColumnName("text_ar");
 
                     b.Property<string>("TextEn")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("text")
                         .HasColumnName("text_en");
 
                     b.HasKey("Id")
@@ -5406,13 +5409,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("description");
 
                     b.Property<string>("Formula")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("text")
                         .HasColumnName("formula");
 
                     b.Property<bool>("IsActive")
@@ -5456,8 +5459,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.SubscriptionReminder", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -5521,11 +5527,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("template_code");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("Id")
+                    b.HasKey("TenantId", "Id")
                         .HasName("pk_subscription_reminders");
 
                     b.HasIndex("TenantId", "DueKey")
@@ -5692,6 +5694,9 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.HasIndex("ExpiresAtUtc")
                         .HasDatabaseName("ix_subscription_requests_expires_at_utc");
 
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_subscription_requests_tenant_id");
+
                     b.ToTable("subscription_requests", "saas", t =>
                         {
                             t.HasCheckConstraint("ck_subscription_requests_status_domain", "\"status\" IN ('Pending', 'Verified', 'Completed')");
@@ -5701,7 +5706,6 @@ namespace Platform.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -5770,6 +5774,12 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("GovernorateId")
                         .HasColumnType("uuid")
                         .HasColumnName("governorate_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
 
                     b.Property<string>("LicenceNo")
                         .HasMaxLength(64)
@@ -5875,6 +5885,8 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.ToTable("tenants", "saas", t =>
                         {
+                            t.HasCheckConstraint("ck_tenants_kind_domain", "\"kind\" IN ('Laboratory', 'Platform')");
+
                             t.HasCheckConstraint("ck_tenants_source_domain", "\"source\" IN ('Subscription', 'Manual')");
 
                             t.HasCheckConstraint("ck_tenants_status_domain", "\"status\" IN ('Trial', 'Active', 'Inactive')");
@@ -5883,8 +5895,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.Wallet", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -5940,11 +5955,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("Id")
+                    b.HasKey("TenantId", "Id")
                         .HasName("pk_wallets");
 
                     b.HasIndex("TenantId")
@@ -5956,6 +5967,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.WalletTopUpRequest", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
@@ -5996,11 +6011,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("wallet_id");
 
-                    b.HasKey("Id")
+                    b.HasKey("TenantId", "Id")
                         .HasName("pk_wallet_top_up_requests");
 
-                    b.HasIndex("WalletId", "Status")
-                        .HasDatabaseName("ix_wallet_top_up_requests_wallet_id_status");
+                    b.HasIndex("TenantId", "WalletId", "Status")
+                        .HasDatabaseName("ix_wallet_top_up_requests_wallet_status");
 
                     b.ToTable("wallet_top_up_requests", "saas", t =>
                         {
@@ -6010,6 +6025,10 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.WalletTransaction", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
@@ -6053,11 +6072,11 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("wallet_id");
 
-                    b.HasKey("Id")
+                    b.HasKey("TenantId", "Id")
                         .HasName("pk_wallet_transactions");
 
-                    b.HasIndex("WalletId", "AtUtc")
-                        .HasDatabaseName("ix_wallet_transactions_wallet_id_at_utc");
+                    b.HasIndex("TenantId", "WalletId", "AtUtc")
+                        .HasDatabaseName("ix_wallet_transactions_wallet_at");
 
                     b.ToTable("wallet_transactions", "saas", t =>
                         {
@@ -6583,7 +6602,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("notes");
 
                     b.Property<string>("Number")
@@ -6671,7 +6690,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("CancellationReason")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("cancellation_reason");
 
                     b.Property<DateTimeOffset?>("CancelledAtUtc")
@@ -6732,7 +6751,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("notes");
 
                     b.Property<string>("Number")
@@ -6887,7 +6906,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("DiscountReason")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("discount_reason");
 
                     b.Property<Guid?>("DiscountReasonId")
@@ -7053,7 +7072,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("CancellationReason")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("cancellation_reason");
 
                     b.Property<Guid?>("CancellationReasonId")
@@ -7336,7 +7355,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("reason");
 
                     b.Property<Guid?>("ReasonId")
@@ -7507,7 +7526,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("CancellationReason")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("cancellation_reason");
 
                     b.Property<DateTimeOffset?>("CancelledAtUtc")
@@ -7553,7 +7572,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("DeltaComment")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("delta_comment");
 
                     b.Property<bool>("DeltaFlag")
@@ -7592,7 +7611,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("InternalNote")
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("text")
                         .HasColumnName("internal_note");
 
                     b.Property<bool>("IsHiddenHelper")
@@ -7681,7 +7700,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("ReportComment")
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("text")
                         .HasColumnName("report_comment");
 
                     b.Property<string>("ReportUnitKey")
@@ -7845,7 +7864,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Detail")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("detail");
 
                     b.Property<string>("FromStatus")
@@ -7879,12 +7898,12 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("ValueAfter")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("value_after");
 
                     b.Property<string>("ValueBefore")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("value_before");
 
                     b.HasKey("TenantId", "Id")
@@ -7928,7 +7947,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("CancellationReason")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("cancellation_reason");
 
                     b.Property<DateTimeOffset?>("CancelledAtUtc")
@@ -8119,7 +8138,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Note")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("note");
 
                     b.Property<Guid?>("ReasonId")
@@ -8214,7 +8233,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("ListPreferences")
                         .HasMaxLength(4096)
-                        .HasColumnType("character varying(4096)")
+                        .HasColumnType("text")
                         .HasColumnName("list_preferences");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
@@ -8424,7 +8443,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Reason")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("reason");
 
                     b.HasKey("TenantId", "Id")
@@ -8470,7 +8489,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Detail")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasColumnType("text")
                         .HasColumnName("detail");
 
                     b.Property<string>("Name")
@@ -8588,7 +8607,7 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.Property<string>("Message")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("text")
                         .HasColumnName("message");
 
                     b.Property<DateTimeOffset>("ReceivedAtUtc")
@@ -8860,6 +8879,9 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_outbox_events_pending")
                         .HasFilter("processed_at_utc IS NULL AND dead_lettered_at_utc IS NULL");
 
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_outbox_events_tenant_id");
+
                     b.ToTable("outbox_events", "ops");
                 });
 
@@ -8980,6 +9002,16 @@ namespace Platform.Infrastructure.Persistence.Migrations
                     b.ToTable("envelope_keys", "identity");
                 });
 
+            modelBuilder.Entity("Platform.Domain.Account.LaboratoryLogo", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_laboratory_logos_tenant");
+                });
+
             modelBuilder.Entity("Platform.Domain.Account.SupportTicket", b =>
                 {
                     b.HasOne("Platform.Domain.Identity.PlatformUser", null)
@@ -8989,8 +9021,19 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_support_tickets_opened_by_user");
 
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_support_tickets_tenant");
+
                     b.OwnsMany("Platform.Domain.Account.SupportTicketReply", "Replies", b1 =>
                         {
+                            b1.Property<Guid>("TenantId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("tenant_id");
+
                             b1.Property<Guid>("Id")
                                 .HasColumnType("uuid")
                                 .HasColumnName("id");
@@ -9020,20 +9063,27 @@ namespace Platform.Infrastructure.Persistence.Migrations
                             b1.Property<string>("Text")
                                 .IsRequired()
                                 .HasMaxLength(4000)
-                                .HasColumnType("character varying(4000)")
+                                .HasColumnType("text")
                                 .HasColumnName("text");
 
-                            b1.HasKey("Id")
+                            b1.HasKey("TenantId", "Id")
                                 .HasName("pk_support_ticket_replies");
 
-                            b1.HasIndex("SupportTicketId", "AtUtc")
+                            b1.HasIndex("TenantId", "SupportTicketId", "AtUtc")
                                 .HasDatabaseName("ix_support_ticket_replies_ticket_at");
 
                             b1.ToTable("support_ticket_replies", "saas");
 
+                            b1.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                                .WithMany()
+                                .HasForeignKey("TenantId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_support_ticket_replies_tenant");
+
                             b1.WithOwner()
-                                .HasForeignKey("SupportTicketId")
-                                .HasConstraintName("fk_support_ticket_replies_support_tickets_support_ticket_id");
+                                .HasForeignKey("TenantId", "SupportTicketId")
+                                .HasConstraintName("fk_support_ticket_replies_ticket");
                         });
 
                     b.Navigation("Replies");
@@ -9053,6 +9103,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_cash_closings_platform_users_closed_by_user_id");
+
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cash_closings_tenant");
 
                     b.OwnsOne("Platform.Domain.Billing.ClosingTotals", "Totals", b1 =>
                         {
@@ -9168,6 +9225,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_cash_entries_platform_users_cashier_user_id");
 
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cash_entries_tenant");
+
                     b.HasOne("Platform.Domain.Identity.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("VoidedByUserId")
@@ -9183,6 +9247,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_payments_platform_users_cashier_user_id");
+
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payments_tenant");
 
                     b.HasOne("Platform.Domain.Identity.PlatformUser", null)
                         .WithMany()
@@ -9200,6 +9271,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Billing.PaymentMethodDefinition", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_methods_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("PaymentMethodDefinitionTenantId")
@@ -9245,6 +9323,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_refunds_platform_users_cashier_user_id");
 
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refunds_tenant");
+
                     b.HasOne("Platform.Domain.Billing.VisitAccount", null)
                         .WithMany("Refunds")
                         .HasForeignKey("TenantId", "VisitId")
@@ -9253,8 +9338,25 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_refunds_visit_accounts_tenant_id_visit_id");
                 });
 
+            modelBuilder.Entity("Platform.Domain.Billing.VisitAccount", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_visit_accounts_tenant");
+                });
+
             modelBuilder.Entity("Platform.Domain.Catalogue.Antibiotic", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_antibiotics_tenant");
+
                     b.HasOne("Platform.Domain.Catalogue.CommercialName", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "CommercialNameId")
@@ -9299,6 +9401,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.ClinicalGroup", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_clinical_groups_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("ClinicalGroupTenantId")
@@ -9337,6 +9446,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.CommentTemplate", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_comment_templates_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Text", b1 =>
                         {
                             b1.Property<Guid>("CommentTemplateTenantId")
@@ -9375,6 +9491,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.CommercialName", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_commercial_names_tenant");
+
                     b.HasOne("Platform.Domain.Catalogue.DrugType", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "DrugTypeId")
@@ -9420,6 +9543,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.Diagnosis", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_diagnoses_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("DiagnosisTenantId")
@@ -9458,6 +9588,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.Doctor", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_doctors_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("DoctorTenantId")
@@ -9496,6 +9633,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.DrugType", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_drug_types_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("DrugTypeTenantId")
@@ -9534,6 +9678,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.LabTest", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tests_tenant");
+
                     b.HasOne("Platform.Domain.Catalogue.ClinicalGroup", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "ClinicalGroupId")
@@ -9597,6 +9748,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.ListValue", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_test_list_values_tenant");
+
                     b.HasOne("Platform.Domain.Catalogue.LabTest", null)
                         .WithMany("ListValues")
                         .HasForeignKey("TenantId", "LabTestId")
@@ -9605,8 +9763,25 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_test_list_values_tests_tenant_id_lab_test_id");
                 });
 
+            modelBuilder.Entity("Platform.Domain.Catalogue.MeasurementUnit", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_measurement_units_tenant");
+                });
+
             modelBuilder.Entity("Platform.Domain.Catalogue.Organism", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_organisms_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("OrganismTenantId")
@@ -9645,6 +9820,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.PatientCondition", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patient_conditions_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("PatientConditionTenantId")
@@ -9683,6 +9865,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.Preparation", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_preparations_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Question", b1 =>
                         {
                             b1.Property<Guid>("PreparationTenantId")
@@ -9721,6 +9910,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.RangeBand", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_test_range_bands_tenant");
+
                     b.HasOne("Platform.Domain.Catalogue.LabTest", null)
                         .WithMany("RangeBands")
                         .HasForeignKey("TenantId", "LabTestId")
@@ -9737,6 +9933,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.Reason", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_reasons_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("ReasonTenantId")
@@ -9775,6 +9978,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.ReportTemplate", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_report_templates_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "FooterText", b1 =>
                         {
                             b1.Property<Guid>("ReportTemplateTenantId")
@@ -9877,6 +10087,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.SampleCompatibilityGroup", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sample_compatibility_groups_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("SampleCompatibilityGroupTenantId")
@@ -9915,12 +10132,19 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.SampleCompatibilityMember", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sample_compatibility_members_tenant");
+
                     b.HasOne("Platform.Domain.Catalogue.SampleCompatibilityGroup", null)
                         .WithMany("Members")
                         .HasForeignKey("TenantId", "GroupId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_sample_compatibility_members_sample_compatibility_groups_te");
+                        .HasConstraintName("fk_sample_compatibility_members_group");
 
                     b.HasOne("Platform.Domain.Catalogue.SampleCondition", null)
                         .WithMany()
@@ -9938,6 +10162,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.SampleCondition", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sample_conditions_tenant");
+
                     b.HasOne("Platform.Domain.Catalogue.SampleType", null)
                         .WithMany("Conditions")
                         .HasForeignKey("TenantId", "SampleTypeId")
@@ -9983,6 +10214,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.SampleType", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sample_types_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("SampleTypeTenantId")
@@ -10021,6 +10259,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.SendingLab", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sending_labs_tenant");
+
                     b.HasOne("Platform.Domain.Catalogue.Doctor", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "DoctorId")
@@ -10100,6 +10345,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.SensitivityValue", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sensitivity_values_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("SensitivityValueTenantId")
@@ -10138,6 +10390,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.Service", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_services_tenant");
+
                     b.HasOne("Platform.Domain.Catalogue.ClinicalGroup", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "ClinicalGroupId")
@@ -10194,6 +10453,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.ServiceMember", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_service_members_tenant");
+
                     b.HasOne("Platform.Domain.Catalogue.Service", null)
                         .WithMany("Members")
                         .HasForeignKey("TenantId", "ServiceId")
@@ -10204,6 +10470,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.ShortcutSet", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_shortcut_sets_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("ShortcutSetTenantId")
@@ -10242,6 +10515,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.TestParagraph", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_test_paragraphs_tenant");
+
                     b.HasOne("Platform.Domain.Catalogue.LabTest", null)
                         .WithMany("Paragraphs")
                         .HasForeignKey("TenantId", "LabTestId")
@@ -10252,6 +10532,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Catalogue.TestRule", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_test_rules_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("TestRuleTenantId")
@@ -10296,6 +10583,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_machine_credentials_service_user");
+
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_machine_credentials_tenant");
                 });
 
             modelBuilder.Entity("Platform.Domain.Identity.RefreshSession", b =>
@@ -10306,41 +10600,22 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_refresh_sessions_platform_users_platform_user_id");
+
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_refresh_sessions_tenant");
                 });
 
             modelBuilder.Entity("Platform.Domain.Integration.Analyser", b =>
                 {
-                    b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
-                        {
-                            b1.Property<Guid>("AnalyserTenantId")
-                                .HasColumnType("uuid")
-                                .HasColumnName("tenant_id");
-
-                            b1.Property<Guid>("AnalyserId")
-                                .HasColumnType("uuid")
-                                .HasColumnName("id");
-
-                            b1.Property<string>("Ar")
-                                .IsRequired()
-                                .HasMaxLength(400)
-                                .HasColumnType("character varying(400)")
-                                .HasColumnName("name_ar");
-
-                            b1.Property<string>("En")
-                                .IsRequired()
-                                .HasMaxLength(400)
-                                .HasColumnType("character varying(400)")
-                                .HasColumnName("name_en");
-
-                            b1.HasKey("AnalyserTenantId", "AnalyserId")
-                                .HasName("pk_analysers");
-
-                            b1.ToTable("analysers", "app");
-
-                            b1.WithOwner()
-                                .HasForeignKey("AnalyserTenantId", "AnalyserId")
-                                .HasConstraintName("fk_analysers_analysers_tenant_id_id");
-                        });
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_analysers_tenant");
 
                     b.OwnsOne("Platform.Domain.Integration.AnalyserConnection", "Connection", b1 =>
                         {
@@ -10397,6 +10672,38 @@ namespace Platform.Infrastructure.Persistence.Migrations
                                 .HasConstraintName("fk_analysers_analysers_tenant_id_id");
                         });
 
+                    b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
+                        {
+                            b1.Property<Guid>("AnalyserTenantId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("tenant_id");
+
+                            b1.Property<Guid>("AnalyserId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Ar")
+                                .IsRequired()
+                                .HasMaxLength(400)
+                                .HasColumnType("character varying(400)")
+                                .HasColumnName("name_ar");
+
+                            b1.Property<string>("En")
+                                .IsRequired()
+                                .HasMaxLength(400)
+                                .HasColumnType("character varying(400)")
+                                .HasColumnName("name_en");
+
+                            b1.HasKey("AnalyserTenantId", "AnalyserId")
+                                .HasName("pk_analysers");
+
+                            b1.ToTable("analysers", "app");
+
+                            b1.WithOwner()
+                                .HasForeignKey("AnalyserTenantId", "AnalyserId")
+                                .HasConstraintName("fk_analysers_analysers_tenant_id_id");
+                        });
+
                     b.OwnsMany("Platform.Domain.Integration.AnalyserFlag", "Flags", b1 =>
                         {
                             b1.Property<Guid>("TenantId")
@@ -10438,6 +10745,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
                                     t.HasCheckConstraint("ck_analyser_flags_action_domain", "\"action\" IN ('Record', 'Stop')");
                                 });
 
+                            b1.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                                .WithMany()
+                                .HasForeignKey("TenantId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_analyser_flags_tenant");
+
                             b1.WithOwner()
                                 .HasForeignKey("TenantId", "AnalyserId")
                                 .HasConstraintName("fk_analyser_flags_analysers_tenant_id_analyser_id");
@@ -10454,6 +10768,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Integration.AnalyserSampleCode", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_analyser_sample_codes_tenant");
+
                     b.HasOne("Platform.Domain.Integration.Analyser", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "AnalyserId")
@@ -10464,6 +10785,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Integration.AnalyserTestMapping", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_analyser_test_mappings_tenant");
+
                     b.HasOne("Platform.Domain.Integration.Analyser", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "AnalyserId")
@@ -10508,9 +10836,16 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                             b1.ToTable("analyser_value_conversions", "app");
 
+                            b1.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                                .WithMany()
+                                .HasForeignKey("TenantId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_analyser_value_conversions_tenant");
+
                             b1.WithOwner()
                                 .HasForeignKey("TenantId", "MappingId")
-                                .HasConstraintName("fk_analyser_value_conversions_analyser_test_mappings_tenant_id");
+                                .HasConstraintName("fk_analyser_value_conversions_mapping");
                         });
 
                     b.Navigation("Conversions");
@@ -10518,6 +10853,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Integration.PcrKit", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pcr_kits_tenant");
+
                     b.HasOne("Platform.Domain.Integration.Analyser", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "AnalyserId")
@@ -10684,6 +11026,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
                                     t.HasCheckConstraint("ck_pcr_kit_genes_thresholds", "positive_ct_max > 0 AND positive_ct_max <= borderline_ct_max AND borderline_ct_max <= 60");
                                 });
 
+                            b1.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                                .WithMany()
+                                .HasForeignKey("TenantId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_pcr_kit_genes_tenant");
+
                             b1.WithOwner()
                                 .HasForeignKey("TenantId", "KitId")
                                 .HasConstraintName("fk_pcr_kit_genes_pcr_kits_tenant_id_kit_id");
@@ -10700,9 +11049,16 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Integration.SiteAgent", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_site_agents_tenant");
+
                     b.HasOne("Platform.Domain.Identity.MachineCredential", null)
                         .WithMany()
-                        .HasForeignKey("MachineCredentialId")
+                        .HasForeignKey("TenantId", "MachineCredentialId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_site_agents_machine_credential");
@@ -10710,6 +11066,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Organization.Branch", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_branches_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("BranchTenantId")
@@ -10748,6 +11111,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Organization.Role", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_roles_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("RoleTenantId")
@@ -10905,6 +11275,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
                             b1.ToTable("role_result_rights", "app");
 
+                            b1.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                                .WithMany()
+                                .HasForeignKey("TenantId")
+                                .OnDelete(DeleteBehavior.Restrict)
+                                .IsRequired()
+                                .HasConstraintName("fk_role_result_rights_tenant");
+
                             b1.WithOwner()
                                 .HasForeignKey("TenantId", "RoleId")
                                 .HasConstraintName("fk_role_result_rights_roles_tenant_id_role_id");
@@ -10921,6 +11298,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Patients.Patient", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patients_tenant");
+
                     b.HasOne("Platform.Domain.Patients.Patient", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "MergedIntoPatientId")
@@ -10930,6 +11314,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Patients.PatientDocument", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patient_documents_tenant");
+
                     b.HasOne("Platform.Domain.Patients.Patient", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "PatientId")
@@ -11223,7 +11614,16 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_subscription_reminders_tenant_tenant_id");
+                        .HasConstraintName("fk_subscription_reminders_tenant");
+                });
+
+            modelBuilder.Entity("Platform.Domain.PlatformAdmin.SubscriptionRequest", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_subscription_requests_tenant");
                 });
 
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.Tenant", b =>
@@ -11305,31 +11705,52 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_wallets_tenants_tenant_id");
+                        .HasConstraintName("fk_wallets_tenant");
                 });
 
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.WalletTopUpRequest", b =>
                 {
-                    b.HasOne("Platform.Domain.PlatformAdmin.Wallet", null)
-                        .WithMany("TopUpRequests")
-                        .HasForeignKey("WalletId")
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_wallet_top_up_requests_wallets_wallet_id");
+                        .HasConstraintName("fk_wallet_top_up_requests_tenant");
+
+                    b.HasOne("Platform.Domain.PlatformAdmin.Wallet", null)
+                        .WithMany("TopUpRequests")
+                        .HasForeignKey("TenantId", "WalletId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_wallet_top_up_requests_wallet");
                 });
 
             modelBuilder.Entity("Platform.Domain.PlatformAdmin.WalletTransaction", b =>
                 {
-                    b.HasOne("Platform.Domain.PlatformAdmin.Wallet", null)
-                        .WithMany("Transactions")
-                        .HasForeignKey("WalletId")
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_wallet_transactions_wallets_wallet_id");
+                        .HasConstraintName("fk_wallet_transactions_tenant");
+
+                    b.HasOne("Platform.Domain.PlatformAdmin.Wallet", null)
+                        .WithMany("Transactions")
+                        .HasForeignKey("TenantId", "WalletId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_wallet_transactions_wallet");
                 });
 
             modelBuilder.Entity("Platform.Domain.Pricing.BasePriceList", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_base_price_lists_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("BasePriceListTenantId")
@@ -11368,6 +11789,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Pricing.ContractPrice", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_contract_prices_tenant");
+
                     b.HasOne("Platform.Domain.Pricing.ContractPricing", null)
                         .WithMany("Prices")
                         .HasForeignKey("TenantId", "ContractPricingId")
@@ -11378,6 +11806,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Pricing.ContractPricing", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_contract_pricings_tenant");
+
                     b.HasOne("Platform.Domain.Pricing.ContractTier", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "ContractTierId")
@@ -11395,6 +11830,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Pricing.ContractTier", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_contract_tiers_tenant");
+
                     b.HasOne("Platform.Domain.Pricing.Payer", null)
                         .WithMany("Tiers")
                         .HasForeignKey("TenantId", "PayerId")
@@ -11440,6 +11882,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Pricing.Payer", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payers_tenant");
+
                     b.OwnsOne("Platform.SharedKernel.Localization.LocalizedText", "Name", b1 =>
                         {
                             b1.Property<Guid>("PayerTenantId")
@@ -11478,6 +11927,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Pricing.PriceLine", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_base_price_lines_tenant");
+
                     b.HasOne("Platform.Domain.Pricing.BasePriceList", null)
                         .WithMany("Lines")
                         .HasForeignKey("TenantId", "PriceListId")
@@ -11488,6 +11944,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Pricing.PricingSource", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_contract_pricing_sources_tenant");
+
                     b.HasOne("Platform.Domain.Pricing.BasePriceList", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "BasePriceListId")
@@ -11503,8 +11966,35 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_contract_pricing_sources_pricing");
                 });
 
+            modelBuilder.Entity("Platform.Domain.Registration.Batch", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_batches_tenant");
+                });
+
+            modelBuilder.Entity("Platform.Domain.Registration.Booking", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_bookings_tenant");
+                });
+
             modelBuilder.Entity("Platform.Domain.Registration.Visit", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_visits_tenant");
+
                     b.HasOne("Platform.Domain.Registration.Batch", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "BatchId")
@@ -11520,6 +12010,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Registration.VisitLine", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_visit_lines_tenant");
+
                     b.HasOne("Platform.Domain.Registration.VisitLine", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "ParentLineId")
@@ -11542,6 +12039,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Registration.VisitPreparationAnswer", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_visit_preparation_answers_tenant");
+
                     b.HasOne("Platform.Domain.Registration.Visit", null)
                         .WithMany("PreparationAnswers")
                         .HasForeignKey("TenantId", "VisitId")
@@ -11552,6 +12056,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Registration.VisitTransfer", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_visit_transfers_tenant");
+
                     b.HasOne("Platform.Domain.Registration.Visit", null)
                         .WithMany("Transfers")
                         .HasForeignKey("TenantId", "VisitId")
@@ -11562,6 +12073,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Registration.VisitTube", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_visit_tubes_tenant");
+
                     b.HasOne("Platform.Domain.Registration.Visit", null)
                         .WithMany("Tubes")
                         .HasForeignKey("TenantId", "VisitId")
@@ -11572,6 +12090,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Results.Result", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_results_tenant");
+
                     b.OwnsOne("Platform.Domain.Results.ResolvedRange", "Range", b1 =>
                         {
                             b1.Property<Guid>("ResultTenantId")
@@ -11632,6 +12157,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Results.ResultLogEntry", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_log_entries_tenant");
+
                     b.HasOne("Platform.Domain.Results.Result", null)
                         .WithMany("Log")
                         .HasForeignKey("TenantId", "ResultId")
@@ -11642,6 +12174,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Samples.Sample", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_samples_tenant");
+
                     b.OwnsOne("Platform.Domain.Samples.SampleRejection", "Rejection", b1 =>
                         {
                             b1.Property<Guid>("SampleTenantId")
@@ -11698,6 +12237,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Platform.Domain.Samples.SampleEvent", b =>
                 {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sample_events_tenant");
+
                     b.HasOne("Platform.Domain.Samples.Sample", null)
                         .WithMany("Events")
                         .HasForeignKey("TenantId", "SampleId")
@@ -11714,6 +12260,13 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_memberships_platform_users_platform_user_id");
+
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_memberships_tenant");
 
                     b.HasOne("Platform.Domain.Organization.Role", null)
                         .WithMany()
@@ -11827,6 +12380,104 @@ namespace Platform.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("SpecialRightsOverride");
+                });
+
+            modelBuilder.Entity("Platform.Infrastructure.Persistence.Audit.AuditTrailEntry", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_audit_trail_tenant");
+                });
+
+            modelBuilder.Entity("Platform.Infrastructure.Persistence.Audit.FieldChange", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_changes_tenant");
+                });
+
+            modelBuilder.Entity("Platform.Infrastructure.Persistence.Audit.SecurityEventRow", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_security_events_tenant");
+                });
+
+            modelBuilder.Entity("Platform.Infrastructure.Persistence.Integration.AgentLogEntryRow", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_agent_log_entries_tenant");
+                });
+
+            modelBuilder.Entity("Platform.Infrastructure.Persistence.Integration.AnalyserConnectionStateRow", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_analyser_connection_states_tenant");
+                });
+
+            modelBuilder.Entity("Platform.Infrastructure.Persistence.Integration.ResultIntakeRow", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_analyser_result_intake_tenant");
+                });
+
+            modelBuilder.Entity("Platform.Infrastructure.Persistence.Integration.SiteAgentStateRow", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_site_agent_states_tenant");
+                });
+
+            modelBuilder.Entity("Platform.Infrastructure.Persistence.Outbox.OutboxEvent", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_outbox_events_tenant");
+                });
+
+            modelBuilder.Entity("Platform.Infrastructure.Persistence.ReferenceCounter", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_reference_counters_tenant");
+                });
+
+            modelBuilder.Entity("Platform.Infrastructure.Persistence.Settings.TenantSetting", b =>
+                {
+                    b.HasOne("Platform.Domain.PlatformAdmin.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_settings_tenant");
                 });
 
             modelBuilder.Entity("Platform.Domain.Billing.VisitAccount", b =>

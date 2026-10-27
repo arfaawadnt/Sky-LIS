@@ -113,7 +113,7 @@ public sealed class IdentityMobileNumbersTests(DatabaseFixture fixture)
         var slug = "mob-" + suffix[^10..];
         var profile = ClientProfile.Create("Lab " + slug, "مختبر " + slug, country, governorate.Id, "Street 1", "0512345670", null, "Manager", "0512345671", null);
         var tenant = Tenant.Provision(profile, country, governorate, plan, slug, TenantSource.Manual, "en", 14, Now);
-        using var provisioning = fixture.AppScope(tenant.Id);
+        using var provisioning = fixture.AppScope(tenant.Id, registerTenant: false);
         provisioning.ServiceProvider.GetRequiredService<ITenantRepository>().Add(tenant);
         await provisioning.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);
         return tenant.Id;

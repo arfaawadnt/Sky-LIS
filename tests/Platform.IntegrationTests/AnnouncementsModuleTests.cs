@@ -109,7 +109,7 @@ public sealed class AnnouncementsModuleTests(DatabaseFixture fixture)
         var slug = "ann-" + Guid.CreateVersion7().ToString("N")[^10..];
         var profile = ClientProfile.Create("Lab " + slug, "مختبر " + slug, country, governorate.Id, "Street 1", "01012345678", null, "Manager", "01112223333", null);
         var tenant = Tenant.Provision(profile, country, governorate, plan, slug, TenantSource.Subscription, "en", 14, Now);
-        using (var provisioning = fixture.AppScope(tenant.Id))   // as provisioning does: the event is recorded in the new tenant's scope
+        using (var provisioning = fixture.AppScope(tenant.Id, registerTenant: false))   // as provisioning does: the event is recorded in the new tenant's scope
         {
             provisioning.ServiceProvider.GetRequiredService<ITenantRepository>().Add(tenant);
             await provisioning.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);

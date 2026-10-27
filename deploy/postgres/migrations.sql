@@ -7426,5 +7426,1263 @@ BEGIN
     VALUES ('20261026174815_CompatibilityGroups', '9.0.20');
     END IF;
 END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.analyser_value_conversions DROP CONSTRAINT fk_analyser_value_conversions_analyser_test_mappings_tenant_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.sample_compatibility_members DROP CONSTRAINT fk_sample_compatibility_members_sample_compatibility_groups_te;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.visits ALTER COLUMN discount_reason TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.visit_transfers ALTER COLUMN reason TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.visit_lines ALTER COLUMN cancellation_reason TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.tests ALTER COLUMN formula_expression TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.test_paragraphs ALTER COLUMN text TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.tenant_memberships ALTER COLUMN list_preferences TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE saas.support_tickets ALTER COLUMN description TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE saas.support_ticket_replies ALTER COLUMN text TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.services ALTER COLUMN precaution TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE audit.security_events ALTER COLUMN detail TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.samples ALTER COLUMN cancellation_reason TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.sample_events ALTER COLUMN note TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE saas.rule_templates ALTER COLUMN formula TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE saas.rule_templates ALTER COLUMN description TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.results ALTER COLUMN report_comment TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.results ALTER COLUMN internal_note TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.results ALTER COLUMN delta_comment TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.results ALTER COLUMN cancellation_reason TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.result_log_entries ALTER COLUMN value_before TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.result_log_entries ALTER COLUMN value_after TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.result_log_entries ALTER COLUMN detail TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.patients ALTER COLUMN merge_reason TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.patient_documents ALTER COLUMN deactivation_reason TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE saas.notification_templates ALTER COLUMN text_en TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE saas.notification_templates ALTER COLUMN text_ar TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE audit.field_changes ALTER COLUMN reason TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE saas.code_system_items ALTER COLUMN display TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.cash_closings ALTER COLUMN note TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.bookings ALTER COLUMN notes TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.bookings ALTER COLUMN cancellation_reason TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.batches ALTER COLUMN notes TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.agent_log_entries ALTER COLUMN message TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.analyser_value_conversions ADD CONSTRAINT fk_analyser_value_conversions_mapping FOREIGN KEY (tenant_id, mapping_id) REFERENCES app.analyser_test_mappings (tenant_id, id) ON DELETE CASCADE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.sample_compatibility_members ADD CONSTRAINT fk_sample_compatibility_members_group FOREIGN KEY (tenant_id, group_id) REFERENCES app.sample_compatibility_groups (tenant_id, id) ON DELETE CASCADE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    ALTER TABLE app.treasury_access_requests ALTER COLUMN approval_comment TYPE text, ALTER COLUMN decision_reason TYPE text;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026205534_DbReviewTextAndNames') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261026205534_DbReviewTextAndNames', '9.0.20');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.site_agents DROP CONSTRAINT fk_site_agents_machine_credential;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.subscription_reminders DROP CONSTRAINT fk_subscription_reminders_tenant_tenant_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.support_ticket_replies DROP CONSTRAINT fk_support_ticket_replies_support_tickets_support_ticket_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_top_up_requests DROP CONSTRAINT fk_wallet_top_up_requests_wallets_wallet_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_transactions DROP CONSTRAINT fk_wallet_transactions_wallets_wallet_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallets DROP CONSTRAINT fk_wallets_tenants_tenant_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallets DROP CONSTRAINT pk_wallets;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_transactions DROP CONSTRAINT pk_wallet_transactions;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    DROP INDEX saas.ix_wallet_transactions_wallet_id_at_utc;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_top_up_requests DROP CONSTRAINT pk_wallet_top_up_requests;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    DROP INDEX saas.ix_wallet_top_up_requests_wallet_id_status;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.support_tickets DROP CONSTRAINT pk_support_tickets;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.support_ticket_replies DROP CONSTRAINT pk_support_ticket_replies;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    DROP INDEX saas.ix_support_ticket_replies_ticket_at;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.subscription_reminders DROP CONSTRAINT pk_subscription_reminders;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    DROP INDEX app.ix_site_agents_machine_credential_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE identity.machine_credentials DROP CONSTRAINT pk_machine_credentials;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_transactions ADD tenant_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_top_up_requests ADD tenant_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.tenants ADD kind character varying(40) NOT NULL DEFAULT 'Laboratory';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.tenants ALTER COLUMN country_id DROP NOT NULL;
+    ALTER TABLE saas.tenants ALTER COLUMN governorate_id DROP NOT NULL;
+    ALTER TABLE saas.tenants ALTER COLUMN plan_id DROP NOT NULL;
+    ALTER TABLE saas.tenants ADD CONSTRAINT ck_tenants_laboratory_place
+        CHECK (kind = 'Platform' OR (country_id IS NOT NULL AND governorate_id IS NOT NULL AND plan_id IS NOT NULL));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    INSERT INTO saas.tenants (id, kind, name_en, name_ar, country_id, governorate_id, plan_id, address, mobile, manager_name, manager_mobile,
+                              portal_slug, source, status, activated_at_utc, preferred_language, created_at_utc, created_by_display_name)
+    VALUES ('00000000-0000-0000-0000-000000000001', 'Platform', 'Sky LIS platform', 'منصة Sky LIS', NULL, NULL, NULL, '', '', '', '',
+            'platform', 'Manual', 'Active', now(), 'en', now(), 'Platform tenant record')
+    ON CONFLICT (id) DO NOTHING;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    DO $$
+    DECLARE
+        ids_sql text;
+        orphans uuid[];
+        v_country uuid;
+        v_governorate uuid;
+        v_plan uuid;
+        v_mobile text;
+    BEGIN
+        SELECT string_agg(format('SELECT s.tenant_id FROM %I.%I s WHERE s.tenant_id IS NOT NULL', c.table_schema, c.table_name), ' UNION ')
+        INTO ids_sql
+        FROM information_schema.columns c
+        JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name AND t.table_type = 'BASE TABLE'
+        WHERE c.column_name = 'tenant_id'
+          AND c.table_schema IN ('identity', 'app', 'ops', 'audit', 'read', 'saas')
+          AND NOT (c.table_schema = 'saas' AND c.table_name = 'tenants');
+        IF ids_sql IS NULL THEN
+            RETURN;
+        END IF;
+
+        EXECUTE 'SELECT coalesce(array_agg(o.tenant_id ORDER BY o.tenant_id), ''{}''::uuid[]) FROM (' || ids_sql || ') o '
+             || 'WHERE o.tenant_id <> ''00000000-0000-0000-0000-000000000001''::uuid '
+             || 'AND NOT EXISTS (SELECT 1 FROM saas.tenants t WHERE t.id = o.tenant_id)'
+        INTO orphans;
+        IF cardinality(orphans) = 0 THEN
+            RETURN;
+        END IF;
+
+        SELECT c.id, c.dial_code || '1' || repeat('0', greatest(c.mobile_length - 1, 0))
+        INTO v_country, v_mobile
+        FROM saas.countries c
+        WHERE EXISTS (SELECT 1 FROM saas.governorates g WHERE g.country_id = c.id)
+        ORDER BY c.created_at_utc, c.id
+        LIMIT 1;
+        SELECT g.id INTO v_governorate FROM saas.governorates g WHERE g.country_id = v_country ORDER BY g.created_at_utc, g.id LIMIT 1;
+        SELECT p.id INTO v_plan FROM saas.plans p ORDER BY p.created_at_utc, p.id LIMIT 1;
+        IF v_country IS NULL OR v_governorate IS NULL OR v_plan IS NULL THEN
+            RAISE EXCEPTION 'DbReviewTenantKeys: % tenant id(s) own data without a client record in saas.tenants, and no country with a governorate or no plan exists to register them as laboratories. Create a country, a governorate and a plan, then apply the migration again.', cardinality(orphans)
+                USING ERRCODE = 'P0001';
+        END IF;
+
+        INSERT INTO saas.tenants (id, kind, name_en, name_ar, country_id, governorate_id, plan_id, address, mobile, manager_name, manager_mobile,
+                                  portal_slug, source, status, deactivated_at_utc, deactivation_reason, preferred_language, created_at_utc, created_by_display_name)
+        SELECT o.tenant_id, 'Laboratory',
+               'Unregistered laboratory ' || left(replace(o.tenant_id::text, '-', ''), 8),
+               'مختبر غير مسجل ' || left(replace(o.tenant_id::text, '-', ''), 8),
+               v_country, v_governorate, v_plan,
+               'Not recorded (registered by migration)', v_mobile, 'Not recorded (registered by migration)', v_mobile,
+               't' || replace(o.tenant_id::text, '-', ''), 'Manual', 'Inactive', now(),
+               'Registered by migration DbReviewTenantKeys: tenant data without a client record', 'en', now(), 'Migration DbReviewTenantKeys'
+        FROM unnest(orphans) AS o(tenant_id);
+        RAISE NOTICE 'DbReviewTenantKeys: % tenant(s) without a client record registered as inactive laboratories', cardinality(orphans);
+    END $$;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.support_ticket_replies ADD tenant_id uuid;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    UPDATE saas.wallet_transactions x SET tenant_id = w.tenant_id FROM saas.wallets w WHERE w.id = x.wallet_id AND x.tenant_id IS NULL;
+    UPDATE saas.wallet_top_up_requests x SET tenant_id = w.tenant_id FROM saas.wallets w WHERE w.id = x.wallet_id AND x.tenant_id IS NULL;
+    UPDATE saas.support_ticket_replies x SET tenant_id = t.tenant_id FROM saas.support_tickets t WHERE t.id = x.support_ticket_id AND x.tenant_id IS NULL;
+    ALTER TABLE saas.wallet_transactions ALTER COLUMN tenant_id SET NOT NULL;
+    ALTER TABLE saas.wallet_top_up_requests ALTER COLUMN tenant_id SET NOT NULL;
+    ALTER TABLE saas.support_ticket_replies ALTER COLUMN tenant_id SET NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallets ADD CONSTRAINT pk_wallets PRIMARY KEY (tenant_id, id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_transactions ADD CONSTRAINT pk_wallet_transactions PRIMARY KEY (tenant_id, id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_top_up_requests ADD CONSTRAINT pk_wallet_top_up_requests PRIMARY KEY (tenant_id, id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.support_tickets ADD CONSTRAINT pk_support_tickets PRIMARY KEY (tenant_id, id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.support_ticket_replies ADD CONSTRAINT pk_support_ticket_replies PRIMARY KEY (tenant_id, id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.subscription_reminders ADD CONSTRAINT pk_subscription_reminders PRIMARY KEY (tenant_id, id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE identity.machine_credentials ADD CONSTRAINT pk_machine_credentials PRIMARY KEY (tenant_id, id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    CREATE INDEX ix_wallet_transactions_wallet_at ON saas.wallet_transactions (tenant_id, wallet_id, at_utc);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    CREATE INDEX ix_wallet_top_up_requests_wallet_status ON saas.wallet_top_up_requests (tenant_id, wallet_id, status);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.tenants ADD CONSTRAINT ck_tenants_kind_domain CHECK ("kind" IN ('Laboratory', 'Platform'));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    CREATE INDEX ix_support_ticket_replies_ticket_at ON saas.support_ticket_replies (tenant_id, support_ticket_id, at_utc);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    CREATE INDEX ix_subscription_requests_tenant_id ON saas.subscription_requests (tenant_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    CREATE INDEX ix_site_agents_tenant_id_machine_credential_id ON app.site_agents (tenant_id, machine_credential_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    CREATE INDEX ix_refresh_sessions_tenant_id ON identity.refresh_sessions (tenant_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    CREATE INDEX ix_outbox_events_tenant_id ON ops.outbox_events (tenant_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.agent_log_entries ADD CONSTRAINT fk_agent_log_entries_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.analyser_connection_states ADD CONSTRAINT fk_analyser_connection_states_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.analyser_flags ADD CONSTRAINT fk_analyser_flags_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.analyser_result_intake ADD CONSTRAINT fk_analyser_result_intake_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.analyser_sample_codes ADD CONSTRAINT fk_analyser_sample_codes_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.analyser_test_mappings ADD CONSTRAINT fk_analyser_test_mappings_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.analyser_value_conversions ADD CONSTRAINT fk_analyser_value_conversions_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.analysers ADD CONSTRAINT fk_analysers_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.antibiotics ADD CONSTRAINT fk_antibiotics_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE audit.audit_trail ADD CONSTRAINT fk_audit_trail_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.base_price_lines ADD CONSTRAINT fk_base_price_lines_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.base_price_lists ADD CONSTRAINT fk_base_price_lists_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.batches ADD CONSTRAINT fk_batches_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.bookings ADD CONSTRAINT fk_bookings_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.branches ADD CONSTRAINT fk_branches_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.cash_closings ADD CONSTRAINT fk_cash_closings_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.cash_entries ADD CONSTRAINT fk_cash_entries_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.clinical_groups ADD CONSTRAINT fk_clinical_groups_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.comment_templates ADD CONSTRAINT fk_comment_templates_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.commercial_names ADD CONSTRAINT fk_commercial_names_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.contract_prices ADD CONSTRAINT fk_contract_prices_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.contract_pricing_sources ADD CONSTRAINT fk_contract_pricing_sources_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.contract_pricings ADD CONSTRAINT fk_contract_pricings_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.contract_tiers ADD CONSTRAINT fk_contract_tiers_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.diagnoses ADD CONSTRAINT fk_diagnoses_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.doctors ADD CONSTRAINT fk_doctors_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.drug_types ADD CONSTRAINT fk_drug_types_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE audit.field_changes ADD CONSTRAINT fk_field_changes_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.laboratory_logos ADD CONSTRAINT fk_laboratory_logos_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE identity.machine_credentials ADD CONSTRAINT fk_machine_credentials_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.measurement_units ADD CONSTRAINT fk_measurement_units_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.organisms ADD CONSTRAINT fk_organisms_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE ops.outbox_events ADD CONSTRAINT fk_outbox_events_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.patient_conditions ADD CONSTRAINT fk_patient_conditions_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.patient_documents ADD CONSTRAINT fk_patient_documents_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.patients ADD CONSTRAINT fk_patients_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.payers ADD CONSTRAINT fk_payers_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.payment_methods ADD CONSTRAINT fk_payment_methods_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.payments ADD CONSTRAINT fk_payments_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.pcr_kit_genes ADD CONSTRAINT fk_pcr_kit_genes_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.pcr_kits ADD CONSTRAINT fk_pcr_kits_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.preparations ADD CONSTRAINT fk_preparations_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.reasons ADD CONSTRAINT fk_reasons_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.reference_counters ADD CONSTRAINT fk_reference_counters_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE identity.refresh_sessions ADD CONSTRAINT fk_refresh_sessions_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.refunds ADD CONSTRAINT fk_refunds_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.report_templates ADD CONSTRAINT fk_report_templates_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.result_log_entries ADD CONSTRAINT fk_result_log_entries_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.results ADD CONSTRAINT fk_results_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.role_result_rights ADD CONSTRAINT fk_role_result_rights_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.roles ADD CONSTRAINT fk_roles_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.sample_compatibility_groups ADD CONSTRAINT fk_sample_compatibility_groups_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.sample_compatibility_members ADD CONSTRAINT fk_sample_compatibility_members_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.sample_conditions ADD CONSTRAINT fk_sample_conditions_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.sample_events ADD CONSTRAINT fk_sample_events_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.sample_types ADD CONSTRAINT fk_sample_types_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.samples ADD CONSTRAINT fk_samples_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE audit.security_events ADD CONSTRAINT fk_security_events_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.sending_labs ADD CONSTRAINT fk_sending_labs_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.sensitivity_values ADD CONSTRAINT fk_sensitivity_values_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.service_members ADD CONSTRAINT fk_service_members_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.services ADD CONSTRAINT fk_services_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.shortcut_sets ADD CONSTRAINT fk_shortcut_sets_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.site_agent_states ADD CONSTRAINT fk_site_agent_states_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.site_agents ADD CONSTRAINT fk_site_agents_machine_credential FOREIGN KEY (tenant_id, machine_credential_id) REFERENCES identity.machine_credentials (tenant_id, id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.site_agents ADD CONSTRAINT fk_site_agents_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.subscription_reminders ADD CONSTRAINT fk_subscription_reminders_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.subscription_requests ADD CONSTRAINT fk_subscription_requests_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.support_ticket_replies ADD CONSTRAINT fk_support_ticket_replies_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.support_ticket_replies ADD CONSTRAINT fk_support_ticket_replies_ticket FOREIGN KEY (tenant_id, support_ticket_id) REFERENCES saas.support_tickets (tenant_id, id) ON DELETE CASCADE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.support_tickets ADD CONSTRAINT fk_support_tickets_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.tenant_memberships ADD CONSTRAINT fk_tenant_memberships_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.tenant_settings ADD CONSTRAINT fk_tenant_settings_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.test_list_values ADD CONSTRAINT fk_test_list_values_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.test_paragraphs ADD CONSTRAINT fk_test_paragraphs_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.test_range_bands ADD CONSTRAINT fk_test_range_bands_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.test_rules ADD CONSTRAINT fk_test_rules_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.tests ADD CONSTRAINT fk_tests_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.visit_accounts ADD CONSTRAINT fk_visit_accounts_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.visit_lines ADD CONSTRAINT fk_visit_lines_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.visit_preparation_answers ADD CONSTRAINT fk_visit_preparation_answers_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.visit_transfers ADD CONSTRAINT fk_visit_transfers_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.visit_tubes ADD CONSTRAINT fk_visit_tubes_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE app.visits ADD CONSTRAINT fk_visits_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_top_up_requests ADD CONSTRAINT fk_wallet_top_up_requests_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_top_up_requests ADD CONSTRAINT fk_wallet_top_up_requests_wallet FOREIGN KEY (tenant_id, wallet_id) REFERENCES saas.wallets (tenant_id, id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_transactions ADD CONSTRAINT fk_wallet_transactions_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallet_transactions ADD CONSTRAINT fk_wallet_transactions_wallet FOREIGN KEY (tenant_id, wallet_id) REFERENCES saas.wallets (tenant_id, id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    ALTER TABLE saas.wallets ADD CONSTRAINT fk_wallets_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    DO $$
+    BEGIN
+        IF to_regclass('app.treasuries') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_treasuries_tenant') THEN
+            ALTER TABLE app.treasuries ADD CONSTRAINT fk_treasuries_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+        END IF;
+        IF to_regclass('app.treasury_access_requests') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_treasury_access_requests_tenant') THEN
+            ALTER TABLE app.treasury_access_requests ADD CONSTRAINT fk_treasury_access_requests_tenant FOREIGN KEY (tenant_id) REFERENCES saas.tenants (id) ON DELETE RESTRICT;
+        END IF;
+    END $$;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ops.__ef_migrations_history WHERE "migration_id" = '20261026212018_DbReviewTenantKeys') THEN
+    INSERT INTO ops.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261026212018_DbReviewTenantKeys', '9.0.20');
+    END IF;
+END $EF$;
 COMMIT;
 

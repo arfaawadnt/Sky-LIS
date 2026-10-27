@@ -56,6 +56,12 @@ public sealed class Tenant : AggregateRoot
         Apply(profile);
     }
 
+    /// <summary>
+    /// Always <see cref="TenantKind.Laboratory"/> for an aggregate the domain creates or loads: the platform row of the registry
+    /// (<see cref="TenantKind.Platform"/>) is filtered out of every read of the model and has no country, governorate or plan.
+    /// </summary>
+    public TenantKind Kind { get; private set; } = TenantKind.Laboratory;
+
     public LocalizedText Name { get; private set; }
 
     public Guid CountryId { get; private set; }

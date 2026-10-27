@@ -153,6 +153,7 @@ public sealed class AuditLedgerTests(DatabaseFixture fixture)
         var other = Guid.CreateVersion7();
         var actor = Guid.CreateVersion7();
 
+        await TestTenants.EnsureLaboratoryAsync(tenant);   // a signed-in tenant always has its registry row (DbReviewTenantKeys)
         using (var anonymous = fixture.AppScope(null, correlationId: "corr-anon"))
         {
             var events = anonymous.ServiceProvider.GetRequiredService<Platform.Application.Abstractions.Audit.ISecurityEventLog>();

@@ -54,6 +54,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         configurationBuilder.Conventions.Add(_ => new TenantKeyConvention());
+        configurationBuilder.Conventions.Add(_ => new TenantForeignKeyConvention());   // after the keys: every tenant_id → saas.tenants
         configurationBuilder.Conventions.Add(_ => new XminConcurrencyConvention());
         configurationBuilder.Properties<Enum>().HaveConversion<string>().HaveMaxLength(EnumColumnLength);
     }
@@ -82,6 +83,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         }
 
         ApplyEnumDomainConstraints(modelBuilder);
+        ApplyLongTextColumns(modelBuilder);
+    }
+
+    /// <summary>The name of the foreign key of <c>&lt;table&gt;.tenant_id</c> to <c>saas.tenants</c> (database team review 2026-10-26, comment 3; <see cref="TenantForeignKeyConvention"/>).</summary>
+    public static string TenantForeignKeyName(string table) => TenantForeignKeyConvention.NameFor(table);
+
+    /// <summary>Strings of this many characters or more are stored as <c>text</c> (database team review 2026-10-26, comment 2).</summary>
+    public const int LongTextThreshold = 1000;
+
+    /// <summary>
+    /// A string property whose maximum length is <see cref="LongTextThreshold"/> or more maps to <c>text</c> instead of
+    /// <c>varchar(n)</c>. The length stays a rule of the domain model and the request validators; the gate is
+    /// <c>ConventionTests.Long_text_columns_are_text_not_varchar</c>.
+    /// </summary>
+    private static void ApplyLongTextColumns(ModelBuilder modelBuilder)
+    {
+        foreach (var property in modelBuilder.Model.GetEntityTypes().SelectMany(type => type.GetProperties()))
+        {
+            if (property.ClrType == typeof(string) && property.GetMaxLength() >= LongTextThreshold)
+            {
+                property.SetColumnType("text");
+            }
+        }
     }
 
     /// <summary><c>e =&gt; context.IsElevated || e.TenantId == context.CurrentTenantIdOrNil</c>: an unresolved tenant matches nothing (fail-closed).</summary>

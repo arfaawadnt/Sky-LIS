@@ -199,7 +199,7 @@ public sealed class WalletChargeRunTests(DatabaseFixture fixture)
         var slug = slugPrefix + "-" + Guid.CreateVersion7().ToString("N")[^6..];
         var profile = ClientProfile.Create("Lab " + slug, "مختبر " + slug, place.Country, place.Governorate.Id, "Street 1", "01012345678", null, "Manager", "01112223333", null);
         var tenant = Tenant.Provision(profile, place.Country, place.Governorate, place.Plan, slug, source, "en", trialDays, DueAt.AddMonths(-1));
-        using var scope = fixture.AppScope(tenant.Id);   // the provisioning scope: the new tenant (intake §11)
+        using var scope = fixture.AppScope(tenant.Id, registerTenant: false);   // the provisioning scope: the new tenant (intake §11)
         scope.ServiceProvider.GetRequiredService<ITenantRepository>().Add(tenant);
         scope.ServiceProvider.GetRequiredService<IWalletRepository>().Add(Wallet.Open(tenant.Id, place.Country.CurrencyCode, DueAt));
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);

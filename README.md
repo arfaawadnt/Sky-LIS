@@ -235,7 +235,24 @@ assemblies, the frontend package and this README aligned. Never bypass the hook 
 
 ### Unreleased
 
-_Nothing yet._
+The database team's review of 2026-10-26 (five comments). Two migrations: `DbReviewTextAndNames`, `DbReviewTenantKeys`.
+
+- **IP addresses** (comment 1): already `inet` (`audit.security_events.client_ip`, `identity.refresh_sessions.ip_address`); gate
+  `ConventionTests.Ip_address_columns_are_inet`.
+- **Long text** (comment 2): every string of 1000 characters or more is `text` (34 columns, convention `AppDbContext.ApplyLongTextColumns`,
+  threshold `AppDbContext.LongTextThreshold`; the lengths stay rules of the domain and validators); gate `Long_text_columns_are_text_not_varchar`.
+- **Identifier length** (comment 5): every identifier is shorter than 62 characters (two foreign keys renamed:
+  `fk_analyser_value_conversions_mapping`, `fk_sample_compatibility_members_group`); the gate now rejects 62 and covers owned types.
+- **Tenant registry and keys** (comments 3 and 4): `saas.tenants` registers every tenant — `kind` Laboratory | Platform, a platform row
+  (`TenantIds.Platform`, written by the migration, `PlatformAdministratorSeeder` and DevTools; hidden from every reader by the EF filter
+  `Kind == Laboratory` and in raw SQL), and the migration registers any tenant that owns data without a client record as an *Inactive*
+  laboratory "Unregistered laboratory …" (`deactivation_reason` starts with `Registered by migration DbReviewTenantKeys`). Every table
+  with `tenant_id` has `fk_<table>_tenant` → `saas.tenants(id)` (87 keys, convention `TenantForeignKeyConvention`, gate);
+  `saas.wallet_transactions`, `wallet_top_up_requests` and `support_ticket_replies` gained `tenant_id`; wallets, wallet transactions,
+  top-ups, subscription reminders, support tickets and replies and machine credentials are keyed `(tenant_id, id)`. Unchanged on purpose:
+  tables whose tenant is nullable (security events, refresh sessions, outbox, subscription requests), natural tenant-first keys (reference
+  counters, tenant settings, audit trail), platform-wide reference and template tables, identity tables without a tenant and the
+  migration history.
 
 ### v0.26.1 — 2026-10-26
 

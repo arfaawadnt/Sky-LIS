@@ -107,6 +107,7 @@ internal sealed class AnalyserTestMappingConfiguration : IEntityTypeConfiguratio
         {
             conversions.ToTable("analyser_value_conversions", AppDbContext.AppSchema);
             conversions.WithOwner().HasForeignKey("TenantId", "MappingId");
+            conversions.Metadata.SetConstraintName("fk_analyser_value_conversions_mapping");   // the default name reached 62 characters (DB review)
             conversions.Property(conversion => conversion.Id).ValueGeneratedNever();
             conversions.HasKey("TenantId", nameof(ValueConversion.Id));
             conversions.Property(conversion => conversion.Order).HasColumnName("sort_order").IsRequired();
@@ -147,7 +148,7 @@ internal sealed class SiteAgentConfiguration : IEntityTypeConfiguration<SiteAgen
         builder.HasIndex(agent => new { agent.TenantId, agent.Name }).IsUnique().HasDatabaseName("ux_site_agents_name");
         builder.Property(agent => agent.BranchId).IsRequired();   // app.branches (organization): by id, checked by the handler
         builder.Property(agent => agent.MachineCredentialId).IsRequired();
-        builder.HasOne<MachineCredential>().WithMany().HasForeignKey(agent => agent.MachineCredentialId).OnDelete(DeleteBehavior.Restrict)
+        builder.HasOne<MachineCredential>().WithMany().HasForeignKey(agent => new { agent.TenantId, agent.MachineCredentialId }).OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_site_agents_machine_credential");
         builder.Property(agent => agent.ServiceUserId).IsRequired();
         builder.HasIndex(agent => agent.ServiceUserId).HasDatabaseName("ix_site_agents_service_user");

@@ -131,8 +131,13 @@ public sealed class SessionIdleTimeoutFlowTests(ApiFactory factory) : IClassFixt
         }
     }
 
-    private static async Task SetTimeoutAsync(Guid tenantId, string value)
+    private async Task SetTimeoutAsync(Guid tenantId, string value)
     {
+        if (!TenantIds.IsPlatform(tenantId))
+        {
+            await factory.EnsureClientRecordAsync(tenantId);   // every tenant_id references saas.tenants (DbReviewTenantKeys)
+        }
+
         await using var connection = new NpgsqlConnection(TestDatabase.OwnerConnection);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand(

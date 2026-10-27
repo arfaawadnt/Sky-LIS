@@ -39,6 +39,8 @@ using Microsoft.EntityFrameworkCore;
 //                                                                       governorate, the subscription default plan (else any plan); address, manager and mobiles
 //                                                                       are placeholders (ClientRecordRegistrar), corrected later on SA-04
 // seed-demo-lab also registers the client record of its tenant (slug demo-lab, else the suggestion rule), when one is missing.
+// Since migration DbReviewTenantKeys every tenant_id references saas.tenants: seed-user, seed-demo-lab and seed-reasons register the
+// tenant first (a laboratory: client record with slug t<id:N> unless one exists; the platform tenant: its registry row).
 // Connection string from LIS_DEVTOOLS_CONNECTION (an lis_* role on an lis* database; anything else is refused).
 
 if (args.Length == 0)
@@ -80,6 +82,11 @@ switch (args[0])
         {
             Console.Error.WriteLine($"user '{args[1]}' already exists");
             return 4;
+        }
+
+        if (!await EnsureTenantRegisteredAsync(services, tenantId))
+        {
+            return 5;
         }
 
         var user = PlatformUser.Register(args[1], $"{args[1]}@lis.local", "Development User", new Argon2idHasher().Hash(args[2]), clock.UtcNow);
@@ -148,6 +155,14 @@ switch (args[0])
                 Console.Error.WriteLine($"user '{username}' already exists");
                 return 4;
             }
+        }
+
+        // LIS-CR-005: sign-in is by laboratory address, so the demo laboratory needs a client record (and with it a slug); since
+        // DbReviewTenantKeys it is written before any row of the laboratory (every tenant_id references saas.tenants).
+        var registered = await RegisterClientRecordAsync(services, tenantId, "demo-lab", "Demo Laboratory", "مختبر تجريبي", suggestWhenTaken: true);
+        if (registered is null)
+        {
+            return 5;
         }
 
         var branch = Branch.Create("MAIN", new LocalizedText("Main Branch", "الفرع الرئيسي"), null, null, null, null, "EGP", now);
@@ -251,14 +266,6 @@ switch (args[0])
         Console.WriteLine($"  branch {branch.Code} ({branch.Id}); price list {priceList.Code}");
         Console.WriteLine($"  users {args[1]} and {managerUsername} (same password), role '{role.Name.En}' with every permission, all special and result rights");
         Console.WriteLine($"  services {string.Join(", ", tests.Select(test => test.Code))}; {reasonsSeeded} reasons");
-
-        // LIS-CR-005: sign-in is by laboratory address, so the demo laboratory needs a client record (and with it a slug).
-        var registered = await RegisterClientRecordAsync(services, tenantId, "demo-lab", "Demo Laboratory", "مختبر تجريبي", suggestWhenTaken: true);
-        if (registered is null)
-        {
-            return 5;
-        }
-
         Console.WriteLine($"  client record: address /lab/{registered.PortalSlug} (placeholders for address, manager and mobiles; correct them on SA-04)");
         return 0;
     }
@@ -281,6 +288,11 @@ switch (args[0])
         // Cancellation, refund, discount and rejection reasons a laboratory needs before the money and sample flows run
         // (a provisioned laboratory receives them from the platform catalogue; a hand-seeded one has none). Idempotent by name.
         tenantAccessor.SetTenant(reasonsTenant);
+        if (!await EnsureTenantRegisteredAsync(services, reasonsTenant))
+        {
+            return 5;
+        }
+
         var count = await SeedReasonsAsync(services, unitOfWork, clock.UtcNow);
         Console.WriteLine($"seeded {count} reasons in tenant {reasonsTenant} on {DatabaseRoleGuard.Describe(connectionString)}");
         return 0;
@@ -334,6 +346,30 @@ static async Task<Tenant?> RegisterClientRecordAsync(IServiceProvider services, 
         Console.Error.WriteLine($"refused: {exception.Code} {exception.Message}");
         return null;
     }
+}
+
+// DbReviewTenantKeys: the tenant's row in saas.tenants before any row of the tenant. The platform tenant gets its registry row;
+// a laboratory without a client record gets one (slug t<id:N>, placeholders as register-tenant-client). False (with a message) when refused.
+static async Task<bool> EnsureTenantRegisteredAsync(IServiceProvider services, Guid tenantId)
+{
+    if (TenantIds.IsPlatform(tenantId))
+    {
+        await services.GetRequiredService<IPlatformTenantRecord>().EnsureAsync(CancellationToken.None);
+        return true;
+    }
+
+    if (await services.GetRequiredService<AppDbContext>().Set<Tenant>().AsNoTracking().AnyAsync(tenant => tenant.Id == tenantId))
+    {
+        return true;
+    }
+
+    var registered = await RegisterClientRecordAsync(services, tenantId, "t" + tenantId.ToString("N"), "Development Laboratory", "مختبر التطوير", suggestWhenTaken: true);
+    if (registered is not null)
+    {
+        Console.WriteLine($"registered client record of tenant {tenantId} at /lab/{registered.PortalSlug} (placeholders; correct them on SA-04)");
+    }
+
+    return registered is not null;
 }
 
 static async Task<int> SeedReasonsAsync(IServiceProvider services, IUnitOfWork unitOfWork, DateTimeOffset now)

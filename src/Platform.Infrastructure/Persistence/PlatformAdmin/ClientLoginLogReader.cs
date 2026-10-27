@@ -61,7 +61,7 @@ internal sealed class ClientLoginLogReader(AppDbContext context) : IClientLoginL
             ) g
         ) f
         JOIN identity.platform_users u ON u.id = f.platform_user_id
-        LEFT JOIN saas.tenants t ON t.id = f.tenant_id
+        LEFT JOIN saas.tenants t ON t.id = f.tenant_id AND t.kind = 'Laboratory'
         """;
 
     private static readonly SortColumns<LogRow> Sorts = new SortColumns<LogRow>(PlatformAdminSortKeys.ClientLoginLogs)

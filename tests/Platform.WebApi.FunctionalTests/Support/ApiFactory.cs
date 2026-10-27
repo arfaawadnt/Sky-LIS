@@ -21,6 +21,7 @@ using Platform.Domain.Tenancy;
 using Platform.Infrastructure;
 using Platform.Infrastructure.Notifications;
 using Platform.Infrastructure.Persistence;
+using Platform.Infrastructure.Persistence.PlatformAdmin;
 using Platform.Infrastructure.Security;
 using Platform.SharedKernel.Abstractions;
 using Platform.SharedKernel.Localization;
@@ -181,6 +182,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await context.Database.MigrateAsync();
             await context.Database.ExecuteSqlRawAsync(TestDatabase.TruncateAllSql);
+            await context.Database.ExecuteSqlRawAsync(PlatformTenantRecord.EnsureSql);   // the registry row of the platform tenant (DbReviewTenantKeys)
         });
     }
 
@@ -197,6 +199,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public async Task<(string Username, Guid TenantId, Guid UserId)> SeedUserAsync(string? password = null, Guid? tenantId = null, IReadOnlyList<string>? permissions = null, string displayName = "Functional Tester", string? mobile = null, IReadOnlyList<Guid>? branchIds = null)
     {
         var tenant = tenantId ?? Guid.CreateVersion7();
+        if (!TenantIds.IsPlatform(tenant))
+        {
+            // LIS-CR-005: sign-in is by laboratory address, so every seeded laboratory has a client record; and since DbReviewTenantKeys
+            // every tenant_id references saas.tenants, so the record comes first.
+            await EnsureClientRecordAsync(tenant);
+        }
+
         var username = $"u.{Guid.CreateVersion7():N}"[..24];
         using var scope = Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<TenantContextAccessor>().SetTenant(tenant);
@@ -212,10 +221,6 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
         scope.ServiceProvider.GetRequiredService<ITenantMembershipRepository>().Add(membership);
         await unitOfWork.SaveChangesAsync(CancellationToken.None);
-        if (!TenantIds.IsPlatform(tenant))
-        {
-            await EnsureClientRecordAsync(tenant);   // LIS-CR-005: sign-in is by laboratory address, so every seeded laboratory has one
-        }
 
         if (permissions is { Count: > 0 })
         {
@@ -323,6 +328,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddSingleton(Clock);
             services.AddSingleton<IClock>(Clock);
             services.AddSingleton(Notifications);
+            // DbReviewTenantKeys: every tenant_id references saas.tenants; a test that seeds a laboratory's rows before seeding its user
+            // gets the laboratory's client record at the first save (TenantRegistrationInterceptor).
+            services.ConfigureDbContext<AppDbContext>((_, options) => options.AddInterceptors(new TenantRegistrationInterceptor(this)));
             if (!Overrides.ContainsKey(NotificationOptions.PickupDirectoryKey))
             {
                 // A test that configures a pickup directory exercises the production sender (NotificationDeliveryFlowTests).
@@ -330,6 +338,64 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 services.AddSingleton<INotificationSender>(Notifications);
             }
         });
+    }
+
+    /// <summary>
+    /// Before a save, gives every laboratory the added rows belong to its client record (<see cref="EnsureClientRecordAsync"/>),
+    /// except the tenants the same save creates and the platform tenant (registered when the database is prepared). Added after
+    /// the infrastructure's interceptors, so the tenant stamp has run.
+    /// </summary>
+    private sealed class TenantRegistrationInterceptor(ApiFactory factory) : Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesInterceptor
+    {
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, byte> _registered = new();
+
+        public override Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> SavingChanges(Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData eventData, Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result)
+        {
+            foreach (var tenantId in Unregistered(eventData.Context))
+            {
+                factory.EnsureClientRecordAsync(tenantId).GetAwaiter().GetResult();
+                _registered.TryAdd(tenantId, 0);
+            }
+
+            return result;
+        }
+
+        public override async ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>> SavingChangesAsync(Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData eventData, Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            foreach (var tenantId in Unregistered(eventData.Context))
+            {
+                await factory.EnsureClientRecordAsync(tenantId);
+                _registered.TryAdd(tenantId, 0);
+            }
+
+            return result;
+        }
+
+        private List<Guid> Unregistered(DbContext? context)
+        {
+            if (context is null)
+            {
+                return [];
+            }
+
+            var created = new HashSet<Guid>();
+            var used = new HashSet<Guid>();
+            foreach (var entry in context.ChangeTracker.Entries().Where(entry => entry.State == EntityState.Added))
+            {
+                if (entry.Entity is Tenant tenant)
+                {
+                    created.Add(tenant.Id);
+                }
+                else if (entry.Metadata.FindProperty(nameof(ITenantScoped.TenantId)) is { } property
+                    && entry.Property(property.Name).CurrentValue is Guid id && id != Guid.Empty && !TenantIds.IsPlatform(id) && !_registered.ContainsKey(id))
+                {
+                    used.Add(id);
+                }
+            }
+
+            used.ExceptWith(created);
+            return [.. used];
+        }
     }
 
     private static string CreateSigningKey()

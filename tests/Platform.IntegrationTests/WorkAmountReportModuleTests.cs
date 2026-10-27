@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Platform.Application.Reporting;
 using Platform.IntegrationTests.Support;
+using Platform.SharedKernel.MultiTenancy;
 
 namespace Platform.IntegrationTests;
 
@@ -74,15 +75,21 @@ public sealed class WorkAmountReportModuleTests(DatabaseFixture fixture)
     }
 
     [DatabaseFact]
-    public async Task The_letterhead_falls_back_to_the_default_laboratory_name_without_a_client_record()
+    public async Task The_letterhead_names_the_client_record_and_falls_back_to_the_default_name_for_the_platform_row()
     {
         var world = await WorldAsync();
-        using var scope = fixture.AppScope(world.Tenant);
+        using (var scope = fixture.AppScope(world.Tenant))
+        {
+            var letterhead = await scope.ServiceProvider.GetRequiredService<IReportLetterhead>().GetAsync(world.Branch, CancellationToken.None);
+            var name = TestTenants.LaboratoryNamePrefix + world.Tenant.ToString("N")[..8];   // the fixture's placeholder record
+            Assert.Equal((name, name), (letterhead.LabNameEn, letterhead.LabNameAr));
+            Assert.Null(letterhead.BranchNameEn);   // no Organization branch row was written for this branch id
+        }
 
-        var letterhead = await scope.ServiceProvider.GetRequiredService<IReportLetterhead>().GetAsync(world.Branch, CancellationToken.None);
-
-        Assert.Equal(("Laboratory", "المختبر"), (letterhead.LabNameEn, letterhead.LabNameAr));
-        Assert.Null(letterhead.BranchNameEn);   // no Organization branch row was written for this branch id
+        // DbReviewTenantKeys: the platform tenant has a registry row (kind Platform) but is no laboratory: the default name stays.
+        using var platform = fixture.AppScope(TenantIds.Platform);
+        var fallback = await platform.ServiceProvider.GetRequiredService<IReportLetterhead>().GetAsync(world.Branch, CancellationToken.None);
+        Assert.Equal(("Laboratory", "المختبر"), (fallback.LabNameEn, fallback.LabNameAr));
     }
 
     private static (int Visits, int Services, decimal Gross, decimal Discount, decimal Cash, decimal Credit, decimal Net) Figures(Contracts.Reporting.WorkAmountRow row) =>

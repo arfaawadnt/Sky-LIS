@@ -22,6 +22,7 @@ using Platform.Infrastructure.Persistence.Identity;
 using Platform.Infrastructure.Persistence.Interceptors;
 using Platform.Infrastructure.Persistence.Organization;
 using Platform.Infrastructure.Persistence.Outbox;
+using Platform.Infrastructure.Persistence.PlatformAdmin;
 using Platform.Infrastructure.Persistence.Tenancy;
 using Platform.Infrastructure.Security;
 using Platform.Infrastructure.Security.CredentialTransport;
@@ -113,6 +114,7 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
         services.AddScoped<IRefreshSessionRepository, RefreshSessionRepository>();
         services.AddScoped<ITenantMembershipRepository, TenantMembershipRepository>();
+        services.AddScoped<IPlatformTenantRecord, PlatformTenantRecord>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IReferenceNumbers, ReferenceNumbers>();
 

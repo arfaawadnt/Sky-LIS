@@ -35,7 +35,7 @@ public sealed class ClientLoginLogReaderTests(DatabaseFixture fixture)
         var (country, governorate, plan) = await SeedPlaceAsync();
         var slug = "logs-" + Guid.CreateVersion7().ToString("N")[^8..];
         var tenantA = await ProvisionAsync(country, governorate, plan, slug);
-        var tenantB = Guid.CreateVersion7();   // no client record: names are null
+        var tenantB = Guid.CreateVersion7();   // registered by the fixture with a placeholder record (every tenant has one since DbReviewTenantKeys)
         var (user1, _) = await RegisterUserAsync("Noor Reception");
         var (user2, _) = await RegisterUserAsync("Sara Cashier");
         var (user3, _) = await RegisterUserAsync("Omar Technician");
@@ -87,7 +87,7 @@ public sealed class ClientLoginLogReaderTests(DatabaseFixture fixture)
 
         var f3 = rows.Single(row => row.FamilyId == third.FamilyId);
         Assert.Equal((Now.AddDays(-1) + Sliding, 480, "Expired"), (f3.EndedAtUtc, f3.DurationMinutes, f3.Status));
-        Assert.Null(f3.ClientNameEn);
+        Assert.Equal(TestTenants.LaboratoryNamePrefix + tenantB.ToString("N")[..8], f3.ClientNameEn);
         Assert.Null(f3.IpAddress);
 
         var f4 = rows.Single(row => row.FamilyId == fourth.FamilyId);
@@ -97,6 +97,7 @@ public sealed class ClientLoginLogReaderTests(DatabaseFixture fixture)
         var platformOnly = await reader.ListAsync(everything with { TenantId = TenantIds.Platform }, ListSort.None, PageRequest.Normalized(1, 50), at, CancellationToken.None);
         Assert.All(platformOnly.Items, row => Assert.Equal(TenantIds.Platform, row.TenantId));
         Assert.Contains(platformOnly.Items, row => row.FamilyId == platform.FamilyId);
+        Assert.All(platformOnly.Items, row => Assert.Null(row.ClientNameEn));   // the platform's registry row is not a client: no client name
         var clientA = await reader.ListAsync(everything with { TenantId = tenantA }, ListSort.None, PageRequest.Normalized(1, 50), at, CancellationToken.None);
         Assert.Equal([second.FamilyId, first.FamilyId], clientA.Items.Select(row => row.FamilyId));
 
@@ -170,7 +171,7 @@ public sealed class ClientLoginLogReaderTests(DatabaseFixture fixture)
     {
         var profile = ClientProfile.Create("Lab " + slug, "مختبر " + slug, country, governorate.Id, "Street 1", "01012345678", null, "Manager", "01112223333", null);
         var tenant = Tenant.Provision(profile, country, governorate, plan, slug, TenantSource.Manual, "en", 14, Now);
-        using var scope = fixture.AppScope(tenant.Id);
+        using var scope = fixture.AppScope(tenant.Id, registerTenant: false);
         scope.ServiceProvider.GetRequiredService<ITenantRepository>().Add(tenant);
         scope.ServiceProvider.GetRequiredService<IWalletRepository>().Add(Wallet.Open(tenant.Id, country.CurrencyCode, Now.AddMonths(1)));
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync(CancellationToken.None);

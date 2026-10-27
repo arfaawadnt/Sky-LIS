@@ -39,6 +39,7 @@ public sealed class PermissionGrantMigrationTests(DatabaseFixture fixture)
         try
         {
             await DatabaseFixture.TruncateAsync(context);
+            await TestTenants.EnsureLaboratoryAsync(Laboratory);   // registered before the roles (DbReviewTenantKeys); the row survives the way down
             await migrator.MigrateAsync(BeforeGrants);
 
             var platformAdministrator = await InsertRoleAsync(TenantIds.Platform, "Platform Administrator", ["organization.view", "platform.view"]);

@@ -151,22 +151,155 @@ public sealed class ConventionTests
         Assert.True(checked_ >= 3, "expected the session enums to be checked");
     }
 
+    /// <summary>
+    /// Database team review (2026-10-26, comment 5): every identifier is shorter than 62 characters (PostgreSQL truncates at 63;
+    /// the team keeps a margin). Owned types count: their table, keys and owner foreign key are real identifiers too.
+    /// </summary>
     [Fact]
-    public void No_database_identifier_exceeds_62_characters()
+    public void Every_database_identifier_is_shorter_than_62_characters()
     {
         var identifiers = new List<string>();
-        foreach (var entityType in TableTypes)
+        foreach (var entityType in Model.GetEntityTypes())
         {
             identifiers.Add(entityType.GetTableName()!);
             identifiers.AddRange(entityType.GetProperties().Select(property => property.GetColumnName()));
             identifiers.AddRange(entityType.GetKeys().Select(key => key.GetName() ?? string.Empty));
             identifiers.AddRange(entityType.GetIndexes().Select(index => index.GetDatabaseName() ?? string.Empty));
-            identifiers.AddRange(entityType.GetForeignKeys().Select(foreignKey => foreignKey.GetConstraintName() ?? string.Empty));
+            // an owned type stored in its owner's table (table splitting) has an ownership key that is never created in the database
+            identifiers.AddRange(entityType.GetForeignKeys()
+                .Where(foreignKey => !(foreignKey.IsOwnership && foreignKey.PrincipalEntityType.GetTableName() == entityType.GetTableName() && foreignKey.PrincipalEntityType.GetSchema() == entityType.GetSchema()))
+                .Select(foreignKey => foreignKey.GetConstraintName() ?? string.Empty));
             identifiers.AddRange(entityType.GetCheckConstraints().Select(constraint => constraint.Name ?? string.Empty));
         }
 
-        var tooLong = identifiers.Where(identifier => identifier.Length > 62).ToList();
-        Assert.True(tooLong.Count == 0, "Identifiers PostgreSQL would truncate: " + string.Join(", ", tooLong));
+        var tooLong = identifiers.Where(identifier => identifier.Length >= 62).Distinct().ToList();
+        Assert.True(tooLong.Count == 0, "Identifiers of 62 characters or more: " + string.Join(", ", tooLong));
+    }
+
+    /// <summary>Database team review (2026-10-26, comment 2): a string column of 1000 characters or more is <c>text</c>, never <c>varchar(n)</c>.</summary>
+    [Fact]
+    public void Long_text_columns_are_text_not_varchar()
+    {
+        var wrong = Model.GetEntityTypes()
+            .SelectMany(type => type.GetProperties().Select(property => (Type: type, Property: property)))
+            .Where(entry => entry.Property.ClrType == typeof(string) && entry.Property.GetMaxLength() >= AppDbContext.LongTextThreshold)
+            .Where(entry => !string.Equals(entry.Property.GetColumnType(), "text", StringComparison.Ordinal))
+            .Select(entry => $"{entry.Type.GetTableName()}.{entry.Property.GetColumnName()} ({entry.Property.GetColumnType()})")
+            .ToList();
+        Assert.True(wrong.Count == 0, "Long text columns that are not text: " + string.Join(", ", wrong));
+    }
+
+    /// <summary>
+    /// Database team review (2026-10-26, comment 3): every table of the model with a <c>tenant_id</c> column has the foreign key
+    /// <c>fk_&lt;table&gt;_tenant</c> (tenant_id) → <c>saas.tenants (id)</c>, ON DELETE RESTRICT; owned types stored in their own
+    /// table count, owned types sharing their owner's table use the owner's. A nullable tenant column keeps an optional key.
+    /// </summary>
+    [Fact]
+    public void Every_tenant_column_references_the_tenant_registry()
+    {
+        var registry = Model.FindEntityType(typeof(Platform.Domain.PlatformAdmin.Tenant))!;
+        var missing = new List<string>();
+        var checkedTables = 0;
+        foreach (var entityType in Model.GetEntityTypes().Where(type => type != registry && type.GetTableName() is not null))
+        {
+            var tenantId = entityType.FindProperty(nameof(ITenantScoped.TenantId));
+            if (tenantId is null || tenantId.GetColumnName() != "tenant_id"
+                || (entityType.FindOwnership() is { } ownership && ownership.PrincipalEntityType.GetTableName() == entityType.GetTableName() && ownership.PrincipalEntityType.GetSchema() == entityType.GetSchema()))
+            {
+                continue;
+            }
+
+            checkedTables++;
+            var table = entityType.GetTableName()!;
+            var foreignKey = entityType.GetForeignKeys().SingleOrDefault(key => key.PrincipalEntityType == registry && key.Properties.Count == 1 && key.Properties[0] == tenantId);
+            if (foreignKey is null)
+            {
+                missing.Add($"{entityType.GetSchema()}.{table}: no foreign key to saas.tenants");
+                continue;
+            }
+
+            if (foreignKey.GetConstraintName() != AppDbContext.TenantForeignKeyName(table) || foreignKey.DeleteBehavior != DeleteBehavior.Restrict)
+            {
+                missing.Add($"{entityType.GetSchema()}.{table}: {foreignKey.GetConstraintName()} ({foreignKey.DeleteBehavior})");
+            }
+
+            if (foreignKey.IsRequired == tenantId.IsNullable)
+            {
+                missing.Add($"{entityType.GetSchema()}.{table}: the key's optionality differs from the column's nullability");
+            }
+        }
+
+        Assert.True(missing.Count == 0, "Tenant columns without the registry foreign key: " + string.Join("; ", missing));
+        Assert.True(checkedTables >= 80, $"expected the tenant tables of the model, checked {checkedTables}");
+    }
+
+    /// <summary>
+    /// Database team review (2026-10-26, comment 4): a table with a NOT NULL <c>tenant_id</c> and an <c>id</c> is keyed
+    /// <c>(tenant_id, id)</c>, whether or not its entity is tenant-scoped (platform-side tables such as wallets, tickets and
+    /// machine credentials included). Tables with a nullable tenant keep <c>(id)</c>; natural tenant-first keys
+    /// (<c>reference_counters</c>, <c>tenant_settings</c>, <c>audit_trail</c>) have no <c>id</c>.
+    /// </summary>
+    [Fact]
+    public void Every_table_with_a_required_tenant_is_keyed_tenant_then_id()
+    {
+        var wrong = new List<string>();
+        foreach (var entityType in Model.GetEntityTypes().Where(type => type.GetTableName() is not null && type.FindPrimaryKey() is not null))
+        {
+            var tenantId = entityType.FindProperty(nameof(ITenantScoped.TenantId));
+            var id = entityType.FindProperty("Id");
+            if (tenantId is null || tenantId.IsNullable || id is null || entityType.ClrType == typeof(Platform.Domain.PlatformAdmin.Tenant)
+                || (entityType.FindOwnership() is { } ownership && ownership.PrincipalEntityType.GetTableName() == entityType.GetTableName() && ownership.PrincipalEntityType.GetSchema() == entityType.GetSchema()))
+            {
+                continue;
+            }
+
+            var key = entityType.FindPrimaryKey()!.Properties.Select(property => property.GetColumnName()).ToArray();
+            if (!key.SequenceEqual(["tenant_id", "id"]))
+            {
+                wrong.Add($"{entityType.GetSchema()}.{entityType.GetTableName()} ({string.Join(", ", key)})");
+            }
+        }
+
+        Assert.True(wrong.Count == 0, "Tables with a tenant whose key is not (tenant_id, id): " + string.Join("; ", wrong));
+    }
+
+    /// <summary>
+    /// Database team review (2026-10-26, comments 3–4): saas.tenants holds the platform tenant's row (kind Platform) as well as
+    /// the laboratories; the model filters it on kind Laboratory, so no reader of the model ever returns the platform row.
+    /// </summary>
+    [Fact]
+    public void The_tenant_registry_is_read_as_laboratories_only()
+    {
+        var registry = Model.FindEntityType(typeof(Platform.Domain.PlatformAdmin.Tenant))!;
+        var filter = registry.GetQueryFilter();
+        Assert.NotNull(filter);
+        var admits = (Func<Platform.Domain.PlatformAdmin.Tenant, bool>)filter.Compile();
+        Assert.True(admits(TenantOfKind(Platform.Domain.PlatformAdmin.TenantKind.Laboratory)));
+        Assert.False(admits(TenantOfKind(Platform.Domain.PlatformAdmin.TenantKind.Platform)));
+        Assert.Equal(ValueGenerated.Never, registry.FindPrimaryKey()!.Properties.Single().ValueGenerated);   // a generated key would be propagated into unset tenant ids
+        Assert.Contains(registry.GetCheckConstraints(), constraint => constraint.Name == "ck_tenants_kind_domain");
+    }
+
+    private static Platform.Domain.PlatformAdmin.Tenant TenantOfKind(Platform.Domain.PlatformAdmin.TenantKind kind)
+    {
+        var tenant = (Platform.Domain.PlatformAdmin.Tenant)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(Platform.Domain.PlatformAdmin.Tenant));
+        typeof(Platform.Domain.PlatformAdmin.Tenant).GetProperty(nameof(Platform.Domain.PlatformAdmin.Tenant.Kind))!.SetValue(tenant, kind);
+        return tenant;
+    }
+
+    /// <summary>Database team review (2026-10-26, comment 1): a column that holds an IP address is <c>inet</c>.</summary>
+    [Fact]
+    public void Ip_address_columns_are_inet()
+    {
+        var ipColumns = Model.GetEntityTypes()
+            .SelectMany(type => type.GetProperties().Select(property => (Type: type, Property: property)))
+            .Where(entry => System.Text.RegularExpressions.Regex.IsMatch(entry.Property.GetColumnName(), @"(^|_)ip(_|$)|ip_address"))
+            .ToList();
+        Assert.NotEmpty(ipColumns);
+        foreach (var (type, property) in ipColumns)
+        {
+            Assert.True(string.Equals(property.GetColumnType(), "inet", StringComparison.Ordinal), $"{type.GetTableName()}.{property.GetColumnName()} is {property.GetColumnType()}, not inet");
+        }
     }
 
     [Fact]
